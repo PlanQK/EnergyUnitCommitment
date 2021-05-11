@@ -1,0 +1,4 @@
+pypsa
+dwave-ocean-sdk
+xarray
+netcdf4
