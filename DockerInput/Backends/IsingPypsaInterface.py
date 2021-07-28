@@ -9,22 +9,25 @@ class IsingPypsaInterface:
         self._startIndex = OrderedDict()
         count = 0
         for i in range(len(network.buses)):
-            gen = network.generators[
-                network.generators.bus == network.buses.index[i]
-            ]
+            gen = network.generators[network.generators.bus == network.buses.index[i]]
             for name in gen.index:
                 if network.generators.committable[name]:
                     continue
                 self._startIndex[name] = count
                 count += len(self.snapshots)
+        for i in range(len(network.lines)):
         self.slackStart = count
         self.slackIndex = count
 
     def addInteraction(self, *args):
+        """Helper function to define an Ising Interaction.
+
+        Can take arbitrary number of arguments:
+        The last argument is the interaction strength.
+        The previous arguments contain the spin ids.
+        """
         if len(args) < 2:
-            raise ValueError(
-                "An interaction needs at least one spin id and a weight."
-            )
+            raise ValueError("An interaction needs at least one spin id and a weight.")
         for i in range(len(args) - 1):
             if not isinstance(args[i], int):
                 raise ValueError("The spin id needs to be an integer")
@@ -36,17 +39,28 @@ class IsingPypsaInterface:
             self.problem[key] = self.problem.get(key, 0) - args[-1]
 
     def toVecIndex(self, generator, time=0):
+        """Return the index for the supplied generator at t=0.
+        If the generator was not yet encountered, it creates a new
+        set of indices for the generator and each point in time.
+        """
         pos = self._startIndex.get(generator, None)
         if pos is None:
             return None
         return pos + time
 
     def addSlackVar(self):
+        """Return the index of a newly created slack variable.
+
+        IMPORTANT: This function can only be used after all
+        generators have been added and processed.
+        This should only happen in the init function.
+        """
         var = self.slackIndex
         self.slackIndex += 1
         return var
 
     def fromVecIndex(self, index):
+        """Return a tuple of generator key and time from a given Spin ID."""
         for key in self._startIndex:
             if index < self._startIndex[key] + len(self.snapshots):
                 break
@@ -55,9 +69,11 @@ class IsingPypsaInterface:
         return (key, index % len(self.snapshots))
 
     def siquanFormat(self):
+        """Return the complete problem in the format for the siquan solver"""
         return [(v, list(k)) for k, v in self.problem.items()]
 
     def numVariables(self):
+        """Return the number of spins."""
         return self.slackIndex
 
     @classmethod
@@ -69,9 +85,12 @@ class IsingPypsaInterface:
         minUpDownFactor,
         useKirchoffInequality=True,
     ):
+        """Build the complete cost function for an Ising formulation.
+        The cost function is quite complex and I recommend first reading
+        through the mathematical formulation.
+        """
         problemDict = cls(network, network.snapshots)
 
-        # TODO these still need to be adjusted
         lambdaMinUp = minUpDownFactor  # for Tminup constraint
         lambdaMinDown = minUpDownFactor  # for Tmindown constraint
         for gen in problemDict._startIndex:
@@ -79,11 +98,11 @@ class IsingPypsaInterface:
                 # operating cost contribution
                 index = problemDict.toVecIndex(gen, t)
                 val = network.generators["marginal_cost"].loc[gen] * (
-                    network.generators_t["p"].iloc[t].loc[gen]
+                    cls.getGeneratorOutput(network, gen, t)
                 )
                 problemDict.addInteraction(index, monetaryCostFactor * val)
 
-                # startup and shutdown costs
+                # startup and shutdown costs, minup and mindown time
                 su = network.generators["start_up_cost"].loc[gen]
                 sd = network.generators["shut_down_cost"].loc[gen]
 
@@ -122,9 +141,7 @@ class IsingPypsaInterface:
                         -lambdaMinUp * Tminup + lambdaMinDown * Tmindown,
                     )
                     for deltaT in range(Tminup):
-                        problemDict.addInteraction(
-                            index + deltaT + 1, -lambdaMinUp
-                        )
+                        problemDict.addInteraction(index + deltaT + 1, -lambdaMinUp)
                         problemDict.addInteraction(
                             index, index + deltaT + 1, -lambdaMinUp
                         )
@@ -136,9 +153,7 @@ class IsingPypsaInterface:
                         )
 
                     for deltaT in range(Tmindown):
-                        problemDict.addInteraction(
-                            index + deltaT + 1, lambdaMinDown
-                        )
+                        problemDict.addInteraction(index + deltaT + 1, lambdaMinDown)
                         problemDict.addInteraction(
                             index - 1, index + deltaT + 1, lambdaMinDown
                         )
@@ -164,10 +179,20 @@ class IsingPypsaInterface:
 
     @staticmethod
     def getGeneratorOutput(network, gen, time):
+        """Return the generator output for a given point in time.
+
+        Two values can be used from the Pypsa datamodel:
+            - p: The output of the LOPF optimization. This is not good, because
+                after LOPF we will already have an optimized solution.
+            - p_nom*p_max_pu: this does not need another optimization. The following
+                parameters must be set:
+                p_nom: the maximal output
+                p_max_pu: a time dependent factor how much power can be output
+                    (usually only set for renewables)
+        """
         factor = 1.0
         if gen in network.generators_t.p_max_pu:
             factor = network.generators_t.p_max_pu[gen].iloc[time]
-        # return np.round(factor*network.generators.p_nom[gen])
         return factor * network.generators.p_nom[gen]
 
     @staticmethod
@@ -175,9 +200,7 @@ class IsingPypsaInterface:
         # the helper c_nt calculation
         c_nt = 0.0
         # storage
-        for i in network.storage_units[
-            network.storage_units.bus == node
-        ].index:
+        for i in network.storage_units[network.storage_units.bus == node].index:
             c_nt += network.storage_units_t.p[i].iloc[t]
         # lines
         for i in network.lines[network.lines.bus0 == node].index:
@@ -200,9 +223,7 @@ class IsingPypsaInterface:
             for t in range(len(problemDict.snapshots)):
                 c_nt = IsingPypsaInterface.generateConstant(network, node, t)
                 # the kirchoff contributions start here
-                for gen0 in network.generators[
-                    network.generators.bus == node
-                ].index:
+                for gen0 in network.generators[network.generators.bus == node].index:
                     index = problemDict.toVecIndex(gen0, t)
                     if index is None:
                         continue
@@ -212,22 +233,16 @@ class IsingPypsaInterface:
                     ].index:
                         index1 = problemDict.toVecIndex(gen1, t)
                         if index1 is None:
-                            # val = getGeneratorOutput(network, gen0, t) * getGeneratorOutput(network, gen1, t)
-                            val = (
-                                network.generators_t.p.iloc[t].loc[gen0]
-                                * network.generators_t.p.iloc[t].loc[gen1]
-                            )
-                            problemDict.addInteraction(
-                                index, 0.5 * lambda2 * val
-                            )
+                            val = IsingPypsaInterface.getGeneratorOutput(
+                                network, gen0, t
+                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
+                            problemDict.addInteraction(index, 0.5 * lambda2 * val)
                         elif index == index1:
                             continue
                         else:
-                            # val = getGeneratorOutput(network, gen0, t) * getGeneratorOutput(network, gen1, t)
-                            val = (
-                                network.generators_t.p.iloc[t].loc[gen0]
-                                * network.generators_t.p.iloc[t].loc[gen1]
-                            )
+                            val = IsingPypsaInterface.getGeneratorOutput(
+                                network, gen0, t
+                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
                             problemDict.addInteraction(
                                 index, index1, 1.0 / 4 * lambda2 * val
                             )
@@ -236,11 +251,14 @@ class IsingPypsaInterface:
                     for gen1 in network.generators[
                         network.generators.bus == node
                     ].index:
-                        nodePower += network.generators_t.p.iloc[t].loc[gen1]
+                        nodePower += IsingPypsaInterface.getGeneratorOutput(
+                            network, gen1, t
+                        )
                     val = (
                         c_nt + 0.5 * nodePower
-                    ) * network.generators_t.p.iloc[t].loc[gen0]
+                    ) * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
                     problemDict.addInteraction(index, lambda2 * val)
+
 
     @staticmethod
     def _kirchoffInequalityConstraint(network, problemDict, lambda2):
@@ -250,10 +268,11 @@ class IsingPypsaInterface:
         """
         for node in network.buses.index:
             for t in range(len(problemDict.snapshots)):
+
+
+                # slack Variables for inequality
                 maxPossible = 0
-                for gen in network.generators[
-                    network.generators.bus == node
-                ].index:
+                for gen in network.generators[network.generators.bus == node].index:
                     maxPossible += IsingPypsaInterface.getGeneratorOutput(
                         network, gen, t
                     )
@@ -278,9 +297,7 @@ class IsingPypsaInterface:
                         * (0.5 * totalBinarySum - c_nt - 0.5 * maxPossible)
                         * 2 ** i,
                     )
-                for gen0 in network.generators[
-                    network.generators.bus == node
-                ].index:
+                for gen0 in network.generators[network.generators.bus == node].index:
                     index = problemDict.toVecIndex(gen0, t)
                     if index is None:
                         continue
@@ -292,42 +309,30 @@ class IsingPypsaInterface:
                         if index1 is None:
                             val = IsingPypsaInterface.getGeneratorOutput(
                                 network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(
-                                network, gen1, t
-                            )
-                            problemDict.addInteraction(
-                                index, 0.5 * lambda2 * val
-                            )
+                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
+                            problemDict.addInteraction(index, 0.5 * lambda2 * val)
                         elif index == index1:
                             continue
                         else:
                             val = IsingPypsaInterface.getGeneratorOutput(
                                 network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(
-                                network, gen1, t
-                            )
+                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
                             problemDict.addInteraction(
                                 index, index1, 1.0 / 4 * lambda2 * val
                             )
                     # c_nt sum + total generator sum
                     val = (
                         c_nt + 0.5 * maxPossible - 0.5 * totalBinarySum
-                    ) * IsingPypsaInterface.getGeneratorOutput(
-                        network, gen0, t
-                    )
+                    ) * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
                     problemDict.addInteraction(index, lambda2 * val)
                     # mixed slack+generator terms
                     for i in range(lenbinary):
                         val = (
                             -0.5
                             * 2 ** i
-                            * IsingPypsaInterface.getGeneratorOutput(
-                                network, gen0, t
-                            )
+                            * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
                         )
-                        problemDict.addInteraction(
-                            index, curSlack + i, lambda2 * val
-                        )
+                        problemDict.addInteraction(index, curSlack + i, lambda2 * val)
 
     @staticmethod
     def addSQASolutionToNetwork(network, problemDict, solutionState):
@@ -336,9 +341,7 @@ class IsingPypsaInterface:
             network.generators_t.status[gen] = np.concatenate(
                 [
                     vec,
-                    np.ones(
-                        len(network.snapshots) - len(problemDict.snapshots)
-                    ),
+                    np.ones(len(network.snapshots) - len(problemDict.snapshots)),
                 ]
             )
         vec = np.zeros(len(problemDict.snapshots))
@@ -352,9 +355,7 @@ class IsingPypsaInterface:
                 network.generators_t.status[gen] = np.concatenate(
                     [
                         vec,
-                        np.ones(
-                            len(network.snapshots) - len(problemDict.snapshots)
-                        ),
+                        np.ones(len(network.snapshots) - len(problemDict.snapshots)),
                     ]
                 )
                 vec = np.zeros(len(problemDict.snapshots))
