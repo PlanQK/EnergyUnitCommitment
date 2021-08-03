@@ -17,9 +17,6 @@ class ClassicalBackend(BackendBase):
         envMgr = EnvironmentVariableManager()
         return IsingPypsaInterface.buildCostFunction(
             network,
-            float(envMgr["monetaryCostFactor"]),
-            float(envMgr["kirchoffFactor"]),
-            float(envMgr["minUpDownFactor"]),
         )
 
     @staticmethod
@@ -36,6 +33,9 @@ class ClassicalBackend(BackendBase):
         self.solver.setTSchedule(envMgr["temperatureSchedule"])
         self.solver.setTrotterSlices(1)
         self.solver.setSteps(int(envMgr["optimizationCycles"]))
+        print(transformedProblem.numVariables())
+        print(transformedProblem.problem)
+        print(transformedProblem.siquanFormat())
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),

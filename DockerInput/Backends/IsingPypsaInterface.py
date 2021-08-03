@@ -1,22 +1,51 @@
 from collections import OrderedDict
 import numpy as np
+from EnvironmentVariableManager import EnvironmentVariableManager
+import typing
 
 
 class IsingPypsaInterface:
     def __init__(self, network, snapshots):
         self.problem = {}
         self.snapshots = snapshots
-        self._startIndex = OrderedDict()
+        self._startIndex = {}
+
+        envMgr = EnvironmentVariableManager()
+        self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
+        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
+        self.minUpDownFactor = float(envMgr["minUpDownFactor"])
+        self.slackVarFactor = float(envMgr["slackVarFactor"])
+        self.network = network
         count = 0
         for i in range(len(network.buses)):
-            gen = network.generators[network.generators.bus == network.buses.index[i]]
+            gen = network.generators[
+                network.generators.bus == network.buses.index[i]
+            ]
             for name in gen.index:
                 if network.generators.committable[name]:
                     continue
                 self._startIndex[name] = count
                 count += len(self.snapshots)
-        for i in range(len(network.lines)):
-        self.slackStart = count
+
+        # this allows to optimize the flow through lines
+        # requires a binary representation of the number
+        # and an additional variable for the sign
+        self._lineIndices = {}
+        self._lineDirection = {}
+
+        for index in network.lines.index:
+            # store the directional qubits first, then the line's binary representations
+            self._lineDirection[index] = count
+            self._lineIndices[index] = count + len(self.snapshots)
+            count += len(self.snapshots * (self.getBinaryLength(index) + 1))
+
+        # to avoid cubic or quartic contributions we add slack variables that
+        # store the product of the binary bit and the sign
+        self._slackVarsForQubo = {}
+        self._slackStart = count
+        for index in network.lines.index:
+            self._slackVarsForQubo[index] = count
+            count += len(self.snapshots) * self.getBinaryLength(index)
         self.slackIndex = count
 
     def addInteraction(self, *args):
@@ -27,15 +56,19 @@ class IsingPypsaInterface:
         The previous arguments contain the spin ids.
         """
         if len(args) < 2:
-            raise ValueError("An interaction needs at least one spin id and a weight.")
+            raise ValueError(
+                "An interaction needs at least one spin id and a weight."
+            )
         for i in range(len(args) - 1):
             if not isinstance(args[i], int):
+                print(args)
                 raise ValueError("The spin id needs to be an integer")
         if not isinstance(args[-1], float):
             raise ValueError("The interaction needs to be a float")
         if args[-1] != 0:
             key = tuple(sorted(args[:-1]))
-            # the minus is necessary because the solver has an additional -1 factor in the couplings
+            # the minus is necessary because the solver has an additional
+            # -1 factor in the couplings
             self.problem[key] = self.problem.get(key, 0) - args[-1]
 
     def toVecIndex(self, generator, time=0):
@@ -47,6 +80,24 @@ class IsingPypsaInterface:
         if pos is None:
             return None
         return pos + time
+
+    def getBinaryLength(self, line):
+        return len(
+            "{0:b}".format(int(np.round(self.network.lines.loc[line].s_nom)))
+        )
+
+    def lineToIndex(self, lineId, time=0):
+        return self._lineIndices[lineId] + time * self.getBinaryLength(lineId)
+
+    def lineDirectionToIndex(self, lineId, time=0):
+        return self._lineDirection[lineId] + time * self.getBinaryLength(
+            lineId
+        )
+
+    def lineSlackToIndex(self, lineId, time=0):
+        return self._slackVarsForQubo[lineId] + time * len(
+            self.network.snapshots
+        )
 
     def addSlackVar(self):
         """Return the index of a newly created slack variable.
@@ -64,7 +115,7 @@ class IsingPypsaInterface:
         for key in self._startIndex:
             if index < self._startIndex[key] + len(self.snapshots):
                 break
-        if self.slackStart <= index:
+        if self._slackStart <= index:
             raise ValueError("No Generator assigned to this index")
         return (key, index % len(self.snapshots))
 
@@ -80,105 +131,108 @@ class IsingPypsaInterface:
     def buildCostFunction(
         cls,
         network,
-        monetaryCostFactor,
-        kirchoffFactor,
-        minUpDownFactor,
-        useKirchoffInequality=True,
     ):
         """Build the complete cost function for an Ising formulation.
         The cost function is quite complex and I recommend first reading
         through the mathematical formulation.
         """
         problemDict = cls(network, network.snapshots)
+        problemDict._marginalCosts()
 
-        lambdaMinUp = minUpDownFactor  # for Tminup constraint
-        lambdaMinDown = minUpDownFactor  # for Tmindown constraint
         for gen in problemDict._startIndex:
             for t in range(len(problemDict.snapshots)):
-                # operating cost contribution
-                index = problemDict.toVecIndex(gen, t)
-                val = network.generators["marginal_cost"].loc[gen] * (
-                    cls.getGeneratorOutput(network, gen, t)
-                )
-                problemDict.addInteraction(index, monetaryCostFactor * val)
+                problemDict._startupShutdownCost(gen, t)
 
-                # startup and shutdown costs, minup and mindown time
-                su = network.generators["start_up_cost"].loc[gen]
-                sd = network.generators["shut_down_cost"].loc[gen]
+        # kirchhoff constraints
+        for node in problemDict.network.buses.index:
+            for t in range(len(problemDict.snapshots)):
+                problemDict._kirchhoffConstraint(node, t)
 
-                Tmindown = min(
-                    len(problemDict.snapshots) - t - 1,
-                    network.generators["min_down_time"].loc[gen],
-                )
-                Tminup = min(
-                    len(problemDict.snapshots) - t - 1,
-                    network.generators["min_up_time"].loc[gen],
-                )
-
-                if t == 0:
-                    problemDict.addInteraction(
-                        index, 0.5 * monetaryCostFactor * (sd - su)
-                    )
-
-                elif t == len(problemDict.snapshots) - 1:
-                    problemDict.addInteraction(
-                        index, 0.5 * monetaryCostFactor * (su - sd)
-                    )
-
-                else:
-                    problemDict.addInteraction(
-                        index,
-                        index - 1,
-                        -0.5 * monetaryCostFactor * (su + sd)
-                        - lambdaMinUp * Tminup
-                        - lambdaMinDown * Tmindown,
-                    )
-                    problemDict.addInteraction(
-                        index, lambdaMinUp * Tminup - lambdaMinDown * Tmindown
-                    )
-                    problemDict.addInteraction(
-                        index - 1,
-                        -lambdaMinUp * Tminup + lambdaMinDown * Tmindown,
-                    )
-                    for deltaT in range(Tminup):
-                        problemDict.addInteraction(index + deltaT + 1, -lambdaMinUp)
-                        problemDict.addInteraction(
-                            index, index + deltaT + 1, -lambdaMinUp
-                        )
-                        problemDict.addInteraction(
-                            index - 1, index + deltaT + 1, lambdaMinUp
-                        )
-                        problemDict.addInteraction(
-                            index, index - 1, index + deltaT + 1, lambdaMinUp
-                        )
-
-                    for deltaT in range(Tmindown):
-                        problemDict.addInteraction(index + deltaT + 1, lambdaMinDown)
-                        problemDict.addInteraction(
-                            index - 1, index + deltaT + 1, lambdaMinDown
-                        )
-                        problemDict.addInteraction(
-                            index, index + deltaT + 1, -lambdaMinDown
-                        )
-                        problemDict.addInteraction(
-                            index,
-                            index - 1,
-                            index + deltaT + 1,
-                            -lambdaMinDown,
-                        )
-
-        if useKirchoffInequality:
-            IsingPypsaInterface._kirchoffInequalityConstraint(
-                network, problemDict, kirchoffFactor
-            )
-        else:
-            IsingPypsaInterface._kirchhoffEqualityConstraint(
-                network, problemDict, kirchoffFactor
-            )
+        problemDict._addSlackConstraints()
         return problemDict
 
-    @staticmethod
-    def getGeneratorOutput(network, gen, time):
+    def _marginalCosts(self):
+        for index in self.network.lines.index:
+            for t in range(len(self.snapshots)):
+                lenbinary = self.getBinaryLength(index)
+                for i in range(lenbinary):
+                    self.addInteraction(
+                        self._lineIndices[index] + i + lenbinary * t,
+                        0.5 * self.monetaryCostFactor * 2 ** i,
+                    )
+
+        for gen in self._startIndex:
+            for t in range(len(self.snapshots)):
+                # operating cost contribution
+                index = self.toVecIndex(gen, t)
+                val = self.network.generators["marginal_cost"].loc[gen] * (
+                    self.getGeneratorOutput(gen, t)
+                )
+                self.addInteraction(index, self.monetaryCostFactor * val)
+
+    def _startupShutdownCost(self, gen, t):
+        lambdaMinUp = self.minUpDownFactor  # for Tminup constraint
+        lambdaMinDown = self.minUpDownFactor  # for Tmindown constraint
+        index = self.toVecIndex(gen, t)
+        su = self.network.generators["start_up_cost"].loc[gen]
+        sd = self.network.generators["shut_down_cost"].loc[gen]
+
+        Tmindown = min(
+            len(self.snapshots) - t - 1,
+            self.network.generators["min_down_time"].loc[gen],
+        )
+        Tminup = min(
+            len(self.snapshots) - t - 1,
+            self.network.generators["min_up_time"].loc[gen],
+        )
+
+        if t == 0:
+            self.addInteraction(
+                index, 0.5 * self.monetaryCostFactor * (sd - su)
+            )
+
+        elif t == len(self.snapshots) - 1:
+            self.addInteraction(
+                index, 0.5 * self.monetaryCostFactor * (su - sd)
+            )
+
+        else:
+            self.addInteraction(
+                index,
+                index - 1,
+                -0.5 * self.monetaryCostFactor * (su + sd)
+                - lambdaMinUp * Tminup
+                - lambdaMinDown * Tmindown,
+            )
+            self.addInteraction(
+                index, lambdaMinUp * Tminup - lambdaMinDown * Tmindown
+            )
+            self.addInteraction(
+                index - 1,
+                -lambdaMinUp * Tminup + lambdaMinDown * Tmindown,
+            )
+            for deltaT in range(Tminup):
+                self.addInteraction(index + deltaT + 1, -lambdaMinUp)
+                self.addInteraction(index, index + deltaT + 1, -lambdaMinUp)
+                self.addInteraction(index - 1, index + deltaT + 1, lambdaMinUp)
+                self.addInteraction(
+                    index, index - 1, index + deltaT + 1, lambdaMinUp
+                )
+
+            for deltaT in range(Tmindown):
+                self.addInteraction(index + deltaT + 1, lambdaMinDown)
+                self.addInteraction(
+                    index - 1, index + deltaT + 1, lambdaMinDown
+                )
+                self.addInteraction(index, index + deltaT + 1, -lambdaMinDown)
+                self.addInteraction(
+                    index,
+                    index - 1,
+                    index + deltaT + 1,
+                    -lambdaMinDown,
+                )
+
+    def getGeneratorOutput(self, gen, time):
         """Return the generator output for a given point in time.
 
         Two values can be used from the Pypsa datamodel:
@@ -191,148 +245,262 @@ class IsingPypsaInterface:
                     (usually only set for renewables)
         """
         factor = 1.0
-        if gen in network.generators_t.p_max_pu:
-            factor = network.generators_t.p_max_pu[gen].iloc[time]
-        return factor * network.generators.p_nom[gen]
+        if gen in self.network.generators_t.p_max_pu:
+            factor = self.network.generators_t.p_max_pu[gen].iloc[time]
+        return factor * self.network.generators.p_nom[gen]
 
-    @staticmethod
-    def generateConstant(network, node, t):
+    def getMaxLineEnergy(self, line):
+        """Return the maximum value of energy a line can transport.
+
+        Currently we round this to the next highest power of 2
+        """
+        return 2 ** self.getBinaryLength(line) - 1
+
+    def maxGenPossible(self, node, t):
+        maxPossible = 0
+        for gen in self.network.generators[
+            self.network.generators.bus == node
+        ].index:
+            maxPossible += self.getGeneratorOutput(gen, t)
+        return maxPossible
+
+    def totalLineCapacity(self, node):
+        totalLineCapacity = 0.0
+        lineIdsFactor = self.getLineFactors(node)
+        for lineId1, _ in lineIdsFactor.items():
+            totalLineCapacity += self.getMaxLineEnergy(lineId1)
+        return totalLineCapacity
+
+    def generateConstant(self, node, t):
         # the helper c_nt calculation
         c_nt = 0.0
         # storage
-        for i in network.storage_units[network.storage_units.bus == node].index:
-            c_nt += network.storage_units_t.p[i].iloc[t]
-        # lines
-        for i in network.lines[network.lines.bus0 == node].index:
-            c_nt -= network.lines_t.p0[i].iloc[t]
-        for i in network.lines[network.lines.bus1 == node].index:
-            c_nt -= network.lines_t.p1[i].iloc[t]
+        for i in self.network.storage_units[
+            self.network.storage_units.bus == node
+        ].index:
+            c_nt += self.network.storage_units_t.p[i].iloc[t]
         # loads contribution
-        for load in network.loads[network.loads.bus == node].index:
-            c_nt -= network.loads_t.p_set[load].iloc[t]
+        for load in self.network.loads[self.network.loads.bus == node].index:
+            c_nt -= self.network.loads_t.p_set[load].iloc[t]
         return c_nt
 
-    @staticmethod
-    def _kirchoffEqualityConstraint(network, problemDict, lambda2):
-        """
-        This constraint implements the equality as a constraint.
-        It requires less overhead but forces the solution to a trivial 1 state.
-        """
-        # kirchhoff constraint (sums over s)
-        for node in network.buses.index:
-            for t in range(len(problemDict.snapshots)):
-                c_nt = IsingPypsaInterface.generateConstant(network, node, t)
-                # the kirchoff contributions start here
-                for gen0 in network.generators[network.generators.bus == node].index:
-                    index = problemDict.toVecIndex(gen0, t)
-                    if index is None:
-                        continue
-                    # quadratic sum
-                    for gen1 in network.generators[
-                        network.generators.bus == node
-                    ].index:
-                        index1 = problemDict.toVecIndex(gen1, t)
-                        if index1 is None:
-                            val = IsingPypsaInterface.getGeneratorOutput(
-                                network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
-                            problemDict.addInteraction(index, 0.5 * lambda2 * val)
-                        elif index == index1:
-                            continue
-                        else:
-                            val = IsingPypsaInterface.getGeneratorOutput(
-                                network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
-                            problemDict.addInteraction(
-                                index, index1, 1.0 / 4 * lambda2 * val
-                            )
-                    # c_nt sum
-                    nodePower = 0
-                    for gen1 in network.generators[
-                        network.generators.bus == node
-                    ].index:
-                        nodePower += IsingPypsaInterface.getGeneratorOutput(
-                            network, gen1, t
-                        )
-                    val = (
-                        c_nt + 0.5 * nodePower
-                    ) * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
-                    problemDict.addInteraction(index, lambda2 * val)
+    def getLineFactors(self, node) -> typing.Dict[str, int]:
+        lineIdsFactor = {}
+        for lineId in self.network.lines[
+            self.network.lines.bus0 == node
+        ].index:
+            lineIdsFactor[lineId] = 1
+        for lineId in self.network.lines[
+            self.network.lines.bus1 == node
+        ].index:
+            lineIdsFactor[lineId] = -1
+        return lineIdsFactor
 
-
-    @staticmethod
-    def _kirchoffInequalityConstraint(network, problemDict, lambda2):
-        """This implements a less or equal version of the kirchoff constraint using slack variables.
-        It allows the optimization to end in configurations that have more energy than required. The
-        fine-tuning is left for the powerflow optimization.
-        """
-        for node in network.buses.index:
-            for t in range(len(problemDict.snapshots)):
-
-
-                # slack Variables for inequality
-                maxPossible = 0
-                for gen in network.generators[network.generators.bus == node].index:
-                    maxPossible += IsingPypsaInterface.getGeneratorOutput(
-                        network, gen, t
+    def _quadraticGeneratorTerm(self, node, t):
+        """This term is the quadratic contribution for the Kirchhoff constraint."""
+        for gen0 in self.network.generators[
+            self.network.generators.bus == node
+        ].index:
+            index = self.toVecIndex(gen0, t)
+            if index is None:
+                continue
+            # generator^2 term
+            for gen1 in self.network.generators[
+                self.network.generators.bus == node
+            ].index:
+                index1 = self.toVecIndex(gen1, t)
+                if index1 is None:
+                    # this branch is for non-committable generators
+                    # in our problems these should not appear
+                    val = self.getGeneratorOutput(
+                        gen0, t
+                    ) * self.getGeneratorOutput(gen1, t)
+                    self.addInteraction(
+                        index, 0.5 * self.kirchhoffFactor * val
                     )
-                lenbinary = len("{0:b}".format(int(np.round(maxPossible))))
-                totalBinarySum = 2 ** lenbinary - 1
-                c_nt = IsingPypsaInterface.generateConstant(network, node, t)
-                curSlack = problemDict.slackIndex
-
-                for i in range(lenbinary):
-                    problemDict.addSlackVar()
-                    for j in range(lenbinary):
-                        if j == i:
-                            continue
-                        problemDict.addInteraction(
-                            curSlack + i,
-                            curSlack + j,
-                            lambda2 * (1.0 / 4 * 2 ** i * 2 ** j),
-                        )
-                    problemDict.addInteraction(
-                        curSlack + i,
-                        lambda2
-                        * (0.5 * totalBinarySum - c_nt - 0.5 * maxPossible)
-                        * 2 ** i,
+                elif index == index1:
+                    # a squared variable does not affect the optimization problem
+                    # we can therefore ignore it
+                    continue
+                else:
+                    val = self.getGeneratorOutput(
+                        gen0, t
+                    ) * self.getGeneratorOutput(gen1, t)
+                    self.addInteraction(
+                        index, index1, 1.0 / 4 * self.kirchhoffFactor * val
                     )
-                for gen0 in network.generators[network.generators.bus == node].index:
-                    index = problemDict.toVecIndex(gen0, t)
-                    if index is None:
-                        continue
-                    # quadratic sum
-                    for gen1 in network.generators[
-                        network.generators.bus == node
-                    ].index:
-                        index1 = problemDict.toVecIndex(gen1, t)
-                        if index1 is None:
-                            val = IsingPypsaInterface.getGeneratorOutput(
-                                network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
-                            problemDict.addInteraction(index, 0.5 * lambda2 * val)
-                        elif index == index1:
-                            continue
-                        else:
-                            val = IsingPypsaInterface.getGeneratorOutput(
-                                network, gen0, t
-                            ) * IsingPypsaInterface.getGeneratorOutput(network, gen1, t)
-                            problemDict.addInteraction(
-                                index, index1, 1.0 / 4 * lambda2 * val
-                            )
-                    # c_nt sum + total generator sum
-                    val = (
-                        c_nt + 0.5 * maxPossible - 0.5 * totalBinarySum
-                    ) * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
-                    problemDict.addInteraction(index, lambda2 * val)
-                    # mixed slack+generator terms
-                    for i in range(lenbinary):
-                        val = (
-                            -0.5
+
+    def _quadraticLineTerms(self, node, t):
+        """This term is the quadratic contribution of the slack variables (lines)
+        for the kirchhoff constraint.
+        """
+        lineIdsFactor = self.getLineFactors(node)
+        for lineId1, factor1 in lineIdsFactor.items():
+            lenbinary = self.getBinaryLength(lineId1)
+            for i in range(lenbinary):
+                for lineId2, factor2 in lineIdsFactor.items():
+                    # cross term between total line sum and individual line
+                    lenbinary2 = self.getBinaryLength(lineId2)
+                    for j in range(lenbinary2):
+                        self.addInteraction(
+                            self.lineToIndex(lineId1, t) + i,
+                            self.lineToIndex(lineId2, t) + j,
+                            self.kirchhoffFactor
+                            / 16.0
                             * 2 ** i
-                            * IsingPypsaInterface.getGeneratorOutput(network, gen0, t)
+                            * 2 ** j
+                            * factor1
+                            * factor2,
                         )
-                        problemDict.addInteraction(index, curSlack + i, lambda2 * val)
+                        # slack vars make up the second quadratic sum
+                        self.addInteraction(
+                            self.lineSlackToIndex(lineId1, t) + i,
+                            self.lineSlackToIndex(lineId2, t) + j,
+                            self.kirchhoffFactor
+                            / 16.0
+                            * 2 ** i
+                            * 2 ** j
+                            * factor1
+                            * factor2,
+                        )
+                        # add the crossterm between line slack vars and line vars
+                        # because the same loops are needed
+                        self.addInteraction(
+                            self.lineToIndex(lineId1, t) + i,
+                            self.lineSlackToIndex(lineId2, t) + j,
+                            self.kirchhoffFactor
+                            / 16.0
+                            * 2 ** i
+                            * 2 ** j
+                            * factor1
+                            * factor2,
+                        )
+
+    def _linearGeneratorTerm(self, node, t):
+        maxGenPossible = self.maxGenPossible(node, t)
+        maxLineCapacity = self.totalLineCapacity(node)
+        c_nt = self.generateConstant(node, t)
+        for gen0 in self.network.generators[
+            self.network.generators.bus == node
+        ].index:
+            index = self.toVecIndex(gen0, t)
+            if index is None:
+                continue
+            self.addInteraction(
+                index,
+                self.kirchhoffFactor
+                * (0.5 * maxGenPossible - 0.5 * maxLineCapacity + c_nt)
+                * self.getGeneratorOutput(gen0, t),
+            )
+
+    def _linearLineTerms(self, node, t):
+        maxGenPossible = self.maxGenPossible(node, t)
+        maxLineCapacity = self.totalLineCapacity(node)
+        c_nt = self.generateConstant(node, t)
+        lineIdsFactor = self.getLineFactors(node)
+        for lineId1, factor1 in lineIdsFactor.items():
+            lenbinary = self.getBinaryLength(lineId1)
+            for i in range(lenbinary):
+                self.addInteraction(
+                    self.lineSlackToIndex(lineId1, t) + i,
+                    self.kirchhoffFactor
+                    * (
+                        9 / 16.0 * maxLineCapacity
+                        - 0.25 * c_nt
+                        - 0.25 * maxGenPossible
+                    )
+                    * factor1
+                    * 2 ** i,
+                )
+                self.addInteraction(
+                    self.lineToIndex(lineId1, t) + i,
+                    self.kirchhoffFactor
+                    * (
+                        9 / 16.0 * maxLineCapacity
+                        - 0.25 * c_nt
+                        - 0.25 * maxGenPossible
+                    )
+                    * factor1
+                    * 2 ** i,
+                )
+
+    def _crossTermGeneratorLine(self, node, t):
+        lineIdsFactor = self.getLineFactors(node)
+        for gen0 in self.network.generators[
+            self.network.generators.bus == node
+        ].index:
+            index = self.toVecIndex(gen0, t)
+            for lineId1, factor1 in lineIdsFactor.items():
+                lenbinary = self.getBinaryLength(lineId1)
+                for i in range(lenbinary):
+                    val = (
+                        self.kirchhoffFactor
+                        / 4.0
+                        * self.getGeneratorOutput(gen0, t)
+                        * factor1
+                        * 2 ** i
+                    )
+                    if index is None:
+                        self.addInteraction(
+                            self.lineToIndex(lineId1, t) + i,
+                            val,
+                        )
+                        self.addInteraction(
+                            self.lineSlackToIndex(lineId1, t) + i,
+                            val,
+                        )
+                    else:
+                        self.addInteraction(
+                            index,
+                            self.lineToIndex(lineId1, t) + i,
+                            val,
+                        )
+                        self.addInteraction(
+                            index,
+                            self.lineSlackToIndex(lineId1, t) + i,
+                            val,
+                        )
+
+    def _addSlackConstraints(self):
+        for index in self.network.lines.index:
+            lenbinary = self.getBinaryLength(index)
+            for t in range(len(self.network.snapshots)):
+                for i in range(lenbinary):
+                    self.addInteraction(
+                        self.lineToIndex(index, t) + i,
+                        -self.slackVarFactor,
+                    )
+                    self.addInteraction(
+                        self.lineDirectionToIndex(index, t),
+                        -self.slackVarFactor,
+                    )
+                    self.addInteraction(
+                        self.lineSlackToIndex(index, t) + i,
+                        2 * self.slackVarFactor,
+                    )
+                    self.addInteraction(
+                        self.lineToIndex(index, t) + i,
+                        self.lineDirectionToIndex(index, t),
+                        self.slackVarFactor,
+                    )
+                    self.addInteraction(
+                        self.lineToIndex(index, t) + i,
+                        self.lineSlackToIndex(index, t) + i,
+                        -2 * self.slackVarFactor,
+                    )
+                    self.addInteraction(
+                        self.lineDirectionToIndex(index, t),
+                        self.lineSlackToIndex(index, t)
+                        + i
+                        - 2 * self.slackVarFactor,
+                    )
+
+    def _kirchhoffConstraint(self, node, t):
+        self._quadraticGeneratorTerm(node, t)
+        self._quadraticLineTerms(node, t)
+        self._linearGeneratorTerm(node, t)
+        self._linearLineTerms(node, t)
+        self._crossTermGeneratorLine(node, t)
 
     @staticmethod
     def addSQASolutionToNetwork(network, problemDict, solutionState):
@@ -341,7 +509,9 @@ class IsingPypsaInterface:
             network.generators_t.status[gen] = np.concatenate(
                 [
                     vec,
-                    np.ones(len(network.snapshots) - len(problemDict.snapshots)),
+                    np.ones(
+                        len(network.snapshots) - len(problemDict.snapshots)
+                    ),
                 ]
             )
         vec = np.zeros(len(problemDict.snapshots))
@@ -355,7 +525,9 @@ class IsingPypsaInterface:
                 network.generators_t.status[gen] = np.concatenate(
                     [
                         vec,
-                        np.ones(len(network.snapshots) - len(problemDict.snapshots)),
+                        np.ones(
+                            len(network.snapshots) - len(problemDict.snapshots)
+                        ),
                     ]
                 )
                 vec = np.zeros(len(problemDict.snapshots))

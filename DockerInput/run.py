@@ -16,12 +16,13 @@ DEFAULT_ENV_VARIABLES = {
     "optimizationCycles": 1000,
     "temperatureSchedule": "[10,iF,0.001]",
     "transverseFieldSchedule": "[10,0]",
-    "monetaryCostFactor": 0.7,
-    "kirchoffFactor": 1,
+    "monetaryCostFactor": 0.0,
+    "kirchhoffFactor": 1.0,
+    "slackVarFactor": 10.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
-    "useKirchoffInequality": True,
     "dwaveAPIToken": "",
+    "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "seed": random.randint(0, 100000),
 }
 
@@ -31,8 +32,11 @@ Usage: run.py [classical | sqa | dwave-classical | dwave-quantum | pypsa-glpk]
 Arguments:
     classical: run a classical annealing algorithm
     sqa: run the discrete time simulated quantum annealing algorithm
-    dwave-classical: run the classical optimization procedure from the dwave package (tabu-search)
-    dwave-quantum: run the optimization on a dwave quantum annealing device (quantum annealing)
+    dwave-tabu: run the classical optimization procedure locally using the dwave package (tabu-search)
+    dwave-greedy: run the classical optimization procedure locally using the dwave package (greedy)
+    dwave-hybrid: run a hybrid optimization procedure from dwave (through cloud)
+    dwave-qpu: run the optimization on a dwave quantum annealing device (through cloud)
+
 
 Any further settings are specified through environment variables:
     optimizationCycles: 1000  Number of optimization cycles
@@ -46,11 +50,12 @@ Any further settings are specified through environment variables:
 ganBackends = {
     "classical": Backends.ClassicalBackend,
     "sqa": Backends.SqaBackend,
-    "dwave-classical": Backends.DwaveClassicalBackend,
     "dwave-tabu": Backends.DwaveTabuSampler,
-    "dwave-quantum": Backends.DwaveCloudQuantumBackend,
+    "dwave-greedy": Backends.DwaveSteepestDescent,
     "pypsa-glpk": Backends.PypsaGlpk,
     "pypsa-fico": Backends.PypsaFico,
+    "dwave-hybrid": Backends.DwaveCloudHybrid,
+    "dwave-qpu": Backends.DwaveCloudDirectQPU,
 }
 
 

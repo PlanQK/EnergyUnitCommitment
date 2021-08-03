@@ -10,7 +10,7 @@ from .BackendBase import BackendBase
 from .IsingPypsaInterface import IsingPypsaInterface
 
 
-class DwaveClassicalBackend(BackendBase):
+class DwaveTabuSampler(BackendBase):
     def __init__(self):
         self.solver = tabu.TabuSampler()
         self.metaInfo = {}
@@ -19,9 +19,6 @@ class DwaveClassicalBackend(BackendBase):
         envMgr = EnvironmentVariableManager()
         cost = IsingPypsaInterface.buildCostFunction(
             network,
-            float(envMgr["monetaryCostFactor"]),
-            float(envMgr["kirchoffFactor"]),
-            float(envMgr["minUpDownFactor"]),
         )
         linear = {
             spins[0]: strength
@@ -49,12 +46,15 @@ class DwaveClassicalBackend(BackendBase):
         solutionState = [
             id for id, value in bestSample.sample.items() if value == -1
         ]
+        print(solutionState)
         network = transformedProblem[0].addSQASolutionToNetwork(
             network, transformedProblem[0], solutionState
         )
         return network
 
     def optimize(self, transformedProblem):
+        print(transformedProblem)
+        print("optimize")
         tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
         self.metaInfo["time"] = time.perf_counter() - tic
@@ -65,15 +65,60 @@ class DwaveClassicalBackend(BackendBase):
         return self.metaInfo
 
 
-class DwaveTabuSampler(DwaveClassicalBackend):
+class DwaveSteepestDescent(DwaveTabuSampler):
     def __init__(self):
         self.solver = greedy.SteepestDescentSolver()
         self.metaInfo = {}
 
 
-class DwaveCloudQuantumBackend(DwaveClassicalBackend):
+class DwaveCloudHybrid(DwaveTabuSampler):
     def __init__(self):
         envMgr = EnvironmentVariableManager()
-        self.client = Client(token=envMgr["dwaveAPIToken"], solver="")
-        self.solver = self.client.get_solver(envMgr["cloudSolverName"])
+        self.client = Client(
+            token=envMgr["dwaveAPIToken"],
+        )
+        self.solver = self.client.get_solver(
+            "hybrid_binary_quadratic_model_version2"
+        )
         self.metaInfo = {}
+
+    def optimize(self, transformedProblem):
+        print(transformedProblem)
+        print("optimize")
+        tic = time.perf_counter()
+        asyncResponse = self.solver.sample_bqm(transformedProblem[1])
+        print("Waiting for server response...")
+        while True:
+            if asyncResponse.done():
+                break
+            time.sleep(10)
+        result = asyncResponse.result()
+        self.metaInfo["time"] = time.perf_counter() - tic
+        self.metaInfo["energy"] = result.first.energy
+        return result
+
+
+class DwaveCloudDirectQPU(DwaveTabuSampler):
+    def __init__(self):
+        envMgr = EnvironmentVariableManager()
+        self.client = Client(
+            token=envMgr["dwaveAPIToken"],
+        )
+        self.solver = self.client.get_solver("DW_2000Q_6")
+        self.metaInfo = {}
+
+    def optimize(self, transformedProblem):
+        print(transformedProblem)
+        print("optimize")
+        tic = time.perf_counter()
+        asyncResponse = self.solver.sample_bqm(transformedProblem[1])
+        print("Waiting for server response...")
+        while True:
+            if asyncResponse.done():
+                break
+            time.sleep(10)
+        result = asyncResponse.result()
+
+        self.metaInfo["time"] = time.perf_counter() - tic
+        self.metaInfo["energy"] = result.first.energy
+        return result
