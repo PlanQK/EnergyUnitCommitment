@@ -16,7 +16,7 @@ class DwaveTabuSampler(BackendBase):
         self.metaInfo = {}
 
     def transformProblemForOptimizer(self, network):
-        envMgr = EnvironmentVariableManager()
+        print("transforming Problem...")
         cost = IsingPypsaInterface.buildCostFunction(
             network,
         )
@@ -47,18 +47,22 @@ class DwaveTabuSampler(BackendBase):
             id for id, value in bestSample.sample.items() if value == -1
         ]
         print(solutionState)
+        print(
+            f"Total cost (with constant terms): {transformedProblem[0].calcCost(solutionState)}"
+        )
+
         network = transformedProblem[0].addSQASolutionToNetwork(
             network, transformedProblem[0], solutionState
         )
         return network
 
     def optimize(self, transformedProblem):
-        print(transformedProblem)
-        print("optimize")
+        print("starting optimization...")
         tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
         self.metaInfo["time"] = time.perf_counter() - tic
         self.metaInfo["energy"] = result.first.energy
+        print("done")
         return result
 
     def getMetaInfo(self):

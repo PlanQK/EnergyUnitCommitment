@@ -13,12 +13,12 @@ INPUT_NETWORK = "Problemset/input.nc"
 OUTPUT_NETWORK = "Problemset/output.nc"
 
 DEFAULT_ENV_VARIABLES = {
-    "optimizationCycles": 1000,
-    "temperatureSchedule": "[10,iF,0.001]",
-    "transverseFieldSchedule": "[10,0]",
+    "optimizationCycles": 10000,
+    "temperatureSchedule": "[1,iF,0.01]",
+    "transverseFieldSchedule": "[100,.1]",
     "monetaryCostFactor": 0.0,
     "kirchhoffFactor": 1.0,
-    "slackVarFactor": 10.0,
+    "slackVarFactor": 100.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
     "dwaveAPIToken": "",
@@ -28,7 +28,7 @@ DEFAULT_ENV_VARIABLES = {
 
 
 errorMsg = """
-Usage: run.py [classical | sqa | dwave-classical | dwave-quantum | pypsa-glpk]
+Usage: run.py [classical | sqa | dwave-tabu | dwave-greedy | dwave-hybrid | dwave-qpu]
 Arguments:
     classical: run a classical annealing algorithm
     sqa: run the discrete time simulated quantum annealing algorithm

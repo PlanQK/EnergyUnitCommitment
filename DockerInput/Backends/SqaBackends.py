@@ -14,7 +14,7 @@ class ClassicalBackend(BackendBase):
 
     @staticmethod
     def transformProblemForOptimizer(network):
-        envMgr = EnvironmentVariableManager()
+        print("transforming problem...")
         return IsingPypsaInterface.buildCostFunction(
             network,
         )
@@ -22,20 +22,22 @@ class ClassicalBackend(BackendBase):
     @staticmethod
     def transformSolutionToNetwork(network, transformedProblem, solution):
         print(solution["state"])
+        print(
+            f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"
+        )
+        # transformedProblem.getIndividualCostContrib(solution)
         transformedProblem.addSQASolutionToNetwork(
             network, transformedProblem, solution["state"]
         )
         return network
 
     def optimize(self, transformedProblem):
+        print("starting optimization...")
         envMgr = EnvironmentVariableManager()
         self.solver.setSeed(int(envMgr["seed"]))
         self.solver.setTSchedule(envMgr["temperatureSchedule"])
-        self.solver.setTrotterSlices(1)
+        self.solver.setTrotterSlices(10)
         self.solver.setSteps(int(envMgr["optimizationCycles"]))
-        print(transformedProblem.numVariables())
-        print(transformedProblem.problem)
-        print(transformedProblem.siquanFormat())
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
@@ -45,6 +47,7 @@ class ClassicalBackend(BackendBase):
             if key == "state":
                 continue
             self._metaInfo[key] = result[key]
+        print("done")
         return result
 
     def getMetaInfo(self):
