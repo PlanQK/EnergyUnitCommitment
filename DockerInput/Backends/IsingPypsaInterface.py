@@ -36,8 +36,10 @@ class IsingPypsaInterface:
         for index in self.network.lines.index:
             # store the directional qubits first, then the line's binary representations
             self._lineDirection[index] = count
-            self._lineIndices[index] = count + len(self.snapshots)
-            count += len(self.snapshots) * (self.getBinaryLength(index) + 1)
+            count += len(self.snapshots)
+            # now the representation
+            self._lineIndices[index] = count
+            count += len(self.snapshots) * self.getBinaryLength(index)
 
         # to avoid cubic or quartic contributions we add slack variables that
         # store the product of the binary bit and the sign
@@ -89,17 +91,21 @@ class IsingPypsaInterface:
             "{0:b}".format(int(np.round(self.network.lines.loc[line].s_nom)))
         )
 
-    def lineToIndex(self, lineId, time=0):
-        return self._lineIndices[lineId] + time * self.getBinaryLength(lineId)
-
-    def lineDirectionToIndex(self, lineId, time=0):
-        return self._lineDirection[lineId] + time * self.getBinaryLength(
-            lineId
+    def lineToIndex(self, lineId, time, binaryPos):
+        return (
+            self._lineIndices[lineId]
+            + time * self.getBinaryLength(lineId)
+            + binaryPos
         )
 
-    def lineSlackToIndex(self, lineId, time=0):
-        return self._slackVarsForQubo[lineId] + time * self.getBinaryLength(
-            lineId
+    def lineDirectionToIndex(self, lineId, time):
+        return self._lineDirection[lineId] + time
+
+    def lineSlackToIndex(self, lineId, time, binaryPos):
+        return (
+            self._slackVarsForQubo[lineId]
+            + time * self.getBinaryLength(lineId)
+            + binaryPos
         )
 
     def addSlackVar(self):
@@ -130,19 +136,18 @@ class IsingPypsaInterface:
         """Return the number of spins."""
         return self.slackIndex
 
-    def printIndividualCostContrib(self, result):
+    def individualCostContribution(self, result):
+        contrib = {}
         for node in self.network.buses.index:
             for t in range(len(self.snapshots)):
                 testNetwork = IsingPypsaInterface(self.network, self.snapshots)
                 testNetwork._kirchhoffConstraint(node, t)
-                print(f"\tCost Contrib for {node}, {t}")
-                print(f"\t\t{testNetwork.problem}")
-                print(
-                    f"\t\t{testNetwork.calcCost(result)}, {testNetwork.constantCostContribution()}"
-                )
-        return
+                contrib[(node, t)] = testNetwork.calcCost(
+                    result, addConstContribution=False
+                ) + self.constantCostContribution(node, t)
+        return contrib
 
-    def calcCost(self, result):
+    def calcCost(self, result, addConstContribution=True):
         result = set(result)
         totalCost = 0.0
         for spins, weight in self.problem.items():
@@ -154,7 +159,11 @@ class IsingPypsaInterface:
                 if spin in result:
                     factor *= -1
             totalCost += factor * weight
-        totalCost += self.constantCostContribution()
+        if addConstContribution:
+            for node in self.network.buses.index:
+                for t in range(len(self.snapshots)):
+                    totalCost += self.constantCostContribution(node, t)
+            totalCost += self.constantSlackCost()
         return totalCost
 
     @classmethod
@@ -282,7 +291,7 @@ class IsingPypsaInterface:
     def getMaxLineEnergy(self, line):
         """Return the maximum value of energy a line can transport.
 
-        Currently we round this to the next highest power of 2
+        Currently we round this to the next highest power of 2 (-1)
         """
         return 2 ** self.getBinaryLength(line) - 1
 
@@ -311,7 +320,8 @@ class IsingPypsaInterface:
             c_nt += self.network.storage_units_t.p[i].iloc[t]
         # loads contribution
         for load in self.network.loads[self.network.loads.bus == node].index:
-            c_nt -= self.network.loads_t.p_set[load].iloc[t]
+            if load in self.network.loads_t.p_set:
+                c_nt -= self.network.loads_t.p_set[load].iloc[t]
         return c_nt
 
     def getLineFactors(self, node) -> typing.Dict[str, int]:
@@ -366,27 +376,27 @@ class IsingPypsaInterface:
         """
         lineIdsFactor = self.getLineFactors(node)
         for lineId1, factor1 in lineIdsFactor.items():
-            lenbinary = self.getBinaryLength(lineId1)
-            for i in range(lenbinary):
+            lenbinary1 = self.getBinaryLength(lineId1)
+            for i in range(lenbinary1):
                 for lineId2, factor2 in lineIdsFactor.items():
                     lenbinary2 = self.getBinaryLength(lineId2)
                     for j in range(lenbinary2):
                         # add the crossterm between line slack vars and line vars
                         # because the same loops are needed
                         self.addInteraction(
-                            self.lineToIndex(lineId1, t) + i,
-                            self.lineSlackToIndex(lineId2, t) + j,
+                            self.lineToIndex(lineId1, t, i),
+                            self.lineSlackToIndex(lineId2, t, j),
                             -self.kirchhoffFactor
                             * 2 ** i
                             * 2 ** j
                             * factor1
                             * factor2,
                         )
-                        if lineId1 != lineId2:
+                        if lineId1 != lineId2 or i != j:
                             # cross term between total line sum and individual line
                             self.addInteraction(
-                                self.lineToIndex(lineId1, t) + i,
-                                self.lineToIndex(lineId2, t) + j,
+                                self.lineToIndex(lineId1, t, i),
+                                self.lineToIndex(lineId2, t, j),
                                 self.kirchhoffFactor
                                 / 4
                                 * 2 ** i
@@ -396,8 +406,8 @@ class IsingPypsaInterface:
                             )
                             # slack vars make up the second quadratic sum
                             self.addInteraction(
-                                self.lineSlackToIndex(lineId1, t) + i,
-                                self.lineSlackToIndex(lineId2, t) + j,
+                                self.lineSlackToIndex(lineId1, t, i),
+                                self.lineSlackToIndex(lineId2, t, j),
                                 self.kirchhoffFactor
                                 * 2 ** i
                                 * 2 ** j
@@ -431,14 +441,14 @@ class IsingPypsaInterface:
             lenbinary = self.getBinaryLength(lineId1)
             for i in range(lenbinary):
                 self.addInteraction(
-                    self.lineSlackToIndex(lineId1, t) + i,
+                    self.lineSlackToIndex(lineId1, t, i),
                     self.kirchhoffFactor
                     * (maxGenPossible + maxLineCapacity + 2 * c_nt)
                     * factor1
                     * 2 ** i,
                 )
                 self.addInteraction(
-                    self.lineToIndex(lineId1, t) + i,
+                    self.lineToIndex(lineId1, t, i),
                     self.kirchhoffFactor
                     * (-0.5 * maxLineCapacity - c_nt - 0.5 * maxGenPossible)
                     * factor1
@@ -452,8 +462,8 @@ class IsingPypsaInterface:
         ].index:
             index = self.toVecIndex(gen0, t)
             for lineId1, factor1 in lineIdsFactor.items():
-                lenbinary = self.getBinaryLength(lineId1)
-                for i in range(lenbinary):
+                lenbinary1 = self.getBinaryLength(lineId1)
+                for i in range(lenbinary1):
                     val = (
                         self.kirchhoffFactor
                         * self.getGeneratorOutput(gen0, t)
@@ -462,22 +472,22 @@ class IsingPypsaInterface:
                     )
                     if index is None:
                         self.addInteraction(
-                            self.lineToIndex(lineId1, t) + i,
+                            self.lineToIndex(lineId1, t, i),
                             -0.5 * val,
                         )
                         self.addInteraction(
-                            self.lineSlackToIndex(lineId1, t) + i,
+                            self.lineSlackToIndex(lineId1, t, i),
                             val,
                         )
                     else:
                         self.addInteraction(
                             index,
-                            self.lineToIndex(lineId1, t) + i,
+                            self.lineToIndex(lineId1, t, i),
                             -0.5 * val,
                         )
                         self.addInteraction(
                             index,
-                            self.lineSlackToIndex(lineId1, t) + i,
+                            self.lineSlackToIndex(lineId1, t, i),
                             val,
                         )
 
@@ -487,7 +497,7 @@ class IsingPypsaInterface:
             for t in range(len(self.network.snapshots)):
                 for i in range(lenbinary):
                     self.addInteraction(
-                        self.lineToIndex(index, t) + i,
+                        self.lineToIndex(index, t, i),
                         -self.slackVarFactor,
                     )
                     self.addInteraction(
@@ -495,43 +505,69 @@ class IsingPypsaInterface:
                         -self.slackVarFactor,
                     )
                     self.addInteraction(
-                        self.lineSlackToIndex(index, t) + i,
+                        self.lineSlackToIndex(index, t, i),
                         2 * self.slackVarFactor,
                     )
                     self.addInteraction(
-                        self.lineToIndex(index, t) + i,
+                        self.lineToIndex(index, t, i),
                         self.lineDirectionToIndex(index, t),
                         self.slackVarFactor,
                     )
                     self.addInteraction(
-                        self.lineToIndex(index, t) + i,
-                        self.lineSlackToIndex(index, t) + i,
+                        self.lineToIndex(index, t, i),
+                        self.lineSlackToIndex(index, t, i),
                         -2 * self.slackVarFactor,
                     )
                     self.addInteraction(
                         self.lineDirectionToIndex(index, t),
-                        self.lineSlackToIndex(index, t) + i,
+                        self.lineSlackToIndex(index, t, i),
                         -2 * self.slackVarFactor,
                     )
 
-    def constantCostContribution(self):
+    def constantCostContribution(self, node, t):
         totalConstCost = 0
-        for node in self.network.buses.index:
+        maxGenPossible = self.maxGenPossible(node, t)
+        maxLineCapacity = self.totalLineCapacity(node)
+        c_nt = self.generateConstant(node, t)
+        totalConstCost += self.kirchhoffFactor * (
+            0.25 * maxLineCapacity ** 2
+            + maxLineCapacity * c_nt
+            + 0.25 * maxGenPossible ** 2
+            + 0.5 * maxGenPossible * maxLineCapacity
+            + maxGenPossible * c_nt
+            + c_nt ** 2
+        )
+        # these parts are from the quadratic sum where the gen, line, slacks are squared
+        for gen0 in self.network.generators[
+            self.network.generators.bus == node
+        ].index:
+            totalConstCost += (
+                0.25
+                * self.kirchhoffFactor
+                * self.getGeneratorOutput(gen0, t) ** 2
+            )
+
+        for line in self.getLineFactors(node):
+            for i in range(self.getBinaryLength(line)):
+                totalConstCost += 1.25 * self.kirchhoffFactor * 2 ** (i * 2)
+        return totalConstCost
+
+    def getLineValues(self, solution):
+        solution = set(solution)
+        lineValues = {}
+        for lineId in self.network.lines.index:
             for t in range(len(self.snapshots)):
-                maxGenPossible = self.maxGenPossible(node, t)
-                maxLineCapacity = self.totalLineCapacity(node)
-                c_nt = self.generateConstant(node, t)
-                totalConstCost += self.kirchhoffFactor * (
-                    0.25 * maxLineCapacity ** 2
-                    + maxLineCapacity * c_nt
-                    + 0.25 * maxGenPossible ** 2
-                    + 0.5 * maxGenPossible * maxLineCapacity
-                    + maxGenPossible * c_nt
-                    + c_nt ** 2
-                    # parts are from the quadratic sum where the gen, line, slacks are squared
-                    + 0.25 * maxGenPossible ** 2
-                    + 1.25 * maxLineCapacity ** 2
-                )
+                value = 0
+                for i in range(self.getBinaryLength(lineId)):
+                    if self.lineToIndex(lineId, t, i) in solution:
+                        value += 2 ** i
+                if self.lineDirectionToIndex(lineId, t):
+                    value = -value
+                lineValues[(lineId, t)] = value
+        return lineValues
+
+    def constantSlackCost(self):
+        totalConstCost = 0.0
         for index in self.network.lines.index:
             for t in range(len(self.snapshots)):
                 lenbinary = self.getBinaryLength(index)

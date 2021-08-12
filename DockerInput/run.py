@@ -13,14 +13,14 @@ INPUT_NETWORK = "Problemset/input.nc"
 OUTPUT_NETWORK = "Problemset/output.nc"
 
 DEFAULT_ENV_VARIABLES = {
-    "optimizationCycles": 10000,
-    "temperatureSchedule": "[1,iF,0.01]",
+    "optimizationCycles": 50000,
+    "temperatureSchedule": "[0.1,iF,0.0001]",
     "transverseFieldSchedule": "[100,.1]",
     "monetaryCostFactor": 0.0,
     "kirchhoffFactor": 1.0,
     "slackVarFactor": 100.0,
     "minUpDownFactor": 0.0,
-    "trotterSlices": 32,
+    "trotterSlices": 64,
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "seed": random.randint(0, 100000),

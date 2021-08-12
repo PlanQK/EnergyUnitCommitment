@@ -22,10 +22,11 @@ class ClassicalBackend(BackendBase):
     @staticmethod
     def transformSolutionToNetwork(network, transformedProblem, solution):
         print(solution["state"])
+        print(transformedProblem.getLineValues(solution["state"]))
+        print(transformedProblem.individualCostContribution(solution["state"]))
         print(
             f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"
         )
-        # transformedProblem.getIndividualCostContrib(solution)
         transformedProblem.addSQASolutionToNetwork(
             network, transformedProblem, solution["state"]
         )
@@ -56,6 +57,7 @@ class ClassicalBackend(BackendBase):
 
 class SqaBackend(ClassicalBackend):
     def optimize(self, transformedProblem):
+        print("starting optimization...")
         envMgr = EnvironmentVariableManager()
         self.solver.setSeed(int(envMgr["seed"]))
         self.solver.setHSchedule(envMgr["transverseFieldSchedule"])
@@ -67,4 +69,9 @@ class SqaBackend(ClassicalBackend):
             transformedProblem.numVariables(),
         )
         result["state"] = literal_eval(result["state"])
+        for key in result:
+            if key == "state":
+                continue
+            self._metaInfo[key] = result[key]
+        print("done")
         return result
