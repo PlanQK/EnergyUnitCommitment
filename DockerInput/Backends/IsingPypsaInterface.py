@@ -142,7 +142,7 @@ class IsingPypsaInterface:
             for t in range(len(self.snapshots)):
                 testNetwork = IsingPypsaInterface(self.network, self.snapshots)
                 testNetwork._kirchhoffConstraint(node, t)
-                contrib[(node, t)] = testNetwork.calcCost(
+                contrib[str((node, t))] = testNetwork.calcCost(
                     result, addConstContribution=False
                 ) + self.constantCostContribution(node, t)
         return contrib
@@ -615,4 +615,5 @@ class IsingPypsaInterface:
         network.generators_t.status[gen] = np.concatenate(
             [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
         )
+
         return network

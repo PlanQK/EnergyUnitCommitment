@@ -37,17 +37,23 @@ class ClassicalBackend(BackendBase):
         envMgr = EnvironmentVariableManager()
         self.solver.setSeed(int(envMgr["seed"]))
         self.solver.setTSchedule(envMgr["temperatureSchedule"])
-        self.solver.setTrotterSlices(10)
+        self.solver.setTrotterSlices(int(envMgr["trotterSlices"]))
         self.solver.setSteps(int(envMgr["optimizationCycles"]))
+        self.solver.setHSchedule("[0]")
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
         )
         result["state"] = literal_eval(result["state"])
         for key in result:
-            if key == "state":
-                continue
             self._metaInfo[key] = result[key]
+
+        self._metaInfo["totalCost"] = transformedProblem.calcCost(
+            result["state"]
+        )
+        self._metaInfo[
+            "individualCost"
+        ] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
 
@@ -70,8 +76,13 @@ class SqaBackend(ClassicalBackend):
         )
         result["state"] = literal_eval(result["state"])
         for key in result:
-            if key == "state":
-                continue
             self._metaInfo[key] = result[key]
+
+        self._metaInfo["totalCost"] = transformedProblem.calcCost(
+            result["state"]
+        )
+        self._metaInfo[
+            "individualCost"
+        ] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result

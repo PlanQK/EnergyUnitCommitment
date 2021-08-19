@@ -9,18 +9,20 @@ import pypsa
 import Backends
 from EnvironmentVariableManager import EnvironmentVariableManager
 
-INPUT_NETWORK = "Problemset/input.nc"
-OUTPUT_NETWORK = "Problemset/output.nc"
+FOLDER = "Problemset"
 
 DEFAULT_ENV_VARIABLES = {
+    "inputNetwork": "input.nc",
+    "outputNetwork": "",
+    "outputInfo": "output.json",
     "optimizationCycles": 50000,
     "temperatureSchedule": "[0.1,iF,0.0001]",
-    "transverseFieldSchedule": "[100,.1]",
+    "transverseFieldSchedule": "[10,.1]",
     "monetaryCostFactor": 0.0,
     "kirchhoffFactor": 1.0,
     "slackVarFactor": 100.0,
     "minUpDownFactor": 0.0,
-    "trotterSlices": 64,
+    "trotterSlices": 32,
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "seed": random.randint(0, 100000),
@@ -67,18 +69,19 @@ def main():
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
     OptimizerClass = ganBackends[sys.argv[1]]
-    pypsaNetwork = pypsa.Network(INPUT_NETWORK)
+    pypsaNetwork = pypsa.Network(f"Problemset/{str(envMgr['inputNetwork'])}")
     optimizer = OptimizerClass()
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
     solution = optimizer.optimize(transformedProblem)
     outputNetwork = optimizer.transformSolutionToNetwork(
         pypsaNetwork, transformedProblem, solution
     )
-    outputNetwork.export_to_netcdf(OUTPUT_NETWORK)
+    if envMgr["outputNetwork"]:
+        outputNetwork.export_to_netcdf(
+            f"Problemset/{str(envMgr['outputNetwork'])}"
+        )
 
-    with open(
-        f"Problemset/{optimizer.__class__.__name__}.json", "w"
-    ) as write_file:
+    with open(f"Problemset/{str(envMgr['outputInfo'])}", "w") as write_file:
         json.dump(optimizer.getMetaInfo(), write_file, indent=2)
     return
 

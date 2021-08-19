@@ -1,4 +1,9 @@
 venv/*
-Problemset/*
+Problemset*/*
 *.pyc
 .vscode/*
+docker.tmp
+inputNetworks*/*
+TestProblems/
+results_*
+plots/*
