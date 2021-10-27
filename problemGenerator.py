@@ -205,7 +205,7 @@ def main():
         for i in range(int(sys.argv[1])):
             newProblem = ProblemInstance()
             newProblem.exportNetwork(
-                f"testProblems/input_{CONFIG['numBuses']}_{i}.nc"
+                f"TestProblems/input_{CONFIG['numBuses']}_{i}.nc"
             )
     return
 
