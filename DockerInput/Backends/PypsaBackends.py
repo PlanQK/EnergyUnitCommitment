@@ -11,6 +11,11 @@ class PypsaBackend(BackendBase):
         self.network = network 
         self.network.generators.committable = True
         self.network.generators.p_nom_extendable = False
+
+        # TODO add slack generators to allow solutitons that don't meet the complete 
+        # demand and penalize them to maximize meeting the demand first If it is done,
+        # set mininal power output to maximal output to force integer solutions
+
         # avoid committing a generator and setting output to 0 
         for name in self.network.generators.index:
             self.network.generators_t.p_min_pu[name] = 1.0
@@ -35,11 +40,11 @@ class PypsaBackend(BackendBase):
         self.opt.solve(transformedProblem).write()
         self.metaInfo["time"] = time.perf_counter() - tic
 
-        # write info
-
-        for gen, time in self.model.generator_status_index:
-            self.metaInfo["runtime_sec"] = 0
-            self.metaInfo["state"] = 0
+        committed_gen = []
+        for key in self.model.generator_status.get_values().keys():
+            if self.model.generator_status.get_values()[key] == 1.0:
+                committed_gen.append(key[0])
+        self.metaInfo["status"] = committed_gen
 
         return self.model
 
@@ -57,13 +62,6 @@ class PypsaBackend(BackendBase):
         self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
-                
-
-# add additional pyomo constraints:
-# flow have to be an integer
-# disable optimizing power flow
-def extra_functionality(network, snapshots):
-    pass
 
 
 class PypsaFico(PypsaBackend):
