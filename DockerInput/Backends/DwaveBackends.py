@@ -9,10 +9,13 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 from .BackendBase import BackendBase
 from .IsingPypsaInterface import IsingPypsaInterface
 
+from dwave.system import LeapHybridSampler
+from dwave.system import DWaveSampler, EmbeddingComposite
+
 
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
-        self.solver = tabu.TabuSampler()
+        self.solver = tabu.Tabusampler()
         self.metaInfo = {}
 
     def transformProblemForOptimizer(self, network):
@@ -46,7 +49,10 @@ class DwaveTabuSampler(BackendBase):
         solutionState = [
             id for id, value in bestSample.sample.items() if value == -1
         ]
+        print("done")
         print(solutionState)
+        print(transformedProblem[0].getLineValues(solutionState))
+        print(transformedProblem[0].individualCostContribution(solutionState))
         print(
             f"Total cost (with constant terms): {transformedProblem[0].calcCost(solutionState)}"
         )
@@ -75,54 +81,70 @@ class DwaveSteepestDescent(DwaveTabuSampler):
         self.metaInfo = {}
 
 
-class DwaveCloudHybrid(DwaveTabuSampler):
+class DwaveCloud(DwaveTabuSampler):
+    # set up all variables except the sampler
     def __init__(self):
         envMgr = EnvironmentVariableManager()
-        self.client = Client(
-            token=envMgr["dwaveAPIToken"],
-        )
-        self.solver = self.client.get_solver(
-            "hybrid_binary_quadratic_model_version2"
-        )
+        self.token = envMgr["dwaveAPIToken"]
         self.metaInfo = {}
 
-    def optimize(self, transformedProblem):
-        print(transformedProblem)
-        print("optimize")
-        tic = time.perf_counter()
-        asyncResponse = self.solver.sample_bqm(transformedProblem[1])
-        print("Waiting for server response...")
-        while True:
-            if asyncResponse.done():
-                break
-            time.sleep(10)
-        result = asyncResponse.result()
-        self.metaInfo["time"] = time.perf_counter() - tic
-        self.metaInfo["energy"] = result.first.energy
-        return result
 
-
-class DwaveCloudDirectQPU(DwaveTabuSampler):
+class DwaveCloudHybrid(DwaveCloud):
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.client = Client(
-            token=envMgr["dwaveAPIToken"],
-        )
-        self.solver = self.client.get_solver("DW_2000Q_6")
-        self.metaInfo = {}
+        super().__init__()
+        self.solver="hybrid_binary_quadratic_model_version2"
+        self.sampler = LeapHybridSampler(solver=self.solver,
+                token=self.token)
 
     def optimize(self, transformedProblem):
-        print(transformedProblem)
         print("optimize")
-        tic = time.perf_counter()
-        asyncResponse = self.solver.sample_bqm(transformedProblem[1])
+
+        sampleset = self.sampler.sample(transformedProblem[1])
         print("Waiting for server response...")
         while True:
-            if asyncResponse.done():
+            if sampleset.done():
                 break
-            time.sleep(10)
-        result = asyncResponse.result()
+            time.sleep(3)
 
-        self.metaInfo["time"] = time.perf_counter() - tic
-        self.metaInfo["energy"] = result.first.energy
-        return result
+        #numpy's int32 are not serializable by json
+        #conv_sample = {k:v.item() for (k,v) in sampleset.first.sample.items()}
+        #self.metaInfo["status"] = conv_sample
+
+        self.metaInfo["serial"] = sampleset.to_serializable()
+
+        #sampler_info = ["qpu_access_time", "charge_time", "run_time"]
+        #for info in sampler_info:
+        #    if info in sampleset.info:
+        #        self.metaInfo[info] = sampleset.info[info]
+        return sampleset
+
+class DwaveCloudDirectQPU(DwaveCloud):
+    def __init__(self):
+        super().__init__()
+        sampler = DWaveSampler(solver={'qpu' : True},
+                token=self.token)
+        self.solver=sampler.solver.id
+        self.metaInfo["solver_id"] = self.solver
+        self.sampler = EmbeddingComposite(sampler)
+
+    def optimize(self, transformedProblem):
+        print("optimize")
+
+        sampleset = self.sampler.sample(transformedProblem[1],
+                num_reads = 4,
+                annealing_time = 40
+                #chain_strength=50
+                )
+        print("Waiting for server response...")
+        while True:
+            if sampleset.done():
+                break
+            time.sleep(3)
+
+        #numpy's int32 are not serializable by json
+        #conv_sample = {k:v.item() for (k,v) in sampleset.first.sample.items()}
+        #self.metaInfo["status"] = conv_sample
+
+        self.metaInfo["serial"] = sampleset.to_serializable()
+
+        return sampleset
