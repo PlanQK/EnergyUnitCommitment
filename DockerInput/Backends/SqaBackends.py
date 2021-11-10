@@ -12,6 +12,9 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
         self._metaInfo = {}
 
+    def processSolution(self, network, transformedProblem, solution):
+        return solution
+
     @staticmethod
     def transformProblemForOptimizer(network):
         print("transforming problem...")

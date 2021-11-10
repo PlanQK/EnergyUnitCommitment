@@ -17,6 +17,9 @@ class DwaveTabuSampler(BackendBase):
         self.solver = tabu.Tabusampler()
         self.metaInfo = {}
 
+    def processSolution(self, network, transformedProblem, solution):
+        return solution
+
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
 

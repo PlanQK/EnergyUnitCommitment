@@ -6,6 +6,10 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 
 
 class PypsaBackend(BackendBase):
+
+    def processSolution(self, network, transformedProblem, solution):
+        return solution
+
     def transformProblemForOptimizer(self, network):
         print("transforming problem...") 
         self.network = network.copy()

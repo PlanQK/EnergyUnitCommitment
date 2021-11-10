@@ -14,6 +14,10 @@ class BackendBase(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def processSolution(self, network, transformedProblem, solution):
+        pass
+
+    @abc.abstractmethod
     def optimize(self, transformedProblem):
         pass
 

@@ -76,8 +76,11 @@ def main():
     optimizer = OptimizerClass()
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
     solution = optimizer.optimize(transformedProblem)
-    outputNetwork = optimizer.transformSolutionToNetwork(
+    processedSolution = optimizer.processSolution(
         pypsaNetwork, transformedProblem, solution
+    )
+    outputNetwork = optimizer.transformSolutionToNetwork(
+        pypsaNetwork, transformedProblem, processedSolution
     )
     if envMgr["outputNetwork"]:
         outputNetwork.export_to_netcdf(
