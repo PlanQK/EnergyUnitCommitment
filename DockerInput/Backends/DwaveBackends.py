@@ -12,7 +12,6 @@ from .IsingPypsaInterface import IsingPypsaInterface
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler, EmbeddingComposite
 
-
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
         self.solver = tabu.Tabusampler()
@@ -20,6 +19,7 @@ class DwaveTabuSampler(BackendBase):
 
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
+
         cost = IsingPypsaInterface.buildCostFunction(
             network,
         )
@@ -43,11 +43,36 @@ class DwaveTabuSampler(BackendBase):
         )
 
     @staticmethod
-    def transformSolutionToNetwork(network, transformedProblem, solution):
-        # obtain the sample with the lowest energy
-        bestSample = solution.first
+    def power_output(network, generatorState, snapshot):
+        result = 0
+        num_generators = len(network.generators_t['p_max_pu'].loc[snapshot])
+        for index in generatorState:
+            if index >= num_generators:
+                break
+            result += network.generators_t['p_max_pu'].loc[snapshot].iloc[index]
+        return result
+
+    @staticmethod
+    def choose_sample(solution, network):
+        return solution.first.sample
+
+    @classmethod
+    def transformSolutionToNetwork(cls, network, transformedProblem, solution):
+        #nominal choice for best sample by choosing the lowest energy sample
+        generatorState = solution.first.sample
+        lowestEnergySolution = [
+            id for id, value in generatorState.items() if value == -1
+        ]
+        power = DwaveTabuSampler.power_output(network,
+                            lowestEnergySolution,
+                            'now')
+        print(f"lowestEnergyPower: {power}")
+
+        #obtain the sample that is closest to matching the demand and then
+        #choose the one with the lowest energy
+        bestSample = cls.choose_sample(solution, network)
         solutionState = [
-            id for id, value in bestSample.sample.items() if value == -1
+            id for id, value in bestSample.items() if value == -1
         ]
         print("done")
         print(solutionState)
@@ -56,6 +81,13 @@ class DwaveTabuSampler(BackendBase):
         print(
             f"Total cost (with constant terms): {transformedProblem[0].calcCost(solutionState)}"
         )
+        for snapshot in network.snapshots:
+            power = DwaveTabuSampler.power_output(network,
+                        solutionState,
+                        snapshot)
+            load = network.loads_t['p_set'].loc[snapshot].sum()
+            print(f"Total output at {snapshot}: {power}")
+            print(f"Total load at {snapshot}: {load}")
 
         network = transformedProblem[0].addSQASolutionToNetwork(
             network, transformedProblem[0], solutionState
@@ -82,69 +114,113 @@ class DwaveSteepestDescent(DwaveTabuSampler):
 
 
 class DwaveCloud(DwaveTabuSampler):
-    # set up all variables except the sampler
-    def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.token = envMgr["dwaveAPIToken"]
-        self.metaInfo = {}
+    pass
 
 
 class DwaveCloudHybrid(DwaveCloud):
     def __init__(self):
-        super().__init__()
+        envMgr = EnvironmentVariableManager()
+        self.token = envMgr["dwaveAPIToken"]
+        self.metaInfo = {}
         self.solver="hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
                 token=self.token)
+        self.metaInfo["solver_id"] = self.solver
 
     def optimize(self, transformedProblem):
         print("optimize")
-
         sampleset = self.sampler.sample(transformedProblem[1])
         print("Waiting for server response...")
         while True:
             if sampleset.done():
                 break
-            time.sleep(3)
-
-        #numpy's int32 are not serializable by json
-        #conv_sample = {k:v.item() for (k,v) in sampleset.first.sample.items()}
-        #self.metaInfo["status"] = conv_sample
-
+            time.sleep(2)
         self.metaInfo["serial"] = sampleset.to_serializable()
-
-        #sampler_info = ["qpu_access_time", "charge_time", "run_time"]
-        #for info in sampler_info:
-        #    if info in sampleset.info:
-        #        self.metaInfo[info] = sampleset.info[info]
         return sampleset
+
 
 class DwaveCloudDirectQPU(DwaveCloud):
     def __init__(self):
-        super().__init__()
+        envMgr = EnvironmentVariableManager()
+        self.token = envMgr["dwaveAPIToken"]
+        self.metaInfo = {}
         sampler = DWaveSampler(solver={'qpu' : True},
                 token=self.token)
         self.solver=sampler.solver.id
         self.metaInfo["solver_id"] = self.solver
         self.sampler = EmbeddingComposite(sampler)
+        self.annealing_time = int(envMgr["annealing_time"])
+        self.num_reads = int(envMgr["num_reads"])
+        self.chain_strength = int(envMgr["chain_strength"])
+
+    def power_output(self, generatorState, snapshot):
+        result = 0
+        for index in generatorState:
+            if index >= self.num_generators:
+                break
+            result += self.generators_t.loc[snapshot].iloc[index]
+        return result
+
+    def transformProblemForOptimizer(self, network):
+        self.num_generators = len(network.generators_t['p_max_pu'].iloc[0])
+        self.loads = {idx : network.loads_t['p_set'].loc[idx].sum() for idx in network.snapshots} 
+        self.generators_t = network.generators_t['p_max_pu']
+        self.network = network
+        return super().transformProblemForOptimizer(network)
+
+    #@staticmethod
+    #def choose_sample(solution, network):
+        #snapshot = network.snapshots[0]
+        #total_load = network.loads_t['p_set'].loc[snapshot].sum()
+        #df = solution.to_pandas_dataframe()
+        #df['deviation_from_opt_load'] = df.apply(
+                #lambda row: abs(total_load -
+                        #DwaveTabuSampler.power_output(network,
+                                #[id for id, value in row.items() if value == -1 ],
+                                #snapshot)
+                                #),
+                #axis=1
+        #)
+        #min_deviation = df['deviation_from_opt_load'].min()
+        #closest_samples = df[df['deviation_from_opt_load'] == min_deviation]
+        #result_row = closest_samples.iloc[closest_samples['energy'].idxmin()]
+        #return result_row[:-3]
 
     def optimize(self, transformedProblem):
         print("optimize")
-
+        # additional parameters: chain strength, anneal schedule
         sampleset = self.sampler.sample(transformedProblem[1],
-                num_reads = 4,
-                annealing_time = 40
-                #chain_strength=50
+                num_reads = self.num_reads,
+                annealing_time = self.annealing_time,
+                chain_strength= self.chain_strength,
                 )
         print("Waiting for server response...")
         while True:
             if sampleset.done():
                 break
-            time.sleep(3)
+            time.sleep(2)
 
-        #numpy's int32 are not serializable by json
-        #conv_sample = {k:v.item() for (k,v) in sampleset.first.sample.items()}
-        #self.metaInfo["status"] = conv_sample
+        bestSample = sampleset.first
+        generatorState = [
+            id for id, value in bestSample.sample.items() 
+                if value == -1 and id < self.num_generators
+        ]
 
+        bestSample = DwaveCloudDirectQPU.choose_sample(sampleset, self.network)
+        generatorState = [
+            id for id, value in bestSample.items() 
+                if value == -1 and id < self.num_generators
+        ]
+        #bestSample = sampleset.first
+        #generatorState = [
+            #id for id, value in bestSample.sample.items() 
+                #if value == -1 and id < self.num_generators
+        #]
+        #
+        #self.metaInfo["power"] = [
+            #self.power_output(generatorState, snapshot)
+            #for snapshot in self.loads.keys()]
+        self.metaInfo["loads"] = self.loads
         self.metaInfo["serial"] = sampleset.to_serializable()
 
         return sampleset

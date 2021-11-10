@@ -25,6 +25,9 @@ DEFAULT_ENV_VARIABLES = {
     "trotterSlices": 32,
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
+    "annealing_time": 500,
+    "num_reads": 1,
+    "chain_strength": 100,
     "seed": random.randint(0, 100000),
 }
 
