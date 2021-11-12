@@ -26,9 +26,12 @@ DEFAULT_ENV_VARIABLES = {
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "annealing_time": 500,
+    "programming_thermalization": 1000,
+    "readout_thermalization": 0,
     "num_reads": 1,
     "chain_strength": 100,
     "seed": random.randint(0, 100000),
+    "strategy": "lowestEnergy",
 }
 
 

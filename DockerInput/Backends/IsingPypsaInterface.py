@@ -178,9 +178,9 @@ class IsingPypsaInterface:
         problemDict = cls(network, network.snapshots)
         problemDict._marginalCosts()
 
-        for gen in problemDict._startIndex:
-            for t in range(len(problemDict.snapshots)):
-                problemDict._startupShutdownCost(gen, t)
+        #for gen in problemDict._startIndex:
+        #    for t in range(len(problemDict.snapshots)):
+        #        problemDict._startupShutdownCost(gen, t)
 
         # kirchhoff constraints
         for node in problemDict.network.buses.index:
@@ -561,7 +561,7 @@ class IsingPypsaInterface:
                 for i in range(self.getBinaryLength(lineId)):
                     if self.lineToIndex(lineId, t, i) in solution:
                         value += 2 ** i
-                if self.lineDirectionToIndex(lineId, t):
+                if self.lineDirectionToIndex(lineId, t) in solution:
                     value = -value
                 lineValues[(lineId, t)] = value
         return lineValues
