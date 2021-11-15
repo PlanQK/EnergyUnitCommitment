@@ -12,16 +12,8 @@ from .IsingPypsaInterface import IsingPypsaInterface
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler, EmbeddingComposite
 
-import pandas
-import random
+#import pandas
 
-
-def randomize(spins,liste):
-    if spins[0] in liste:
-#        return [-1,1][random.randrange(2)]
-        return 1
-    else:
-        return 1
 
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
@@ -39,11 +31,9 @@ class DwaveTabuSampler(BackendBase):
         )
 
         
-            # store the directional qubits first, then the line's binary representations
-        liste = [cost._lineDirection[index] for index in network.lines.index]
-
+        # store the directional qubits first, then the line's binary representations
         linear = {
-            spins[0]: randomize(spins, liste) * strength
+            spins[0]: strength
             for spins, strength in cost.problem.items()
             if len(spins) == 1
         }
@@ -77,19 +67,7 @@ class DwaveTabuSampler(BackendBase):
 
     @classmethod
     def transformSolutionToNetwork(cls, network, transformedProblem, solution):
-        #nominal choice for best sample by choosing the lowest energy sample
-#        generatorState = solution.first.sample
-#        lowestEnergySolution = [
-#            id for id, value in generatorState.items() if value == -1
-#        ]
-#        power = DwaveTabuSampler.power_output(network,
-#                            lowestEnergySolution,
-#                            'now')
-#        print(f"lowestEnergyPower: {power}")
-
-        #obtain the sample that is closest to matching the demand and then
-        #choose the one with the lowest energy
-        bestSample = cls.choose_sample(solution, network, strategy='lowestEnergy')
+        bestSample = cls.choose_sample(solution, network, strategy='LowestEnergy')
         solutionState = [
             id for id, value in bestSample.items() if value == -1
         ]
@@ -163,6 +141,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         envMgr = EnvironmentVariableManager()
         self.token = envMgr["dwaveAPIToken"]
         self.metaInfo = {}
+        # pegasus topology corresponds to Advantage 4.1
         sampler = DWaveSampler(solver={'qpu' : True ,
                 'topology__type': 'pegasus'},
                 token=self.token)
@@ -186,53 +165,54 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
     def transformProblemForOptimizer(self, network):
         self.num_generators = len(network.generators_t['p_max_pu'].iloc[0])
-        self.loads = {idx : network.loads_t['p_set'].loc[idx].sum() for idx in network.snapshots} 
+        self.loads = {
+                idx : network.loads_t['p_set'].loc[idx].sum() 
+                for idx in network.snapshots
+        } 
         self.generators_t = network.generators_t['p_max_pu']
         self.network = network
         return super().transformProblemForOptimizer(network)
 
     @staticmethod
-    def choose_sample(solution, network, strategy="close_sample"):
-
-        snapshot = network.snapshots[0]
+    def choose_sample(solution, network, strategy="ClosestSample", snapshot=None):
+        if snapshot is None:
+            snapshot = network.snapshots[0]
         total_load = network.loads_t['p_set'].loc[snapshot].sum()
         df = solution.to_pandas_dataframe()
-        pandas.set_option('display.max_columns', 40)
+        #pandas.set_option('display.max_columns', 40)
         print(f"INDEX LOWEST E: {df['energy'].idxmin()}\n")
-
-        print(df)
 
         if strategy == 'MajorityVote':
             print(f"using {strategy}")
-#            snapshot = network.snapshots[0]
-#            total_load = network.loads_t['p_set'].loc[snapshot].sum()
-#            df = solution.to_pandas_dataframe()
             return df.mode().iloc[0]
     
-        if strategy == 'lowestEnergy':
+        if strategy == 'LowestEnergy':
             return solution.first.sample
 
-        df['deviation_from_opt_load'] = df.apply(
-                lambda row: abs(total_load -
-                        DwaveTabuSampler.power_output(network,
-                                [id for id, value in row.items() if value == -1 ],
-                                snapshot)
-                                ),
-                axis=1
-        )
-        min_deviation = df['deviation_from_opt_load'].min()
-        closest_samples = df[df['deviation_from_opt_load'] == min_deviation]
-        print(f"INDEX OF CHOSEN SAMPLE: {closest_samples['energy'].idxmin()}")
-        result_row = closest_samples.loc[closest_samples['energy'].idxmin()]
-        #return solution.first.sample
-        return result_row[:-3]
+        if strategy == 'ClosestSample':
+            df['deviation_from_opt_load'] = df.apply(
+                    lambda row: abs(total_load -
+                                    DwaveTabuSampler.power_output(
+                                        network,
+                                        [id for id, value in row.items() if value == -1],
+                                        snapshot
+                                        )
+                                    ),
+                    axis=1
+            )
+            min_deviation = df['deviation_from_opt_load'].min()
+            ClosestSamples = df[df['deviation_from_opt_load'] == min_deviation]
+            print(f"INDEX OF CHOSEN SAMPLE: {closest_samples['energy'].idxmin()}")
+            result_row = ClosestSamples.loc[ClosestSamples['energy'].idxmin()]
+            return result_row[:-3]
+
+        raise ValueError("The chosen strategy for picking a sample is not supported")
 
     def processSolution(self, network, transformedProblem, solution):
         return solution
 
     def optimize(self, transformedProblem):
         print("optimize")
-        # additional parameters: chain strength, anneal schedule
         sampleset = self.sampler.sample(transformedProblem[1],
                 num_reads=self.num_reads,
                 annealing_time=self.annealing_time,
@@ -252,20 +232,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if value == -1 and id < self.num_generators
         ]
 
-        #bestSample = DwaveCloudDirectQPU.choose_sample(sampleset, self.network)
-        #generatorState = [
-            #id for id, value in bestSample.items() 
-                #if value == -1 and id < self.num_generators
-        #]
-        #bestSample = sampleset.first
-        #generatorState = [
-            #id for id, value in bestSample.sample.items() 
-                #if value == -1 and id < self.num_generators
-        #]
-        #
-        #self.metaInfo["power"] = [
-            #self.power_output(generatorState, snapshot)
-            #for snapshot in self.loads.keys()]
         self.metaInfo["loads"] = self.loads
         self.metaInfo["serial"] = sampleset.to_serializable()
 

@@ -31,7 +31,7 @@ DEFAULT_ENV_VARIABLES = {
     "num_reads": 1,
     "chain_strength": 100,
     "seed": random.randint(0, 100000),
-    "strategy": "lowestEnergy",
+    "strategy": "LowestEnergy",
 }
 
 

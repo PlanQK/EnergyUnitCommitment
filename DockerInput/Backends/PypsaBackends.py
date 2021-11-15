@@ -64,6 +64,13 @@ class PypsaBackend(BackendBase):
                     print(f"all loads met in {snapshot}")
                 else:
                     print(f"missing load in {snapshot}: {dev_from_optimum}")
+        
+        #print(solution["state"])
+        #print(transformedProblem.getLineValues(solution["state"]))
+        #print(transformedProblem.individualCostContribution(solution["state"]))
+        #print(
+        #    f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"
+        #)
         return
 
     def optimize(self, transformedProblem):
@@ -78,7 +85,6 @@ class PypsaBackend(BackendBase):
                 committed_gen.append(key[0])
         self.metaInfo["status"] = committed_gen
         #self.metaInfo["output"] = self.model.generator_p.get_values()
-
 
         return self.model
 
