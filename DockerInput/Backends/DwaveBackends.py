@@ -25,7 +25,10 @@ class DwaveTabuSampler(BackendBase):
         self.metaInfo = {}
 
     def processSolution(self, network, transformedProblem, solution):
-        bestSample = self.choose_sample(solution, self.network, strategy=self.strategy)
+        if hasattr(self,'network'):
+            bestSample = self.choose_sample(solution, self.network, strategy=self.strategy)
+        else:
+            bestSample = self.choose_sample(solution, network)
         solutionState = [
             id for id, value in bestSample.items() if value == -1
         ]
@@ -38,6 +41,8 @@ class DwaveTabuSampler(BackendBase):
                 'individualCostContribution' : indCostCon,
                 'totalCost' : totCost,
         }
+
+
         return resultDict
 
     def transformProblemForOptimizer(self, network):
@@ -213,6 +218,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.programming_thermalization = int(envMgr["programming_thermalization"])
         self.readout_thermalization = int(envMgr["readout_thermalization"])
         self.strategy = envMgr["strategy"]
+        self.granularity = int(envMgr["granularity"])
 
     def power_output(self, generatorState, snapshot):
         result = 0
@@ -238,26 +244,28 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.lineDictionary = {}
         self.lineNames = network.lines.index
         for line in self.lineNames:
-            k, v = self.splitLine(line, self.network)
+            k, v = self.splitLine(line, self.network,self.granularity)
             self.lineDictionary[k]=v
 
         return super().transformProblemForOptimizer(self.network)
 
-    def splitLine(self, line, network):
+    def splitLine(self, line, network, granularity=0):
         """
         splits up a line into multiple lines such that each new line
         has capacity 2^n - 1 for some n. Modifies the network given
         as an argument and returns the original line name and how
         many components where used to split it up. Use it on the
         network stored in self.
+
+        granularity is an upper limit for number of splits. if
+        is is 0, no limit is set
         """
         remaining_s_nom = network.lines.loc[line].s_nom
         numComponents = 0
-        while remaining_s_nom > 0:
-            binLength = len("{0:b}".format(int(npround(remaining_s_nom))))-1
-            #case remaining_s_nom <= 1
-            if binLength == 0: 
-                binLength += 1
+        while remaining_s_nom > 0 \
+                and (granularity == 0 or granularity > numComponents):
+            # don't cut off is remaining_s_nom = 2^n -1 for some n
+            binLength = len("{0:b}".format(1+int(npround(remaining_s_nom))))-1
             magnitude = 2 ** binLength - 1
             remaining_s_nom -= magnitude
             network.add(
@@ -268,6 +276,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 s_nom=magnitude
             )
             numComponents += 1
+
         network.remove("Line",line)
         return (line, numComponents)
 
