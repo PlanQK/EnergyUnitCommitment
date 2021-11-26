@@ -93,7 +93,8 @@ class ProblemInstance:
     def _createBusesAndLoads(self) -> None:
         loads = []
         for _ in range(CONFIG["snapshots"]):
-            numBuses = randomFactor() * CONFIG["numBuses"]
+            numBuses =  CONFIG["numBuses"]
+#            numBuses = randomFactor() * CONFIG["numBuses"]
             loads.append(
                 Partitioner(
                     CONFIG["averageRequiredEnergy"] * numBuses,
@@ -200,7 +201,7 @@ def main():
         print(usageString)
         exit(1)
     global CONFIG
-    for numBuses in [5, 10, 25, 50]:
+    for numBuses in [6 , 21]:
         CONFIG["numBuses"] = numBuses
         for i in range(int(sys.argv[1])):
             newProblem = ProblemInstance()

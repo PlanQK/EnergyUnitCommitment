@@ -32,6 +32,8 @@ DEFAULT_ENV_VARIABLES = {
     "chain_strength": 100,
     "seed": random.randint(0, 100000),
     "strategy": "LowestEnergy",
+    "granularity": 0,
+    "postprocess": "flow",
 }
 
 
