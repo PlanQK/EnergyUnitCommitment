@@ -31,6 +31,8 @@ CONFIG = {
     "avMarginalCost": 6.0,
     # number of different time slices
     "snapshots": 1,
+    # scaling factor for line capacity in percent
+    "lineScale": 100,
 }
 
 
@@ -147,6 +149,7 @@ class ProblemInstance:
     def _createLines(self):
         """Each bus needs to be connected with at least 1 line."""
         averageLoad = CONFIG["averageRequiredEnergy"]
+        lineScale = float(CONFIG["lineScale"])/100.0
         buses = [i for i in range(len(self.network.buses))]
         for busId1 in range(len(self.network.buses)):
             tmpBuses = buses.copy()
@@ -185,28 +188,32 @@ class ProblemInstance:
                         f"Line_{busId1}_{busId2}",
                         bus0=f"Bus_{busId1}",
                         bus1=f"Bus_{busId2}",
-                        s_nom=int(randomFactor() * averageLoad),
+                        s_nom=int(randomFactor() * lineScale * averageLoad),
                     )
 
     def exportNetwork(self, fileName: str) -> None:
         self.network.export_to_netcdf(fileName)
 
 
-usageString = """usage: problemGenerator.py num_problems
+usageString = """
+usage: problemGenerator.py num_problems
+       problemGenerator.py num_problems scale
 """
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) == 1 or len(sys.argv) > 3: 
         print(usageString)
         exit(1)
     global CONFIG
-    for numBuses in [6 , 21]:
+    if len(sys.argv) == 3:
+        CONFIG["lineScale"] = int(sys.argv[2])
+    for numBuses in [8, ]:
         CONFIG["numBuses"] = numBuses
         for i in range(int(sys.argv[1])):
             newProblem = ProblemInstance()
             newProblem.exportNetwork(
-                f"TestProblems/input_{CONFIG['numBuses']}_{i}.nc"
+                f"TestProblems/input_{CONFIG['numBuses']}_{i}_{CONFIG['lineScale']}.nc"
             )
     return
 
