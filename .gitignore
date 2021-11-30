@@ -3,7 +3,7 @@ Problemset*/*
 *.pyc
 .vscode/*
 docker.tmp
-inputNetworks*/*
+*Networks*/*
 TestProblems/
 results_*
 plots/*
