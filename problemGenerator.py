@@ -160,7 +160,7 @@ class ProblemInstance:
                 f"Line_{busId1}_{busId2}",
                 bus0=f"Bus_{busId1}",
                 bus1=f"Bus_{busId2}",
-                s_nom=int(randomFactor() * averageLoad),
+                s_nom=int(randomFactor() * lineScale * averageLoad),
             )
         # add some additional lines as well
         for busId1 in range(len(self.network.buses)):
@@ -208,7 +208,7 @@ def main():
     global CONFIG
     if len(sys.argv) == 3:
         CONFIG["lineScale"] = int(sys.argv[2])
-    for numBuses in [8, ]:
+    for numBuses in [5,7,9,11]:
         CONFIG["numBuses"] = numBuses
         for i in range(int(sys.argv[1])):
             newProblem = ProblemInstance()
