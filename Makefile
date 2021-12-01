@@ -13,9 +13,9 @@ SIQUAN_TEMP = $(shell seq 1.0 1 4)
 TRANSVERSE_HIGH = $(shell seq 1.0 1.0 1)
 
 ANNEAL_TIME = $(shell seq 220 30 220)
-NUM_READS = $(shell seq 100 50 200)
-SLACKVARFACTOR = $(shell seq 70 30 70)
-GRANULARITY = $(shell seq 1 1 1)
+NUM_READS = $(shell seq 150 50 150)
+SLACKVARFACTOR = $(shell seq 40 30 70)
+GRANULARITY = $(shell seq 1 1 2)
 
 
 INPUTFILES = $(shell find $(PROBLEMDIRECTORY)/inputNetworks -name "input*.nc" | sed 's!.*/!!' | sed 's!.po!!')
@@ -171,13 +171,14 @@ docker.tmp: Dockerfile DockerInput/run.py DockerInput/Backends/SqaBackends.py Do
 
 
 # all plots are generated using the python plot_results script
-plots/CostVsTraining.pdf: plot_results.py venv/bin/activate $(SQA_FILES)
+plots: venv/bin/activate
 	mkdir -p plots && source venv/bin/activate && python plot_results.py
 
 venv/bin/activate:
 	python3 -m venv venv && pip install -r requirements.txt && pip install 
 
-.PHONY: all clean classicalParSweep siquanParSweep quantumAnnealParSweep
+.PHONY: all clean classicalParSweep siquanParSweep quantumAnnealParSweep plots
+
 all: classicalParSweep siquanParSweep quantumAnnealParSweep
 
 classicalParSweep: $(CLASSICAL_PARAMETER_SWEEP_FILES)
