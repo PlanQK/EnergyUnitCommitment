@@ -18,11 +18,21 @@ from networkx.algorithms.flow import edmonds_karp
 from networkx.algorithms.flow import build_residual_network
 from networkx.classes.function import set_edge_attributes
 
+from os import path
+from glob import glob
+import mmap
+
 
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
         self.solver = tabu.Tabusampler()
         self.metaInfo = {}
+
+    def validateInput(self, path, network):
+        pass
+
+    def handleOptimizationStop(self, path, network):
+        pass
 
     def processSolution(self, network, transformedProblem, solution):
         """
@@ -213,6 +223,42 @@ class DwaveCloudHybrid(DwaveCloud):
 
 
 class DwaveCloudDirectQPU(DwaveCloud):
+
+    @staticmethod
+    def get_filepaths(root_path: str, file_regex: str):
+        return glob(path.join(root_path, file_regex))
+
+    def validateInput(self, networkpath, network):
+        
+        blacklists = self.get_filepaths(networkpath, "*_qpu_blacklist")
+        filteredByTimeout = []
+        for blacklist in blacklists:
+            blacklist_name = blacklist[len(networkpath + "/"):]
+            blacklisted_timeout = int(blacklist_name.split("_")[0])
+            if blacklisted_timeout <= self.timeout :
+                filteredByTimeout.append(blacklist)
+
+        for blacklist in filteredByTimeout:
+            with open(blacklist) as f:
+                s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+                if s.find(bytes(network, 'utf-8')) != -1:
+                    raise ValueError("network found in blacklist")
+        return
+
+
+    def handleOptimizationStop(self, networkpath, network):
+        """
+        If a network raises an error during optimization, add this network
+        to the blacklisted networks for this optimizer and timeout value
+        Blacklistfiles are of the form '{networkpath}/{self.timeout}_{Backend}_blacklist'
+        """
+        # on unix writing small buffers is atomic. no file locking necessary
+        # append to existing file or create a new one
+        with open(f"{networkpath}/{self.timeout}_qpu_blacklist" , 'a+') as f:
+            f.write(network + '\n')
+        return
+
+
     def __init__(self):
         envMgr = EnvironmentVariableManager()
         self.token = envMgr["dwaveAPIToken"]
@@ -223,24 +269,41 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 token=self.token)
         self.sampler = EmbeddingComposite(sampler)
 
+
+             
         self.annealing_time = int(envMgr["annealing_time"])
         self.num_reads = int(envMgr["num_reads"])
+
+
+        self.timeout = int(envMgr["timeout"])
         self.chain_strength = int(envMgr["chain_strength"])
         self.programming_thermalization = int(envMgr["programming_thermalization"])
         self.readout_thermalization = int(envMgr["readout_thermalization"])
         self.strategy = envMgr["strategy"]
         self.granularity = int(envMgr["granularity"])
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
+        self.slackVarFactor = float(envMgr["slackVarFactor"])
         self.postprocess = envMgr["postprocess"]
 
         self.metaInfo["annealing_time"] = int(envMgr["annealing_time"])
         self.metaInfo["num_reads"] = int(envMgr["num_reads"])
+
+        self.metaInfo["annealReadRatio"] = float(self.metaInfo["annealing_time"]) / \
+                float(self.metaInfo["num_reads"])
+        self.metaInfo["totalAnnealTime"] = float(self.metaInfo["annealing_time"]) * \
+                float(self.metaInfo["num_reads"])
+        # intentionally round totalAnnealTime imprecisely, so computations 
+        # that have similar totatAnnealTime, but not exactly the same 
+        # can be grouped together by plotting script
+        self.metaInfo["mangledTotalAnnealTime"] = int(self.metaInfo["totalAnnealTime"] / 10.0)
+
         self.metaInfo["chain_strength"] = int(envMgr["chain_strength"])
         self.metaInfo["programming_thermalization"] = int(envMgr["programming_thermalization"])
         self.metaInfo["readout_thermalization"] = int(envMgr["readout_thermalization"])
         self.metaInfo["strategy"] = envMgr["strategy"]
         self.metaInfo["granularity"] = int(envMgr["granularity"])
         self.metaInfo["kirchhoffFactor"] = float(envMgr["kirchhoffFactor"])
+        self.metaInfo["slackVarFactor"] = float(envMgr["slackVarFactor"])
 
 
     def power_output(self, generatorState, snapshot):
@@ -415,7 +478,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor of 1 
         and writes it to metaInfo. The generatorState is fixed, so it returns
-        only a dictionary of thevalues it computes for an optimal flow. The flow
+        only a dictionary of the values it computes for an optimal flow. The flow
         solution doesn't spread imbalances across all buses so it can still be
         improved
         """
@@ -546,13 +609,19 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
     def optimize(self, transformedProblem):
         print("optimize")
-        sampleset = self.sampler.sample(transformedProblem[1],
-                num_reads=self.num_reads,
-                annealing_time=self.annealing_time,
-                chain_strength=self.chain_strength,
-                programming_thermalization=self.programming_thermalization,
-                readout_thermalization=self.readout_thermalization,
-                )
+        try:
+            sampleset = self.sampler.sample(transformedProblem[1],
+                    num_reads=self.num_reads,
+                    annealing_time=self.annealing_time,
+                    chain_strength=self.chain_strength,
+                    programming_thermalization=self.programming_thermalization,
+                    readout_thermalization=self.readout_thermalization,
+                    embedding_parameters=dict(timeout=self.timeout)
+                    )
+        except ValueError:
+            print("no embedding found in given time limit")
+            raise ValueError("no embedding onto qpu was found")
+
         print("Waiting for server response...")
         while True:
             if sampleset.done():

@@ -29,11 +29,12 @@ DEFAULT_ENV_VARIABLES = {
     "programming_thermalization": 1000,
     "readout_thermalization": 0,
     "num_reads": 1,
-    "chain_strength": 100,
+    "chain_strength": 250,
     "seed": random.randint(0, 100000),
     "strategy": "LowestEnergy",
     "granularity": 0,
     "postprocess": "flow",
+    "timeout": "50",
 }
 
 
@@ -77,10 +78,24 @@ def main():
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
     OptimizerClass = ganBackends[sys.argv[1]]
-    pypsaNetwork = pypsa.Network(f"Problemset/{str(envMgr['inputNetwork'])}")
     optimizer = OptimizerClass()
+    try:
+        optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
+    except ValueError:
+        print("network has been blacklisted for this optimizer and timeout value")
+        print("stopping optimization")
+        return
+
+    pypsaNetwork = pypsa.Network(f"Problemset/{str(envMgr['inputNetwork'])}")
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
-    solution = optimizer.optimize(transformedProblem)
+
+    try:
+        solution = optimizer.optimize(transformedProblem)
+    except ValueError:
+        optimizer.handleOptimizationStop("Problemset",str(envMgr['inputNetwork']))
+        print("stopping optimization")
+        return
+
     processedSolution = optimizer.processSolution(
         pypsaNetwork, transformedProblem, solution
     )

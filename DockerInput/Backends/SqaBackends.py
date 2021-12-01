@@ -12,6 +12,12 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
         self._metaInfo = {}
 
+    def validateInput(self, path, network):
+        pass
+
+    def handleOptimizationStop(self, path, network):
+        pass
+
     def processSolution(self, network, transformedProblem, solution):
         return solution
 

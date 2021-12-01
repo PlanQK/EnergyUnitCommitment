@@ -24,3 +24,12 @@ class BackendBase(abc.ABC):
     @abc.abstractmethod
     def getMetaInfo(self):
         pass
+
+    @abc.abstractmethod
+    def validateInput(self, path, network):
+        pass
+
+    @abc.abstractmethod
+    def handleOptimizationStop(self, path, network):
+        pass
+    

@@ -6,6 +6,12 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 
 class PypsaBackend(BackendBase):
 
+    def validateInput(self, path, network):
+        pass
+
+    def handleOptimizationStop(self, path, network):
+        pass
+
     def processSolution(self, network, transformedProblem, solution):
         """
         writes results of generator states and line values of pypsa
