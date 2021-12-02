@@ -10,7 +10,7 @@ from .BackendBase import BackendBase
 from .IsingPypsaInterface import IsingPypsaInterface
 
 from dwave.system import LeapHybridSampler
-from dwave.system import DWaveSampler, EmbeddingComposite, DWaveCliqueSampler
+from dwave.system import DWaveSampler, FixedEmbeddingComposite, EmbeddingComposite, DWaveCliqueSampler
 
 from numpy import round as npround 
 import networkx as nx
@@ -21,6 +21,7 @@ from networkx.classes.function import set_edge_attributes
 from os import path
 from glob import glob
 import mmap
+import json
 
 
 class DwaveTabuSampler(BackendBase):
@@ -230,6 +231,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
     def validateInput(self, networkpath, network):
         
+        self.networkPath = networkpath
+        self.networkName = network
+
         blacklists = self.get_filepaths(networkpath, "*_qpu_blacklist")
         filteredByTimeout = []
         for blacklist in blacklists:
@@ -243,6 +247,18 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
+
+        embeddingPath=f"{networkpath}/embedding_gran_{self.granularity}_{network}.json"
+        if path.isfile(embeddingPath):
+            print("found previous embedding")
+            with open(embeddingPath) as embeddingFile:
+                embedding = json.load(embeddingFile)
+
+
+            self.embedding = {
+                    int(key):tuple(value) 
+                    for key,value in embedding.items()
+                    }
         return
 
 
@@ -268,12 +284,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 'topology__type': 'pegasus'},
                 token=self.token)
         self.sampler = EmbeddingComposite(sampler)
-
-
              
         self.annealing_time = int(envMgr["annealing_time"])
         self.num_reads = int(envMgr["num_reads"])
-
 
         self.timeout = int(envMgr["timeout"])
         self.chain_strength = int(envMgr["chain_strength"])
@@ -284,6 +297,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
         self.postprocess = envMgr["postprocess"]
+        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
 
         self.metaInfo["annealing_time"] = int(envMgr["annealing_time"])
         self.metaInfo["num_reads"] = int(envMgr["num_reads"])
@@ -304,6 +318,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["granularity"] = int(envMgr["granularity"])
         self.metaInfo["kirchhoffFactor"] = float(envMgr["kirchhoffFactor"])
         self.metaInfo["slackVarFactor"] = float(envMgr["slackVarFactor"])
+        self.metaInfo["monetaryCostFactor"] = float(envMgr["monetaryCostFactor"])
 
 
     def power_output(self, generatorState, snapshot):
@@ -511,7 +526,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
             try:
                 newValue = FlowSolution[bus0][bus1]['flow']
             except KeyError:
-                newValue = - FlowSolution[bus1][bus0]['flow']
+                try:
+                    newValue = - FlowSolution[bus1][bus0]['flow']
+                except KeyError:
+                    newValue = 0
             lineValues[(line,0)] = newValue
         return lineValues
 
@@ -609,25 +627,49 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
     def optimize(self, transformedProblem):
         print("optimize")
-        try:
-            sampleset = self.sampler.sample(transformedProblem[1],
-                    num_reads=self.num_reads,
-                    annealing_time=self.annealing_time,
-                    chain_strength=self.chain_strength,
-                    programming_thermalization=self.programming_thermalization,
-                    readout_thermalization=self.readout_thermalization,
-                    embedding_parameters=dict(timeout=self.timeout)
-                    )
-        except ValueError:
-            print("no embedding found in given time limit")
-            raise ValueError("no embedding onto qpu was found")
+
+        if hasattr(self,'embedding'):
+            print("Reusing embedding from previous run")
+            sampler = DWaveSampler(solver={'qpu' : True ,
+                    'topology__type': 'pegasus'},
+                    token=self.token)
+            sampler = FixedEmbeddingComposite(sampler, self.embedding)
+            sampleset = sampler.sample(transformedProblem[1],
+                                num_reads=self.num_reads,
+                                annealing_time=self.annealing_time,
+                                chain_strength=self.chain_strength,
+                                programming_thermalization=self.programming_thermalization,
+                                readout_thermalization=self.readout_thermalization,
+                                )
+        else:
+            try:
+                sampleset = self.sampler.sample(transformedProblem[1],
+                        num_reads=self.num_reads,
+                        annealing_time=self.annealing_time,
+                        chain_strength=self.chain_strength,
+                        programming_thermalization=self.programming_thermalization,
+                        readout_thermalization=self.readout_thermalization,
+                        embedding_parameters=dict(timeout=self.timeout),
+                        return_embedding = True,
+                        )
+            except ValueError:
+                print("no embedding found in given time limit")
+                raise ValueError("no embedding onto qpu was found")
 
         print("Waiting for server response...")
         while True:
             if sampleset.done():
                 break
-            time.sleep(3)
+            time.sleep(1)
 
         self.metaInfo["serial"] = sampleset.to_serializable()
+
+        if not hasattr(self,'embedding'):
+            embeddingPath = f"{self.networkPath}/embedding_gran_{self.granularity}_{self.networkName}.json"
+            embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
+            with open(embeddingPath, "w") as write_embedding:
+                json.dump(
+                    embeddingDict, write_embedding, indent=2
+                )
 
         return sampleset
