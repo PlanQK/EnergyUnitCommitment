@@ -248,7 +248,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
-        embeddingPath=f"{networkpath}/embedding_gran_{self.granularity}_{network}.json"
+        embeddingPath=f"{networkpath}/embedding_gran_{self.lineRepresentation}_{network}.json"
         if path.isfile(embeddingPath):
             print("found previous embedding")
             with open(embeddingPath) as embeddingFile:
@@ -293,7 +293,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.programming_thermalization = int(envMgr["programming_thermalization"])
         self.readout_thermalization = int(envMgr["readout_thermalization"])
         self.strategy = envMgr["strategy"]
-        self.granularity = int(envMgr["granularity"])
+        self.lineRepresentation = int(envMgr["lineRepresentation"])
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
         self.postprocess = envMgr["postprocess"]
@@ -315,7 +315,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["programming_thermalization"] = int(envMgr["programming_thermalization"])
         self.metaInfo["readout_thermalization"] = int(envMgr["readout_thermalization"])
         self.metaInfo["strategy"] = envMgr["strategy"]
-        self.metaInfo["granularity"] = int(envMgr["granularity"])
+        self.metaInfo["lineRepresentation"] = int(envMgr["lineRepresentation"])
         self.metaInfo["kirchhoffFactor"] = float(envMgr["kirchhoffFactor"])
         self.metaInfo["slackVarFactor"] = float(envMgr["slackVarFactor"])
         self.metaInfo["monetaryCostFactor"] = float(envMgr["monetaryCostFactor"])
@@ -354,67 +354,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # never be changed
         self.network = network.copy()
 
-        # line splitting. Stores data to retrieve original configuration in dict
-        #keys: line name in original network
-        #value: number of components of capacity 2^n-1 the decomposition is made
-        #of. Line names in dummy network for an item (k,v) in the dictionary are
-        #"{k}_split_{i}" for 0 <= i < v
-        self.lineDictionary = {}
-        self.lineNames = network.lines.index
-        for line in self.lineNames:
-            originalLine, numSplits = self.splitLine(line, self.network,self.granularity)
-            self.lineDictionary[originalLine] = numSplits
-
         return super().transformProblemForOptimizer(self.network)
 
 
-    def splitLine(self, line, network, granularity=0):
-        """
-        splits up a line into multiple lines such that each new line
-        has capacity 2^n - 1 for some n. Modifies the network given
-        as an argument and returns the original line name and how
-        many components where used to split it up. Use it on the
-        network stored in self because it modifies it.
-
-        granularity is an upper limit for number of splits. if
-        is is 0, no limit is set
-        """
-        remaining_s_nom = network.lines.loc[line].s_nom
-        numComponents = 0
-        while remaining_s_nom > 0 \
-                and (granularity == 0 or granularity > numComponents):
-            binLength = len("{0:b}".format(1+int(npround(remaining_s_nom))))-1
-            magnitude = 2 ** binLength - 1
-            remaining_s_nom -= magnitude
-            network.add(
-                "Line",
-                f"{line}_split_{numComponents}",
-                bus0=network.lines.loc[line].bus0,
-                bus1=network.lines.loc[line].bus1,
-                s_nom=magnitude
-            )
-            numComponents += 1
-
-        network.remove("Line",line)
-        return (line, numComponents)
-
-
-    def mergeLines(self, lineValues, snapshots):
-        """
-        For a dictionary of lineValues of the network, whose
-        lines were split up, uses the data in self to calculate
-        the corresponding lineValues in the unmodified network
-        """
-        result = {}
-        for line, numSplits in self.lineDictionary.items():
-            for snapshot in range(len(snapshots)):
-                newKey = (line, snapshot)
-                value = 0
-                for i in range(numSplits):
-                    splitLineKey = line + "_split_" + str(i)
-                    value += lineValues[(splitLineKey, snapshot)]
-                result[newKey] = value
-        return result
     
 
     def processSolution(self, network, transformedProblem, solution, sample=None):
@@ -424,30 +366,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 solution,
                 )
 
-        lineValues = self.mergeLines(resultDict['lineValues'], network.snapshots)
-        resultDict['lineValues'] = lineValues
-
-        # store lineValues of all other samples that were not chosen and save them
-        # to metaInfo
-        lineValuesDict = {
-                idx : self.mergeLines(
-                        transformedProblem[0].getLineValues(
-                                self.metaInfo['sample_df']['data'][idx][:-3]
-                        ),
-                        network.snapshots,
-                        )
-                for idx in range(len(self.metaInfo['sample_df']['data']))
-        }
-        self.metaInfo['sample_df']['columns'].append('lineValues')
-        for idx in range(len(self.metaInfo['sample_df']['data'])):
-                self.metaInfo['sample_df']['data'][idx].append(
-                        {
-                                key[0]: value 
-                                for key,value in lineValuesDict[idx].items()
-                        }
-            )
-
-
         lowestEnergySample = solution.first.sample
         lowestEnergyState = [
             id for id, value in lowestEnergySample.items() if value == -1
@@ -456,7 +374,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         graphLowestEnergy = self.buildFlowproblem(network,
                 lowestEnergyState,
-                lineValues)
+                resultDict['lineValues'])
         lineValuesLowestEnergyFlowSample = self.solveFlowproblem(
                 graphLowestEnergy,
                 network,
@@ -470,7 +388,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         ]
         graphClosestSample = self.buildFlowproblem(network,
                 closestSampleState,
-                lineValues)
+                resultDict['lineValues'])
         lineValuesClosestSample = self.solveFlowproblem(
                 graphClosestSample,
                 network,
@@ -665,7 +583,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["serial"] = sampleset.to_serializable()
 
         if not hasattr(self,'embedding'):
-            embeddingPath = f"{self.networkPath}/embedding_gran_{self.granularity}_{self.networkName}.json"
+            embeddingPath = f"{self.networkPath}/embedding_gran_{self.lineRepresentation}_{self.networkName}.json"
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
             with open(embeddingPath, "w") as write_embedding:
                 json.dump(

@@ -9,13 +9,31 @@ class IsingPypsaInterface:
         self.problem = {}
         self.snapshots = snapshots
         self._startIndex = {}
-        self.network = network
 
         envMgr = EnvironmentVariableManager()
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
         self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
+
+        lineRepresentation = envMgr["lineRepresentation"]
+        if lineRepresentation == "":
+            self.network = network
+        else:
+            self.lineRepresentation = int(lineRepresentation)
+            self.network = network.copy()
+        # line splitting. Stores data to retrieve original configuration in dict
+        #keys: line name in original network
+        #value: number of components of capacity 2^n-1 the decomposition is made
+        #of. Line names in dummy network for an item (k,v) in the dictionary are
+        #"{k}_split_{i}" for 0 <= i < v
+            self.lineDictionary = {}
+            self.lineNames = network.lines.index
+            for line in self.lineNames:
+                originalLine, numSplits = self.splitLine(line, self.network,self.lineRepresentation)
+                self.lineDictionary[originalLine] = numSplits
+            
+
         count = 0
         for i in range(len(self.network.buses)):
             gen = self.network.generators[
@@ -564,7 +582,7 @@ class IsingPypsaInterface:
                 if self.lineDirectionToIndex(lineId, t) in solution:
                     value = -value
                 lineValues[(lineId, t)] = value
-        return lineValues
+        return self.mergeLines(lineValues,self.snapshots)
 
     def constantSlackCost(self):
         totalConstCost = 0.0
@@ -617,3 +635,57 @@ class IsingPypsaInterface:
         )
 
         return network
+
+
+    def splitLine(self, line, network, lineRepresentation=0):
+        """
+        splits up a line into multiple lines such that each new line
+        has capacity 2^n - 1 for some n. Modifies the network given
+        as an argument and returns the original line name and how
+        many components where used to split it up. Use it on the
+        network stored in self because it modifies it.
+
+        lineRepresentation is an upper limit for number of splits. if
+        is is 0, no limit is set
+        """
+        remaining_s_nom = network.lines.loc[line].s_nom
+        numComponents = 0
+        while remaining_s_nom > 0 \
+                and (lineRepresentation == 0 or lineRepresentation > numComponents):
+            binLength = len("{0:b}".format(1+int(np.round(remaining_s_nom))))-1
+            magnitude = 2 ** binLength - 1
+            remaining_s_nom -= magnitude
+            network.add(
+                "Line",
+                f"{line}_split_{numComponents}",
+                bus0=network.lines.loc[line].bus0,
+                bus1=network.lines.loc[line].bus1,
+                s_nom=magnitude
+            )
+            numComponents += 1
+
+        network.remove("Line",line)
+        return (line, numComponents)
+
+
+    def mergeLines(self, lineValues, snapshots):
+        """
+        For a dictionary of lineValues of the network, whose
+        lines were split up, uses the data in self to calculate
+        the corresponding lineValues in the unmodified network
+        """
+        if hasattr(self, 'lineDictionary'):
+            result = {}
+            for line, numSplits in self.lineDictionary.items():
+                for snapshot in range(len(snapshots)):
+                    newKey = (line, snapshot)
+                    value = 0
+                    for i in range(numSplits):
+                        splitLineKey = line + "_split_" + str(i)
+                        value += lineValues[(splitLineKey, snapshot)]
+                    result[newKey] = value
+            return result
+        else:
+            return lineValues
+    
+

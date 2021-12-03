@@ -21,26 +21,28 @@ TRANSVERSE_HIGH = $(shell seq 1.0 1.0 1)
 ANNEAL_TIME = $(shell seq 100 50 100)
 NUM_READS = $(shell seq 100 50 100)
 SLACKVARFACTOR = $(shell seq 70 30 70)
-GRANULARITY = $(shell seq 1 1 1)
+LINEREPRESENTATION = $(shell seq 0 1 0)
 
 
 INPUTFILES = $(shell find $(PROBLEMDIRECTORY)/inputNetworks -name "input*.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "input*.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_7*_[23][50].nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), $(foreach hightemp, ${CLASSICAL_HIGH_TEMP}, \
 		$(foreach number, ${NUMBERS}, $(foreach lowtemp, ${CLASSICAL_LOW_TEMP}, \
 		results_classical_parameter_sweep/info_${filename}_${hightemp}_${lowtemp}_${number}))))
 
 SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), $(foreach temp, ${SIQUAN_TEMP}, \
-		$(foreach transverse, ${TRANSVERSE_HIGH}, $(foreach number, ${NUMBERS}, results_sqa_sweep/info_${filename}_${temp}_${transverse}_${number}))))
+		$(foreach transverse, ${TRANSVERSE_HIGH}, \
+		$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
+		$(foreach number, ${NUMBERS}, results_sqa_sweep/info_${filename}_${temp}_${transverse}_${lineRepresentation}_${number})))))
 
 QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach anneal_time, ${ANNEAL_TIME}, \
 		$(foreach num_reads, ${NUM_READS}, \
 		$(foreach slackvarfactor, ${SLACKVARFACTOR}, \
-		$(foreach granularity, ${GRANULARITY}, \
+		$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
 		$(foreach number, ${NUMBERS}, \
-		results_qpu_sweep/info_${filename}_${anneal_time}_${num_reads}_${slackvarfactor}_${granularity}_${number}))))))
+		results_qpu_sweep/info_${filename}_${anneal_time}_${num_reads}_${slackvarfactor}_${lineRepresentation}_${number}))))))
 
 NETWORK_FILES = $(foreach filename, $(SWEEPFILES), \
 		results_pypsa_glpk_sweep/info_${filename})
@@ -78,21 +80,25 @@ $(foreach filename, $(SWEEPFILES), $(foreach hightemp, ${CLASSICAL_HIGH_TEMP}, \
 #
 
 define sqaParameterSweep
-results_sqa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_sqa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	--env temperatureSchedule=[$(strip $(2))] \
-	--env transverseFieldSchedule=[$(strip $(2)),0.0] \
+	--env transverseFieldSchedule=[$(strip $(3)),0.0] \
 	--env optimizationCycles=1000 \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
+	--env lineRepresentation=$(strip $(4)) \
+	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 sqa
 	mkdir -p results_sqa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_sqa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) results_sqa_sweep/
 
 endef
 
 $(foreach filename, $(SWEEPFILES), $(foreach temp, ${SIQUAN_TEMP}, \
-	$(foreach transverseField, ${TRANSVERSE_HIGH}, $(foreach number, ${NUMBERS}, $(eval $(call sqaParameterSweep, ${filename}, ${temp}, ${transverseField}, ${number}))))))
+	$(foreach transverseField, ${TRANSVERSE_HIGH}, \
+	$(foreach number, ${NUMBERS}, \
+	$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
+	$(eval $(call sqaParameterSweep, ${filename}, ${temp}, ${transverseField}, ${lineRepresentation}, ${number})))))))
 
 #
 # Define D-Wave qpu targets
@@ -104,7 +110,7 @@ results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$
 	--env annealing_time=$(strip $(2)) \
 	--env num_reads=$(strip $(3)) \
 	--env slackVarFactor=$(strip $(4)) \
-	--env granularity=$(strip $(5))\
+	--env lineRepresentation=$(strip $(5))\
 	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env dwaveAPIToken=$(dwaveAPIToken) \
@@ -117,9 +123,9 @@ endef
 $(foreach filename, $(SWEEPFILES), $(foreach anneal_time, ${ANNEAL_TIME}, \
 	$(foreach num_reads, ${NUM_READS}, \
 	$(foreach slackvarfactor, ${SLACKVARFACTOR}, \
-	$(foreach granularity, ${GRANULARITY}, \
+	$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
 	$(foreach number, ${NUMBERS}, \
-	$(eval $(call qpuParameterSweep, ${filename}, ${anneal_time}, ${num_reads}, ${slackvarfactor}, ${granularity}, ${number}))))))))
+	$(eval $(call qpuParameterSweep, ${filename}, ${anneal_time}, ${num_reads}, ${slackvarfactor}, ${lineRepresentation}, ${number}))))))))
 
 
 define pypsa-glpk
