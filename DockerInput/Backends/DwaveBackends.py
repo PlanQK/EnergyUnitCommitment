@@ -248,7 +248,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
-        embeddingPath=f"{networkpath}/embedding_gran_{self.lineRepresentation}_{network}.json"
+        embeddingPath=f"{networkpath}/embedding_" \
+                f"rep_{self.lineRepresentation}_" \
+                f"ord_{self.maxOrder}_" \
+                f"{network}.json"
         if path.isfile(embeddingPath):
             print("found previous embedding")
             with open(embeddingPath) as embeddingFile:
@@ -285,40 +288,51 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 token=self.token)
         self.sampler = EmbeddingComposite(sampler)
              
-        self.annealing_time = int(envMgr["annealing_time"])
-        self.num_reads = int(envMgr["num_reads"])
+        # reading variables from environment
+        intVars = [
+                "annealing_time",
+                "num_reads",
+                "timeout",
+                "chain_strength",
+                "programming_thermalization",
+                "readout_thermalization",
+                "lineRepresentation",
+                "maxOrder",
+                "num_reads",
+        ]
+        for var in intVars:
+            setattr(self,var,int(envMgr[var]))
+            self.metaInfo[var] = int(envMgr[var])
 
-        self.timeout = int(envMgr["timeout"])
-        self.chain_strength = int(envMgr["chain_strength"])
-        self.programming_thermalization = int(envMgr["programming_thermalization"])
-        self.readout_thermalization = int(envMgr["readout_thermalization"])
-        self.strategy = envMgr["strategy"]
-        self.lineRepresentation = int(envMgr["lineRepresentation"])
-        self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
-        self.slackVarFactor = float(envMgr["slackVarFactor"])
-        self.postprocess = envMgr["postprocess"]
-        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
+        floatVars = [
+                "kirchhoffFactor",
+                "slackVarFactor",
+                "monetaryCostFactor",
+        ]
+        for var in floatVars:
+            setattr(self,var,float(envMgr[var]))
+            self.metaInfo[var] = float(envMgr[var])
 
-        self.metaInfo["annealing_time"] = int(envMgr["annealing_time"])
-        self.metaInfo["num_reads"] = int(envMgr["num_reads"])
+        stringVars = [
+                "strategy",
+                "postprocess",
+        ]
+        for var in stringVars:
+            setattr(self,var,envMgr[var])
+            self.metaInfo[var] = envMgr[var]
+
+        #additional info
+        if self.timeout < 0:
+            self.timeout = 1000
 
         self.metaInfo["annealReadRatio"] = float(self.metaInfo["annealing_time"]) / \
                 float(self.metaInfo["num_reads"])
         self.metaInfo["totalAnnealTime"] = float(self.metaInfo["annealing_time"]) * \
                 float(self.metaInfo["num_reads"])
-        # intentionally round totalAnnealTime imprecisely, so computations 
-        # that have similar totatAnnealTime, but not exactly the same 
-        # can be grouped together by plotting script
-        self.metaInfo["mangledTotalAnnealTime"] = int(self.metaInfo["totalAnnealTime"] / 10.0)
+        # intentionally round totalAnnealTime so computations with similar anneal time
+        # can ge grouped together
+        self.metaInfo["mangledTotalAnnealTime"] = int(self.metaInfo["totalAnnealTime"] / 1000.0)
 
-        self.metaInfo["chain_strength"] = int(envMgr["chain_strength"])
-        self.metaInfo["programming_thermalization"] = int(envMgr["programming_thermalization"])
-        self.metaInfo["readout_thermalization"] = int(envMgr["readout_thermalization"])
-        self.metaInfo["strategy"] = envMgr["strategy"]
-        self.metaInfo["lineRepresentation"] = int(envMgr["lineRepresentation"])
-        self.metaInfo["kirchhoffFactor"] = float(envMgr["kirchhoffFactor"])
-        self.metaInfo["slackVarFactor"] = float(envMgr["slackVarFactor"])
-        self.metaInfo["monetaryCostFactor"] = float(envMgr["monetaryCostFactor"])
 
 
     def power_output(self, generatorState, snapshot):
@@ -583,7 +597,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["serial"] = sampleset.to_serializable()
 
         if not hasattr(self,'embedding'):
-            embeddingPath = f"{self.networkPath}/embedding_gran_{self.lineRepresentation}_{self.networkName}.json"
+            embeddingPath=f"{self.networkPath}/embedding_" \
+                    f"rep_{self.lineRepresentation}_" \
+                    f"ord_{self.maxOrder}_" \
+                    f"{self.networkName}.json"
+
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
             with open(embeddingPath, "w") as write_embedding:
                 json.dump(
