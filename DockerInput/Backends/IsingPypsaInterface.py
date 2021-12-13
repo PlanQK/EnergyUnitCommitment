@@ -17,6 +17,8 @@ class IsingPypsaInterface:
         self.slackVarFactor = float(envMgr["slackVarFactor"])
 
         lineRepresentation = envMgr["lineRepresentation"]
+        self.maxOrder = int(envMgr["maxOrder"])
+
         if lineRepresentation == "":
             self.network = network
         else:
@@ -30,7 +32,12 @@ class IsingPypsaInterface:
             self.lineDictionary = {}
             self.lineNames = network.lines.index
             for line in self.lineNames:
-                originalLine, numSplits = self.splitLine(line, self.network,self.lineRepresentation)
+                originalLine, numSplits = self.splitLine(
+                        line,
+                        self.network,
+                        self.lineRepresentation,
+                        self.maxOrder
+                )
                 self.lineDictionary[originalLine] = numSplits
             
 
@@ -637,7 +644,7 @@ class IsingPypsaInterface:
         return network
 
 
-    def splitLine(self, line, network, lineRepresentation=0):
+    def splitLine(self, line, network, lineRepresentation=0, maxOrder=0):
         """
         splits up a line into multiple lines such that each new line
         has capacity 2^n - 1 for some n. Modifies the network given
@@ -650,10 +657,14 @@ class IsingPypsaInterface:
         """
         remaining_s_nom = network.lines.loc[line].s_nom
         numComponents = 0
+        maxMagnitude = 2 ** self.maxOrder - 1
+
         while remaining_s_nom > 0 \
                 and (lineRepresentation == 0 or lineRepresentation > numComponents):
             binLength = len("{0:b}".format(1+int(np.round(remaining_s_nom))))-1
             magnitude = 2 ** binLength - 1
+            if maxOrder:
+                magnitude = min(magnitude,maxMagnitude)
             remaining_s_nom -= magnitude
             network.add(
                 "Line",

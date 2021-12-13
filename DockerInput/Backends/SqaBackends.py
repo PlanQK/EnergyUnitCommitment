@@ -14,6 +14,7 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
         self._metaInfo = {}
         self._metaInfo["lineRepresentation"] = self.lineRepresentation
+        self._metaInfo["maxOrder"] = int(envMgr["maxOrder"])
 
     def validateInput(self, path, network):
         pass

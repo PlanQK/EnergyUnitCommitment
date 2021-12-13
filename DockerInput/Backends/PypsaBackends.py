@@ -75,6 +75,7 @@ class PypsaBackend(BackendBase):
                 formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
                 solver_name=self.solver_name)
+        self.opt.options["tmlim"] = self.timeout
         return self.model
 
 
@@ -145,6 +146,7 @@ class PypsaBackend(BackendBase):
         self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
+        self.timeout = int(envMgr["timeout"])
 
 
 class PypsaFico(PypsaBackend):

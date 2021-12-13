@@ -34,7 +34,8 @@ DEFAULT_ENV_VARIABLES = {
     "strategy": "LowestEnergy",
     "lineRepresentation": 0,
     "postprocess": "flow",
-    "timeout": "50",
+    "timeout": "-1",
+    "maxOrder": 0,
 }
 
 
