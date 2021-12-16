@@ -13,6 +13,7 @@ FOLDER = "Problemset"
 
 DEFAULT_ENV_VARIABLES = {
     "inputNetwork": "input.nc",
+    "inputInfo": "",
     "outputNetwork": "",
     "outputInfo": "output.json",
     "optimizationCycles": 1000,
@@ -36,6 +37,8 @@ DEFAULT_ENV_VARIABLES = {
     "postprocess": "flow",
     "timeout": "-1",
     "maxOrder": 0,
+    "sampleCutSize": 100,
+    "threshold": 0.5
 }
 
 
@@ -48,6 +51,7 @@ Arguments:
     dwave-greedy: run the classical optimization procedure locally using the dwave package (greedy)
     dwave-hybrid: run a hybrid optimization procedure from dwave (through cloud)
     dwave-qpu: run the optimization on a dwave quantum annealing device (through cloud)
+    dwave-read-qpu: reuse the optimization of a dwave quantum annealing device (read from local drive)
 
 
 Any further settings are specified through environment variables:
@@ -68,6 +72,7 @@ ganBackends = {
     "pypsa-fico": Backends.PypsaFico,
     "dwave-hybrid": Backends.DwaveCloudHybrid,
     "dwave-qpu": Backends.DwaveCloudDirectQPU,
+    "dwave-read-qpu": Backends.DwaveReadQPU,
 }
 
 

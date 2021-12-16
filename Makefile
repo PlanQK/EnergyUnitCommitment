@@ -23,8 +23,12 @@ NUM_READS = $(shell seq 365 20 365)
 SLACKVARFACTOR = $(shell seq 30 10 30)
 CHAINSTRENGTH = 80
 
+SAMPLECUTSIZE = $(shell seq 100 4 100)
+
 LINEREPRESENTATION = $(shell seq 0 1 0)
 MAXORDER = 1
+
+TIMEOUT = 30
 
 
 INPUTFILES = $(shell find $(PROBLEMDIRECTORY)/inputNetworks -name "input*.nc" | sed 's!.*/!!' | sed 's!.po!!')
@@ -51,8 +55,21 @@ QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach number, ${NUMBERS}, \
 		results_qpu_sweep/info_${filename}_${anneal_time}_${num_reads}_${slackvarfactor}_${lineRepresentation}_${maxOrder}_${chain_strength}_${number}))))))))
 
+QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
+		$(foreach anneal_time, ${ANNEAL_TIME}, \
+		$(foreach num_reads, ${NUM_READS}, \
+		$(foreach slackvarfactor, ${SLACKVARFACTOR}, \
+		$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
+		$(foreach maxOrder, ${MAXORDER}, \
+		$(foreach chain_strength, ${CHAINSTRENGTH}, \
+		$(foreach sampleCutSize, ${SAMPLECUTSIZE}, \
+		$(foreach number, ${NUMBERS}, \
+		results_qpu_read_sweep/info_${filename}_${anneal_time}_${num_reads}_${slackvarfactor}_${lineRepresentation}_${maxOrder}_${chain_strength}_${sampleCutSize}_${number})))))))))
+
 NETWORK_FILES = $(foreach filename, $(SWEEPFILES), \
-		results_pypsa_glpk_sweep/info_${filename})
+		$(foreach timeout, $(TIMEOUT), \
+		$(foreach number, ${NUMBERS}, \
+		results_pypsa_glpk_sweep/info_${filename}_${timeout}_${number})))
 		
 
 
@@ -141,20 +158,55 @@ $(foreach filename, $(SWEEPFILES), $(foreach anneal_time, ${ANNEAL_TIME}, \
 	$(foreach number, ${NUMBERS}, \
 	$(eval $(call qpuParameterSweep, ${filename}, ${anneal_time}, ${num_reads}, ${slackvarfactor}, ${lineRepresentation}, ${maxOrder}, ${chain_strength}, ${number}))))))))))
 
+# define targets for old sample data
+
+define qpuReadSweep
+results_qpu_read_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9)): docker.tmp \
+		results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(9))
+	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+			--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep/,target=/energy/results_qpu \
+	--env annealing_time=$(strip $(2)) \
+	--env num_reads=$(strip $(3)) \
+	--env slackVarFactor=$(strip $(4)) \
+	--env lineRepresentation=$(strip $(5))\
+	--env maxOrder=$(strip $(6)) \
+	--env chain_strength=$(strip $(7)) \
+	--env sampleCutSize=$(strip $(8)) \
+	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9)) \
+	--env inputNetwork=$(strip $(1)) \
+	--env inputInfo=results_qpu/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(9)) \
+	energy:1.0 dwave-read-qpu
+	mkdir -p results_qpu_read_sweep
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9)) results_qpu_read_sweep/
+
+endef
+
+$(foreach filename, $(SWEEPFILES), $(foreach anneal_time, ${ANNEAL_TIME}, \
+	$(foreach num_reads, ${NUM_READS}, \
+	$(foreach slackvarfactor, ${SLACKVARFACTOR}, \
+	$(foreach lineRepresentation, ${LINEREPRESENTATION}, \
+	$(foreach maxOrder, ${MAXORDER}, \
+	$(foreach chain_strength, ${CHAINSTRENGTH}, \
+	$(foreach sampleCutSize, ${SAMPLECUTSIZE}, \
+	$(foreach number, ${NUMBERS}, \
+	$(eval $(call qpuReadSweep, ${filename}, ${anneal_time}, ${num_reads}, ${slackvarfactor}, ${lineRepresentation}, ${maxOrder}, ${chain_strength}, ${sampleCutSize}, ${number})))))))))))
 
 define pypsa-glpk
-results_pypsa_glpk_sweep/info_$(strip $(1)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_pypsa_glpk_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
-	--env outputInfo=info_$(strip $(1)) \
+	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
 	--env inputNetwork=$(strip $(1)) \
+	--env timeout=$(strip $(2)) \
 	energy:1.0 pypsa-glpk
 	mkdir -p results_pypsa_glpk_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1)) results_pypsa_glpk_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3)) results_pypsa_glpk_sweep/
 
 endef
 
 $(foreach filename, $(SWEEPFILES), \
-	$(eval $(call pypsa-glpk, ${filename})))
+	$(foreach timeout, $(TIMEOUT), \
+	$(foreach number, ${NUMBERS}, \
+	$(eval $(call pypsa-glpk, ${filename}, ${timeout}, ${number})))))
 
 ####################
 ### not functional yet
@@ -221,7 +273,7 @@ plots: venv/bin/activate
 venv/bin/activate:
 	python3 -m venv venv && pip install -r requirements.txt && pip install 
 
-.PHONY: all clean classicalParSweep siquanParSweep quantumAnnealParSweep plots pypsa-glpk
+.PHONY: all clean classicalParSweep siquanParSweep quantumAnnealParSweep plots pypsa-glpk quantumReadSweep
 
 all: classicalParSweep siquanParSweep quantumAnnealParSweep pypsa-glpk
 
@@ -230,6 +282,8 @@ classicalParSweep: $(CLASSICAL_PARAMETER_SWEEP_FILES)
 siquanParSweep: $(SIQUAN_PARAMETER_SWEEP_FILES)
 
 quantumAnnealParSweep: $(QUANTUM_ANNEALING_SWEEP_FILES)
+
+quantumReadSweep: $(QUANTUM_ANNEALING_READ_RESULTS)
 
 pypsa-glpk: $(NETWORK_FILES)
 

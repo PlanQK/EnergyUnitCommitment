@@ -4,5 +4,6 @@ from .DwaveBackends import (
     DwaveSteepestDescent,
     DwaveCloudHybrid,
     DwaveCloudDirectQPU,
+    DwaveReadQPU,
 )
 from .PypsaBackends import PypsaGlpk, PypsaFico
