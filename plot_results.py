@@ -5,6 +5,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+from os import path
+
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
 FILEFORMAT = "png"
@@ -95,7 +97,6 @@ def makeFig(plotInfo, outputFile,
             y = []
             for e in values:
                 x += e[1][0]
-                print(x)
                 y += e[1][1]
             ax.scatter(x,y,s=10)
             
@@ -131,7 +132,7 @@ def extractEmbeddingInformation(
     plotData = collections.defaultdict(collections.defaultdict)
     for fileName in glob.glob(fileRegex):
         with open(fileName) as file:
-            fileName = fileName.split("/")[-1]
+            fileName = path.split(fileName)[-1]
             element = json.load(file)
             logicalQubits = [int(key) for key in element.keys()]
             embeddedQubits = [item for sublist in element.values() for item in sublist ]
@@ -194,7 +195,7 @@ def extractPlottableInformation(
         # For a dwave-qpu computation the solver parameters are
         # ANNEALINGTIME_NUMREADS_SLACKVARFACTOR_LINEPRESENTATION_MAXORDER_CHAINSTRENGTH_REPETITIONNUMBER
         with open(fileName) as file:
-            fileName = fileName.split("/")[-1]
+            fileName = path.split(fileName)[-1]
             element = json.load(file)
             element["fileName"] = "_".join(fileName.split("_")[1:])
             element["problemSize"] = float(fileName.split("_")[2])
