@@ -335,22 +335,60 @@ def main():
 
     plt.style.use("seaborn")
 
+    regex = '*20.nc_110_365_30_0_1_80_1'
+    plotGroup("opt_size_to_cost_split_sampleCutSize_mean",
+              "qpu_read",
+              [
+                  regex,
+                  "*20.nc*"
+              ],
+              "problemSize",
+              yFieldList=["cutSamplesCost", "totalCost"],
+              splitFields=["sampleCutSize"],
+              logscalex=False,
+              lineNames=['cutSampplesCost', 'glpk'],
+              constraints={"sampleCutSize": [1, 2, 5, 10, 30, 100, 365]},
+              PATH=[
+                  "results_qpu_sweep",
+                  "results_pypsa_glpk_sweep"
+              ],
+              )
 
-    regex = '*put_15_0_20.nc_110_365_30_0_1_80_365_1'
-    plotGroup("costDistribution_for_fullSampleOpt",
-            "qpu_read",
-            [
+    return
+
+    regex = '*'
+    constraints = {}
+    plotGroup(plotname = "costDistribution_for_fullSampleOpt",
+            solver = "pypsa_glpk",
+            fileRegexList = [
             regex,
             ],
-            "problemSize",
-            yFieldList = ["sampleValues",],
-            reductionMethod = [lambda x:x],
+            xField = "scale",
+            yFieldList = ["totalCost",],
             splitFields = [],
-            histogramm=True,
+            constraints=constraints,
             logscalex=False,
-            ylabel="count",
-            xlabel="sampleValues",
+            logscaley=False,
     )
+
+    return
+
+    plotGroup("glpk_scale_to_cost_mean",
+              "pypsa_glpk",
+              [
+                  '*nocostinput_*1',
+              ],
+              xField="scale",
+              yFieldList=["totalCost"],
+              splitFields=[],
+              constraints={
+                  'problemSize': [10, 11, 12, 13, 14],
+                  'scale': list(range(10, 45, 5)),
+              },
+              logscalex=False,
+              logscaley=False,
+              )
+
     plotGroup("cumulativeCostDistribution_for_fullSampleOpt",
             "qpu_read",
             [

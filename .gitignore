@@ -7,3 +7,4 @@ docker.tmp
 TestProblems/
 results_*
 plots/*
+/build_and_run_euc.sh
