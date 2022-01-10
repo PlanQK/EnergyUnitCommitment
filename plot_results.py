@@ -383,6 +383,28 @@ def main():
     BINSIZE = 1
 
     regex = '*put_15_0_20.nc_110_365_30_0_1_80_365_1'
+
+    plotGroup("glpk_scale_to_cost_mean",
+              "pypsa_glpk",
+              [
+                  '*nocostinput_*1',
+                  '*nocostinput_*1',
+              ],
+              xField="scale",
+              yFieldList=["totalCost"] * 2,
+              splitFields=[],
+              reductionMethod=[np.mean, np.std],
+              constraints={
+                  'problemSize': [10, 11, 12, 13, 14],
+                  'scale': list(range(10, 45, 5)),
+              },
+              lineNames=["totalCost", "standard_deviation"],
+              logscalex=False,
+              logscaley=False,
+              )
+
+    return
+
     plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
             "qpu_read",
             [
@@ -399,7 +421,6 @@ def main():
             ylabel="cost",
     )
 
-    return
     plotGroup("costDistribution_for_fullSampleOpt",
             "qpu_read",
             [
