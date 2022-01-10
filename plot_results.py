@@ -5,14 +5,18 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+from os import path
+
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
 FILEFORMAT = "png"
+BINSIZE = 1
+PLOTLIMIT = 500
 
 def deviationOfTheMean(values : list) -> float :
     return np.std(values)/np.sqrt(len(values))
 
-def cumulativeDistribution(values : list , rightLimit=150):
+def cumulativeDistribution(values : list ):
     result = []
     maxVal = max(values[0])
     for valueLists in values:
@@ -45,15 +49,27 @@ def averageOfBestPercent(values : list, percentage : float) -> float:
     values.sort()
     return np.mean(values[:int(percentage*len(values))])
 
-    
+def extractCutSamples(cutSamplesDictList):
+    """
+    used to create scatter plots from a single run
+    """
+    energy = []
+    optimizedCost = []
+    for cutSamplesDict in cutSamplesDictList:
+        for value in cutSamplesDict.values():
+            energy.append(value["energy"])
+            optimizedCost.append(value["optimizedCost"])
+    return (energy,optimizedCost)
+
+
     
 def makeFig(plotInfo, outputFile, 
         logscalex=False, logscaley=False, xlabel=None, ylabel=None, title=None, 
-        fileformat="pdf", histogramm=False, rightLimit=500):
+        fileformat="pdf", plottype="line", ):
     fig, ax = plt.subplots()
-    # fig.set_size_inches((20, 20))
     for key, values in plotInfo.items():
-        if histogramm:
+
+        if plottype=="histogramm":
             # if condition is truthy if the function values have not been reduced earlier. thus in 'yvalues' we have a list of
             # values that go in to the histogramm with weight 1.
             # if the condition is falsy, the xField should be the yvalues we want to plot, using arbitrary yvalues that
@@ -63,13 +79,36 @@ def makeFig(plotInfo, outputFile,
                     flattenedList = [ item for sublist in entries[1] for item in sublist]
                     if not flattenedList:
                         continue
-                    ax.hist( flattenedList ,bins=[i for i in range(int(min(flattenedList))-2,int(max(flattenedList))+2,1)], label=key) 
+                    ax.hist( flattenedList ,bins=[i*BINSIZE for i in range(int(min(flattenedList)/BINSIZE)-2,int(max(flattenedList)/BINSIZE)+2,1)], label=key)
             else:
                 sortedValues = sorted(values)
-                ax.hist([e[0]  for e in values],bins=[i for i in range(0,rightLimit,1)],  label=key, weights=[e[1]  for e in sortedValues] )
-        else:
+                ax.hist([e[0]  for e in values],bins=[i*BINSIZE for i in range(0,PLOTLIMIT//BINSIZE + 1,1)],  label=key, weights=[e[1]  for e in sortedValues] )
+
+        if plottype=="scatterplot":
+            # no use yet
+            pass
+
+        # in order to make a scatterplot of all shots for one file, we need to break
+        # convention and put all relevant data as a dict where we would usually put
+        # the y-value. We have to transform that into points to be plotted by giving
+        # a reduction method, that can also extract the data from the dictionary
+        if plottype=="scatterCutSample":
+            x = []
+            y = []
+            for e in values:
+                x += e[1][0]
+                y += e[1][1]
+            ax.scatter(x,y,s=10)
+
+            # linear regression
+            m, b = np.polyfit(x, y, 1)
+            ax.plot(x,[m*z+b for z in x], color='red')
+
+        # default plot type of a function graph
+        if plottype=="line":
             sortedValues = sorted(values)
             ax.errorbar([e[0] for e in sortedValues], [e[1] for e in sortedValues], label=key, yerr=[e[2]/2.0 for e in sortedValues] )
+
     plt.legend()
     if logscalex:
         ax.set_xscale("log")
@@ -86,12 +125,14 @@ def makeFig(plotInfo, outputFile,
 
 
 def extractEmbeddingInformation(
-    fileRegex, xField, yField, splitFields=["problemSize"], reductionMethod=np.mean,errorMethod=deviationOfTheMean
+    fileRegex, xField, yField, splitFields=["problemSize"],
+    reductionMethod=np.mean,
+    errorMethod=deviationOfTheMean
 ):
     plotData = collections.defaultdict(collections.defaultdict)
     for fileName in glob.glob(fileRegex):
         with open(fileName) as file:
-            fileName = fileName.split("/")[-1]
+            fileName = path.split(fileName)[-1]
             element = json.load(file)
             logicalQubits = [int(key) for key in element.keys()]
             embeddedQubits = [item for sublist in element.values() for item in sublist ]
@@ -101,15 +142,15 @@ def extractEmbeddingInformation(
             element["embedFactor"] = float(element["embeddedQubits"]) / float(element["logicalQubits"])
 
             element["fileName"] = "_".join(fileName.split("_")[5:])[:-5]
-            element["problemSize"] = fileName.split("_")[6]
-            element["scale"] = fileName.split("_")[8][:-8]
-            element["rep"] = fileName.split("_")[2]
-            element["ord"] = fileName.split("_")[4]
+            element["problemSize"] = float(fileName.split("_")[6])
+            element["scale"] = float(fileName.split("_")[8][:-8])
+            element["rep"] = float(fileName.split("_")[2])
+            element["ord"] = float(fileName.split("_")[4])
             key = tuple(
                 e
                 for e in [
                     splitField + "=" + str(element[splitField])
-                    for splitField in splitFields
+                    for splitField in sorted(splitFields)
                 ]
             )
             if element[xField] not in plotData[key]:
@@ -147,32 +188,31 @@ def extractPlottableInformation(
     plotData = collections.defaultdict(collections.defaultdict)
     filesRead = 0
     for fileName in glob.glob(fileRegex):
+        # a filename of a unit commitment computation has the the following
+        # convention for its networks meta parameters and the solver parameters
+        # info_NETWORKNAME_NUMBER_SCALE.nc_{SOLVERPARAMETERS}
+        # NETWORKNAME mustn't contain an underscore `_`
+        # For a dwave-qpu computation the solver parameters are
+        # ANNEALINGTIME_NUMREADS_SLACKVARFACTOR_LINEPRESENTATION_MAXORDER_CHAINSTRENGTH_REPETITIONNUMBER
         with open(fileName) as file:
-            fileName = fileName.split("\\")[-1]
+            fileName = path.split(fileName)[-1]
             element = json.load(file)
             element["fileName"] = "_".join(fileName.split("_")[1:])
-            element["problemSize"] = fileName.split("_")[2]
-            element["scale"] = fileName.split("_")[4][:-3]
+            element["problemSize"] = float(fileName.split("_")[2])
+            element["scale"] = float(fileName.split("_")[4][:-3])
             if "cutSamples" in element:
                 element["sampleCutSize"] = len(element["cutSamples"])
                 element["sampleValues"] = [
                         element["cutSamples"][key]["optimizedCost"]
                         for key in element["cutSamples"].keys()
                 ]
-                element["dummyWeights"] = [1 for _ in element["sampleValues"]]
 
-
-            if yField == "minChoice":
+            # often, one of those two solutions is significantly better than the ohter
+            if "LowestFLow" in element:
                 element["minChoice"] = min(element["LowestFlow"], element["ClosestFlow"])
 
-            try:
-                element["maxOrder"] = fileName.split("_")[9]
-            except IndexError:
-                element["maxOrder"] = 0
-
-
-            # if a constraint is broken, don't add the current files info.
-            # else block is default execution path so it works with empty contraints
+            # if a constraint is broken, don't add the current files data. else block
+            # is execution path for adding to plot data so it works with empty contraints
             for key,values in constraints.items():
                 try:
                     if float(element[key]) not in values:
@@ -189,8 +229,16 @@ def extractPlottableInformation(
                 )
 
                 try:
-                    if element[xField] not in plotData[key]:
-                        plotData[key][element[xField]] = []
+                    # unpacking xvalue if it is in nested dict
+                    if isinstance(xField,list):
+                        xvalue = element
+                        for dict_key in xField:
+                            xvalue = xvalue[dict_key]
+                    else:
+                        xvalue = element[xField]
+
+                    if xvalue not in plotData[key]:
+                        plotData[key][xvalue] = []
 
                     # unpacking yvalue if it is in nested dict
                     if isinstance(yField,list):
@@ -200,12 +248,10 @@ def extractPlottableInformation(
                     else:
                         yvalue = element[yField]
 
-                    try:
-                        plotData[key][element[xField]].append(float(yvalue))
-                    # yvalue has not been reduced into a value and is still a list
-                    except TypeError:
-                        plotData[key][element[xField]].append([float(y) for y in yvalue])
+                    # reductionMethod condense and casts yvalues
+                    plotData[key][element[xField]].append(yvalue)
                 except KeyError:
+                    print("key error")
                     pass
             filesRead += 1
                 
@@ -213,20 +259,18 @@ def extractPlottableInformation(
     result = collections.defaultdict(list)
     for outerKey in plotData:
         for innerKey in plotData[outerKey]:
-            # extract numeric value in string innerKey
-            if hasattr(innerKey, "__getitem__"):
-                if innerKey == "":
-                    xvalue = -1
-                elif innerKey[0] == "[":
+            if isinstance(innerKey, str):
+                # H, T in sqa data
+                if innerKey.startswith("["):
                     xvalue = innerKey[1:-1].split(',')[0]
                 else:
                     xvalue = innerKey   
             else:
                 xvalue = innerKey
-
             result[outerKey].append(
                 [
-                    float(xvalue),
+                    # sometimes xvalue is still a string and has to be cast to a float
+                    xvalue,
                     reductionMethod(plotData[outerKey][innerKey]),
                     errorMethod(plotData[outerKey][innerKey]) if errorMethod is not None else 0
                 ]
@@ -243,7 +287,7 @@ def plotGroup(
     plotname, solver, fileRegexList, xField, 
     yFieldList=None, splitFields=["problemSize"], logscalex=True, logscaley=False,
     PATH=None, reductionMethod=None, lineNames=None, embeddingData=False, errorMethod=deviationOfTheMean,
-    constraints={},histogramm=False,xlabel=None,ylabel=None
+    constraints={},plottype="line",xlabel=None,ylabel=None
     ):
     """
     extracts data from all files in the regexList list and plots it into a single
@@ -326,7 +370,7 @@ def plotGroup(
         logscaley=logscaley,
         xlabel=xlabel,
         ylabel=ylabel,
-        histogramm=histogramm
+        plottype=plottype
 #        title=''
     )
 
@@ -335,39 +379,41 @@ def main():
 
     plt.style.use("seaborn")
 
-    regex = '*'
-    constraints = {}
-    plotGroup(plotname = "costDistribution_for_fullSampleOpt1",
-            solver = "pypsa_glpk",
-            fileRegexList = [
+    global BINSIZE
+    BINSIZE = 1
+
+    regex = '*put_15_0_20.nc_110_365_30_0_1_80_365_1'
+    plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
+            "qpu_read",
+            [
             regex,
             ],
-            xField = "problemSize",
-            yFieldList = ["totalCost",],
+            "problemSize",
+            yFieldList = ["cutSamples"],
+            reductionMethod = [extractCutSamples],
+            errorMethod = None,
             splitFields = [],
-            constraints=constraints,
+            plottype="scatterCutSample",
             logscalex=False,
-            logscaley=False,
+            xlabel="energy",
+            ylabel="cost",
     )
 
     return
-
-    plotGroup("glpk_scale_to_cost_mean",
-              "pypsa_glpk",
-              [
-                  '*nocostinput_*1',
-              ],
-              xField="scale",
-              yFieldList=["totalCost"],
-              splitFields=[],
-              constraints={
-                  'problemSize': [10, 11, 12, 13, 14],
-                  'scale': list(range(10, 45, 5)),
-              },
-              logscalex=False,
-              logscaley=False,
-              )
-
+    plotGroup("costDistribution_for_fullSampleOpt",
+            "qpu_read",
+            [
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["sampleValues",],
+            reductionMethod = [lambda x:x],
+            splitFields = [],
+            plottype="histogramm",
+            logscalex=False,
+            ylabel="count",
+            xlabel="sampleValues",
+    )
     plotGroup("cumulativeCostDistribution_for_fullSampleOpt",
             "qpu_read",
             [
@@ -377,7 +423,7 @@ def main():
             yFieldList = ["sampleValues",],
             reductionMethod = [cumulativeDistribution],
             splitFields = [],
-            histogramm=True,
+            plottype="histogramm",
             logscalex=False,
             ylabel="count",
             xlabel="sampleValues",
@@ -391,7 +437,7 @@ def main():
             yFieldList = [["serial",  "vectors" ,"energy", "data"]],
             reductionMethod = [cumulativeDistribution],
             splitFields = [],
-            histogramm=True,
+            plottype="histogramm",
             logscalex=False,
             ylabel="count",
             xlabel="energy",
@@ -402,14 +448,17 @@ def main():
             "pypsa_glpk",
             [ 
               '*nocostinput_*1',  
+              '*nocostinput_*1',
             ],
             xField = "scale",
-            yFieldList = ["totalCost"],
+            yFieldList = ["totalCost"]*2,
             splitFields=[],
+            reductionMethod=[np.mean, np.std],
             constraints={
                     'problemSize' : [10,11,12,13,14],
                     'scale' : list(range(10,45,5)),
             },
+            lineNames = ["totalCost","standard_deviation"],
             logscalex=False,
             logscaley=False,
     )
@@ -672,7 +721,7 @@ def main():
                         reductionMethod=[len] ,
                         logscalex=False,
                         splitFields=[],
-                        histogramm=True,
+                        plottype="histogramm",
                         errorMethod=None,
                     )
     regex = "*input_[7-9]*_20.nc_78_258_[1-5]0_0_1_[2-5]0_1"
@@ -687,7 +736,7 @@ def main():
                 reductionMethod=[len] ,
                 logscalex=False,
                 splitFields=[],
-                histogramm=True,
+                plottype="histogramm",
                 errorMethod=None,
                 )
 
@@ -763,8 +812,9 @@ def main():
 
 
     regex="*input_[7-9]*_20.nc_78_258_*"
+    chainStrengthList = list(range(30, 80, 20)) + [100]
     constraints={'slackVarFactor' : range(10, 50 , 10),
-                'chain_strength' : list(range(30, 70, 20)) + [100],
+                'chain_strength' : chainStrengthList,
                 'num_reads' : [258],
                 'annealing_time' : [78],
                 }
@@ -808,6 +858,19 @@ def main():
             splitFields=["chain_strength"],
             constraints=constraints,
             )
+    for chainStrength in chainStrengthList:
+        constraints["chain_strength"] = [chainStrength]
+        plotGroup(f"slackvar_to_cost_chain_{chainStrength}_mean",
+                "qpu",
+                [regex]*3,
+                "slackVarFactor",
+                yFieldList = ["totalCost", "LowestFlow","ClosestFlow"],
+                reductionMethod=[np.mean]*3 ,
+                logscalex=False,
+                splitFields=[],
+                constraints=constraints,
+                )
+
 
 
     regex="*put_[7-9]_[0-9]_20.nc_78_258_[1-5]*[0-9][0]_1"
@@ -943,7 +1006,7 @@ def main():
                 'annealing_time' : [10, 20, 40, 50, 70, 80 ,110],
                 'problemSize' : [15,16,17],
                 }
-    plotGroup("annealTime_to_cost_same_reads_mean",
+    plotGroup("annealTime_to_sampleCost_same_reads_mean",
             "qpu_read",
             [
             regex
@@ -954,7 +1017,7 @@ def main():
             splitFields = [],
             constraints=constraints,
             logscalex=False)
-    plotGroup("annealTime_to_cost_same_reads_median",
+    plotGroup("annealTime_to_sampleCost_same_reads_median",
             "qpu_read",
             [
             regex
@@ -965,6 +1028,32 @@ def main():
             splitFields = [],
             constraints=constraints,
             logscalex=False)
+    plotGroup("annealTime_to_cost_same_reads_mean",
+            "qpu_read",
+            [
+            regex,
+            regex,
+            regex,
+            ],
+            "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow", "ClosestFlow"],
+            splitFields = [],
+            constraints=constraints,
+            logscalex=False)
+    plotGroup("annealTime_to_cost_same_reads_median",
+            "qpu_read",
+            [
+            regex,
+            regex,
+            regex
+            ],
+            "annealing_time",
+            reductionMethod = [np.median]*3,
+            yFieldList = ["totalCost", "LowestFlow", "ClosestFlow"],
+            splitFields = [],
+            constraints=constraints,
+            logscalex=False)
+
 
 
     regex = '*input_1[5-7]*20.nc*'
@@ -1007,6 +1096,8 @@ def main():
             splitFields=["mangledTotalAnnealTime"],
             constraints={"mangledTotalAnnealTime" : [20,40]},
             ylabel = "total qpu access time in " + chr(956) + "s",
+            logscalex=True,
+            logscaley=True,
             )
 
 
