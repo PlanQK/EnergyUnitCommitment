@@ -148,7 +148,7 @@ def extractPlottableInformation(
     filesRead = 0
     for fileName in glob.glob(fileRegex):
         with open(fileName) as file:
-            fileName = fileName.split("/")[-1]
+            fileName = fileName.split("\\")[-1]
             element = json.load(file)
             element["fileName"] = "_".join(fileName.split("_")[1:])
             element["problemSize"] = fileName.split("_")[2]
@@ -335,35 +335,14 @@ def main():
 
     plt.style.use("seaborn")
 
-    regex = '*20.nc_110_365_30_0_1_80_1'
-    plotGroup("opt_size_to_cost_split_sampleCutSize_mean",
-              "qpu_read",
-              [
-                  regex,
-                  "*20.nc*"
-              ],
-              "problemSize",
-              yFieldList=["cutSamplesCost", "totalCost"],
-              splitFields=["sampleCutSize"],
-              logscalex=False,
-              lineNames=['cutSampplesCost', 'glpk'],
-              constraints={"sampleCutSize": [1, 2, 5, 10, 30, 100, 365]},
-              PATH=[
-                  "results_qpu_sweep",
-                  "results_pypsa_glpk_sweep"
-              ],
-              )
-
-    return
-
     regex = '*'
     constraints = {}
-    plotGroup(plotname = "costDistribution_for_fullSampleOpt",
+    plotGroup(plotname = "costDistribution_for_fullSampleOpt1",
             solver = "pypsa_glpk",
             fileRegexList = [
             regex,
             ],
-            xField = "scale",
+            xField = "problemSize",
             yFieldList = ["totalCost",],
             splitFields = [],
             constraints=constraints,
