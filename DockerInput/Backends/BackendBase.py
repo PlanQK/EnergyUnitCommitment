@@ -38,7 +38,11 @@ class BackendBase(abc.ABC):
         pass
 
     def buildMetaInfo(self):
+
         variables = {
+            "fileName": "",
+            "problemSize": "",
+            "scale": "",
             "annealing_time": "int",
             "num_reads": "int",
             "timeout": "int",
@@ -48,14 +52,29 @@ class BackendBase(abc.ABC):
             "lineRepresentation": "int",
             "maxOrder": "int",
             "sampleCutSize": "int",
+            "sampleValue": "",
+            "minChoice": "",
             "kirchhoffFactor": "float",
             "slackVarFactor": "float",
             "monetaryCostFactor": "float",
             "threshold": "float",
             "minUpDownFactor": "float",
+            "time": "",
+            "energy": "",
             "strategy": "string",
             "postprocess": "string",
-            "totalCost": "float"
+            "totalCost": "",
+            "individualCost": "",
+            "annealReadRatio": "",
+            "totalAnnealTime": "",
+            "mangledTotalAnnealTime": "",
+            "LowestEenrgy": "",
+            "LowestFlow": "",
+            "ClosestFlow": "",
+            "cutSamplesCost": "",
+            "optimizedStrategySample": "",
+            "solver_id": "",
+
         }
 
         for var in variables:
