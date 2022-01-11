@@ -2,7 +2,6 @@ import time
 
 from .BackendBase import BackendBase
 import pypsa
-from EnvironmentVariableManager import EnvironmentVariableManager
 
 class PypsaBackend(BackendBase):
 

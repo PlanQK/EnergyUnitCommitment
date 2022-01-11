@@ -1,7 +1,6 @@
 import numpy as np
 import random
 from ast import literal_eval
-from EnvironmentVariableManager import EnvironmentVariableManager
 import siquan
 from .IsingPypsaInterface import IsingPypsaInterface
 from .BackendBase import BackendBase
@@ -9,12 +8,9 @@ from .BackendBase import BackendBase
 
 class ClassicalBackend(BackendBase):
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.lineRepresentation=envMgr["lineRepresentation"]
+        super().__init__()
+        self.lineRepresentation = self.envMgr["lineRepresentation"]
         self.solver = siquan.DTSQA()
-        self._metaInfo = {}
-        self._metaInfo["lineRepresentation"] = self.lineRepresentation
-        self._metaInfo["maxOrder"] = int(envMgr["maxOrder"])
 
     def validateInput(self, path, network):
         pass
@@ -47,11 +43,10 @@ class ClassicalBackend(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        envMgr = EnvironmentVariableManager()
-        self.solver.setSeed(int(envMgr["seed"]))
-        self.solver.setTSchedule(envMgr["temperatureSchedule"])
-        self.solver.setTrotterSlices(int(envMgr["trotterSlices"]))
-        self.solver.setSteps(int(envMgr["optimizationCycles"]))
+        self.solver.setSeed(int(self.envMgr["seed"]))
+        self.solver.setTSchedule(self.envMgr["temperatureSchedule"])
+        self.solver.setTrotterSlices(int(self.envMgr["trotterSlices"]))
+        self.solver.setSteps(int(self.envMgr["optimizationCycles"]))
         self.solver.setHSchedule("[0]")
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
@@ -77,12 +72,11 @@ class ClassicalBackend(BackendBase):
 class SqaBackend(ClassicalBackend):
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        envMgr = EnvironmentVariableManager()
-        self.solver.setSeed(int(envMgr["seed"]))
-        self.solver.setHSchedule(envMgr["transverseFieldSchedule"])
-        self.solver.setTSchedule(envMgr["temperatureSchedule"])
-        self.solver.setTrotterSlices(int(envMgr["trotterSlices"]))
-        self.solver.setSteps(int(envMgr["optimizationCycles"]))
+        self.solver.setSeed(int(self.envMgr["seed"]))
+        self.solver.setHSchedule(self.solver["transverseFieldSchedule"])
+        self.solver.setTSchedule(self.solver["temperatureSchedule"])
+        self.solver.setTrotterSlices(int(self.solver["trotterSlices"]))
+        self.solver.setSteps(int(self.envMgr["optimizationCycles"]))
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),

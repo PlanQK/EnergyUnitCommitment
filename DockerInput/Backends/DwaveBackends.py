@@ -5,7 +5,6 @@ import dimod
 import tabu
 import greedy
 
-from EnvironmentVariableManager import EnvironmentVariableManager
 from .BackendBase import BackendBase
 from .IsingPypsaInterface import IsingPypsaInterface
 
@@ -27,8 +26,8 @@ from pandas import value_counts
 
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
+        super().__init__()
         self.solver = tabu.Tabusampler()
-        self.metaInfo = {}
 
     def validateInput(self, path, network):
         pass
@@ -210,8 +209,8 @@ class DwaveTabuSampler(BackendBase):
 
 class DwaveSteepestDescent(DwaveTabuSampler):
     def __init__(self):
+        super().__init__()
         self.solver = greedy.SteepestDescentSolver()
-        self.metaInfo = {}
 
 
 class DwaveCloud(DwaveTabuSampler):
@@ -220,9 +219,8 @@ class DwaveCloud(DwaveTabuSampler):
 
 class DwaveCloudHybrid(DwaveCloud):
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.token = envMgr["dwaveAPIToken"]
-        self.metaInfo = {}
+        super().__init__()
+        self.token = self.envMgr["dwaveAPIToken"]
         self.solver="hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
                 token=self.token)
@@ -347,46 +345,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
 
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.token = envMgr["dwaveAPIToken"]
-        self.metaInfo = {}
+        super().__init__()
+        self.token = self.envMgr["dwaveAPIToken"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
-
-        # reading variables from environment
-        intVars = [
-                "annealing_time",
-                "num_reads",
-                "timeout",
-                "chain_strength",
-                "programming_thermalization",
-                "readout_thermalization",
-                "lineRepresentation",
-                "maxOrder",
-                "num_reads",
-                "sampleCutSize",
-        ]
-        for var in intVars:
-            setattr(self,var,int(envMgr[var]))
-            self.metaInfo[var] = int(envMgr[var])
-
-        floatVars = [
-                "kirchhoffFactor",
-                "slackVarFactor",
-                "monetaryCostFactor",
-                "threshold",
-        ]
-        for var in floatVars:
-            setattr(self,var,float(envMgr[var]))
-            self.metaInfo[var] = float(envMgr[var])
-
-        stringVars = [
-                "strategy",
-                "postprocess",
-        ]
-        for var in stringVars:
-            setattr(self,var,envMgr[var])
-            self.metaInfo[var] = envMgr[var]
 
         #additional info
         if self.timeout < 0:
@@ -689,8 +651,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     that it got that from the cloud
     """
     def getSampler(self):
-        envMgr = EnvironmentVariableManager()
-        self.inputInfo = envMgr["inputInfo"]
+        self.inputInfo = self.envMgr["inputInfo"]
 
     def getSampleSet(self, transformedProblem):
 
