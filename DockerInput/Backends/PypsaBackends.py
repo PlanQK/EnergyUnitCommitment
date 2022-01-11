@@ -140,26 +140,8 @@ class PypsaBackend(BackendBase):
     
     def __init__(self, solver_name = "glpk", slack_gen_penalty = 100.0):
         super().__init__()
-        self.metaInfo = {}
         self.solver_name = solver_name
         self.slack_gen_penalty = slack_gen_penalty
-        #envMgr = EnvironmentVariableManager()
-
-        intVars = [
-                "timeout",
-        ]
-        for var in intVars:
-            setattr(self,var,int(self.envMgr[var]))
-            self.metaInfo[var] = int(self.envMgr[var])
-
-        floatVars = [
-                "minUpDownFactor",
-                "monetaryCostFactor",
-                "kirchhoffFactor",
-        ]
-        for var in floatVars:
-            setattr(self,var,float(self.envMgr[var]))
-            self.metaInfo[var] = float(self.envMgr[var])
 
         if self.timeout < 0:
             self.timeout = 1000
