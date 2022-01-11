@@ -208,7 +208,7 @@ def extractPlottableInformation(
                 ]
 
             # often, one of those two solutions is significantly better than the ohter
-            if "LowestFLow" in element:
+            if "LowestFlow" in element:
                 element["minChoice"] = min(element["LowestFlow"], element["ClosestFlow"])
 
             # if a constraint is broken, don't add the current files data. else block
@@ -382,9 +382,7 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    regex = '*put_15_0_20.nc_110_365_30_0_1_80_365_1'
-
-    plotGroup("glpk_scale_to_cost_mean",
+    plotGroup("glpk_scale_to_cost_mean1",
               "pypsa_glpk",
               [
                   '*nocostinput_*1',
@@ -403,8 +401,7 @@ def main():
               logscaley=False,
               )
 
-    return
-
+    regex = '*nocostinput_*'
     plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
             "qpu_read",
             [
@@ -420,6 +417,8 @@ def main():
             xlabel="energy",
             ylabel="cost",
     )
+
+    return
 
     plotGroup("costDistribution_for_fullSampleOpt",
             "qpu_read",

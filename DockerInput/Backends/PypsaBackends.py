@@ -20,7 +20,7 @@ class PypsaBackend(BackendBase):
         """
 
         # value of bits corresponding to generators in network
-        self.metaInfo["solution"] = {} 
+        self.metaInfo["solution"] = {}
         self.metaInfo["solution"]["genStates"] = {
                 gen[0] : value for gen,value in self.model.generator_status.get_values().items()
         }
@@ -139,17 +139,18 @@ class PypsaBackend(BackendBase):
 
     
     def __init__(self, solver_name = "glpk", slack_gen_penalty = 100.0):
+        super().__init__()
         self.metaInfo = {}
         self.solver_name = solver_name
         self.slack_gen_penalty = slack_gen_penalty
-        envMgr = EnvironmentVariableManager()
+        #envMgr = EnvironmentVariableManager()
 
         intVars = [
                 "timeout",
         ]
         for var in intVars:
-            setattr(self,var,int(envMgr[var]))
-            self.metaInfo[var] = int(envMgr[var])
+            setattr(self,var,int(self.envMgr[var]))
+            self.metaInfo[var] = int(self.envMgr[var])
 
         floatVars = [
                 "minUpDownFactor",
@@ -157,8 +158,8 @@ class PypsaBackend(BackendBase):
                 "kirchhoffFactor",
         ]
         for var in floatVars:
-            setattr(self,var,float(envMgr[var]))
-            self.metaInfo[var] = float(envMgr[var])
+            setattr(self,var,float(self.envMgr[var]))
+            self.metaInfo[var] = float(self.envMgr[var])
 
         if self.timeout < 0:
             self.timeout = 1000
