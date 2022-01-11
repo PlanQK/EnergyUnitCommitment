@@ -4,7 +4,7 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, network):
+    def __init__(self):
         envMgr = EnvironmentVariableManager()
 
     @abc.abstractstaticmethod
