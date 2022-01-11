@@ -5,7 +5,7 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 
 class BackendBase(abc.ABC):
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
+        self.envMgr = EnvironmentVariableManager()
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):

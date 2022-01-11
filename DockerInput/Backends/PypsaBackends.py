@@ -143,7 +143,6 @@ class PypsaBackend(BackendBase):
         self.metaInfo = {}
         self.solver_name = solver_name
         self.slack_gen_penalty = slack_gen_penalty
-        self.envMgr = super().envMgr
         #envMgr = EnvironmentVariableManager()
 
         intVars = [
