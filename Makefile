@@ -6,29 +6,32 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
 
-#for qpu sweeps, export an APIToken as:
-#dwaveAPIToken
-
+# general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
 
-CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
-CLASSICAL_LOW_TEMP = $(shell seq 0.5 0.5 0.5)
+# sqa parameters
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
 TRANSVERSE_HIGH = $(shell seq 10.0 1.0 10)
 OPTIMIZATIONCYCLES = 1000
 #OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
 
+# classical parameters. reuses OPTIMIZATIONCYCLES
+CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
+CLASSICAL_LOW_TEMP = $(shell seq 0.5 0.5 0.5)
 
+# dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
+# dwaveAPIToken
 ANNEAL_TIME = $(shell seq 110 50 110)
 NUM_READS = $(shell seq 365 20 365)
 SLACKVARFACTOR = $(shell seq 30 10 30)
 CHAINSTRENGTH = 80
-
 SAMPLECUTSIZE = $(shell seq 100 4 100)
 
+# Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
 LINEREPRESENTATION = $(shell seq 0 1 0)
 MAXORDER = 1
 
+# glpk parameter
 TIMEOUT = 30
 
 
