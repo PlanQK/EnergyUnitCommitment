@@ -1,6 +1,6 @@
 import abc
 
-from DockerInput.EnvironmentVariableManager import EnvironmentVariableManager
+from EnvironmentVariableManager import EnvironmentVariableManager
 
 
 class BackendBase(abc.ABC):
