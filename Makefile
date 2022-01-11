@@ -263,7 +263,7 @@ endef
 # Define further helper targets
 #
 docker.tmp: Dockerfile DockerInput/run.py DockerInput/Backends/SqaBackends.py DockerInput/Backends/IsingPypsaInterface.py DockerInput/Backends/PypsaBackends.py DockerInput/Backends/DwaveBackends.py
-	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
+	$(DOCKERCOMMAND) build -t energy:1.0 . #&& touch docker.tmp
 
 
 # all plots are generated using the python plot_results script
