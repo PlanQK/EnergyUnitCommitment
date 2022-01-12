@@ -195,11 +195,7 @@ def extractPlottableInformation(
         # For a dwave-qpu computation the solver parameters are
         # ANNEALINGTIME_NUMREADS_SLACKVARFACTOR_LINEPRESENTATION_MAXORDER_CHAINSTRENGTH_REPETITIONNUMBER
         with open(fileName) as file:
-            fileName = path.split(fileName)[-1]
             element = json.load(file)
-            element["fileName"] = "_".join(fileName.split("_")[1:])
-            element["problemSize"] = float(fileName.split("_")[2])
-            element["scale"] = float(fileName.split("_")[4][:-3])
             if "cutSamples" in element:
                 element["sampleCutSize"] = len(element["cutSamples"])
                 element["sampleValues"] = [
