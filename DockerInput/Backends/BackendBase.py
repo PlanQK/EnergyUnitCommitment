@@ -39,9 +39,11 @@ class BackendBase(abc.ABC):
 
     def buildMetaInfo(self):
 
-        # reading variables from environment??
+        # reading variables from environment. If "int" or "float" are defined the environment variables will cast to
+        # that type. If nothing is defined, they will be kept as String-type.
         variables = {
             "fileName": "",
+            "inputFile": "",
             "problemSize": "",
             "scale": "",
             "annealing_time": "int",
@@ -53,23 +55,23 @@ class BackendBase(abc.ABC):
             "lineRepresentation": "int",
             "maxOrder": "int",
             "sampleCutSize": "int",
-            "sampleValue": "",
-            "minChoice": "",
             "kirchhoffFactor": "float",
             "slackVarFactor": "float",
             "monetaryCostFactor": "float",
             "threshold": "float",
             "minUpDownFactor": "float",
+            "strategy": "",
+            "postprocess": "",
+            "sampleValue": "",
+            "minChoice": "",
             "time": "",
             "energy": "",
-            "strategy": "string",
-            "postprocess": "string",
             "totalCost": "",
             "individualCost": "",
             "annealReadRatio": "",
             "totalAnnealTime": "",
             "mangledTotalAnnealTime": "",
-            "LowestEenrgy": "",
+            "LowestEnergy": "",
             "LowestFlow": "",
             "ClosestFlow": "",
             "cutSamplesCost": "",
@@ -87,5 +89,10 @@ class BackendBase(abc.ABC):
             else:
                 setattr(self, var, self.envMgr[var])
                 self.metaInfo[var] = self.envMgr[var]
+
+        self.metaInfo["fileName"] = self.envMgr["outputInfo"]
+        self.metaInfo["inputFile"] = "_".join(self.metaInfo["fileName"].split("_")[1:5])
+        self.metaInfo["problemSize"] = int(self.metaInfo["fileName"].split("_")[2])
+        self.metaInfo["scale"] = int(self.metaInfo["fileName"].split("_")[4][:-3])
 
         return
