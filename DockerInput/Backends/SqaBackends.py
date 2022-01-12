@@ -9,7 +9,6 @@ from .BackendBase import BackendBase
 class ClassicalBackend(BackendBase):
     def __init__(self):
         super().__init__()
-        self.lineRepresentation = self.envMgr["lineRepresentation"]
         self.solver = siquan.DTSQA()
 
     def validateInput(self, path, network):

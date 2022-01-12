@@ -56,7 +56,7 @@ class PypsaBackend(BackendBase):
                     committable=False,
                     p_min_pu=0.0,
                     p_max_pu= maximum_loads_t[load],
-                    marginal_cost=self.metaInfo["pypsaBackends_slackGenPenalty"],
+                    marginal_cost=self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
                     min_down_time=0,
                     start_up_cost=0,
                     p_nom=1)
@@ -64,7 +64,7 @@ class PypsaBackend(BackendBase):
                     committable=False,
                     p_min_pu= - maximum_loads_t[load],
                     p_max_pu=0.0,
-                    marginal_cost= - self.metaInfo["pypsaBackends_slackGenPenalty"],
+                    marginal_cost= - self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
                     min_down_time=0,
                     start_up_cost=0,
                     p_nom=1)
@@ -73,7 +73,7 @@ class PypsaBackend(BackendBase):
                 self.network.snapshots,
                 formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                solver_name=self.metaInfo["pypsaBackends_SolverName"])
+                solver_name=self.metaInfo["pypsaBackend"]["solver_name"])
         self.opt.options["tmlim"] = self.metaInfo["timeout"]
 
         return self.model
@@ -139,8 +139,8 @@ class PypsaBackend(BackendBase):
     
     def __init__(self, solver_name = "glpk", slack_gen_penalty = 100.0):
         super().__init__()
-        self.metaInfo["pypsaBackends_SolverName"] = solver_name
-        self.metaInfo["pypsaBackends_slackGenPenalty"] = slack_gen_penalty
+        self.metaInfo["pypsaBackend"]["solver_name"] = solver_name
+        self.metaInfo["pypsaBackend"]["slack_gen_penalty"] = slack_gen_penalty
 
         if self.metaInfo["timeout"] < 0:
             self.metaInfo["timeout"] = 1000

@@ -46,27 +46,28 @@ class BackendBase(abc.ABC):
             "inputFile": "",
             "problemSize": "",
             "scale": "",
-            "annealing_time": "int",
-            "num_reads": "int",
-            "timeout": "int",
-            "chain_strength": "int",
-            "programming_thermalization": "int",
-            "readout_thermalization": "int",
-            "lineRepresentation": "int",
-            "maxOrder": "int",
-            "sampleCutSize": "int",
-            "kirchhoffFactor": "float",
-            "slackVarFactor": "float",
-            "monetaryCostFactor": "float",
-            "threshold": "float",
-            "minUpDownFactor": "float",
-            "strategy": "",
-            "postprocess": "",
-            "pypsaBackends_SolverName": "",
-            "pypsaBackends_slackGenPenalty": "",
+            "dwaveBackend": {"annealing_time": "int",
+                             "num_reads": "int",
+                             "chain_strength": "int",
+                             "programming_thermalization": "int",
+                             "readout_thermalization": "int",
+                             "lineRepresentation": "int",
+                             "maxOrder": "int",
+                             "sampleCutSize": "int",
+                             },
+            "timeout": "int",#pypsa; dwave
+            "kirchhoffFactor": "float",#ising
+            "slackVarFactor": "float",#ising
+            "monetaryCostFactor": "float",#ising
+            "threshold": "float",#dwave
+            "minUpDownFactor": "float",#ising
+            "strategy": "",#dwave
+            "postprocess": "",#dwave
+            "pypsaBackend": {"solver_name": "",
+                             "slack_gen_penalty": ""},
             "sampleValue": "",
             "minChoice": "",
-            "time": "",
+            "time": "",#pypsa; dwave
             "energy": "",
             "totalCost": "",
             "individualCost": "",
@@ -81,16 +82,22 @@ class BackendBase(abc.ABC):
             "solver_id": ""
         }
 
-        for var in variables:
-            if variables[var] == "int":
-                setattr(self, var, int(self.envMgr[var]))
-                self.metaInfo[var] = int(self.envMgr[var])
-            elif variables[var] == "float":
-                setattr(self, var, float(self.envMgr[var]))
-                self.metaInfo[var] = float(self.envMgr[var])
+        def populateMetaInfo(varType: str, varName: str):
+            if varType == "int":
+                return int(self.envMgr[varName])
+            elif varType == "float":
+                return float(self.envMgr[varName])
             else:
-                setattr(self, var, self.envMgr[var])
-                self.metaInfo[var] = self.envMgr[var]
+                return self.envMgr[varName]
+
+        for var in variables:
+            if isinstance(variables[var], dict):
+                self.metaInfo[var] = {}
+                for dictVar in variables[var]:
+                    self.metaInfo[var][dictVar] = populateMetaInfo(varType=variables[var][dictVar], varName=dictVar)
+            else:
+                self.metaInfo[var] = populateMetaInfo(varType=variables[var], varName=var)
+
 
         self.metaInfo["fileName"] = self.envMgr["outputInfo"]
         self.metaInfo["inputFile"] = "_".join(self.metaInfo["fileName"].split("_")[1:5])
@@ -98,3 +105,14 @@ class BackendBase(abc.ABC):
         self.metaInfo["scale"] = int(self.metaInfo["fileName"].split("_")[4][:-3])
 
         return
+
+        if variables[var] == "int":
+            setattr(self, var, int(self.envMgr[var]))
+            self.metaInfo[var] = int(self.envMgr[var])
+        elif variables[var] == "float":
+            setattr(self, var, float(self.envMgr[var]))
+            self.metaInfo[var] = float(self.envMgr[var])
+        else:
+            setattr(self, var, self.envMgr[var])
+            self.metaInfo[var] = self.envMgr[var]
+
