@@ -62,6 +62,8 @@ class BackendBase(abc.ABC):
             "minUpDownFactor": "float",
             "strategy": "",
             "postprocess": "",
+            "pypsaBackends_SolverName": "",
+            "pypsaBackends_slackGenPenalty": "",
             "sampleValue": "",
             "minChoice": "",
             "time": "",
