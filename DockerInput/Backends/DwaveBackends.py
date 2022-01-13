@@ -44,7 +44,7 @@ class DwaveTabuSampler(BackendBase):
         """
 
         if hasattr(self, 'network'):
-            bestSample = self.choose_sample(solution, self.network, strategy=self.strategy)
+            bestSample = self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"])
         else:
             bestSample = self.choose_sample(solution, network)
 
@@ -131,7 +131,7 @@ class DwaveTabuSampler(BackendBase):
                 lambda col: float(col.loc[-1]) / float(len(df))
             )
             return sample.apply(
-                lambda x: -1 if x >= self.threshold else 1
+                lambda x: -1 if x >= self.metaInfo["dwaveBackend"]["threshold"] else 1
             )
 
         # requires postprocessing because in order to match total power output
@@ -440,17 +440,17 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         self.optimizeSampleFlow(
-            self.choose_sample(solution, self.network, strategy=self.strategy),
+            self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"]),
             self.network,
             costKey="optimizedStrategySample"
         )
 
         print(f'cutSamplesCost with {self.metaInfo["dwaveBackend"]["sampleCutSize"]} samples: {self.metaInfo["cutSamplesCost"]}')
 
-        if self.postprocess == "flow":
-            if self.strategy == "LowestEnergy":
+        if self.metaInfo["dwaveBackend"]["postprocess"] == "flow":
+            if self.metaInfo["dwaveBackend"]["strategy"] == "LowestEnergy":
                 resultDict['lineValues'] = lineValuesLowestEnergyFlowSample
-            elif self.strategy == "ClosestSample":
+            elif self.metaInfo["dwaveBackend"]["strategy"] == "ClosestSample":
                 resultDict['lineValues'] = lineValuesClosestSample
 
         return resultDict

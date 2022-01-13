@@ -54,19 +54,17 @@ class BackendBase(abc.ABC):
                              "lineRepresentation": "int",
                              "maxOrder": "int",
                              "sampleCutSize": "int",
+                             "threshold": "float",
+                             "strategy": "",
+                             "postprocess": "",
                              },
             "timeout": "int",#pypsa; dwave
             "kirchhoffFactor": "float",#ising
             "slackVarFactor": "float",#ising
             "monetaryCostFactor": "float",#ising
-            "threshold": "float",#dwave
             "minUpDownFactor": "float",#ising
-            "strategy": "",#dwave
-            "postprocess": "",#dwave
             "pypsaBackend": {"solver_name": "",
                              "slack_gen_penalty": ""},
-            "sampleValue": "",
-            "minChoice": "",
             "time": "",#pypsa; dwave
             "energy": "", #dwave
             "totalCost": "", #all
