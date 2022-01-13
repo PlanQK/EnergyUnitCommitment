@@ -35,7 +35,7 @@ MAXORDER = 1
 TIMEOUT = 30
 
 
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[2-7]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[2-3]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 
@@ -157,7 +157,8 @@ results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$
 
 endef
 
-$(foreach filename, $(SWEEPFILES), $(foreach anneal_time, ${ANNEAL_TIME}, \
+$(foreach filename, $(SWEEPFILES), \
+	$(foreach anneal_time, ${ANNEAL_TIME}, \
 	$(foreach num_reads, ${NUM_READS}, \
 	$(foreach slackvarfactor, ${SLACKVARFACTOR}, \
 	$(foreach lineRepresentation, ${LINEREPRESENTATION}, \

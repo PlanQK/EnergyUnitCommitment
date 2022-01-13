@@ -28,7 +28,7 @@ from pandas import value_counts
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
         super().__init__()
-        self.solver = tabu.Tabusampler()
+        #self.solver = tabu.Tabusampler()
 
     def validateInput(self, path, network):
         pass
@@ -237,17 +237,17 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
-    def validateInput(self, networkpath, network):
+    def validateInput(self, networkPath, network):
 
-        self.networkPath = networkpath
+        self.networkPath = networkPath
         self.networkName = network
 
-        blacklists = self.get_filepaths(networkpath, "*_qpu_blacklist")
+        blacklists = self.get_filepaths(networkPath, "*_qpu_blacklist")
         filteredByTimeout = []
         for blacklist in blacklists:
-            blacklist_name = blacklist[len(networkpath + "/"):]
+            blacklist_name = blacklist[len(networkPath + "/"):]
             blacklisted_timeout = int(blacklist_name.split("_")[0])
-            if blacklisted_timeout <= self.timeout:
+            if blacklisted_timeout <= self.metaInfo["timeout"]:
                 filteredByTimeout.append(blacklist)
 
         for blacklist in filteredByTimeout:
@@ -256,7 +256,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
-        embeddingPath = f'{networkpath}/embedding_' \
+        embeddingPath = f'{networkPath}/embedding_' \
                         f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
                         f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
                         f'{network}.json'
@@ -271,15 +271,15 @@ class DwaveCloudDirectQPU(DwaveCloud):
             }
         return
 
-    def handleOptimizationStop(self, networkpath, network):
+    def handleOptimizationStop(self, networkPath, network):
         """
         If a network raises an error during optimization, add this network
         to the blacklisted networks for this optimizer and timeout value
-        Blacklistfiles are of the form '{networkpath}/{self.timeout}_{Backend}_blacklist'
+        Blacklistfiles are of the form '{networkPath}/{self.metaInfo["timeout"]}_{Backend}_blacklist'
         """
         # on unix writing small buffers is atomic. no file locking necessary
         # append to existing file or create a new one
-        with open(f"{networkpath}/{self.timeout}_qpu_blacklist", 'a+') as f:
+        with open(f'{networkPath}/{self.metaInfo["timeout"]}_qpu_blacklist', 'a+') as f:
             f.write(network + '\n')
         return
 
@@ -317,7 +317,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                                                 chain_strength=self.metaInfo["dwaveBackend"]["chain_strength"],
                                                 programming_thermalization=self.metaInfo["dwaveBackend"]["programming_thermalization"],
                                                 readout_thermalization=self.metaInfo["dwaveBackend"]["readout_thermalization"],
-                                                embedding_parameters=dict(timeout=self.timeout),
+                                                embedding_parameters=dict(timeout=self.metaInfo["timeout"]),
                                                 return_embedding=True,
                                                 )
             except ValueError:
@@ -338,8 +338,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.getSampler()
 
         # additional info
-        if self.timeout < 0:
-            self.timeout = 1000
+        if self.metaInfo["timeout"] < 0:
+            self.metaInfo["timeout"] = 1000
 
         self.metaInfo["dwaveBackend"]["annealReadRatio"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) / \
                                            float(self.metaInfo["dwaveBackend"]["num_reads"])
@@ -601,7 +601,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.metaInfo["serial"] = sampleset.to_serializable()
 
         if not hasattr(self, 'embedding'):
-            embeddingPath = f'{self.networkpath}/embedding_' \
+            embeddingPath = f'{self.networkPath}/embedding_' \
                             f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
                             f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
                             f'{self.network}.json'
