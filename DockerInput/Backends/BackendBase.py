@@ -96,8 +96,8 @@ class BackendBase(abc.ABC):
                 self.metaInfo[var] = {}
                 for dictVar in variables[var]:
                     self.metaInfo[var][dictVar] = populateMetaInfo(varType=variables[var][dictVar], varName=dictVar)
-                    if variables[var] == "isingInterface":
-                        setattr(self, dictVar, self.metaInfo[var][dictVar])
+                    if var == "isingInterface":
+                        setattr(self, dictVar, float(self.metaInfo[var][dictVar]))
             else:
                 self.metaInfo[var] = populateMetaInfo(varType=variables[var], varName=var)
 
