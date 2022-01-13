@@ -257,8 +257,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{networkpath}/embedding_' \
-                        f'rep_{self.metaInfo["dwaveBackend"]["lineRepresentation"]}_' \
-                        f'ord_{self.metaInfo["dwaveBackend"]["maxOrder"]}_' \
+                        f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
+                        f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
                         f'{network}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
@@ -602,8 +602,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         if not hasattr(self, 'embedding'):
             embeddingPath = f'{self.networkpath}/embedding_' \
-                            f'rep_{self.metaInfo["dwaveBackend"]["lineRepresentation"]}_' \
-                            f'ord_{self.metaInfo["dwaveBackend"]["maxOrder"]}_' \
+                            f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
+                            f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
                             f'{self.network}.json'
 
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]

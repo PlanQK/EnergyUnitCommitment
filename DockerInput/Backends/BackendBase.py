@@ -54,8 +54,6 @@ class BackendBase(abc.ABC):
                              "chain_strength": "int",
                              "programming_thermalization": "int",
                              "readout_thermalization": "int",
-                             "lineRepresentation": "int",
-                             "maxOrder": "int",
                              "sampleCutSize": "int",
                              "threshold": "float",
                              "strategy": "",
@@ -74,7 +72,9 @@ class BackendBase(abc.ABC):
             "isingInterface": {"kirchhoffFactor": "float",
                                "slackVarFactor": "float",
                                "monetaryCostFactor": "float",
-                               "minUpDownFactor": "float"
+                               "minUpDownFactor": "float",
+                               "lineRepresentation": "int",
+                               "maxOrder": "int"
                                },
             "pypsaBackend": {"solver_name": "",
                              "slack_gen_penalty": ""
