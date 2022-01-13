@@ -190,7 +190,7 @@ class DwaveTabuSampler(BackendBase):
         tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
         self.metaInfo["time"] = time.perf_counter() - tic
-        self.metaInfo["energy"] = result.first.energy
+        self.metaInfo["dwaveBackend"]["energy"] = result.first.energy
         print("done")
         return result
 
@@ -215,7 +215,7 @@ class DwaveCloudHybrid(DwaveCloud):
         self.solver = "hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
                                          token=self.token)
-        self.metaInfo["solver_id"] = self.solver
+        self.metaInfo["dwaveBackend"]["solver_id"] = self.solver
 
         # TODO write more info on solution to metaInfo
 
@@ -341,13 +341,13 @@ class DwaveCloudDirectQPU(DwaveCloud):
         if self.timeout < 0:
             self.timeout = 1000
 
-        self.metaInfo["annealReadRatio"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) / \
+        self.metaInfo["dwaveBackend"]["annealReadRatio"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) / \
                                            float(self.metaInfo["dwaveBackend"]["num_reads"])
-        self.metaInfo["totalAnnealTime"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) * \
+        self.metaInfo["dwaveBackend"]["totalAnnealTime"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) * \
                                            float(self.metaInfo["dwaveBackend"]["num_reads"])
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
-        self.metaInfo["mangledTotalAnnealTime"] = int(self.metaInfo["totalAnnealTime"] / 1000.0)
+        self.metaInfo["dwaveBackend"]["mangledTotalAnnealTime"] = int(self.metaInfo["dwaveBackend"]["totalAnnealTime"] / 1000.0)
 
     def power_output(self, generatorState, snapshot):
         """
@@ -409,7 +409,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         lowestEnergyState = [
             id for id, value in lowestEnergySample.items() if value == -1
         ]
-        self.metaInfo["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
+        self.metaInfo["dwaveBackend"]["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
 
         _, lineValuesLowestEnergyFlowSample = self.optimizeSampleFlow(
             lowestEnergySample,
@@ -437,7 +437,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             axis=1
         )
         self.metaInfo["cutSamples"] = cutSamples[["energy", "optimizedCost"]].to_dict('index')
-        self.metaInfo["cutSamplesCost"] = cutSamples['optimizedCost'].min()
+        self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         self.optimizeSampleFlow(
             self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"]),
@@ -445,7 +445,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             costKey="optimizedStrategySample"
         )
 
-        print(f'cutSamplesCost with {self.metaInfo["dwaveBackend"]["sampleCutSize"]} samples: {self.metaInfo["cutSamplesCost"]}')
+        print(f'cutSamplesCost with {self.metaInfo["dwaveBackend"]["sampleCutSize"]} samples: {self.metaInfo["dwaveBackend"]["cutSamplesCost"]}')
 
         if self.metaInfo["dwaveBackend"]["postprocess"] == "flow":
             if self.metaInfo["dwaveBackend"]["strategy"] == "LowestEnergy":
@@ -488,7 +488,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             return totalCost, None
 
         print(f"TOTAL COST AFTER FLOW OPT {costKey}: {totalCost}")
-        self.metaInfo[costKey] = totalCost
+        self.metaInfo["dwaveBackend"][costKey] = totalCost
 
         lineValues = {}
         # TODO split flow on two lines if we have more flow than capacity

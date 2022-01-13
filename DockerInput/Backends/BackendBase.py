@@ -46,6 +46,9 @@ class BackendBase(abc.ABC):
             "inputFile": "",
             "problemSize": "",
             "scale": "",
+            "timeout": "int",  # pypsa; dwave
+            "time": "",  # pypsa; dwave
+            "totalCost": "",  # all
             "dwaveBackend": {"annealing_time": "int",
                              "num_reads": "int",
                              "chain_strength": "int",
@@ -57,28 +60,28 @@ class BackendBase(abc.ABC):
                              "threshold": "float",
                              "strategy": "",
                              "postprocess": "",
+                             "annealReadRatio": "",  # output
+                             "totalAnnealTime": "",
+                             "mangledTotalAnnealTime": "",
+                             "LowestEnergy": "",
+                             "LowestFlow": "",
+                             "ClosestFlow": "",
+                             "cutSamplesCost": "",
+                             "optimizedStrategySample": "",
+                             "solver_id": "",
+                             "energy": ""
                              },
-            "timeout": "int",#pypsa; dwave
-            "kirchhoffFactor": "float",#ising
-            "slackVarFactor": "float",#ising
-            "monetaryCostFactor": "float",#ising
-            "minUpDownFactor": "float",#ising
+            "isingInterface": {"kirchhoffFactor": "float",
+                               "slackVarFactor": "float",
+                               "monetaryCostFactor": "float",
+                               "minUpDownFactor": "float"
+                               },
             "pypsaBackend": {"solver_name": "",
-                             "slack_gen_penalty": ""},
-            "time": "",#pypsa; dwave
-            "energy": "", #dwave
-            "totalCost": "", #all
-            "individualCost": "", #sqa
-            "annealReadRatio": "", #dwave
-            "totalAnnealTime": "", #dwave
-            "mangledTotalAnnealTime": "", #dwave
-            "LowestEnergy": "",#dwave
-            "LowestFlow": "",#dwave
-            "ClosestFlow": "",#dwave
-            "cutSamplesCost": "",#dwave
-            "optimizedStrategySample": "",#dwave
-            "solver_id": ""#dwave
-        }
+                             "slack_gen_penalty": ""
+                             },
+            "sqaBackend": {"individualCost": ""
+                           }
+            }
 
         def populateMetaInfo(varType: str, varName: str):
             if varType == "int":
@@ -93,6 +96,8 @@ class BackendBase(abc.ABC):
                 self.metaInfo[var] = {}
                 for dictVar in variables[var]:
                     self.metaInfo[var][dictVar] = populateMetaInfo(varType=variables[var][dictVar], varName=dictVar)
+                    if variables[var] == "isingInterface":
+                        setattr(self, dictVar, self.metaInfo[var][dictVar])
             else:
                 self.metaInfo[var] = populateMetaInfo(varType=variables[var], varName=var)
 

@@ -58,9 +58,7 @@ class ClassicalBackend(BackendBase):
         self._metaInfo["totalCost"] = transformedProblem.calcCost(
             result["state"]
         )
-        self._metaInfo[
-            "individualCost"
-        ] = transformedProblem.individualCostContribution(result["state"])
+        self._metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
 
@@ -84,11 +82,7 @@ class SqaBackend(ClassicalBackend):
         for key in result:
             self._metaInfo[key] = result[key]
 
-        self._metaInfo["totalCost"] = transformedProblem.calcCost(
-            result["state"]
-        )
-        self._metaInfo[
-            "individualCost"
-        ] = transformedProblem.individualCostContribution(result["state"])
+        self._metaInfo["totalCost"] = transformedProblem.calcCost(result["state"])
+        self._metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
