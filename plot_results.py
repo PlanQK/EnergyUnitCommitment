@@ -203,12 +203,12 @@ def extractPlottableInformation(
                         for key in element["cutSamples"].keys()
                 ]
 
-            # often, one of those two solutions is significantly better than the ohter
+            # often, one of those two solutions is significantly better than the other
             if "LowestFlow" in element:
                 element["minChoice"] = min(element["LowestFlow"], element["ClosestFlow"])
 
             # if a constraint is broken, don't add the current files data. else block
-            # is execution path for adding to plot data so it works with empty contraints
+            # is execution path for adding to plot data so it works with empty constraints
             for key,values in constraints.items():
                 try:
                     if float(element[key]) not in values:
