@@ -68,18 +68,18 @@ class BackendBase(abc.ABC):
             "sampleValue": "",
             "minChoice": "",
             "time": "",#pypsa; dwave
-            "energy": "",
-            "totalCost": "",
-            "individualCost": "",
-            "annealReadRatio": "",
-            "totalAnnealTime": "",
-            "mangledTotalAnnealTime": "",
-            "LowestEnergy": "",
-            "LowestFlow": "",
-            "ClosestFlow": "",
-            "cutSamplesCost": "",
-            "optimizedStrategySample": "",
-            "solver_id": ""
+            "energy": "", #dwave
+            "totalCost": "", #all
+            "individualCost": "", #sqa
+            "annealReadRatio": "", #dwave
+            "totalAnnealTime": "", #dwave
+            "mangledTotalAnnealTime": "", #dwave
+            "LowestEnergy": "",#dwave
+            "LowestFlow": "",#dwave
+            "ClosestFlow": "",#dwave
+            "cutSamplesCost": "",#dwave
+            "optimizedStrategySample": "",#dwave
+            "solver_id": ""#dwave
         }
 
         def populateMetaInfo(varType: str, varName: str):
