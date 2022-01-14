@@ -35,7 +35,7 @@ MAXORDER = 1
 TIMEOUT = 30
 
 
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[2-3]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[4-4]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 

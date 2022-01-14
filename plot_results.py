@@ -378,9 +378,9 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    plotGroup("glpk_scale_to_cost_mean1",
-              "pypsa_glpk",
-              [
+    plotGroup(plotname="glpk_scale_to_cost_mean1",
+              solver="pypsa_glpk",
+              fileRegexList=[
                   '*nocostinput_*1',
                   '*nocostinput_*1',
               ],

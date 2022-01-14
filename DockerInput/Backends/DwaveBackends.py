@@ -604,7 +604,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             embeddingPath = f'{self.networkPath}/embedding_' \
                             f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
                             f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
-                            f'{self.network}.json'
+                            f'{self.networkName}.json'
 
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
             with open(embeddingPath, "w") as write_embedding:
