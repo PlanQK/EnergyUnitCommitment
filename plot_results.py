@@ -133,14 +133,14 @@ def makeFig(plotInfo, outputFile: str,
     else:
         fig.savefig(outputFile + "." + fileformat)
 
-
+#TODO: extra openJson needed???
 def openJson(fileName: str) -> dict:
 
     pass
 
 def extractInformation(fileRegex: str, xField: str, yField: str,
                                 splitFields: list = ["problemSize"], reductionMethod = np.mean,
-                                errorMethod = deviationOfTheMean) -> dict:
+                                errorMethod = deviationOfTheMean, constraints: dict = {}) -> dict:
     embedding = True
     filesRead = 1
     plotData = collections.defaultdict(collections.defaultdict)
@@ -148,9 +148,51 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
         with open(fileName) as file:
             element = json.load(file)
             if embedding:
-                plotData = extractEmbeddingInformation()
+                plotData = extractEmbeddingInformation(plotData=plotData, jsonDict=element, xField=xField, yField=yField, splitFields=splitFields)
             else:
-                plotData = extractPlottableInformation()
+                plotData = extractPlottableInformation(jsonDict=element)
+
+    for key, values in constraints.items():
+        try:
+            if float(element[key]) not in values:
+                break
+        except KeyError:
+            pass
+    else:
+        key = tuple(
+            e
+            for e in [
+                splitField + "=" + str(element.get(splitField) or "")
+                for splitField in splitFields
+            ]
+        )
+
+        try:
+            # unpacking xvalue if it is in nested dict
+            if isinstance(xField, list):
+                xvalue = element
+                for dict_key in xField:
+                    xvalue = xvalue[dict_key]
+            else:
+                xvalue = element[xField]
+
+            if xvalue not in plotData[key]:
+                plotData[key][xvalue] = []
+
+            # unpacking yvalue if it is in nested dict
+            if isinstance(yField, list):
+                yvalue = element
+                for dict_key in yField:
+                    yvalue = yvalue[dict_key]
+            else:
+                yvalue = element[yField]
+
+            # reductionMethod condense and casts yvalues
+            plotData[key][element[xField]].append(yvalue)
+        except KeyError:
+            print("key error")
+            pass
+    filesRead += 1
 
    # now perform reduction
     result = collections.defaultdict(list)
@@ -180,58 +222,44 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
     return result
 
 
-def extractEmbeddingInformation(fileRegex: str, xField: str, yField: str,
-                                splitFields: list = ["problemSize"], reductionMethod = np.mean,
-                                errorMethod = deviationOfTheMean
-                                ) -> dict:
-    plotData = collections.defaultdict(collections.defaultdict)
-    for fileName in glob.glob(fileRegex):
-        with open(fileName) as file:
-            fileName = path.split(fileName)[-1]
-            element = json.load(file)
-            logicalQubits = [int(key) for key in element.keys()]
-            embeddedQubits = [item for sublist in element.values() for item in sublist]
+def extractEmbeddingInformation(plotData: dict, element: dict, xField: str, yField: str,
+                                splitFields: list = ["problemSize"]) -> dict:
 
-            element["embeddedQubits"] = len(embeddedQubits)
-            element["logicalQubits"] = len(logicalQubits)
-            element["embedFactor"] = float(element["embeddedQubits"]) / float(element["logicalQubits"])
+    embeddingDict = element["info"]["embedding_context"]["embedding"]
+    logicalQubits = [int(key) for key in embeddingDict.keys()]
+    embeddedQubits = [item for sublist in embeddingDict.values() for item in sublist]
 
-            element["fileName"] = "_".join(fileName.split("_")[5:])[:-5]
-            element["problemSize"] = float(fileName.split("_")[6])
-            element["scale"] = float(fileName.split("_")[8][:-8])
-            element["rep"] = float(fileName.split("_")[2])
-            element["ord"] = float(fileName.split("_")[4])
-            key = tuple(
-                e
-                for e in [
-                    splitField + "=" + str(element[splitField])
-                    for splitField in sorted(splitFields)
-                ]
-            )
-            if element[xField] not in plotData[key]:
-                plotData[key][element[xField]] = []
+    element["dwaveBackend"]["embeddedQubits"] = len(embeddedQubits)
+    element["dwaveBackend"]["logicalQubits"] = len(logicalQubits)
+    element["dwaveBackend"]["embedFactor"] = float(element["dwaveBackend"]["embeddedQubits"]) / float(element["dwaveBackend"]["logicalQubits"])
 
-            yvalue = element[yField]
+    #element["fileName"] = "_".join(fileName.split("_")[5:])[:-5]
+    #element["problemSize"] = float(fileName.split("_")[6])
+    #element["scale"] = float(fileName.split("_")[8][:-8])
+    element["rep"] = float(fileName.split("_")[2])
+    element["ord"] = float(fileName.split("_")[4])
+    #TODO: dump rep & ord in JSON
 
-            plotData[key][element[xField]].append(float(yvalue))
+    #TODO: loop to check where splitField is located
 
-    # now perform reduction
-    result = collections.defaultdict(list)
-    for outerKey in plotData:
-        for innerKey in plotData[outerKey]:
-            xvalue = innerKey
-            result[outerKey].append(
-                [
-                    float(xvalue),
-                    reductionMethod(plotData[outerKey][innerKey]),
-                    errorMethod(plotData[outerKey][innerKey]),
-                ]
-            )
-        result[outerKey].sort()
+    key = tuple(
+        e
+        for e in [
+            splitField + "=" + str(element[splitField])
+            for splitField in sorted(splitFields)
+        ]
+    )
 
-    return result
+    if element[xField] not in plotData[key]:
+        plotData[key][element[xField]] = []
 
+    yvalue = element[yField]
 
+    plotData[key][element[xField]].append(float(yvalue))
+
+    return plotData
+
+#TODO: adjust to extractInformation format
 def extractPlottableInformation(fileRegex: str, xField: str, yField: str,
                                 splitFields: list = ["problemSize"], reductionMethod = np.mean,
                                 errorMethod = deviationOfTheMean, constraints: dict = {}) -> dict:
@@ -430,7 +458,9 @@ def main():
     BINSIZE = 1
 
     #extractEmbeddingInformation(fileRegex="sweepNetworks/embedding_rep_0_ord_1_nocostinput_1*", xField="logicalQubits", yField="embeddedQubits")
-    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField="scale", yField="totalCost")
+    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField="scale", yField="totalCost",
+                                constraints={'problemSize': [10, 11, 12, 13, 14]}
+                                )
 
     plotGroup(plotname="glpk_scale_to_cost_mean1",
               solver="pypsa_glpk",
