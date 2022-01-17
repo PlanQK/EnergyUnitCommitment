@@ -184,7 +184,7 @@ def addPlottableInformation(jsonDict: dict) -> dict:
                                                     for key in jsonDict["cutSamples"].keys()]
 
     # often, one of those two solutions is significantly better than the other
-    if "LowestFlow" in jsonDict["dwaveBackend"]:
+    if jsonDict["dwaveBackend"]["LowestFlow"] is not None:
         jsonDict["dwaveBackend"]["minChoice"] = min(jsonDict["dwaveBackend"]["LowestFlow"],
                                                     jsonDict["dwaveBackend"]["ClosestFlow"])
 
@@ -193,9 +193,10 @@ def addPlottableInformation(jsonDict: dict) -> dict:
 
 def extractInformation(fileRegex: str, xField: str, yField: str,
                        splitFields: list = ["problemSize"], reductionMethod=np.mean,
-                       errorMethod=deviationOfTheMean, constraints: dict = {}) -> dict:
+                       errorMethod=deviationOfTheMean, constraints: dict = {}, embedding: bool = False) -> dict:
     """
 
+    @param embedding:
     @param fileRegex:
     @param xField:
     @param yField:
@@ -205,7 +206,6 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
     @param constraints:
     @return:
     """
-    embedding = True
     filesRead = 1
     plotData = collections.defaultdict(collections.defaultdict)
     for fileName in glob.glob(fileRegex):
@@ -321,25 +321,14 @@ def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFie
     plotInfo = {}
     for idx in range(len(fileRegexList)):
         for regex in fileRegexList[idx].split():
-            if embeddingData:
-                iterator = extractEmbeddingInformation(
-                    f"{PATH[idx]}/{regex}",
-                    xField=xField,
-                    yField=yFieldList[idx],
-                    splitFields=splitFields,
-                    reductionMethod=reductionMethod[idx],
-                    errorMethod=errorMethod,
-                ).items()
-            else:
-                iterator = extractPlottableInformation(
-                    f"{PATH[idx]}/{regex}",
-                    xField=xField,
-                    yField=yFieldList[idx],
-                    splitFields=splitFields,
-                    reductionMethod=reductionMethod[idx],
-                    errorMethod=errorMethod,
-                    constraints=constraints,
-                ).items()
+            iterator = extractInformation(fileRegex=f"{PATH[idx]}/{regex}",
+                                          xField=xField,
+                                          yField=yFieldList[idx],
+                                          splitFields=splitFields,
+                                          reductionMethod=reductionMethod[idx],
+                                          errorMethod=errorMethod,
+                                          constraints=constraints,
+                                          embedding=embeddingData).items()
 
             for key, value in iterator:
                 plotInfoKey = f"{solver}_{key}_{lineNames[idx]}"
@@ -366,17 +355,24 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    # extractEmbeddingInformation(fileRegex="sweepNetworks/embedding_rep_0_ord_1_nocostinput_1*", xField="logicalQubits", yField="embeddedQubits")
-    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField=["scale", "timeout"],
-                                yField="totalCost", constraints={'problemSize': [10, 11, 12, 13, 14]})
+    regex = '*nocostinput_*'
+    plotGroup("afterChange_cumulativeCostDistribution_for_fullInitialEnergies",
+              "qpu",
+              [
+                  regex,
+              ],
+              "problemSize",
+              yFieldList=["cutSamples"],
+              reductionMethod=[extractCutSamples],
+              errorMethod=None,
+              splitFields=[],
+              plottype="scatterCutSample",
+              logscalex=False,
+              xlabel="energy",
+              ylabel="cost",
+              )
 
-    # with open("results_qpu_sweep/info_nocostinput_12_0_20.nc_110_365_30_0_1_80_1") as file:
-    #    element = json.load(file)
-    #    print(resolveKey(element, "post_processing_overhead_time"))
-
-    return
-
-    plotGroup(plotname="glpk_scale_to_cost_mean1",
+    plotGroup(plotname="afterChange_glpk_scale_to_cost_mean",
               solver="pypsa_glpk",
               fileRegexList=[
                   '*nocostinput_*1',
@@ -393,23 +389,6 @@ def main():
               lineNames=["totalCost", "standard_deviation"],
               logscalex=False,
               logscaley=False,
-              )
-
-    regex = '*nocostinput_*'
-    plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
-              "qpu_read",
-              [
-                  regex,
-              ],
-              "problemSize",
-              yFieldList=["cutSamples"],
-              reductionMethod=[extractCutSamples],
-              errorMethod=None,
-              splitFields=[],
-              plottype="scatterCutSample",
-              logscalex=False,
-              xlabel="energy",
-              ylabel="cost",
               )
 
     return
