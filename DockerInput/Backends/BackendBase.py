@@ -108,14 +108,3 @@ class BackendBase(abc.ABC):
         self.metaInfo["scale"] = int(self.metaInfo["fileName"].split("_")[4][:-3])
 
         return
-
-        if variables[var] == "int":
-            setattr(self, var, int(self.envMgr[var]))
-            self.metaInfo[var] = int(self.envMgr[var])
-        elif variables[var] == "float":
-            setattr(self, var, float(self.envMgr[var]))
-            self.metaInfo[var] = float(self.envMgr[var])
-        else:
-            setattr(self, var, self.envMgr[var])
-            self.metaInfo[var] = self.envMgr[var]
-

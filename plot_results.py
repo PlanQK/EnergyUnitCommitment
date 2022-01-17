@@ -53,13 +53,27 @@ def averageOfBest(values: list) -> float:
 
 
 def averageOfBestPercent(values: list, percentage: float) -> float:
+    """
+    Reduction method to reduce the given values into one float using the "average of best percent"-method
+    @param values: list
+        A list of values to be reduced.
+    @param percentage: float
+        The percentage of values to be considered.
+    @return: float
+        Reduced value.
+    """
     values.sort()
     return np.mean(values[:int(percentage * len(values))])
 
 
 def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
     """
-    used to create scatter plots from a single run
+    Used to create scatter plots from a single run.
+
+    @param cutSamplesDictList: object
+        List of dicts to be searched through.
+    @return: [list, list]
+        A list with the extracted energy and one with the optimized costs.
     """
     energy = []
     optimizedCost = []
@@ -70,9 +84,32 @@ def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
     return energy, optimizedCost
 
 
-def makeFig(plotInfo, outputFile: str,
+def makeFig(plotInfo: dict, outputFile: str,
             logscalex: bool = False, logscaley: bool = False, xlabel: str = None, ylabel: str = None, title: str = None,
-            fileformat: str = "pdf", plottype: str = "line", ):
+            fileformat: str = "pdf", plottype: str = "line", ) -> None:
+    """
+    Generates the plot and saves it to the specified location.
+
+    @param plotInfo: dict
+        The data to be plotted.
+    @param outputFile: str
+        The path to where the plot will be saved.
+    @param logscalex: bool
+        Turns the x-axis into a log scale.
+    @param logscaley: bool
+        Turns the y-axis into a log scale.
+    @param xlabel: str
+        The label of the x-axis.
+    @param ylabel: str
+        The label of the y-axis.
+    @param title: str
+        The title of the figure.
+    @param fileformat: str
+        The format of the saved file.
+    @param plottype: str
+        Indicates the type of plot to be created, e.g. scatter, line, etc..
+    @return: None
+    """
     fig, ax = plt.subplots()
     for key, values in plotInfo.items():
 
@@ -137,18 +174,26 @@ def makeFig(plotInfo, outputFile: str,
 
 def resolveKey(element: dict, field: str) -> any:
     """
+    Finds the given key within the given dictionary, even if the key is nested in it.
 
-    @param element:
-    @param field:
-    @return:
+    @param element: dict
+        The dict to be searched through.
+    @param field: str
+        The key to be searched for.
+    @return: any
+        The value of the specific key.
     """
     out = None
+    # search for key in the given dict
     if field in element:
         out = element[field]
+    # if key is not found, loop through all elements of the dict. If they are a dict themselves, enter and perform the
+    # search again
     else:
         for key in element:
             if isinstance(element[key], dict):
                 out = resolveKey(element[key], field)
+                # if the key and therefore a value for it is found, break out of the loop and return the value
                 if out is not None:
                     break
 
@@ -157,9 +202,12 @@ def resolveKey(element: dict, field: str) -> any:
 
 def addEmbeddingInformation(jsonDict: dict) -> dict:
     """
+    Add embedding information, specific to the dWave Backends, extracted from their backend specific results.
 
-    @param jsonDict:
-    @return:
+    @param jsonDict: dict
+        The dict where the embedding inforamtion is extracted from and added to.
+    @return: dict
+        The adjusted input dict.
     """
     embeddingDict = jsonDict["info"]["embedding_context"]["embedding"]
     logicalQubits = [int(key) for key in embeddingDict.keys()]
@@ -175,9 +223,12 @@ def addEmbeddingInformation(jsonDict: dict) -> dict:
 
 def addPlottableInformation(jsonDict: dict) -> dict:
     """
-    Add plottable Information, specific to the dWave Backends, extracted from their backend specific results.
-    @param jsonDict:
-    @return:
+    Add plottable information, specific to the dWave Backends, extracted from their backend specific results.
+
+    @param jsonDict: dict
+        The dict where the plottable inforamtion is extracted from and added to.
+    @return: dict
+        The adjusted input dict.
     """
     if "cutSamples" in jsonDict:
         jsonDict["dwaveBackend"]["sampleValues"] = [jsonDict["cutSamples"][key]["optimizedCost"]
@@ -195,16 +246,30 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
                        splitFields: list = ["problemSize"], reductionMethod=np.mean,
                        errorMethod=deviationOfTheMean, constraints: dict = {}, embedding: bool = False) -> dict:
     """
+    Extracts the information to be plotted.
 
-    @param embedding:
-    @param fileRegex:
-    @param xField:
-    @param yField:
-    @param splitFields:
-    @param reductionMethod:
-    @param errorMethod:
-    @param constraints:
-    @return:
+    @param fileRegex: str
+        A regular expressions to get the data
+    @param xField: str
+        The name of the x-Axis key. Nested keys can be reached by providing a list of strings, which represent the path
+        through the nested dicts.
+    @param yField: str
+        The name of the y-axis key. Nested keys can be reached by providing a list of strings, which represent the path
+        through the nested dicts.
+    @param splitFields: list
+        A list with keys for which the extracted data should be grouped.
+    @param reductionMethod: func
+        The function to be used to reduce values into one float value.
+    @param errorMethod: func
+        The function to be used to plot error bars.
+    @param constraints: dict
+        A dictionary of values that the .json file has to have to be included in the plot. The key has to be identical
+        to the key in the .json file. In combination with it a list with all acceptable values has to be given. If a
+        .json file doesn't have this key or a listed value, it is ignored.
+    @param embedding: bool
+        If true, embedded information from dWaveBackend is extracted to be plotted.
+    @return: dict
+        A dict with the information to be plotted.
     """
     filesRead = 1
     plotData = collections.defaultdict(collections.defaultdict)
@@ -218,11 +283,14 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
     for key, values in constraints.items():
         try:
+            # value of constraint is not in constrains list
             if float(resolveKey(element, key)) not in values:
                 break
         except KeyError:
             pass
+    # value of constraint is found in constrains list
     else:
+        # create a new key using the splitField
         key = tuple(
             e
             for e in [
@@ -275,27 +343,55 @@ def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFie
               embeddingData: bool = False, errorMethod=deviationOfTheMean, constraints: dict = {},
               plottype: str = "line", xlabel: str = None, ylabel: str = None) -> None:
     """
-    extracts data from all files in the regexList list and plots it into a single
-    plot as {plotname}.{FILEFORMAT}. fileInfo are json files
+    Extracts data from all files in the fileRegexList list and plots them into a single plot with the given plotname
+    and set fileformat. The given files have to be .JSON files.
 
-    plotname -- filename of plot without filetype
-    solver -- string to indicate which solver was used. sets some helpful default values
-    fileRegexList -- List of all regular expressions to get data. Each item in the list is
-            plotted as it's own line (and further split up if splitFields is not empty)
-            a whitespace in a regex string splits multiple regular expressions to be
-            plotted into a single line
-    PATH -- PATH to plot data. Same size as fileRegexList.
-    xField -- name of x-axis key 
-    yFieldList -- list of keys for y-axis values. Same size as fileRegexList. The i-th entry is for the i-th regex
-            in fileRegexList. A list of keys unpacks the value in a nested dictionary
-    reductionMethod -- list of functions to reduce list of values into a float value. Same size as fileRegexList.
-    errorMethod -- complement to reductionMethod to plot error bars
-    constraints -- dictionary of values that a .json file has to have to be included
-            in the plot. A dict key is the name of the value, and the dict value
-            has to be a list of all permissible values. If a .json file doesn't have a key,
-            that constraint is ignored
+    @param plotname: str
+        The name of the generated plot, without the filetype.
+    @param solver: str
+        A string to indicate which solver was used. This sets some helpful default values
+    @param fileRegexList: list
+        A list of all regular expressions to get data. Each item in the list is plotted as it's own line (possibly
+        further split up, if splitFields is not empty). A whitespace in a regex string splits multiple regular
+        expressions to be plotted into a single line.
+    @param xField: str
+        The name of the x-axis key. Nested keys can be reached by providing a list of strings, which represent the path
+        through the nested dicts.
+    @param yFieldList: list
+        The list of names of the y-axis keys. It has to be the same size as fileRegexList. The i-th entry in this list
+        is for the i-th entry in the fileRegexList. Nested keys can be reached by providing a list of strings, which
+        represent the path through the nested dicts.
+    @param splitFields: list
+        A list with keys for which the extracted data should be grouped.
+    @param logscalex: bool
+        Turns the x-axis into a log scale.
+    @param logscaley: bool
+        Turns the y-axis into a log scale.
+    @param PATH: list
+        A list of the paths to the data. It has to be the same size as fileRegexList. If nothing is given the data is
+        searched for in a standard folder.
+    @param reductionMethod: func
+        A list of functions to be used to reduce values into one float value. It has to be the same size as
+        fileRegexList.
+    @param lineNames: list
+        A list with the labels for the lines to be plotted. It has to be the same size as fileRegexList. If nothing is
+        given, the keys of yFieldList will be used as labels.
+    @param embeddingData: bool
+        If true, embedded information from dWaveBackend is extracted to be plotted.
+    @param errorMethod: func
+        The function to be used to plot error bars.
+    @param constraints: dict
+        A dictionary of values that the .json file has to have to be included in the plot. The key has to be identical
+        to the key in the .json file. In combination with it a list with all acceptable values has to be given. If a
+        .json file doesn't have this key or a listed value, it is ignored.
+    @param plottype: str
+        Indicates the type of plot to be created, e.g. scatter, line, etc..
+    @param xlabel: str
+        The label of the x-axis.
+    @param ylabel: str
+        The label of the y-axis.
+    @return: None
     """
-
     if yFieldList is None:
         yFieldList = ["totalCost"] * len(fileRegexList)
 
