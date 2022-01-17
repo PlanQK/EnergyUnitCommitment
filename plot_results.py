@@ -1,6 +1,7 @@
 import glob
 import json
 import collections
+from typing import Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -138,6 +139,20 @@ def openJson(fileName: str) -> dict:
 
     pass
 
+def resolveKey(element: dict, field: str) -> any:
+    out = None
+    if field in element:
+        out = element[field]
+    else:
+        for key in element:
+            if isinstance(element[key], dict):
+                out = resolveKey(element[key], field)
+                if out is not None:
+                    break
+
+    return out
+
+
 def extractInformation(fileRegex: str, xField: str, yField: str,
                                 splitFields: list = ["problemSize"], reductionMethod = np.mean,
                                 errorMethod = deviationOfTheMean, constraints: dict = {}) -> dict:
@@ -154,7 +169,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
     for key, values in constraints.items():
         try:
-            if float(element[key]) not in values:
+            if float(resolveKey(element, key)) not in values:
                 break
         except KeyError:
             pass
@@ -162,7 +177,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
         key = tuple(
             e
             for e in [
-                splitField + "=" + str(element.get(splitField) or "")
+                splitField + "=" + str(resolveKey(element, splitField) or "")
                 for splitField in splitFields
             ]
         )
@@ -236,11 +251,10 @@ def extractEmbeddingInformation(plotData: dict, element: dict, xField: str, yFie
     #element["fileName"] = "_".join(fileName.split("_")[5:])[:-5]
     #element["problemSize"] = float(fileName.split("_")[6])
     #element["scale"] = float(fileName.split("_")[8][:-8])
-    element["rep"] = float(fileName.split("_")[2])
-    element["ord"] = float(fileName.split("_")[4])
-    #TODO: dump rep & ord in JSON
+    #element["rep"] = float(fileName.split("_")[2]) #isingInterface - lineRepetiton
+    #element["ord"] = float(fileName.split("_")[4]) #isingInterface - maxOrder
 
-    #TODO: loop to check where splitField is located
+    #TODO: loop to check where splitField is located; Done in extractInformation?
 
     key = tuple(
         e
@@ -301,7 +315,7 @@ def extractPlottableInformation(fileRegex: str, xField: str, yField: str,
                 key = tuple(
                     e
                     for e in [
-                        splitField + "=" + str(element.get(splitField) or "")
+                        splitField + "=" + str(resolveKey(element, splitField) or "")
                         for splitField in splitFields
                     ]
                 )
@@ -458,9 +472,13 @@ def main():
     BINSIZE = 1
 
     #extractEmbeddingInformation(fileRegex="sweepNetworks/embedding_rep_0_ord_1_nocostinput_1*", xField="logicalQubits", yField="embeddedQubits")
-    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField="scale", yField="totalCost",
-                                constraints={'problemSize': [10, 11, 12, 13, 14]}
-                                )
+    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField="scale", yField="totalCost", constraints={'problemSize': [10, 11, 12, 13, 14]}, splitFields=["annealing_time"])
+
+    #with open("results_qpu_sweep/info_nocostinput_12_0_20.nc_110_365_30_0_1_80_1") as file:
+    #    element = json.load(file)
+    #    print(resolveKey(element, "post_processing_overhead_time"))
+
+    return
 
     plotGroup(plotname="glpk_scale_to_cost_mean1",
               solver="pypsa_glpk",
