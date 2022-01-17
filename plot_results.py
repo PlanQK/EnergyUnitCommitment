@@ -134,12 +134,14 @@ def makeFig(plotInfo, outputFile: str,
     else:
         fig.savefig(outputFile + "." + fileformat)
 
-#TODO: extra openJson needed???
-def openJson(fileName: str) -> dict:
-
-    pass
 
 def resolveKey(element: dict, field: str) -> any:
+    """
+
+    @param element:
+    @param field:
+    @return:
+    """
     out = None
     if field in element:
         out = element[field]
@@ -153,9 +155,56 @@ def resolveKey(element: dict, field: str) -> any:
     return out
 
 
+def addEmbeddingInformation(jsonDict: dict) -> dict:
+    """
+
+    @param jsonDict:
+    @return:
+    """
+    embeddingDict = jsonDict["info"]["embedding_context"]["embedding"]
+    logicalQubits = [int(key) for key in embeddingDict.keys()]
+    embeddedQubits = [item for sublist in embeddingDict.values() for item in sublist]
+
+    jsonDict["dwaveBackend"]["embeddedQubits"] = len(embeddedQubits)
+    jsonDict["dwaveBackend"]["logicalQubits"] = len(logicalQubits)
+    jsonDict["dwaveBackend"]["embedFactor"] = float(jsonDict["dwaveBackend"]["embeddedQubits"]) \
+                                              / float(jsonDict["dwaveBackend"]["logicalQubits"])
+
+    return jsonDict
+
+
+def addPlottableInformation(jsonDict: dict) -> dict:
+    """
+    Add plottable Information, specific to the dWave Backends, extracted from their backend specific results.
+    @param jsonDict:
+    @return:
+    """
+    if "cutSamples" in jsonDict:
+        jsonDict["dwaveBackend"]["sampleValues"] = [jsonDict["cutSamples"][key]["optimizedCost"]
+                                                    for key in jsonDict["cutSamples"].keys()]
+
+    # often, one of those two solutions is significantly better than the other
+    if "LowestFlow" in jsonDict["dwaveBackend"]:
+        jsonDict["dwaveBackend"]["minChoice"] = min(jsonDict["dwaveBackend"]["LowestFlow"],
+                                                    jsonDict["dwaveBackend"]["ClosestFlow"])
+
+    return jsonDict
+
+
 def extractInformation(fileRegex: str, xField: str, yField: str,
-                                splitFields: list = ["problemSize"], reductionMethod = np.mean,
-                                errorMethod = deviationOfTheMean, constraints: dict = {}) -> dict:
+                       splitFields: list = ["problemSize"], reductionMethod=np.mean,
+                       errorMethod=deviationOfTheMean, constraints: dict = {}) -> dict:
+    """
+
+    @param fileRegex:
+    @param xField:
+    @param yField:
+    @param splitFields:
+    @param reductionMethod:
+    @param errorMethod:
+    @param constraints:
+    @return:
+    """
     embedding = True
     filesRead = 1
     plotData = collections.defaultdict(collections.defaultdict)
@@ -163,9 +212,9 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
         with open(fileName) as file:
             element = json.load(file)
             if embedding:
-                plotData = extractEmbeddingInformation(plotData=plotData, jsonDict=element, xField=xField, yField=yField, splitFields=splitFields)
+                element = addEmbeddingInformation(jsonDict=element)
             else:
-                plotData = extractPlottableInformation(jsonDict=element)
+                element = addPlottableInformation(jsonDict=element)
 
     for key, values in constraints.items():
         try:
@@ -182,170 +231,15 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             ]
         )
 
-        try:
-            # unpacking xvalue if it is in nested dict
-            if isinstance(xField, list):
-                xvalue = element
-                for dict_key in xField:
-                    xvalue = xvalue[dict_key]
-            else:
-                xvalue = element[xField]
+        xvalue = resolveKey(element, xField)
 
-            if xvalue not in plotData[key]:
-                plotData[key][xvalue] = []
+        if xvalue not in plotData[key]:
+            plotData[key][xvalue] = []
 
-            # unpacking yvalue if it is in nested dict
-            if isinstance(yField, list):
-                yvalue = element
-                for dict_key in yField:
-                    yvalue = yvalue[dict_key]
-            else:
-                yvalue = element[yField]
+        yvalue = resolveKey(element, yField)
 
-            # reductionMethod condense and casts yvalues
-            plotData[key][element[xField]].append(yvalue)
-        except KeyError:
-            print("key error")
-            pass
-    filesRead += 1
-
-   # now perform reduction
-    result = collections.defaultdict(list)
-    for outerKey in plotData:
-        for innerKey in plotData[outerKey]:
-            if isinstance(innerKey, str):
-                # H, T in sqa data
-                if innerKey.startswith("["):
-                    xvalue = innerKey[1:-1].split(',')[0]
-                else:
-                    xvalue = innerKey
-            else:
-                xvalue = innerKey
-            result[outerKey].append(
-                [
-                    # sometimes xvalue is still a string and has to be cast to a float
-                    xvalue,
-                    reductionMethod(plotData[outerKey][innerKey]),
-                    errorMethod(plotData[outerKey][innerKey]) if errorMethod is not None else 0
-                ]
-            )
-        result[outerKey].sort()
-
-    if PRINT_NUM_READ_FILES:
-        print(f"files read for {fileRegex} : {filesRead}")
-
-    return result
-
-
-def extractEmbeddingInformation(plotData: dict, element: dict, xField: str, yField: str,
-                                splitFields: list = ["problemSize"]) -> dict:
-
-    embeddingDict = element["info"]["embedding_context"]["embedding"]
-    logicalQubits = [int(key) for key in embeddingDict.keys()]
-    embeddedQubits = [item for sublist in embeddingDict.values() for item in sublist]
-
-    element["dwaveBackend"]["embeddedQubits"] = len(embeddedQubits)
-    element["dwaveBackend"]["logicalQubits"] = len(logicalQubits)
-    element["dwaveBackend"]["embedFactor"] = float(element["dwaveBackend"]["embeddedQubits"]) / float(element["dwaveBackend"]["logicalQubits"])
-
-    #element["fileName"] = "_".join(fileName.split("_")[5:])[:-5]
-    #element["problemSize"] = float(fileName.split("_")[6])
-    #element["scale"] = float(fileName.split("_")[8][:-8])
-    #element["rep"] = float(fileName.split("_")[2]) #isingInterface - lineRepetiton
-    #element["ord"] = float(fileName.split("_")[4]) #isingInterface - maxOrder
-
-    #TODO: loop to check where splitField is located; Done in extractInformation?
-
-    key = tuple(
-        e
-        for e in [
-            splitField + "=" + str(element[splitField])
-            for splitField in sorted(splitFields)
-        ]
-    )
-
-    if element[xField] not in plotData[key]:
-        plotData[key][element[xField]] = []
-
-    yvalue = element[yField]
-
-    plotData[key][element[xField]].append(float(yvalue))
-
-    return plotData
-
-#TODO: adjust to extractInformation format
-def extractPlottableInformation(fileRegex: str, xField: str, yField: str,
-                                splitFields: list = ["problemSize"], reductionMethod = np.mean,
-                                errorMethod = deviationOfTheMean, constraints: dict = {}) -> dict:
-    """Transform the json data by averaging the yName values for each xName value.
-    If splitFields is given generate multiple Lines. The reduction method needs to
-    reduce a list of multiple values into one value (e.g. np.mean, max, min)
-    """
-    plotData = collections.defaultdict(collections.defaultdict)
-    filesRead = 0
-    for fileName in glob.glob(fileRegex):
-        # a filename of a unit commitment computation has the the following
-        # convention for its networks meta parameters and the solver parameters
-        # info_NETWORKNAME_NUMBER_SCALE.nc_{SOLVERPARAMETERS}
-        # NETWORKNAME mustn't contain an underscore `_`
-        # For a dwave-qpu computation the solver parameters are
-        # ANNEALINGTIME_NUMREADS_SLACKVARFACTOR_LINEPRESENTATION_MAXORDER_CHAINSTRENGTH_REPETITIONNUMBER
-        with open(fileName) as file:
-            element = json.load(file)
-            if "cutSamples" in element:
-                element["sampleCutSize"] = len(element["cutSamples"])
-                element["sampleValues"] = [
-                    element["cutSamples"][key]["optimizedCost"]
-                    for key in element["cutSamples"].keys()
-                ]
-
-            # often, one of those two solutions is significantly better than the other
-            if "LowestFlow" in element["dwaveBackend"]:
-                element["dwaveBackend"]["minChoice"] = min(element["dwaveBackend"]["LowestFlow"], element["dwaveBackend"]["ClosestFlow"])
-
-            # if a constraint is broken, don't add the current files data. else block
-            # is execution path for adding to plot data so it works with empty constraints
-            for key, values in constraints.items():
-                try:
-                    if float(element[key]) not in values:
-                        break
-                except KeyError:
-                    pass
-            else:
-                key = tuple(
-                    e
-                    for e in [
-                        splitField + "=" + str(resolveKey(element, splitField) or "")
-                        for splitField in splitFields
-                    ]
-                )
-
-                try:
-                    # unpacking xvalue if it is in nested dict
-                    if isinstance(xField, list):
-                        xvalue = element
-                        for dict_key in xField:
-                            xvalue = xvalue[dict_key]
-                    else:
-                        xvalue = element[xField]
-
-                    if xvalue not in plotData[key]:
-                        plotData[key][xvalue] = []
-
-                    # unpacking yvalue if it is in nested dict
-                    if isinstance(yField, list):
-                        yvalue = element
-                        for dict_key in yField:
-                            yvalue = yvalue[dict_key]
-                    else:
-                        yvalue = element[yField]
-
-                    # reductionMethod condense and casts yvalues
-                    plotData[key][element[xField]].append(yvalue)
-                except KeyError:
-                    print("key error")
-                    pass
-            filesRead += 1
+        plotData[key][element[xField]].append(yvalue)
+        filesRead += 1
 
     # now perform reduction
     result = collections.defaultdict(list)
@@ -371,13 +265,14 @@ def extractPlottableInformation(fileRegex: str, xField: str, yField: str,
 
     if PRINT_NUM_READ_FILES:
         print(f"files read for {fileRegex} : {filesRead}")
+
     return result
 
 
 def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFieldList: list = None,
               splitFields: list = ["problemSize"], logscalex: bool = True, logscaley: bool = False,
               PATH: list = None, reductionMethod: list = None, lineNames: list = None,
-              embeddingData: bool = False, errorMethod = deviationOfTheMean, constraints: dict = {},
+              embeddingData: bool = False, errorMethod=deviationOfTheMean, constraints: dict = {},
               plottype: str = "line", xlabel: str = None, ylabel: str = None) -> None:
     """
     extracts data from all files in the regexList list and plots it into a single
@@ -471,10 +366,11 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    #extractEmbeddingInformation(fileRegex="sweepNetworks/embedding_rep_0_ord_1_nocostinput_1*", xField="logicalQubits", yField="embeddedQubits")
-    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField="scale", yField="totalCost", constraints={'problemSize': [10, 11, 12, 13, 14]}, splitFields=["annealing_time"])
+    # extractEmbeddingInformation(fileRegex="sweepNetworks/embedding_rep_0_ord_1_nocostinput_1*", xField="logicalQubits", yField="embeddedQubits")
+    extractPlottableInformation(fileRegex="results_qpu_sweep/*nocostinput_*", xField=["scale", "timeout"],
+                                yField="totalCost", constraints={'problemSize': [10, 11, 12, 13, 14]})
 
-    #with open("results_qpu_sweep/info_nocostinput_12_0_20.nc_110_365_30_0_1_80_1") as file:
+    # with open("results_qpu_sweep/info_nocostinput_12_0_20.nc_110_365_30_0_1_80_1") as file:
     #    element = json.load(file)
     #    print(resolveKey(element, "post_processing_overhead_time"))
 
