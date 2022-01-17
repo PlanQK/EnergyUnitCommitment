@@ -17,6 +17,14 @@ PLOTLIMIT = 500
 
 
 def deviationOfTheMean(values: list) -> float:
+    """
+        Reduction method to reduce the given values into one float using the "deviation of the mean"-method
+
+        @param values: list
+            A list of values to be reduced.
+        @return: float
+            Reduced value.
+        """
     return np.std(values) / np.sqrt(len(values))
 
 
@@ -36,6 +44,14 @@ def cumulativeDistribution(values: list) -> list:
 
 
 def averageOfBetterThanMedian(values: list) -> float:
+    """
+        Reduction method to reduce the given values into one float using the "average of better than median"-method
+
+        @param values: list
+            A list of values to be reduced.
+        @return: float
+            Reduced value.
+        """
     median = np.median(values)
     result = 0
     count = 0
@@ -48,6 +64,14 @@ def averageOfBetterThanMedian(values: list) -> float:
 
 
 def averageOfBest(values: list) -> float:
+    """
+    Reduction method to reduce the given values into one float using the "average of best"-method
+
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     values.sort()
     return np.mean(values[:-1])
 
@@ -55,6 +79,7 @@ def averageOfBest(values: list) -> float:
 def averageOfBestPercent(values: list, percentage: float) -> float:
     """
     Reduction method to reduce the given values into one float using the "average of best percent"-method
+
     @param values: list
         A list of values to be reduced.
     @param percentage: float
