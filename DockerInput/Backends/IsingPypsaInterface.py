@@ -5,10 +5,20 @@ import typing
 
 
 class IsingPypsaInterface:
+
+    # TODO Missing features for complete problem:
+    # - marginal cost
+    # - startup/shutdown cost
+    # - multiple time slices
+
     def __init__(self, network, snapshots):
+        # contains qubo coefficients
         self.problem = {}
         self.snapshots = snapshots
-        self._startIndex = {}
+
+        self.allocatedQubits = 0
+        # contains encoding data
+        self.data = {}
 
         envMgr = EnvironmentVariableManager()
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
@@ -24,56 +34,388 @@ class IsingPypsaInterface:
         else:
             self.lineRepresentation = int(lineRepresentation)
             self.network = network.copy()
-        # line splitting. Stores data to retrieve original configuration in dict
-        #keys: line name in original network
-        #value: number of components of capacity 2^n-1 the decomposition is made
-        #of. Line names in dummy network for an item (k,v) in the dictionary are
-        #"{k}_split_{i}" for 0 <= i < v
-            self.lineDictionary = {}
-            self.lineNames = network.lines.index
-            for line in self.lineNames:
-                originalLine, numSplits = self.splitLine(
-                        line,
-                        self.network,
-                        self.lineRepresentation,
-                        self.maxOrder
-                )
-                self.lineDictionary[originalLine] = numSplits
             
 
-        count = 0
+
+        self.storeGenerators()
+
+        self.storeLines()
+
+        self.storeSlackVars()
+
+        
+    def buildQubo(self):
+        pass
+        
+
+
+
+    def storeGenerators(self):
+        time = 0
         for i in range(len(self.network.buses)):
-            gen = self.network.generators[
+            generatorsAtBus = self.network.generators[
                 self.network.generators.bus == self.network.buses.index[i]
             ]
-            for name in gen.index:
-                if self.network.generators.committable[name]:
+            for gen in generatorsAtBus.index:
+                if self.network.generators.committable[gen]:
                     continue
-                self._startIndex[name] = count
-                count += len(self.snapshots)
+                self.data[gen] = {
+                        'indices' : [self.allocatedQubits],
+                        'values' : [self.network.generators_t.p_max_pu[gen].iloc[time]]
+                }
+                self.allocatedQubits += len(self.snapshots)
+        return
 
-        # this allows to optimize the flow through lines
-        # requires a binary representation of the number
-        # and an additional variable for the sign
-        self._lineIndices = {}
-        self._lineDirection = {}
 
+    def totalLoad(self, bus, time):
+        if time is None:
+            time = self.network.loads_t['p_set'].index[0]
+        loadsAtCurrentBus = self.network.loads[
+                                    self.network.loads.bus == bus
+                            ].index
+        allLoads = self.network.loads_t['p_set'].loc[time]
+
+        result = allLoads[allLoads.index.isin(loadsAtCurrentBus)]
+        return result.sum()
+
+    def getTotalEncodedValue(self, component):
+        result = 0
+        for val in self.data[component]['values']:
+            result += val
+        return result
+
+    def getBusComponents(self, bus):
+        """return all labels of components that connect to a bus as a dictionary
+        generators - at this bus
+        positiveLines - start in this bus
+        negativeLines - end in this bus
+        loads - at this bus
+        """
+        result = {
+                "generators":
+                        list(self.network.generators[
+                                self.network.generators.bus == bus
+                        ].index)
+                    ,
+                "positiveLines" :
+                        list(self.network.lines[
+                                self.network.lines.bus1 == bus
+                        ].index)
+                ,
+                "negativeLines" :
+                        list(self.network.lines[
+                                self.network.lines.bus0 == bus
+                        ].index)
+                ,
+                }
+        return result
+
+        
+
+    def storeLines(self):
+        "calls encodeLine for each line"
         for index in self.network.lines.index:
-            # store the directional qubits first, then the line's binary representations
-            self._lineDirection[index] = count
-            count += len(self.snapshots)
-            # now the representation
-            self._lineIndices[index] = count
-            count += len(self.snapshots) * self.getBinaryLength(index)
+            # overwrite this in child classes
+            self.encodeLine(index)
 
-        # to avoid cubic or quartic contributions we add slack variables that
-        # store the product of the binary bit and the sign
-        self._slackVarsForQubo = {}
-        self._slackStart = count
+    def encodeLine(self, line):
+        """
+        split lines into 1-valued qubits
+        """
+        
+        capacity = int(self.network.lines.loc[line].s_nom)
+        indices = list(range(self.allocatedQubits, self.allocatedQubits+ 2*capacity,1) )
+        values = [1 for _ in range(0,capacity,1)] + [-1 for _ in range(0,capacity,1)]
+
+        self.allocatedQubits += len(indices)
+
+        self.data[line] = {
+                'values' : values,
+                'indices' : indices,
+        }
+        return
+
+    def getLineValue(self, line, solution):
+        result = 0
+        for idx in range(len(self.data[line]['indices'])):
+            if self.data[line]['indices'][idx] in solution:
+                result+=self.data[line]['values'][idx]
+        return result
+
+    def getLineValues(self, solution):
+        solution = set(solution)
+        lineValues = {}
+        for lineId in self.network.lines.index:
+            for t in range(len(self.snapshots)):
+                value = self.getLineValue(lineId, solution)
+                lineValues[(lineId, t)] = value
+        return lineValues
+
+    def storeSingleton(self, label, value):
+        if hasattr(self.data, label):
+            raise ValueError("The label already exists")
+        self.data[label] = {
+                'values': [value],
+                'indices': [self.allocatedQubits],
+                }
+        self.allocatedQubits += 1
+
+    def storeSlackVars(self):
+        pass
+
+
+
+    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, additive = True):
+        "given two labels couples all qubits in their representation"
+        # TODO: with or without scaling factor?"
+        firstComponentAdress = self.getMemoryAdress(firstComponent)
+        secondComponentAdress = self.getMemoryAdress(secondComponent)
+        
+        if firstComponentAdress[0] > secondComponentAdress[0]:
+            self.coupleComponents(secondComponent, firstComponent, couplingStrength, additive=additive)
+            return
+
+        for first in range(len(firstComponentAdress)):
+            for second in range(len(secondComponentAdress)):
+                key = (firstComponentAdress[first], secondComponentAdress[second])
+                if key[0] == key[1]:
+                    # continue
+                    key = (key  [0],)
+                interactionStrength = - couplingStrength * \
+                        self.data[firstComponent]['values'][first] * \
+                        self.data[secondComponent]['values'][second]
+
+                if additive:
+                    interactionStrength += self.problem.get(key,0)
+                self.problem[key] = interactionStrength
+            
+
+    def biasComponent(self, component,bias=1, additive = True, ):
+        "given a component level, sets the bias for all qubits in their representation"
+        componentAdress = self.getMemoryAdress(component)
+        for idx in range(len(componentAdress)):
+            key = (componentAdress[idx],)
+            interactionStrength = bias * \
+                    self.data[component]['values'][idx] 
+            if additive:
+                interactionStrength += self.problem.get(key,0)
+            self.problem[key] = interactionStrength
+
+
+
+    def getMemoryAdress(self, component):
+        return self.data[component]["indices"]
+        
+
+        
+
+    def encodeKirchhoffConstraint(self, bus):
+        """
+        add interactions to QUBO that enforce the Kirchhoff Constraint on solutions.
+        This means that the total power at a bus is as close as possible to the load
+        """
+
+        components = self.getBusComponents(bus)
+        flattenedComponenents = components['generators'] + \
+                components['positiveLines'] + \
+                components['negativeLines']
+
+        demand = self.totalLoad(bus,time=None)
+        print(f"{bus} :: Demand :: {demand}")
+
+        for component1 in flattenedComponenents:
+            factor = 1.0
+
+            # self.biasComponent(component1, bias = 1)
+            if component1 in components['negativeLines']:
+                print(f"negativeLine :: {component1}")
+                factor *= -1.0
+            self.biasComponent(component1, bias= -factor * 0.5 * demand)
+
+            for component2 in flattenedComponenents:
+                if component2 in components['negativeLines']:
+                    curFactor = -factor
+                else:
+                    curFactor = factor
+
+                self.coupleComponents(component1, component2, couplingStrength= factor * 0.25)
+                self.biasComponent(component1, bias= 0.25 * curFactor * 1)
+                self.biasComponent(component2, bias= 0.25 * curFactor * 1)
+        print(self.problem)
+        print(f"ending {bus}")
+
+
+    def siquanFormat(self):
+        """Return the complete problem in the format for the siquan solver"""
+        return [(v, list(k)) for k, v in self.problem.items()]
+
+
+    @classmethod
+    def buildCostFunction(
+        cls,
+        network,
+    ):
+        """Build the complete cost function for an Ising formulation.
+        The cost function is quite complex and I recommend first reading
+        through the mathematical formulation.
+        """
+        problemDict = cls(network, network.snapshots)
+        # problemDict._marginalCosts()
+
+        # for gen in problemDict._startIndex:
+            # for t in range(len(problemDict.snapshots)):
+                # problemDict._startupShutdownCost(gen, t)
+
+        # kirchhoff constraints
+        for node in problemDict.network.buses.index:
+            for t in range(len(problemDict.snapshots)):
+                problemDict.encodeKirchhoffConstraint(node)
+
+        return problemDict
+
+
+    @staticmethod
+    def addSQASolutionToNetwork(network, problemDict, solutionState):
+        for gen in problemDict._startIndex:
+            vec = np.zeros(len(problemDict.snapshots))
+            network.generators_t.status[gen] = np.concatenate(
+                [
+                    vec,
+                    np.ones(
+                        len(network.snapshots) - len(problemDict.snapshots)
+                    ),
+                ]
+            )
+        vec = np.zeros(len(problemDict.snapshots))
+        gen, time = problemDict.fromVecIndex(0)
+        for index in solutionState:
+            try:
+                new_gen, new_time = problemDict.fromVecIndex(index)
+            except:
+                continue
+            if gen != new_gen:
+                network.generators_t.status[gen] = np.concatenate(
+                    [
+                        vec,
+                        np.ones(
+                            len(network.snapshots) - len(problemDict.snapshots)
+                        ),
+                    ]
+                )
+                vec = np.zeros(len(problemDict.snapshots))
+                gen = new_gen
+                vec[new_time] = 1
+        network.generators_t.status[gen] = np.concatenate(
+            [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
+        )
+
+        return network
+
+    def numVariables(self):
+        """Return the number of spins."""
+        return self.allocatedQubits
+
+    def getValueToResult(self, component, result):
+        value = 0 
+        for idx in range(len(self.data[component]['indices'])):
+            if self.data[component]['indices'][idx] in result:
+                value += self.data[component]['values'][idx]
+        return value
+
+
+    def individualCostContribution(self, result):
+        # TODO proper cost
+        contrib = {}
+        for node in self.network.buses.index:
+            for t in range(len(self.snapshots)):
+                load = - self.totalLoad(node,time=None)
+                components = self.getBusComponents(node)
+                for gen in components['generators']:
+                    load += self.getValueToResult(gen, result)
+                for lineId in components['positiveLines']:
+                    load += self.getValueToResult(lineId, result)
+                for lineId in components['negativeLines']:
+                    load -= self.getValueToResult(lineId, result)
+                contrib[str((node, t))] = load
+        return contrib
+
+    # OLD CODE
+
+
+    def _marginalCosts(self):
         for index in self.network.lines.index:
-            self._slackVarsForQubo[index] = count
-            count += len(self.snapshots) * self.getBinaryLength(index)
-        self.slackIndex = count
+            for t in range(len(self.snapshots)):
+                lenbinary = self.getBinaryLength(index)
+                for i in range(lenbinary):
+                    self.addInteraction(
+                        self._lineIndices[index] + i + lenbinary * t,
+                        0.5 * self.monetaryCostFactor * 2 ** i,
+                    )
+
+        for gen in self._startIndex:
+            for t in range(len(self.snapshots)):
+                # operating cost contribution
+                index = self.toVecIndex(gen, t)
+                val = self.network.generators["marginal_cost"].loc[gen] * (
+                    self.getGeneratorOutput(gen, t)
+                )
+                self.addInteraction(index, self.monetaryCostFactor * val)
+
+
+
+    def getGeneratorOutput(self, gen, time):
+        """Return the generator output for a given point in time.
+
+        Two values can be used from the Pypsa datamodel:
+            - p: The output of the LOPF optimization. This is not good, because
+                after LOPF we will already have an optimized solution.
+            - p_nom*p_max_pu: this does not need another optimization. The following
+                parameters must be set:
+                p_nom: the maximal output
+                p_max_pu: a time dependent factor how much power can be output
+                    (usually only set for renewables)
+        """
+        factor = 1.0
+        if gen in self.network.generators_t.p_max_pu:
+            factor = self.network.generators_t.p_max_pu[gen].iloc[time]
+        return factor * self.network.generators.p_nom[gen]
+
+
+    def marginalCosts(self):
+        for gen in self.network.lines.index:
+            self.biasComponent(
+                    gen,
+                    0.5 * self.monetaryCostFactor 
+            )
+
+            generatorCost = self.network.generators["marginal_cost"].loc[gen] * \
+                    self.getGeneratorOutput(gen, time)
+            self.biasComponent(
+                    gen,
+                    0.5 * self.monetaryCostFactor * generatorCost,
+            )
+
+    def startupShutdownCost(self, gen, t):
+        pass
+        
+    def getMaxLineEnergy(self, line):
+        """Return the maximum value of energy a line can transport.
+        """
+        return self.network.lines.loc[line].s_nom
+
+
+
+
+        for gen in self._startIndex:
+            for t in range(len(self.snapshots)):
+                # operating cost contribution
+                index = self.toVecIndex(gen, t)
+                val = self.network.generators["marginal_cost"].loc[gen] * (
+                    self.getGeneratorOutput(gen, t)
+                )
+                self.addInteraction(index, self.monetaryCostFactor * val)
+
+
 
     def addInteraction(self, *args):
         """Helper function to define an Ising Interaction.
@@ -153,24 +495,6 @@ class IsingPypsaInterface:
             raise ValueError("No Generator assigned to this index")
         return (key, index % len(self.snapshots))
 
-    def siquanFormat(self):
-        """Return the complete problem in the format for the siquan solver"""
-        return [(v, list(k)) for k, v in self.problem.items()]
-
-    def numVariables(self):
-        """Return the number of spins."""
-        return self.slackIndex
-
-    def individualCostContribution(self, result):
-        contrib = {}
-        for node in self.network.buses.index:
-            for t in range(len(self.snapshots)):
-                testNetwork = IsingPypsaInterface(self.network, self.snapshots)
-                testNetwork._kirchhoffConstraint(node, t)
-                contrib[str((node, t))] = testNetwork.calcCost(
-                    result, addConstContribution=False
-                ) + self.constantCostContribution(node, t)
-        return contrib
 
     def calcCost(self, result, addConstContribution=True):
         result = set(result)
@@ -190,49 +514,6 @@ class IsingPypsaInterface:
                     totalCost += self.constantCostContribution(node, t)
             totalCost += self.constantSlackCost()
         return totalCost
-
-    @classmethod
-    def buildCostFunction(
-        cls,
-        network,
-    ):
-        """Build the complete cost function for an Ising formulation.
-        The cost function is quite complex and I recommend first reading
-        through the mathematical formulation.
-        """
-        problemDict = cls(network, network.snapshots)
-        problemDict._marginalCosts()
-
-        for gen in problemDict._startIndex:
-            for t in range(len(problemDict.snapshots)):
-                problemDict._startupShutdownCost(gen, t)
-
-        # kirchhoff constraints
-        for node in problemDict.network.buses.index:
-            for t in range(len(problemDict.snapshots)):
-                problemDict._kirchhoffConstraint(node, t)
-
-        problemDict._addSlackConstraints()
-        return problemDict
-
-    def _marginalCosts(self):
-        for index in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                lenbinary = self.getBinaryLength(index)
-                for i in range(lenbinary):
-                    self.addInteraction(
-                        self._lineIndices[index] + i + lenbinary * t,
-                        0.5 * self.monetaryCostFactor * 2 ** i,
-                    )
-
-        for gen in self._startIndex:
-            for t in range(len(self.snapshots)):
-                # operating cost contribution
-                index = self.toVecIndex(gen, t)
-                val = self.network.generators["marginal_cost"].loc[gen] * (
-                    self.getGeneratorOutput(gen, t)
-                )
-                self.addInteraction(index, self.monetaryCostFactor * val)
 
     def _startupShutdownCost(self, gen, t):
         lambdaMinUp = self.minUpDownFactor  # for Tminup constraint
@@ -319,6 +600,7 @@ class IsingPypsaInterface:
         Currently we round this to the next highest power of 2 (-1)
         """
         return 2 ** self.getBinaryLength(line) - 1
+        #return self.network.lines.loc[line].s_nom
 
     def maxGenPossible(self, node, t):
         maxPossible = 0
@@ -413,7 +695,7 @@ class IsingPypsaInterface:
                             self.lineSlackToIndex(lineId2, t, j),
                             -self.kirchhoffFactor
                             * 2 ** i
-                            * 2 ** j
+                            # * 2 ** j
                             * factor1
                             * factor2,
                         )
@@ -434,8 +716,8 @@ class IsingPypsaInterface:
                                 self.lineSlackToIndex(lineId1, t, i),
                                 self.lineSlackToIndex(lineId2, t, j),
                                 self.kirchhoffFactor
-                                * 2 ** i
-                                * 2 ** j
+                                # * 2 ** i
+                                # * 2 ** j
                                 * factor1
                                 * factor2,
                             )
@@ -470,7 +752,7 @@ class IsingPypsaInterface:
                     self.kirchhoffFactor
                     * (maxGenPossible + maxLineCapacity + 2 * c_nt)
                     * factor1
-                    * 2 ** i,
+                    # * 2 ** i,
                 )
                 self.addInteraction(
                     self.lineToIndex(lineId1, t, i),
@@ -493,7 +775,7 @@ class IsingPypsaInterface:
                         self.kirchhoffFactor
                         * self.getGeneratorOutput(gen0, t)
                         * factor1
-                        * 2 ** i
+                        # * 2 ** i
                     )
                     if index is None:
                         self.addInteraction(
@@ -577,20 +859,6 @@ class IsingPypsaInterface:
                 totalConstCost += 1.25 * self.kirchhoffFactor * 2 ** (i * 2)
         return totalConstCost
 
-    def getLineValues(self, solution):
-        solution = set(solution)
-        lineValues = {}
-        for lineId in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                value = 0
-                for i in range(self.getBinaryLength(lineId)):
-                    if self.lineToIndex(lineId, t, i) in solution:
-                        value += 2 ** i
-                if self.lineDirectionToIndex(lineId, t) in solution:
-                    value = -value
-                lineValues[(lineId, t)] = value
-        return self.mergeLines(lineValues,self.snapshots)
-
     def constantSlackCost(self):
         totalConstCost = 0.0
         for index in self.network.lines.index:
@@ -605,44 +873,6 @@ class IsingPypsaInterface:
         self._linearGeneratorTerm(node, t)
         self._linearLineTerms(node, t)
         self._crossTermGeneratorLine(node, t)
-
-    @staticmethod
-    def addSQASolutionToNetwork(network, problemDict, solutionState):
-        for gen in problemDict._startIndex:
-            vec = np.zeros(len(problemDict.snapshots))
-            network.generators_t.status[gen] = np.concatenate(
-                [
-                    vec,
-                    np.ones(
-                        len(network.snapshots) - len(problemDict.snapshots)
-                    ),
-                ]
-            )
-        vec = np.zeros(len(problemDict.snapshots))
-        gen, time = problemDict.fromVecIndex(0)
-        for index in solutionState:
-            try:
-                new_gen, new_time = problemDict.fromVecIndex(index)
-            except:
-                continue
-            if gen != new_gen:
-                network.generators_t.status[gen] = np.concatenate(
-                    [
-                        vec,
-                        np.ones(
-                            len(network.snapshots) - len(problemDict.snapshots)
-                        ),
-                    ]
-                )
-                vec = np.zeros(len(problemDict.snapshots))
-                gen = new_gen
-                vec[new_time] = 1
-        network.generators_t.status[gen] = np.concatenate(
-            [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
-        )
-
-        return network
-
 
     def splitLine(self, line, network, lineRepresentation=0, maxOrder=0):
         """
