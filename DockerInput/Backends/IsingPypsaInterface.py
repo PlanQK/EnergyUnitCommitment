@@ -12,8 +12,11 @@ class IsingPypsaInterface:
     # - multiple time slices
 
     def __init__(self, network, snapshots):
+
         # contains qubo coefficients
         self.problem = {}
+
+        self.network = network
         self.snapshots = snapshots
 
         self.allocatedQubits = 0
@@ -26,70 +29,83 @@ class IsingPypsaInterface:
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
         self.slackVarFactor = float(envMgr["slackVarFactor"])
 
-        lineRepresentation = envMgr["lineRepresentation"]
-        self.maxOrder = int(envMgr["maxOrder"])
-
-        if lineRepresentation == "":
-            self.network = network
-        else:
-            self.lineRepresentation = int(lineRepresentation)
-            self.network = network.copy()
-            
-
-
+        # read generators and lines from network and encode as qubits
         self.storeGenerators()
-
         self.storeLines()
 
-        self.storeSlackVars()
 
-        
-    def buildQubo(self):
-        pass
-        
-
+    def writeToHighestLevel(self, component):
+        "write weights of qubits in highest level of data dictionary"
+        for idx in range(len(self.data[component]['indices'])):
+            self.data[self.data[component]['indices'][idx]] = self.data[component]['weights'][idx]
 
 
     def storeGenerators(self):
-        time = 0
-        for i in range(len(self.network.buses)):
+        "encodes generators at each time slice as a single qubit"
+        for bus in range(len(self.network.buses)):
             generatorsAtBus = self.network.generators[
-                self.network.generators.bus == self.network.buses.index[i]
+                self.network.generators.bus == self.network.buses.index[bus]
             ]
             for gen in generatorsAtBus.index:
-                if self.network.generators.committable[gen]:
-                    continue
-                self.data[gen] = {
-                        'indices' : [self.allocatedQubits],
-                        'values' : [self.network.generators_t.p_max_pu[gen].iloc[time]]
-                }
-                self.allocatedQubits += len(self.snapshots)
+                for time in range(len(self.network.snapshots)):
+                    # no generator is supposed to be committable in our problems
+                    if self.network.generators.committable[gen]:
+                        continue
+                    self.data[gen] = {
+                            'indices' : [self.allocatedQubits],
+                            'weights' : [self.network.generators_t.p_max_pu[gen].iloc[time]],
+                            'encodingLength' : 1,
+                    }
+                    self.allocatedQubits += 1
+                self.writeToHighestLevel(gen)
+
+
         return
 
 
-    def totalLoad(self, bus, time):
-        if time is None:
-            time = self.network.loads_t['p_set'].index[0]
-        loadsAtCurrentBus = self.network.loads[
-                                    self.network.loads.bus == bus
-                            ].index
-        allLoads = self.network.loads_t['p_set'].loc[time]
+    def storeLines(self):
+        """
+        wrapper for calling encodeLine to store a qubit representation
+        of all lines at each time slice
+        """
+        for line in self.network.lines.index:
+            for time in range(len(self.network.snapshots)):
+            # overwrite this in child classes
+                self.encodeLine(line,time)
+            self.writeToHighestLevel(line)
 
-        result = allLoads[allLoads.index.isin(loadsAtCurrentBus)]
-        return result.sum()
+    def encodeLine(self, line, time):
+        """
+        encodes a line at each time slice. splitCapacity gives weightss of
+        components that the line is split up into
+        """
+        capacity = int(self.network.lines.loc[line].s_nom)
+        weights = self.splitCapacity(capacity)
+        indices = list(range(self.allocatedQubits, self.allocatedQubits + len(weights),1))
+        self.allocatedQubits += len(indices)
+        self.data[line] = {
+                'weights' : weights,
+                'indices' : indices,
+                'encodingLength' : len(weights),
+        }
+        return
 
-    def getTotalEncodedValue(self, component):
-        result = 0
-        for val in self.data[component]['values']:
-            result += val
-        return result
+    def splitCapacity(self, capacity):
+        """returns a list of integers each representing a weights for a qubit.
+        A collection of qubits with such a weights distributions represent a line
+        with maximum power flow of capacity
+        """
+
+        return [1 for _ in range(0,capacity,1)]  + [-1 for _ in range(0,capacity,1)]
+
+    # helper functions to obtain represented values
 
     def getBusComponents(self, bus):
         """return all labels of components that connect to a bus as a dictionary
         generators - at this bus
+        loads - at this bus
         positiveLines - start in this bus
         negativeLines - end in this bus
-        loads - at this bus
         """
         result = {
                 "generators":
@@ -99,155 +115,196 @@ class IsingPypsaInterface:
                     ,
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index)
                 ,
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index)
                 ,
                 }
         return result
 
-        
 
-    def storeLines(self):
-        "calls encodeLine for each line"
-        for index in self.network.lines.index:
-            # overwrite this in child classes
-            self.encodeLine(index)
 
-    def encodeLine(self, line):
+    def getLineFlow(self, line, solution, time=0):
         """
-        split lines into 1-valued qubits
-        """
-        
-        capacity = int(self.network.lines.loc[line].s_nom)
-        indices = list(range(self.allocatedQubits, self.allocatedQubits+ 2*capacity,1) )
-        values = [1 for _ in range(0,capacity,1)] + [-1 for _ in range(0,capacity,1)]
-
-        self.allocatedQubits += len(indices)
-
-        self.data[line] = {
-                'values' : values,
-                'indices' : indices,
-        }
-        return
-
-    def getLineValue(self, line, solution):
+        returns the power flow through a line for qubits assignment according to solution"""
         result = 0
         for idx in range(len(self.data[line]['indices'])):
             if self.data[line]['indices'][idx] in solution:
-                result+=self.data[line]['values'][idx]
+                result+=self.data[line]['weights'][idx]
+        return result
+
+
+    def getFlowDictionary(self, solution):
+        """build dictionary of all flows at each time slice"""
+        solution = set(solution)
+        result = {}
+        for lineId in self.network.lines.index:
+            for time in range(len(self.snapshots)):
+                result[(lineId, time)] = self.getLineFlow(lineId, solution, time)
         return result
 
     def getLineValues(self, solution):
-        solution = set(solution)
-        lineValues = {}
-        for lineId in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                value = self.getLineValue(lineId, solution)
-                lineValues[(lineId, t)] = value
-        return lineValues
-
-    def storeSingleton(self, label, value):
-        if hasattr(self.data, label):
-            raise ValueError("The label already exists")
-        self.data[label] = {
-                'values': [value],
-                'indices': [self.allocatedQubits],
-                }
-        self.allocatedQubits += 1
-
-    def storeSlackVars(self):
-        pass
+        return self.getFlowDictionary(solution)
 
 
+    def getLoad(self, bus, time=0):
+        loadsAtCurrentBus = self.network.loads[
+                                    self.network.loads.bus == bus
+                            ].index
+        allLoads = self.network.loads_t['p_set'].iloc[time]
+        result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
+        if result < 0:
+            raise ValueError(
+                "negative Load"
+            )
+        return result
 
-    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, additive = True):
-        "given two labels couples all qubits in their representation"
-        # TODO: with or without scaling factor?"
-        firstComponentAdress = self.getMemoryAdress(firstComponent)
-        secondComponentAdress = self.getMemoryAdress(secondComponent)
-        
+
+    def getMemoryAdress(self, component, time=0):
+        encodingLength = self.data[component]["encodingLength"]
+        return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
+
+
+
+    # functions to couple components
+
+
+
+    def addInteraction(self, *args):
+        """Helper function to define an Ising Interaction.
+
+        Can take arbitrary number of arguments:
+        The last argument is the interaction strength.
+        The previous arguments contain the spin ids.
+        """
+        if len(args) < 2:
+            raise ValueError(
+                "An interaction needs at least one spin id and a weight."
+            )
+        if len(args) > 3:
+            raise ValueError(
+                "Too many arguments for an interaction"
+            )
+
+        key = tuple(args[:-1])
+        interactionStrength = args[-1]
+        for qubit in key:
+            interactionStrength *= self.data[qubit]
+        if key[0] == key[-1]:
+            key = (key[0],)
+        # couplings with 2 qubits have factor of -1
+        if len(args) == 3:
+            interactionStrength *= 1
+        self.problem[key] = self.problem.get(key,0) - interactionStrength
+
+
+    def coupleComponentWithConstant(self, component, couplingStrength=1, time=0):
+        """given a label, calculates the product with a fixed value and translates
+        it into an ising interaction"""
+        componentAdress = self.getMemoryAdress(component,time)
+
+        for qubit in componentAdress:
+            self.addInteraction(qubit, 0.5 * couplingStrength)
+
+
+
+    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0 ,additive=True):
+        """given two lables, calculates the product of the corresponding qubits and
+        translates it into an ising interaction"""
+
+        # encode sign of power flow in sign of coupling stregnth
+
+        firstComponentAdress = self.getMemoryAdress(firstComponent,time)
+        secondComponentAdress = self.getMemoryAdress(secondComponent,time)
+        # determines which ising spin represents a 1 in QUBO for
+        spin =  1
+        couplingStrength *= 1
+
         if firstComponentAdress[0] > secondComponentAdress[0]:
-            self.coupleComponents(secondComponent, firstComponent, couplingStrength, additive=additive)
+            self.coupleComponents(
+                    secondComponent, firstComponent, couplingStrength, time=time, additive=additive
+            )
             return
+
 
         for first in range(len(firstComponentAdress)):
             for second in range(len(secondComponentAdress)):
-                key = (firstComponentAdress[first], secondComponentAdress[second])
-                if key[0] == key[1]:
-                    # continue
-                    key = (key  [0],)
-                interactionStrength = - couplingStrength * \
-                        self.data[firstComponent]['values'][first] * \
-                        self.data[secondComponent]['values'][second]
 
-                if additive:
-                    interactionStrength += self.problem.get(key,0)
-                self.problem[key] = interactionStrength
-            
-
-    def biasComponent(self, component,bias=1, additive = True, ):
-        "given a component level, sets the bias for all qubits in their representation"
-        componentAdress = self.getMemoryAdress(component)
-        for idx in range(len(componentAdress)):
-            key = (componentAdress[idx],)
-            interactionStrength = bias * \
-                    self.data[component]['values'][idx] 
-            if additive:
-                interactionStrength += self.problem.get(key,0)
-            self.problem[key] = interactionStrength
+                self.addInteraction(
+                        firstComponentAdress[first],
+                        spin * couplingStrength * self.data[secondComponent]['weights'][second] * 0.25
+                )
+                self.addInteraction(
+                        secondComponentAdress[second],
+                        spin * couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
+                )
+                self.addInteraction(
+                        firstComponentAdress[first],
+                        secondComponentAdress[second],
+                        couplingStrength * 0.25
+                )
 
 
-
-    def getMemoryAdress(self, component):
-        return self.data[component]["indices"]
-        
-
-        
 
     def encodeKirchhoffConstraint(self, bus):
         """
         add interactions to QUBO that enforce the Kirchhoff Constraint on solutions.
         This means that the total power at a bus is as close as possible to the load
         """
-
         components = self.getBusComponents(bus)
         flattenedComponenents = components['generators'] + \
                 components['positiveLines'] + \
                 components['negativeLines']
 
-        demand = self.totalLoad(bus,time=None)
-        print(f"{bus} :: Demand :: {demand}")
+        demand = self.getLoad(bus)
 
-        for component1 in flattenedComponenents:
+        for idx1 in range(len(flattenedComponenents)):
+            component1 = flattenedComponenents[idx1]
             factor = 1.0
-
-            # self.biasComponent(component1, bias = 1)
             if component1 in components['negativeLines']:
-                print(f"negativeLine :: {component1}")
-                factor *= -1.0
-            self.biasComponent(component1, bias= -factor * 0.5 * demand)
 
-            for component2 in flattenedComponenents:
+                factor *= -1.0
+            self.coupleComponentWithConstant(component1, - 2.5 * factor * demand)
+
+            for idx2 in range(0,len(flattenedComponenents),1):
+                component2 = flattenedComponenents[idx2]
                 if component2 in components['negativeLines']:
+
                     curFactor = -factor
                 else:
                     curFactor = factor
 
-                self.coupleComponents(component1, component2, couplingStrength= factor * 0.25)
-                self.biasComponent(component1, bias= 0.25 * curFactor * 1)
-                self.biasComponent(component2, bias= 0.25 * curFactor * 1)
-        print(self.problem)
-        print(f"ending {bus}")
+                self.coupleComponents(component1, component2, couplingStrength= curFactor)
+
+
 
 
     def siquanFormat(self):
         """Return the complete problem in the format for the siquan solver"""
-        return [(v, list(k)) for k, v in self.problem.items()]
+        print(f"END :: {self.problem}")
+        return [(v, list(k)) for k, v in self.problem.items() if v != 0]
+
+
+
+
+    def getTotalEncodedValue(self, component):
+        result = 0
+        for val in self.data[component]['weights']:
+            result += val
+        return result
+    def storeSingleton(self, label, value):
+        if hasattr(self.data, label):
+            raise ValueError("The label already exists")
+        self.data[label] = {
+                'weights': [value],
+                'indices': [self.allocatedQubits],
+                }
+        self.allocatedQubits += 1
+
 
 
     @classmethod
@@ -269,6 +326,7 @@ class IsingPypsaInterface:
         # kirchhoff constraints
         for node in problemDict.network.buses.index:
             for t in range(len(problemDict.snapshots)):
+
                 problemDict.encodeKirchhoffConstraint(node)
 
         return problemDict
@@ -316,10 +374,11 @@ class IsingPypsaInterface:
         return self.allocatedQubits
 
     def getValueToResult(self, component, result):
-        value = 0 
+        value = 0
         for idx in range(len(self.data[component]['indices'])):
             if self.data[component]['indices'][idx] in result:
-                value += self.data[component]['values'][idx]
+                value += self.data[component]['weights'][idx]
+
         return value
 
 
@@ -328,7 +387,7 @@ class IsingPypsaInterface:
         contrib = {}
         for node in self.network.buses.index:
             for t in range(len(self.snapshots)):
-                load = - self.totalLoad(node,time=None)
+                load = - self.getLoad(node,t)
                 components = self.getBusComponents(node)
                 for gen in components['generators']:
                     load += self.getValueToResult(gen, result)
@@ -385,7 +444,7 @@ class IsingPypsaInterface:
         for gen in self.network.lines.index:
             self.biasComponent(
                     gen,
-                    0.5 * self.monetaryCostFactor 
+                    0.5 * self.monetaryCostFactor
             )
 
             generatorCost = self.network.generators["marginal_cost"].loc[gen] * \
@@ -397,7 +456,7 @@ class IsingPypsaInterface:
 
     def startupShutdownCost(self, gen, t):
         pass
-        
+
     def getMaxLineEnergy(self, line):
         """Return the maximum value of energy a line can transport.
         """
@@ -417,31 +476,31 @@ class IsingPypsaInterface:
 
 
 
-    def addInteraction(self, *args):
-        """Helper function to define an Ising Interaction.
-
-        Can take arbitrary number of arguments:
-        The last argument is the interaction strength.
-        The previous arguments contain the spin ids.
-        """
-        if len(args) < 2:
-            raise ValueError(
-                "An interaction needs at least one spin id and a weight."
-            )
-        if len(args) == 3 and args[0] == args[1]:
-            raise ValueError("Same qubit")
-        for i in range(len(args) - 1):
-            if not isinstance(args[i], int):
-                raise ValueError(
-                    f"The spin id: {args[:-1]} needs to be an integer"
-                )
-        if not isinstance(args[-1], float):
-            raise ValueError("The interaction needs to be a float")
-        if args[-1] != 0:
-            key = tuple(sorted(args[:-1]))
-            # the minus is necessary because the solver has an additional
-            # -1 factor in the couplings
-            self.problem[key] = self.problem.get(key, 0) - args[-1]
+    # def addInteraction(self, *args):
+    #     """Helper function to define an Ising Interaction.
+    #
+    #     Can take arbitrary number of arguments:
+    #     The last argument is the interaction strength.
+    #     The previous arguments contain the spin ids.
+    #     """
+    #     if len(args) < 2:
+    #         raise ValueError(
+    #             "An interaction needs at least one spin id and a weight."
+    #         )
+    #     if len(args) == 3 and args[0] == args[1]:
+    #         raise ValueError("Same qubit")
+    #     for i in range(len(args) - 1):
+    #         if not isinstance(args[i], int):
+    #             raise ValueError(
+    #                 f"The spin id: {args[:-1]} needs to be an integer"
+    #             )
+    #     if not isinstance(args[-1], float):
+    #         raise ValueError("The interaction needs to be a float")
+    #     if args[-1] != 0:
+    #         key = tuple(sorted(args[:-1]))
+    #         the minus is necessary because the solver has an additional
+    #         -1 factor in the couplings
+    #         self.problem[key] = self.problem.get(key, 0) - args[-1]
 
     def toVecIndex(self, generator, time=0):
         """Return the index for the supplied generator at t=0.
