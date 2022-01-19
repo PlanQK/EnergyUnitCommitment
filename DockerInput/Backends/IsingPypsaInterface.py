@@ -126,6 +126,9 @@ class IsingPypsaInterface:
         return result
 
 
+    def getGeneratorStatus(self, gen, solution, time=0):
+        return self.data[self.data[gen]['indices'][time]]
+
     def getLineFlow(self, line, solution, time=0):
         """
         returns the power flow through a line for qubits assignment according to solution"""
@@ -288,8 +291,8 @@ class IsingPypsaInterface:
         return problemDict
 
 
-    @staticmethod
-    def addSQASolutionToNetwork(network, problemDict, solutionState):
+    # @staticmethod
+    def addSQASolutionToNetwork(self, network, solutionState):
         for gen in problemDict._startIndex:
             vec = np.zeros(len(problemDict.snapshots))
             network.generators_t.status[gen] = np.concatenate(
@@ -329,29 +332,36 @@ class IsingPypsaInterface:
         """Return the number of spins."""
         return self.allocatedQubits
 
-    def getValueToResult(self, component, result):
+    def getValueToResult(self, component, result, time=0):
         value = 0
-        for idx in range(len(self.data[component]['indices'])):
+        encodingLength = self.data[component]["encodingLength"]
+        for idx in range(time*encodingLength, (time+1)*encodingLength,1):
             if self.data[component]['indices'][idx] in result:
                 value += self.data[component]['weights'][idx]
-
         return value
 
 
     def individualCostContribution(self, result):
         # TODO proper cost
         contrib = {}
-        for node in self.network.buses.index:
-            for t in range(len(self.snapshots)):
-                load = - self.getLoad(node,t)
-                components = self.getBusComponents(node)
-                for gen in components['generators']:
-                    load += self.getValueToResult(gen, result)
-                for lineId in components['positiveLines']:
-                    load += self.getValueToResult(lineId, result)
-                for lineId in components['negativeLines']:
-                    load -= self.getValueToResult(lineId, result)
-                contrib[str((node, t))] = load
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result)}
+        return contrib
+
+
+    def calcKirchhoffCostAtBus(self, bus, result):
+        contrib = {}
+        for t in range(len(self.snapshots)):
+            load = - self.getLoad(bus,t)
+            components = self.getBusComponents(bus)
+            for gen in components['generators']:
+                load += self.getValueToResult(gen, result, time=t)
+            for lineId in components['positiveLines']:
+                load += self.getValueToResult(lineId, result, time=t)
+            for lineId in components['negativeLines']:
+                load -= self.getValueToResult(lineId, result, time=t)
+            load = (load * self.kirchhoffFactor) ** 2
+            contrib[str((bus, t))] = load
         return contrib
 
     # OLD CODE

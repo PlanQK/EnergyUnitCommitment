@@ -37,12 +37,16 @@ class ClassicalBackend(BackendBase):
         print(solution["state"])
         print(transformedProblem.getLineValues(solution["state"]))
         print(transformedProblem.individualCostContribution(solution["state"]))
+        kirchhoffCost = 0
+        for key, val in transformedProblem.individualCostContribution(solution["state"]).items():
+            kirchhoffCost += val 
+        print(f"Total Kirchhoff cost: {kirchhoffCost}")
         print(
             f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"
         )
-        transformedProblem.addSQASolutionToNetwork(
-            network, transformedProblem, solution["state"]
-        )
+        # transformedProblem.addSQASolutionToNetwork(
+        #     network, solution["state"]
+        # )
         return network
 
     def optimize(self, transformedProblem):

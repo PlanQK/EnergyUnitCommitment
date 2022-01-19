@@ -188,9 +188,9 @@ class DwaveTabuSampler(BackendBase):
             print(f"Total output at {snapshot}: {power}")
             print(f"Total load at {snapshot}: {load}")
 
-        network = transformedProblem[0].addSQASolutionToNetwork(
-            network, transformedProblem[0], solutionState
-        )
+        # network = transformedProblem.addSQASolutionToNetwork(
+        #      network, solutionState
+        # )
         return network
 
 
