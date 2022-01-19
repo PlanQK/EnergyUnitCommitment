@@ -13,7 +13,7 @@ class IsingPypsaInterface:
 
     def __init__(self, network, snapshots):
 
-        # contains qubo coefficients
+        # contains ising coefficients
         self.problem = {}
 
         self.network = network
@@ -76,7 +76,7 @@ class IsingPypsaInterface:
 
     def encodeLine(self, line, time):
         """
-        encodes a line at each time slice. splitCapacity gives weightss of
+        encodes a line at each time slice. splitCapacity gives weights of
         components that the line is split up into
         """
         capacity = int(self.network.lines.loc[line].s_nom)
@@ -91,11 +91,10 @@ class IsingPypsaInterface:
         return
 
     def splitCapacity(self, capacity):
-        """returns a list of integers each representing a weights for a qubit.
-        A collection of qubits with such a weights distributions represent a line
+        """returns a list of integers each representing a weight for a qubit.
+        A collection of qubits with such a weight distributions represent a line
         with maximum power flow of capacity
         """
-
         return [1 for _ in range(0,capacity,1)]  + [-1 for _ in range(0,capacity,1)]
 
     # helper functions to obtain represented values
@@ -115,17 +114,16 @@ class IsingPypsaInterface:
                     ,
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index)
                 ,
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index)
                 ,
                 }
         return result
-
 
 
     def getLineFlow(self, line, solution, time=0):
@@ -147,6 +145,7 @@ class IsingPypsaInterface:
                 result[(lineId, time)] = self.getLineFlow(lineId, solution, time)
         return result
 
+
     def getLineValues(self, solution):
         return self.getFlowDictionary(solution)
 
@@ -159,7 +158,7 @@ class IsingPypsaInterface:
         result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result < 0:
             raise ValueError(
-                "negative Load"
+                "negative Load at current Bus"
             )
         return result
 
@@ -169,11 +168,7 @@ class IsingPypsaInterface:
         return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
 
 
-
     # functions to couple components
-
-
-
     def addInteraction(self, *args):
         """Helper function to define an Ising Interaction.
 
@@ -196,9 +191,6 @@ class IsingPypsaInterface:
             interactionStrength *= self.data[qubit]
         if key[0] == key[-1]:
             key = (key[0],)
-        # couplings with 2 qubits have factor of -1
-        if len(args) == 3:
-            interactionStrength *= 1
         self.problem[key] = self.problem.get(key,0) - interactionStrength
 
 
@@ -206,48 +198,39 @@ class IsingPypsaInterface:
         """given a label, calculates the product with a fixed value and translates
         it into an ising interaction"""
         componentAdress = self.getMemoryAdress(component,time)
-
         for qubit in componentAdress:
             self.addInteraction(qubit, 0.5 * couplingStrength)
 
 
-
-    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0 ,additive=True):
+    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0):
         """given two lables, calculates the product of the corresponding qubits and
         translates it into an ising interaction"""
-
-        # encode sign of power flow in sign of coupling stregnth
-
+        # encode direction/sign of power flow in sign of coupling strength
         firstComponentAdress = self.getMemoryAdress(firstComponent,time)
         secondComponentAdress = self.getMemoryAdress(secondComponent,time)
         # determines which ising spin represents a 1 in QUBO for
-        spin =  1
-        couplingStrength *= 1
 
         if firstComponentAdress[0] > secondComponentAdress[0]:
             self.coupleComponents(
-                    secondComponent, firstComponent, couplingStrength, time=time, additive=additive
+                    secondComponent, firstComponent, couplingStrength, time=time
             )
             return
 
-
         for first in range(len(firstComponentAdress)):
             for second in range(len(secondComponentAdress)):
-
                 self.addInteraction(
                         firstComponentAdress[first],
-                        spin * couplingStrength * self.data[secondComponent]['weights'][second] * 0.25
+                        couplingStrength * self.data[secondComponent]['weights'][second] * 0.25
                 )
                 self.addInteraction(
                         secondComponentAdress[second],
-                        spin * couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
+                        couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
                 )
                 self.addInteraction(
                         firstComponentAdress[first],
                         secondComponentAdress[second],
                         couplingStrength * 0.25
                 )
-
 
 
     def encodeKirchhoffConstraint(self, bus):
@@ -262,49 +245,22 @@ class IsingPypsaInterface:
 
         demand = self.getLoad(bus)
 
-        for idx1 in range(len(flattenedComponenents)):
-            component1 = flattenedComponenents[idx1]
+        for component1 in flattenedComponenents:
             factor = 1.0
             if component1 in components['negativeLines']:
-
                 factor *= -1.0
             self.coupleComponentWithConstant(component1, - 2.5 * factor * demand)
-
-            for idx2 in range(0,len(flattenedComponenents),1):
-                component2 = flattenedComponenents[idx2]
+            for component2 in flattenedComponenents:
                 if component2 in components['negativeLines']:
-
                     curFactor = -factor
                 else:
                     curFactor = factor
-
                 self.coupleComponents(component1, component2, couplingStrength= curFactor)
-
-
 
 
     def siquanFormat(self):
         """Return the complete problem in the format for the siquan solver"""
-        print(f"END :: {self.problem}")
         return [(v, list(k)) for k, v in self.problem.items() if v != 0]
-
-
-
-
-    def getTotalEncodedValue(self, component):
-        result = 0
-        for val in self.data[component]['weights']:
-            result += val
-        return result
-    def storeSingleton(self, label, value):
-        if hasattr(self.data, label):
-            raise ValueError("The label already exists")
-        self.data[label] = {
-                'weights': [value],
-                'indices': [self.allocatedQubits],
-                }
-        self.allocatedQubits += 1
-
 
 
     @classmethod
@@ -474,33 +430,6 @@ class IsingPypsaInterface:
                 )
                 self.addInteraction(index, self.monetaryCostFactor * val)
 
-
-
-    # def addInteraction(self, *args):
-    #     """Helper function to define an Ising Interaction.
-    #
-    #     Can take arbitrary number of arguments:
-    #     The last argument is the interaction strength.
-    #     The previous arguments contain the spin ids.
-    #     """
-    #     if len(args) < 2:
-    #         raise ValueError(
-    #             "An interaction needs at least one spin id and a weight."
-    #         )
-    #     if len(args) == 3 and args[0] == args[1]:
-    #         raise ValueError("Same qubit")
-    #     for i in range(len(args) - 1):
-    #         if not isinstance(args[i], int):
-    #             raise ValueError(
-    #                 f"The spin id: {args[:-1]} needs to be an integer"
-    #             )
-    #     if not isinstance(args[-1], float):
-    #         raise ValueError("The interaction needs to be a float")
-    #     if args[-1] != 0:
-    #         key = tuple(sorted(args[:-1]))
-    #         the minus is necessary because the solver has an additional
-    #         -1 factor in the couplings
-    #         self.problem[key] = self.problem.get(key, 0) - args[-1]
 
     def toVecIndex(self, generator, time=0):
         """Return the index for the supplied generator at t=0.
@@ -932,60 +861,4 @@ class IsingPypsaInterface:
         self._linearGeneratorTerm(node, t)
         self._linearLineTerms(node, t)
         self._crossTermGeneratorLine(node, t)
-
-    def splitLine(self, line, network, lineRepresentation=0, maxOrder=0):
-        """
-        splits up a line into multiple lines such that each new line
-        has capacity 2^n - 1 for some n. Modifies the network given
-        as an argument and returns the original line name and how
-        many components where used to split it up. Use it on the
-        network stored in self because it modifies it.
-
-        lineRepresentation is an upper limit for number of splits. if
-        is is 0, no limit is set
-        """
-        remaining_s_nom = network.lines.loc[line].s_nom
-        numComponents = 0
-        maxMagnitude = 2 ** self.maxOrder - 1
-
-        while remaining_s_nom > 0 \
-                and (lineRepresentation == 0 or lineRepresentation > numComponents):
-            binLength = len("{0:b}".format(1+int(np.round(remaining_s_nom))))-1
-            magnitude = 2 ** binLength - 1
-            if maxOrder:
-                magnitude = min(magnitude,maxMagnitude)
-            remaining_s_nom -= magnitude
-            network.add(
-                "Line",
-                f"{line}_split_{numComponents}",
-                bus0=network.lines.loc[line].bus0,
-                bus1=network.lines.loc[line].bus1,
-                s_nom=magnitude
-            )
-            numComponents += 1
-
-        network.remove("Line",line)
-        return (line, numComponents)
-
-
-    def mergeLines(self, lineValues, snapshots):
-        """
-        For a dictionary of lineValues of the network, whose
-        lines were split up, uses the data in self to calculate
-        the corresponding lineValues in the unmodified network
-        """
-        if hasattr(self, 'lineDictionary'):
-            result = {}
-            for line, numSplits in self.lineDictionary.items():
-                for snapshot in range(len(snapshots)):
-                    newKey = (line, snapshot)
-                    value = 0
-                    for i in range(numSplits):
-                        splitLineKey = line + "_split_" + str(i)
-                        value += lineValues[(splitLineKey, snapshot)]
-                    result[newKey] = value
-            return result
-        else:
-            return lineValues
-    
 
