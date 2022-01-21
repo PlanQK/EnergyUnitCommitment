@@ -18,26 +18,46 @@ PLOTLIMIT = 500
 COSTPERHOUR = getenv('costperhour')
  
 
-def meanOfSquareRoot(values):
+def meanOfSquareRoot(values: list) -> float:
+    """
+    Reduction method to reduce the given values into one float by first applying 
+    a square root to all values and then averaging them by using "mean"-method"
+
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     return np.mean([np.sqrt(value) for value in values])
 
 
 def meanOfAnnealingComputingCost(values : list) -> float :
     return np.mean([COSTPERHOUR*value for value in values])
 
+
 def deviationOfTheMean(values: list) -> float:
     """
-        Reduction method to reduce the given values into one float using the "deviation of the mean"-method
+    Reduction method to reduce the given values into one float using the "deviation of the mean"-method
 
-        @param values: list
-            A list of values to be reduced.
-        @return: float
-            Reduced value.
-        """
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     return np.std(values) / np.sqrt(len(values))
 
 
-def cumulativeDistribution(values: list) -> list:
+def cumulativeDistribution(values: list[list[float]]) -> list:
+    """
+    Reduction method to construct a cumulativeDistribution for a list of lists of values
+    It returns a list of values that a histogramm of that list will look like the cumulative
+    distribution of all values
+
+    @param values: list
+        A list of lists of values for which to construct a cumulative Distribution
+    @param: list
+        A list which histogramm is a cumulative distribution
+    """
     result = []
     maxVal = max(values[0])
     for valueLists in values:
@@ -54,13 +74,13 @@ def cumulativeDistribution(values: list) -> list:
 
 def averageOfBetterThanMedian(values: list) -> float:
     """
-        Reduction method to reduce the given values into one float using the "average of better than median"-method
+    Reduction method to reduce the given values into one float using the "average of better than median"-method
 
-        @param values: list
-            A list of values to be reduced.
-        @return: float
-            Reduced value.
-        """
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     median = np.median(values)
     result = 0
     count = 0
@@ -102,7 +122,9 @@ def averageOfBestPercent(values: list, percentage: float) -> float:
 
 def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
     """
-    Used to create scatter plots from a single run.
+    Reduction method to extract data from all shots of a single batch. It creates two lists for making
+    a scatter plot: First list consists of the spin glass's systems energy for the x-axis and second list is
+    the corresponding optimized cost of the optimization problem
 
     @param cutSamplesDictList: object
         List of dicts to be searched through.
@@ -208,7 +230,6 @@ def makeFig(plotInfo: dict, outputFile: str,
     else:
         fig.savefig(outputFile + "." + fileformat)
 
-
 def resolveKey(element: dict, field: str) -> any:
     """
     Finds the given key within the given dictionary, even if the key is nested in it.
@@ -286,7 +307,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
     Extracts the information to be plotted.
 
     @param fileRegex: str
-        A regular expressions to get the data
+        A glob pattern to get the data
     @param xField: str
         The name of the x-Axis key. Nested keys can be reached by providing a list of strings, which represent the path
         through the nested dicts.
@@ -318,32 +339,32 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             else:
                 element = addPlottableInformation(jsonDict=element)
 
-    for key, values in constraints.items():
-        try:
-            # value of constraint is not in constrains list
-            if float(resolveKey(element, key)) not in values:
-                break
-        except KeyError:
-            pass
-    # value of constraint is found in constrains list
-    else:
-        # create a new key using the splitField
-        key = tuple(
-            e
-            for e in [
-                splitField + "=" + str(resolveKey(element, splitField) or "")
-                for splitField in splitFields
-            ]
-        )
+        for key, values in constraints.items():
+            try:
+                # value of constraint is not in constrains list
+                if float(resolveKey(element, key)) not in values:
+                    break
+            except KeyError:
+                pass
+        # value of constraint is found in constrains list
+        else:
+            # create a new key using the splitField
+            key = tuple(
+                e
+                for e in [
+                    splitField + "=" + str(resolveKey(element, splitField) or "")
+                    for splitField in splitFields
+                ]
+            )
 
-        xvalue = resolveKey(element, xField)
+            xvalue = resolveKey(element, xField)
 
-        if xvalue not in plotData[key]:
-            plotData[key][xvalue] = []
+            if xvalue not in plotData[key]:
+                plotData[key][xvalue] = []
 
-        yvalue = resolveKey(element, yField)
+            yvalue = resolveKey(element, yField)
 
-        plotData[key][element[xField]].append(yvalue)
+            plotData[key][element[xField]].append(yvalue)
         filesRead += 1
 
     # now perform reduction
@@ -372,7 +393,6 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
         print(f"files read for {fileRegex} : {filesRead}")
 
     return result
-
 
 def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFieldList: list = None,
               splitFields: list = ["problemSize"], logscalex: bool = True, logscaley: bool = False,
@@ -406,7 +426,7 @@ def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFie
         Turns the y-axis into a log scale.
     @param PATH: list
         A list of the paths to the data. It has to be the same size as fileRegexList. If nothing is given the data is
-        searched for in a standard folder.
+        searched for in the standard folder f'results_{solver}_sweep'.
     @param reductionMethod: func
         A list of functions to be used to reduce values into one float value. It has to be the same size as
         fileRegexList.
