@@ -229,11 +229,12 @@ class IsingPypsaInterface:
                         secondComponentAdress[second],
                         couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
                 )
-                self.addInteraction(
-                        firstComponentAdress[first],
-                        secondComponentAdress[second],
-                        couplingStrength * 0.25
-                )
+                if firstComponentAdress[first] != secondComponentAdress[second]:
+                    self.addInteraction(
+                            firstComponentAdress[first],
+                            secondComponentAdress[second],
+                            couplingStrength * 0.25
+                    )
 
 
     def encodeKirchhoffConstraint(self, bus):
@@ -252,7 +253,7 @@ class IsingPypsaInterface:
             factor = 1.0
             if component1 in components['negativeLines']:
                 factor *= -1.0
-            self.coupleComponentWithConstant(component1, - 2.5 * factor * demand)
+            self.coupleComponentWithConstant(component1, - 2.0 * factor * demand)
             for component2 in flattenedComponenents:
                 if component2 in components['negativeLines']:
                     curFactor = -factor
