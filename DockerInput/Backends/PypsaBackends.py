@@ -2,7 +2,6 @@ import time
 
 from .BackendBase import BackendBase
 import pypsa
-from EnvironmentVariableManager import EnvironmentVariableManager
 
 class PypsaBackend(BackendBase):
 
@@ -20,7 +19,7 @@ class PypsaBackend(BackendBase):
         """
 
         # value of bits corresponding to generators in network
-        self.metaInfo["solution"] = {} 
+        self.metaInfo["solution"] = {}
         self.metaInfo["solution"]["genStates"] = {
                 gen[0] : value for gen,value in self.model.generator_status.get_values().items()
         }
@@ -57,7 +56,7 @@ class PypsaBackend(BackendBase):
                     committable=False,
                     p_min_pu=0.0,
                     p_max_pu= maximum_loads_t[load],
-                    marginal_cost=self.slack_gen_penalty,
+                    marginal_cost=self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
                     min_down_time=0,
                     start_up_cost=0,
                     p_nom=1)
@@ -65,7 +64,7 @@ class PypsaBackend(BackendBase):
                     committable=False,
                     p_min_pu= - maximum_loads_t[load],
                     p_max_pu=0.0,
-                    marginal_cost= - self.slack_gen_penalty,
+                    marginal_cost= - self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
                     min_down_time=0,
                     start_up_cost=0,
                     p_nom=1)
@@ -74,8 +73,8 @@ class PypsaBackend(BackendBase):
                 self.network.snapshots,
                 formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                solver_name=self.solver_name)
-        self.opt.options["tmlim"] = self.timeout
+                solver_name=self.metaInfo["pypsaBackend"]["solver_name"])
+        self.opt.options["tmlim"] = self.metaInfo["timeout"]
 
         return self.model
 
@@ -139,37 +138,20 @@ class PypsaBackend(BackendBase):
 
     
     def __init__(self, solver_name = "glpk", slack_gen_penalty = 100.0):
-        self.metaInfo = {}
-        self.solver_name = solver_name
-        self.slack_gen_penalty = slack_gen_penalty
-        envMgr = EnvironmentVariableManager()
+        super().__init__()
+        self.metaInfo["pypsaBackend"]["solver_name"] = solver_name
+        self.metaInfo["pypsaBackend"]["slack_gen_penalty"] = slack_gen_penalty
 
-        intVars = [
-                "timeout",
-        ]
-        for var in intVars:
-            setattr(self,var,int(envMgr[var]))
-            self.metaInfo[var] = int(envMgr[var])
-
-        floatVars = [
-                "minUpDownFactor",
-                "monetaryCostFactor",
-                "kirchhoffFactor",
-        ]
-        for var in floatVars:
-            setattr(self,var,float(envMgr[var]))
-            self.metaInfo[var] = float(envMgr[var])
-
-        if self.timeout < 0:
-            self.timeout = 1000
+        if self.metaInfo["timeout"] < 0:
+            self.metaInfo["timeout"] = 1000
 
 
 class PypsaFico(PypsaBackend):
 
     def __init__(self):
-        super().__init__("fico")
+        super().__init__(solver_name="fico")
 
 class PypsaGlpk(PypsaBackend):
 
     def __init__(self):
-        super().__init__("glpk")
+        super().__init__(solver_name="glpk")

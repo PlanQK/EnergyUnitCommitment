@@ -5,14 +5,13 @@ import dimod
 import tabu
 import greedy
 
-from EnvironmentVariableManager import EnvironmentVariableManager
 from .BackendBase import BackendBase
 from .IsingPypsaInterface import IsingPypsaInterface
 
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler, FixedEmbeddingComposite, EmbeddingComposite, DWaveCliqueSampler
 
-from numpy import round as npround 
+from numpy import round as npround
 import networkx as nx
 from networkx.algorithms.flow import edmonds_karp
 from networkx.algorithms.flow import build_residual_network
@@ -25,10 +24,11 @@ import json
 
 from pandas import value_counts
 
+
 class DwaveTabuSampler(BackendBase):
     def __init__(self):
-        self.solver = tabu.Tabusampler()
-        self.metaInfo = {}
+        super().__init__()
+        #self.solver = tabu.Tabusampler()
 
     def validateInput(self, path, network):
         pass
@@ -43,13 +43,13 @@ class DwaveTabuSampler(BackendBase):
         for postprocessing.
         """
 
-        if hasattr(self,'network'):
-            bestSample = self.choose_sample(solution, self.network, strategy=self.strategy)
+        if hasattr(self, 'network'):
+            bestSample = self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"])
         else:
             bestSample = self.choose_sample(solution, network)
 
         solutionState = [
-                id for id, value in bestSample.items() if value == -1
+            id for id, value in bestSample.items() if value == -1
         ]
         lineValues = transformedProblem[0].getLineValues(solutionState)
         indCostCon = transformedProblem[0].individualCostContribution(solutionState)
@@ -57,13 +57,12 @@ class DwaveTabuSampler(BackendBase):
         self.metaInfo["totalCost"] = totalCost
 
         resultDict = {
-                'solutionState' : solutionState,
-                'lineValues' : lineValues,
-                'individualCostContribution' : indCostCon,
-                'totalCost' : totalCost,
+            'solutionState': solutionState,
+            'lineValues': lineValues,
+            'individualCostContribution': indCostCon,
+            'totalCost': totalCost,
         }
         return resultDict
-
 
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
@@ -71,7 +70,7 @@ class DwaveTabuSampler(BackendBase):
         cost = IsingPypsaInterface.buildCostFunction(
             network,
         )
-        
+
         # store the directional qubits first, then the line's binary representations
         linear = {
             spins[0]: strength
@@ -87,11 +86,10 @@ class DwaveTabuSampler(BackendBase):
         }
         return (
             cost,
-            dimod.BinaryQuadraticModel( 
+            dimod.BinaryQuadraticModel(
                 linear, quadratic, 0, dimod.Vartype.SPIN
             ),
         )
-
 
     @staticmethod
     def power_output(network, generatorState, snapshot):
@@ -108,10 +106,9 @@ class DwaveTabuSampler(BackendBase):
             result += network.generators_t['p_max_pu'].loc[snapshot].iloc[index]
         return result
 
-
     def choose_sample(self, solution, network, strategy="LowestEnergy", snapshot=None):
-    
-        if hasattr(self.metaInfo,"sample_df"):
+
+        if hasattr(self.metaInfo, "sample_df"):
             df = self.metaInfo["sample_df"]
         else:
             df = solution.to_pandas_dataframe()
@@ -131,13 +128,11 @@ class DwaveTabuSampler(BackendBase):
         # instead of requireing a majority, a percentage voting for -1 is enough
         if strategy == 'PercentageVote':
             sample = df.apply(value_counts).fillna(0).apply(
-                    lambda col : float(col.loc[-1])/float(len(df))
+                lambda col: float(col.loc[-1]) / float(len(df))
             )
             return sample.apply(
-                    lambda x : -1 if x >= self.threshold else 1
+                lambda x: -1 if x >= self.metaInfo["dwaveBackend"]["threshold"] else 1
             )
-            
-
 
         # requires postprocessing because in order to match total power output
         # local knapsack problems are usually solved worsed compared to
@@ -145,20 +140,19 @@ class DwaveTabuSampler(BackendBase):
         if strategy == 'ClosestSample':
             total_load = network.loads_t['p_set'].loc[snapshot].sum()
             df['deviation_from_opt_load'] = df.apply(
-                    lambda row: abs(total_load -
-                                    DwaveTabuSampler.power_output(
-                                        network,
-                                        [id for id, value in row.items() if value == -1],
-                                        snapshot
-                                        )
-                                    ),
-                    axis=1
+                lambda row: abs(total_load -
+                                DwaveTabuSampler.power_output(
+                                    network,
+                                    [id for id, value in row.items() if value == -1],
+                                    snapshot
+                                )
+                                ),
+                axis=1
             )
             min_deviation = df['deviation_from_opt_load'].min()
             ClosestSamples = df[df['deviation_from_opt_load'] == min_deviation]
             result_row = ClosestSamples.loc[ClosestSamples['energy'].idxmin()]
             return result_row[:-3]
-
 
         # interpret strategy as index in sample df
         try:
@@ -166,13 +160,11 @@ class DwaveTabuSampler(BackendBase):
         except TypeError:
             raise ValueError("The chosen strategy for picking a sample is not supported")
 
-
-
     @classmethod
     def transformSolutionToNetwork(cls, network, transformedProblem, solution):
 
         solutionState = solution['solutionState']
-        
+
         print("done")
         print(solutionState)
         print(solution['lineValues'])
@@ -182,8 +174,8 @@ class DwaveTabuSampler(BackendBase):
         )
         for snapshot in network.snapshots:
             power = DwaveTabuSampler.power_output(network,
-                        solutionState,
-                        snapshot)
+                                                  solutionState,
+                                                  snapshot)
             load = network.loads_t['p_set'].loc[snapshot].sum()
             print(f"Total output at {snapshot}: {power}")
             print(f"Total load at {snapshot}: {load}")
@@ -193,16 +185,14 @@ class DwaveTabuSampler(BackendBase):
         # )
         return network
 
-
     def optimize(self, transformedProblem):
         print("starting optimization...")
         tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
         self.metaInfo["time"] = time.perf_counter() - tic
-        self.metaInfo["energy"] = result.first.energy
+        self.metaInfo["dwaveBackend"]["energy"] = result.first.energy
         print("done")
         return result
-
 
     def getMetaInfo(self):
         return self.metaInfo
@@ -210,8 +200,8 @@ class DwaveTabuSampler(BackendBase):
 
 class DwaveSteepestDescent(DwaveTabuSampler):
     def __init__(self):
+        super().__init__()
         self.solver = greedy.SteepestDescentSolver()
-        self.metaInfo = {}
 
 
 class DwaveCloud(DwaveTabuSampler):
@@ -220,15 +210,15 @@ class DwaveCloud(DwaveTabuSampler):
 
 class DwaveCloudHybrid(DwaveCloud):
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.token = envMgr["dwaveAPIToken"]
-        self.metaInfo = {}
-        self.solver="hybrid_binary_quadratic_model_version2"
+        super().__init__()
+        self.token = self.envMgr["dwaveAPIToken"]
+        self.solver = "hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
-                token=self.token)
-        self.metaInfo["solver_id"] = self.solver
+                                         token=self.token)
+        self.metaInfo["dwaveBackend"]["solver_id"] = self.solver
 
         # TODO write more info on solution to metaInfo
+
     def optimize(self, transformedProblem):
         print("optimize")
         sampleset = self.sampler.sample(transformedProblem[1])
@@ -241,25 +231,23 @@ class DwaveCloudHybrid(DwaveCloud):
         return sampleset
 
 
-
-
 class DwaveCloudDirectQPU(DwaveCloud):
 
     @staticmethod
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
-    def validateInput(self, networkpath, network):
-        
-        self.networkPath = networkpath
+    def validateInput(self, networkPath, network):
+
+        self.networkPath = networkPath
         self.networkName = network
 
-        blacklists = self.get_filepaths(networkpath, "*_qpu_blacklist")
+        blacklists = self.get_filepaths(networkPath, "*_qpu_blacklist")
         filteredByTimeout = []
         for blacklist in blacklists:
-            blacklist_name = blacklist[len(networkpath + "/"):]
+            blacklist_name = blacklist[len(networkPath + "/"):]
             blacklisted_timeout = int(blacklist_name.split("_")[0])
-            if blacklisted_timeout <= self.timeout :
+            if blacklisted_timeout <= self.metaInfo["timeout"]:
                 filteredByTimeout.append(blacklist)
 
         for blacklist in filteredByTimeout:
@@ -268,72 +256,70 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
-        embeddingPath=f"{networkpath}/embedding_" \
-                f"rep_{self.lineRepresentation}_" \
-                f"ord_{self.maxOrder}_" \
-                f"{network}.json"
+        embeddingPath = f'{networkPath}/embedding_' \
+                        f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
+                        f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
+                        f'{network}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
             with open(embeddingPath) as embeddingFile:
                 embedding = json.load(embeddingFile)
 
-
             self.embedding = {
-                    int(key):tuple(value) 
-                    for key,value in embedding.items()
-                    }
+                int(key): tuple(value)
+                for key, value in embedding.items()
+            }
         return
 
-
-    def handleOptimizationStop(self, networkpath, network):
+    def handleOptimizationStop(self, networkPath, network):
         """
         If a network raises an error during optimization, add this network
         to the blacklisted networks for this optimizer and timeout value
-        Blacklistfiles are of the form '{networkpath}/{self.timeout}_{Backend}_blacklist'
+        Blacklistfiles are of the form '{networkPath}/{self.metaInfo["timeout"]}_{Backend}_blacklist'
         """
         # on unix writing small buffers is atomic. no file locking necessary
         # append to existing file or create a new one
-        with open(f"{networkpath}/{self.timeout}_qpu_blacklist" , 'a+') as f:
+        with open(f'{networkPath}/{self.metaInfo["timeout"]}_qpu_blacklist', 'a+') as f:
             f.write(network + '\n')
         return
 
     def getSampler(self):
         self.sampler = EmbeddingComposite(
-                DWaveSampler(
-                        solver={
-                                'qpu' : True ,
-                                'topology__type': 'pegasus'
-                        },
-                        token=self.token
-                )
+            DWaveSampler(
+                solver={
+                    'qpu': True,
+                    'topology__type': 'pegasus'
+                },
+                token=self.token
+            )
         )
         return
 
     def getSampleSet(self, transformedProblem):
-        if hasattr(self,'embedding'):
+        if hasattr(self, 'embedding'):
             print("Reusing embedding from previous run")
-            sampler = DWaveSampler(solver={'qpu' : True ,
-                    'topology__type': 'pegasus'},
-                    token=self.token)
+            sampler = DWaveSampler(solver={'qpu': True,
+                                           'topology__type': 'pegasus'},
+                                   token=self.token)
             sampler = FixedEmbeddingComposite(sampler, self.embedding)
             sampleset = sampler.sample(transformedProblem[1],
-                                num_reads=self.num_reads,
-                                annealing_time=self.annealing_time,
-                                chain_strength=self.chain_strength,
-                                programming_thermalization=self.programming_thermalization,
-                                readout_thermalization=self.readout_thermalization,
-                                )
+                                       num_reads=self.metaInfo["dwaveBackend"]["num_reads"],
+                                       annealing_time=self.metaInfo["dwaveBackend"]["annealing_time"],
+                                       chain_strength=self.metaInfo["dwaveBackend"]["chain_strength"],
+                                       programming_thermalization=self.metaInfo["dwaveBackend"]["programming_thermalization"],
+                                       readout_thermalization=self.metaInfo["dwaveBackend"]["readout_thermalization"],
+                                       )
         else:
             try:
                 sampleset = self.sampler.sample(transformedProblem[1],
-                        num_reads=self.num_reads,
-                        annealing_time=self.annealing_time,
-                        chain_strength=self.chain_strength,
-                        programming_thermalization=self.programming_thermalization,
-                        readout_thermalization=self.readout_thermalization,
-                        embedding_parameters=dict(timeout=self.timeout),
-                        return_embedding = True,
-                        )
+                                                num_reads=self.metaInfo["dwaveBackend"]["num_reads"],
+                                                annealing_time=self.metaInfo["dwaveBackend"]["annealing_time"],
+                                                chain_strength=self.metaInfo["dwaveBackend"]["chain_strength"],
+                                                programming_thermalization=self.metaInfo["dwaveBackend"]["programming_thermalization"],
+                                                readout_thermalization=self.metaInfo["dwaveBackend"]["readout_thermalization"],
+                                                embedding_parameters=dict(timeout=self.metaInfo["timeout"]),
+                                                return_embedding=True,
+                                                )
             except ValueError:
                 print("no embedding found in given time limit")
                 raise ValueError("no embedding onto qpu was found")
@@ -345,62 +331,23 @@ class DwaveCloudDirectQPU(DwaveCloud):
             time.sleep(1)
         return sampleset
 
-
     def __init__(self):
-        envMgr = EnvironmentVariableManager()
-        self.token = envMgr["dwaveAPIToken"]
-        self.metaInfo = {}
+        super().__init__()
+        self.token = self.envMgr["dwaveAPIToken"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
 
-        # reading variables from environment
-        intVars = [
-                "annealing_time",
-                "num_reads",
-                "timeout",
-                "chain_strength",
-                "programming_thermalization",
-                "readout_thermalization",
-                "lineRepresentation",
-                "maxOrder",
-                "num_reads",
-                "sampleCutSize",
-        ]
-        for var in intVars:
-            setattr(self,var,int(envMgr[var]))
-            self.metaInfo[var] = int(envMgr[var])
+        # additional info
+        if self.metaInfo["timeout"] < 0:
+            self.metaInfo["timeout"] = 1000
 
-        floatVars = [
-                "kirchhoffFactor",
-                "slackVarFactor",
-                "monetaryCostFactor",
-                "threshold",
-        ]
-        for var in floatVars:
-            setattr(self,var,float(envMgr[var]))
-            self.metaInfo[var] = float(envMgr[var])
-
-        stringVars = [
-                "strategy",
-                "postprocess",
-        ]
-        for var in stringVars:
-            setattr(self,var,envMgr[var])
-            self.metaInfo[var] = envMgr[var]
-
-        #additional info
-        if self.timeout < 0:
-            self.timeout = 1000
-
-        self.metaInfo["annealReadRatio"] = float(self.metaInfo["annealing_time"]) / \
-                float(self.metaInfo["num_reads"])
-        self.metaInfo["totalAnnealTime"] = float(self.metaInfo["annealing_time"]) * \
-                float(self.metaInfo["num_reads"])
+        self.metaInfo["dwaveBackend"]["annealReadRatio"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) / \
+                                           float(self.metaInfo["dwaveBackend"]["num_reads"])
+        self.metaInfo["dwaveBackend"]["totalAnnealTime"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) * \
+                                           float(self.metaInfo["dwaveBackend"]["num_reads"])
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
-        self.metaInfo["mangledTotalAnnealTime"] = int(self.metaInfo["totalAnnealTime"] / 1000.0)
-
-
+        self.metaInfo["dwaveBackend"]["mangledTotalAnnealTime"] = int(self.metaInfo["dwaveBackend"]["totalAnnealTime"] / 1000.0)
 
     def power_output(self, generatorState, snapshot):
         """
@@ -415,7 +362,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
             result += self.generators_t.loc[snapshot].iloc[index]
         return result
 
-
     def transformProblemForOptimizer(self, network):
         """
         stores some variables of the network that are necessary for later
@@ -425,9 +371,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         self.num_generators = len(network.generators_t['p_max_pu'].iloc[0])
         self.loads = {
-                idx : network.loads_t['p_set'].loc[idx].sum() 
-                for idx in network.snapshots
-        } 
+            idx: network.loads_t['p_set'].loc[idx].sum()
+            for idx in network.snapshots
+        }
         self.generators_t = network.generators_t['p_max_pu']
 
         # copy that will be modified to better suit the problem. Only
@@ -437,84 +383,77 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         return super().transformProblemForOptimizer(self.network)
 
-
-    
     def optimizeSampleFlow(self, sample, network, costKey):
         generatorState = [
             id for id, value in sample.items() if value == -1
         ]
         graph = self.buildFlowproblem(
-                network,
-                generatorState
+            network,
+            generatorState
         )
         return self.solveFlowproblem(
-                graph,
-                network,
-                generatorState,
-                costKey=costKey
+            graph,
+            network,
+            generatorState,
+            costKey=costKey
         )
-
-
-
 
     def processSolution(self, network, transformedProblem, solution, sample=None):
         resultDict = super().processSolution(
-                network, 
-                transformedProblem, 
-                solution,
-                )
+            network,
+            transformedProblem,
+            solution,
+        )
 
         lowestEnergySample = solution.first.sample
         lowestEnergyState = [
             id for id, value in lowestEnergySample.items() if value == -1
         ]
-        self.metaInfo["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
+        self.metaInfo["dwaveBackend"]["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
 
-        _ ,lineValuesLowestEnergyFlowSample = self.optimizeSampleFlow(
-                lowestEnergySample,
-                network,
-                costKey="LowestFlow"
+        _, lineValuesLowestEnergyFlowSample = self.optimizeSampleFlow(
+            lowestEnergySample,
+            network,
+            costKey="LowestFlow"
         )
 
         closestSample = self.choose_sample(solution, self.network, strategy="ClosestSample")
         _, lineValuesClosestSample = self.optimizeSampleFlow(
-                closestSample,
-                network,
-                costKey="ClosestFlow"
+            closestSample,
+            network,
+            costKey="ClosestFlow"
         )
 
-        #choose best self.sampleCutSize Samples and optimize Flow
+        # choose best self.metaInfo["dwaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
-        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.sampleCutSize]
+        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.metaInfo["dwaveBackend"]["sampleCutSize"]]
 
         cutSamples['optimizedCost'] = cutSamples.apply(
-                lambda row: self.optimizeSampleFlow(
-                        row[:-3],
-                        self.network,
-                        costKey=None,
-                )[0],
-                axis=1
-                )
-        self.metaInfo["cutSamples"] = cutSamples[["energy","optimizedCost"]].to_dict('index')
-        self.metaInfo["cutSamplesCost"] = cutSamples['optimizedCost'].min()
-
+            lambda row: self.optimizeSampleFlow(
+                row[:-3],
+                self.network,
+                costKey=None,
+            )[0],
+            axis=1
+        )
+        self.metaInfo["cutSamples"] = cutSamples[["energy", "optimizedCost"]].to_dict('index')
+        self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         self.optimizeSampleFlow(
-                self.choose_sample(solution, self.network, strategy=self.strategy),
-                self.network,
-                costKey="optimizedStrategySample"
+            self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"]),
+            self.network,
+            costKey="optimizedStrategySample"
         )
 
-        print(f"cutSamplesCost with {self.sampleCutSize} samples: {self.metaInfo['cutSamplesCost']}")
+        print(f'cutSamplesCost with {self.metaInfo["dwaveBackend"]["sampleCutSize"]} samples: {self.metaInfo["dwaveBackend"]["cutSamplesCost"]}')
 
-        if self.postprocess == "flow":
-            if self.strategy == "LowestEnergy":
+        if self.metaInfo["dwaveBackend"]["postprocess"] == "flow":
+            if self.metaInfo["dwaveBackend"]["strategy"] == "LowestEnergy":
                 resultDict['lineValues'] = lineValuesLowestEnergyFlowSample
-            elif self.strategy == "ClosestSample":
+            elif self.metaInfo["dwaveBackend"]["strategy"] == "ClosestSample":
                 resultDict['lineValues'] = lineValuesClosestSample
 
         return resultDict
-
 
     def solveFlowproblem(self, graph, network, generatorState, costKey="totalCostFlow"):
         """
@@ -536,12 +475,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for bus in network.buses.index:
             try:
                 totalCost += (FlowSolution['superSource'][bus]['capacity'] - \
-                            FlowSolution['superSource'][bus]['flow']) ** 2
+                              FlowSolution['superSource'][bus]['flow']) ** 2
             except KeyError:
                 pass
             try:
                 totalCost += (FlowSolution[bus]['superSink']['capacity'] - \
-                            FlowSolution[bus]['superSink']['flow']) ** 2
+                              FlowSolution[bus]['superSink']['flow']) ** 2
             except KeyError:
                 pass
 
@@ -549,14 +488,14 @@ class DwaveCloudDirectQPU(DwaveCloud):
             return totalCost, None
 
         print(f"TOTAL COST AFTER FLOW OPT {costKey}: {totalCost}")
-        self.metaInfo[costKey] = totalCost
+        self.metaInfo["dwaveBackend"][costKey] = totalCost
 
-        lineValues = {} 
+        lineValues = {}
         # TODO split flow on two lines if we have more flow than capacity
         # we had lines a->b and b->a which were merged in previous step
         for line in network.lines.index:
-            bus0=network.lines.loc[line].bus0
-            bus1=network.lines.loc[line].bus1
+            bus0 = network.lines.loc[line].bus0
+            bus1 = network.lines.loc[line].bus1
             try:
                 newValue = FlowSolution[bus0][bus1]['flow']
             except KeyError:
@@ -564,9 +503,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     newValue = - FlowSolution[bus1][bus0]['flow']
                 except KeyError:
                     newValue = 0
-            lineValues[(line,0)] = newValue
+            lineValues[(line, 0)] = newValue
         return totalCost, lineValues
-
 
     def powerAtBus(self, network, generatorState, bus):
         """
@@ -577,11 +515,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
         activeGenerators = network.generators_t['p_max_pu'].iloc[0].iloc[activeGeneratorIndex]
         return activeGenerators[network.generators.loc[activeGenerators.index].bus == bus].sum()
 
-
     # quantum computation struggles with finetuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
     # archieved in polynomial time
-    def buildFlowproblem(self, network, generatorState, lineValues=None,):
+    def buildFlowproblem(self, network, generatorState, lineValues=None, ):
         """
         build a networkx model to further optimise power flow. If using a warmstart,
         it uses the solution of the quantum computer encoded in generatorState to
@@ -590,12 +527,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
         makes it slower. warmstart is used if lineValues is not None
         """
 
-
         # turn pypsa network in nx.DiGraph. Power generation and consumption
         # is modeled by adjusting capacity of the edge to a super source/super sink 
         graph = nx.DiGraph()
         graph.add_nodes_from(network.buses.index)
-        graph.add_nodes_from(["superSource","superSink"])
+        graph.add_nodes_from(["superSource", "superSink"])
 
         for line in network.lines.index:
             bus0 = network.lines.loc[line].bus0
@@ -603,13 +539,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
             cap = network.lines.loc[line].s_nom
             # if network has multiple lines between buses, make sure not to 
             # erase the capacity of previous lines
-            if graph.has_edge(bus0,bus1):
+            if graph.has_edge(bus0, bus1):
                 graph[bus0][bus1]['capacity'] += cap
                 graph[bus1][bus0]['capacity'] += cap
             else:
-                graph.add_edges_from([(bus0,bus1,{'capacity': cap}),
-                                (bus1,bus0,{'capacity': cap})])
-
+                graph.add_edges_from([(bus0, bus1, {'capacity': cap}),
+                                      (bus1, bus0, {'capacity': cap})])
 
         for bus in network.buses.index:
             graph.add_edge(
@@ -625,17 +560,16 @@ class DwaveCloudDirectQPU(DwaveCloud):
             )
         # done building nx.DiGrpah
 
-
         if lineValues is not None:
             # generate flow for network lines
             for line in network.lines.index:
                 bus0 = network.lines.loc[line].bus0
                 bus1 = network.lines.loc[line].bus1
-                if hasattr(graph[bus1][bus0],'flow'):
-                    graph[bus1][bus0]['flow'] -= lineValues[(line,0)]
+                if hasattr(graph[bus1][bus0], 'flow'):
+                    graph[bus1][bus0]['flow'] -= lineValues[(line, 0)]
                 else:
-                    graph[bus0][bus1]['flow'] = lineValues[(line,0)]
-            
+                    graph[bus0][bus1]['flow'] = lineValues[(line, 0)]
+
             # adjust source and sink flow to make it a valid flow. edges
             # to source/sink are not at full capacity iff there is a net
             # demand/power generated after subtraction power flow at that bus
@@ -647,18 +581,17 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 load = network.loads_t['p_set'].iloc[0][loadName]
                 netFlowThroughBus = 0
                 for line in network.lines.index[network.lines.bus0 == bus]:
-                    netFlowThroughBus += lineValues[(line,0)]
+                    netFlowThroughBus += lineValues[(line, 0)]
                 for line in network.lines.index[network.lines.bus1 == bus]:
-                    netFlowThroughBus -= lineValues[(line,0)]
+                    netFlowThroughBus -= lineValues[(line, 0)]
                 netPower = generatedPower \
-                        - load \
-                        + netFlowThroughBus
+                           - load \
+                           + netFlowThroughBus
 
-                graph["superSource"][bus]['flow'] = min(generatedPower,generatedPower - netPower)
-                graph[bus]["superSink"]['flow'] = min(load,load + netPower)
+                graph["superSource"][bus]['flow'] = min(generatedPower, generatedPower - netPower)
+                graph[bus]["superSink"]['flow'] = min(load, load + netPower)
 
         return graph
-
 
     def optimize(self, transformedProblem):
         print("optimize")
@@ -667,11 +600,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         self.metaInfo["serial"] = sampleset.to_serializable()
 
-        if not hasattr(self,'embedding'):
-            embeddingPath=f"{self.networkPath}/embedding_" \
-                    f"rep_{self.lineRepresentation}_" \
-                    f"ord_{self.maxOrder}_" \
-                    f"{self.networkName}.json"
+        if not hasattr(self, 'embedding'):
+            embeddingPath = f'{self.networkPath}/embedding_' \
+                            f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
+                            f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
+                            f'{self.networkName}.json'
 
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
             with open(embeddingPath, "w") as write_embedding:
@@ -688,9 +621,9 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     use the Cloud. Instead it reads a serialized Sample and pretends
     that it got that from the cloud
     """
+
     def getSampler(self):
-        envMgr = EnvironmentVariableManager()
-        self.inputInfo = envMgr["inputInfo"]
+        self.inputInfo = self.envMgr["inputInfo"]
 
     def getSampleSet(self, transformedProblem):
 
@@ -698,7 +631,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
             self.inputData = json.load(inputInfo)
         if 'cutSamples' not in self.inputData:
             self.inputData['cutSamples'] = {}
-                
+
         return dimod.SampleSet.from_serializable(self.inputData["serial"])
 
     def optimizeSampleFlow(self, sample, network, costKey):
@@ -718,5 +651,3 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
                 json.dump(self.getMetaInfo(), inputInfo, indent=2)
             print("adding more flow optimizations to qpu result file")
         return result
-            
-
