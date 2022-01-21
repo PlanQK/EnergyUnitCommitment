@@ -5,6 +5,9 @@ REPETITIONS := 1
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
+MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Backends,target=/energy/Backends
+
+
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -90,6 +93,7 @@ GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 define classicalParameterSweep
 results_classical_parameter_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	$(MOUNTBACKENDPATH) \
 	--env temperatureSchedule=[$(strip $(2)),$(strip $(3))] \
 	--env transverseFieldSchedule=[0] \
 	--env optimizationCycles=$(strip $(4)) \
@@ -114,6 +118,7 @@ $(foreach filename, $(SWEEPFILES), \
 define sqaParameterSweep
 results_sqa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	$(MOUNTBACKENDPATH) \
 	--env temperatureSchedule=[$(strip $(2)),iF,0.0001] \
 	--env transverseFieldSchedule=[$(strip $(3)),0.0] \
 	--env optimizationCycles=$(strip $(4)) \
@@ -142,6 +147,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuParameterSweep
 results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	$(MOUNTBACKENDPATH) \
 	--env annealing_time=$(strip $(2)) \
 	--env num_reads=$(strip $(3)) \
 	--env slackVarFactor=$(strip $(4)) \
@@ -174,6 +180,7 @@ define qpuReadSweep
 results_qpu_read_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9)): docker.tmp \
 		results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(9))
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	$(MOUNTBACKENDPATH) \
 			--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep/,target=/energy/results_qpu \
 	--env annealing_time=$(strip $(2)) \
 	--env num_reads=$(strip $(3)) \
@@ -207,6 +214,7 @@ $(foreach filename, $(SWEEPFILES), $(foreach anneal_time, ${ANNEAL_TIME}, \
 define pypsa-glpk
 results_pypsa_glpk_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	$(MOUNTBACKENDPATH) \
 	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
@@ -227,7 +235,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 # Define further helper targets
 
-docker.tmp: Dockerfile DockerInput/run.py DockerInput/Backends/SqaBackends.py DockerInput/Backends/IsingPypsaInterface.py DockerInput/Backends/PypsaBackends.py DockerInput/Backends/DwaveBackends.py
+docker.tmp: Dockerfile DockerInput/run.py 
 	$(DOCKERCOMMAND) build -t energy:1.0 . #&& touch docker.tmp
 
 
