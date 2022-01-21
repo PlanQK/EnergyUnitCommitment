@@ -5,16 +5,25 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path
+from os import path, getenv
 
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
 FILEFORMAT = "png"
 BINSIZE = 1
 PLOTLIMIT = 500
+# export computing cost rate
+COSTPERHOUR = getenv('costperhour')
+ 
+
+def meanOfSquareRoot(values):
+    return np.mean([np.sqrt(value) for value in values])
 
 def deviationOfTheMean(values : list) -> float :
     return np.std(values)/np.sqrt(len(values))
+
+def meanOfAnnealingComputingCost(values : list) -> float :
+    return np.mean([COSTPERHOUR*value for value in values])
 
 def cumulativeDistribution(values : list ):
     result = []
@@ -98,11 +107,12 @@ def makeFig(plotInfo, outputFile,
             for e in values:
                 x += e[1][0]
                 y += e[1][1]
-            ax.scatter(x,y,s=10)
+            ax.scatter(x,y,s=8)
             
             # linear regression
             m, b = np.polyfit(x, y, 1)
-            ax.plot(x,[m*z+b for z in x], color='red')
+            ax.plot(x,[m*z+b for z in x], )
+            print(f"slope: {m}\nconstant: {b}")
 
         # default plot type of a function graph
         if plottype=="line":
@@ -117,6 +127,8 @@ def makeFig(plotInfo, outputFile,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.suptitle(title)
+
+
     if fileformat == "":
         fig.savefig(outputFile +".png")
         fig.savefig(outputFile +".pdf")
@@ -382,7 +394,194 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    regex = '*put_15_0_20.nc_110_365_30_0_1_80_365_1'
+    plotGroup("newising_chain_strength_to_cutSamplesCost",
+            "qpu_read",
+            [
+            "*newising_20_[0]_20.nc_[1]00_365*"
+            ],
+            "chain_strength",
+            yFieldList = ["cutSamplesCost"],
+            splitFields=["annealing_time"],
+            logscalex=False,
+            )
+
+    for chain in [50, 70, 90]:
+        regex = f"*newising_20_[0]_20.nc_[1]00_365_30_0_1_{chain}_365_1"
+        plotGroup(f"cumulativeCostDistribution_for_100_Anneal_{chain}_chain_strength",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["sampleValues"],
+                reductionMethod = [cumulativeDistribution],
+                errorMethod = None,
+                splitFields=["annealing_time"],
+                plottype="histogramm",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+        plotGroup(f"scatterplot_new_ising_100_Anneal_{chain}_chain_strength",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["cutSamples"],
+                reductionMethod = [extractCutSamples],
+                errorMethod = None,
+                splitFields = ["annealing_time"],
+                plottype="scatterCutSample",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+    return
+
+    plotGroup(f"scatterplot_new_ising_365Anneal",
+            "qpu_read",
+            [
+            f"*newising_10_[0]_20.nc_110_365_30_0_1_80_365_1",
+            ]
+            "problemSize",
+            yFieldList = ["cutSamples"],
+            reductionMethod = [extractCutSamples],
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+    return
+
+
+
+
+    # TODO add embeddings for other scales for first plot
+
+    regex = 'embedding_rep_0_ord_1_nocostnewising*.nc.json'
+    plotGroup("embedding_size_to_embeddedQubits_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["embeddedQubits"],
+            splitFields=["scale"],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+    plotGroup("embedding_size_to_logicalQubits_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["logicalQubits"],
+            splitFields=[],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+    plotGroup("embedding_scale_to_embedFactor_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["embedFactor"],
+            splitFields=[],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+
+
+
+    regex = "*input_[7-9]_*_20.nc_*_70_0_[01]_250_1"
+    constraints={'mangledTotalAnnealTime' : [19,20],
+            'chain_strength' : [250],
+            'slackVarFactor' : [70.0],
+            'maxOrder' : [0,1],
+    }
+    plotGroup("annealReadRatio_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            ],
+            "annealReadRatio",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow"],
+            splitFields=[],
+            logscalex=True,
+            reductionMethod=[meanOfSquareRoot]*3,
+            constraints=constraints,
+            )
+    plotGroup("annealTime_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            ],
+            "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow"],
+            reductionMethod=[meanOfSquareRoot]*3,
+            logscalex=True,
+            splitFields=[],
+            constraints=constraints,
+            )
+
+    return
+
+
+
+    plotGroup(f"scatterplot_energy_to_optimizedCost_for_anneal_split",
+            "qpu_read",
+            [
+            f"*put_15_[0]_20.nc_5_365_30_0_1_80_365_1",
+            f"*put_15_[0]_20.nc_1000_365_30_0_1_80_365_1",
+            f"*put_15_[0]_20.nc_2000_365_30_0_1_80_365_1"
+            ],
+            "problemSize",
+            yFieldList = ["cutSamples"]*3,
+            reductionMethod = [extractCutSamples]*3,
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+    return
+
+
+    for annealTime in [1,5,110,1000,2000]:
+        regex = f"*put_15_[0]_20.nc_{annealTime}_365_30_0_1_80_365_1"
+        plotGroup(f"scatterplot_energy_to_optimizedCost_for_anneal_{annealTime}",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["cutSamples"],
+                reductionMethod = [extractCutSamples],
+                errorMethod = None,
+                splitFields = [],
+                plottype="scatterCutSample",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+
+    regex = '*put_15_[0]_20.nc_110_365_30_0_1_80_365_1'
     plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
             "qpu_read",
             [
@@ -493,61 +692,6 @@ def main():
             logscaley=False,
     )
 
-
-
-    # TODO add embeddings for other scales for first plot
-    plotGroup("embedding_size_to_embeddedQubits",
-            "qpu",
-            [
-                'embedding_rep_0_ord_1_nocostinput*.nc.json'
-            ],
-            xField = "problemSize",
-            yFieldList = ["embeddedQubits"],
-            splitFields=["scale"],
-            PATH=["sweepNetworks"],
-            embeddingData = True,
-            logscalex=False,
-            logscaley=False,
-            )
-    plotGroup("embedding_size_to_logicalQubits",
-            "qpu",
-            [
-                'embedding_rep_0_ord_1_nocostinput*20.nc.json'
-            ],
-            xField = "problemSize",
-            yFieldList = ["logicalQubits"],
-            splitFields=[],
-            PATH=["sweepNetworks"],
-            embeddingData = True,
-            logscalex=False,
-            logscaley=False,
-            )
-    plotGroup("embedding_scale_to_embedFactor",
-            "qpu",
-            [
-                'embedding_rep*'
-            ],
-            xField = "scale",
-            yFieldList = ["embedFactor"],
-            splitFields=[],
-            PATH=["sweepNetworks"],
-            embeddingData = True,
-            logscalex=False,
-            logscaley=False,
-            )
-    plotGroup("embedding_size_to_embedFactor",
-            "qpu",
-            [
-                'embedding_rep_0_ord_1_nocostinput*20.nc.json'
-            ],
-            xField = "problemSize",
-            yFieldList = ["embedFactor"],
-            splitFields=[],
-            PATH=["sweepNetworks"],
-            embeddingData = True,
-            logscalex=False,
-            logscaley=False,
-            )
 
 
     qpu_regex = "*110_365_30_0_1_80_1"
