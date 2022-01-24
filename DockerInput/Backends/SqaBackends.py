@@ -46,10 +46,13 @@ class ClassicalBackend(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        self.solver.setSeed(int(self.envMgr["seed"]))
-        self.solver.setTSchedule(self.envMgr["temperatureSchedule"])
-        self.solver.setTrotterSlices(int(self.envMgr["trotterSlices"]))
-        self.solver.setSteps(int(self.envMgr["optimizationCycles"]))
+        try:
+            self.solver.setSeed(self.metaInfo["sqaBackend"]["seed"])
+        except KeyError:
+            pass
+        self.solver.setTSchedule(self.metaInfo["sqaBackend"]["temperatureSchedule"])
+        self.solver.setTrotterSlices(self.metaInfo["sqaBackend"]["trotterSlices"])
+        self.solver.setSteps(self.metaInfo["sqaBackend"]["optimizationCycles"])
         self.solver.setHSchedule("[0]")
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
@@ -57,36 +60,39 @@ class ClassicalBackend(BackendBase):
         )
         result["state"] = literal_eval(result["state"])
         for key in result:
-            self._metaInfo[key] = result[key]
+            self.metaInfo[key] = result[key]
 
-        self._metaInfo["totalCost"] = transformedProblem.calcCost(
+        self.metaInfo["totalCost"] = transformedProblem.calcCost(
             result["state"]
         )
-        self._metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
+        self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
 
     def getMetaInfo(self):
-        return self._metaInfo
+        return self.metaInfo
 
 
 class SqaBackend(ClassicalBackend):
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        self.solver.setSeed(int(self.envMgr["seed"]))
-        self.solver.setHSchedule(self.solver["transverseFieldSchedule"])
-        self.solver.setTSchedule(self.solver["temperatureSchedule"])
-        self.solver.setTrotterSlices(int(self.solver["trotterSlices"]))
-        self.solver.setSteps(int(self.envMgr["optimizationCycles"]))
+        try:
+            self.solver.setSeed(self.metaInfo["sqaBackend"]["seed"])
+        except KeyError:
+            pass
+        self.solver.setHSchedule(self.metaInfo["sqaBackend"]["transverseFieldSchedule"])
+        self.solver.setTSchedule(self.metaInfo["sqaBackend"]["temperatureSchedule"])
+        self.solver.setTrotterSlices(self.metaInfo["sqaBackend"]["trotterSlices"])
+        self.solver.setSteps(self.metaInfo["sqaBackend"]["optimizationCycles"])
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
         )
         result["state"] = literal_eval(result["state"])
         for key in result:
-            self._metaInfo[key] = result[key]
+            self.metaInfo[key] = result[key]
 
-        self._metaInfo["totalCost"] = transformedProblem.calcCost(result["state"])
-        self._metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
+        self.metaInfo["totalCost"] = transformedProblem.calcCost(result["state"])
+        self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
