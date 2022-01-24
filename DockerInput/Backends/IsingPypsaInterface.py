@@ -114,12 +114,12 @@ class IsingPypsaInterface:
                     ,
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index)
                 ,
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index)
                 ,
                 }
@@ -179,10 +179,6 @@ class IsingPypsaInterface:
         The last argument is the interaction strength.
         The previous arguments contain the spin ids.
         """
-        if len(args) < 2:
-            raise ValueError(
-                "An interaction needs at least one spin id and a weight."
-            )
         if len(args) > 3:
             raise ValueError(
                 "Too many arguments for an interaction"
@@ -192,8 +188,13 @@ class IsingPypsaInterface:
         interactionStrength = args[-1]
         for qubit in key:
             interactionStrength *= self.data[qubit]
-        if key[0] == key[-1]:
-            key = (key[0],)
+
+        # if we couple two spins, we check if they are different. If both spins are the same, 
+        # we substitute the product of spins with 1, since 1 * 1 = -1 * -1 = 1 holds. This
+        # makes it into a constant contribution
+        if len(key) == 2:
+            if key[0] == key[1]:
+                key = tuple([])
         self.problem[key] = self.problem.get(key,0) - interactionStrength
 
 
@@ -202,7 +203,10 @@ class IsingPypsaInterface:
         it into an ising interaction"""
         componentAdress = self.getMemoryAdress(component,time)
         for qubit in componentAdress:
+            # term with single spin after applying QUBO to Ising transformation
             self.addInteraction(qubit, 0.5 * couplingStrength)
+            # term with constant cost constribution after applying QUBO to Ising transformation
+            self.addInteraction(0.5 * couplingStrength * self.data[qubit])
 
 
     def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0):
@@ -211,7 +215,6 @@ class IsingPypsaInterface:
         # encode direction/sign of power flow in sign of coupling strength
         firstComponentAdress = self.getMemoryAdress(firstComponent,time)
         secondComponentAdress = self.getMemoryAdress(secondComponent,time)
-        # determines which ising spin represents a 1 in QUBO for
 
         if firstComponentAdress[0] > secondComponentAdress[0]:
             self.coupleComponents(
@@ -221,6 +224,16 @@ class IsingPypsaInterface:
 
         for first in range(len(firstComponentAdress)):
             for second in range(len(secondComponentAdress)):
+                # term with two spins after applying QUBO to Ising transformation
+                # if both spins are the same, this will add a constant cost.
+                # addInteraction performs substitution of spin with a constant
+                self.addInteraction(
+                        firstComponentAdress[first],
+                        secondComponentAdress[second],
+                        couplingStrength * 0.25
+                )
+
+                # terms with single spins after applying QUBO to Ising transformation
                 self.addInteraction(
                         firstComponentAdress[first],
                         couplingStrength * self.data[secondComponent]['weights'][second] * 0.25
@@ -229,12 +242,13 @@ class IsingPypsaInterface:
                         secondComponentAdress[second],
                         couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
                 )
-                if firstComponentAdress[first] != secondComponentAdress[second]:
-                    self.addInteraction(
-                            firstComponentAdress[first],
-                            secondComponentAdress[second],
-                            couplingStrength * 0.25
-                    )
+
+                # term with constant cost constribution after applying QUBO to Ising transformation
+                self.addInteraction(
+                    self.data[firstComponent]['weights'][first] * \
+                    self.data[secondComponent]['weights'][second] * \
+                    couplingStrength * 0.25
+                )
 
 
     def encodeKirchhoffConstraint(self, bus):
@@ -249,22 +263,29 @@ class IsingPypsaInterface:
 
         demand = self.getLoad(bus)
 
+        # constant load contribution to cost function
+        self.addInteraction(demand ** 2)
+
         for component1 in flattenedComponenents:
             factor = 1.0
             if component1 in components['negativeLines']:
                 factor *= -1.0
+
+            # reward/penalty term for matching/adding load
             self.coupleComponentWithConstant(component1, - 2.0 * factor * demand)
             for component2 in flattenedComponenents:
                 if component2 in components['negativeLines']:
                     curFactor = -factor
                 else:
                     curFactor = factor
+
+                # attraction/repulsion term for different/same sign of power at components
                 self.coupleComponents(component1, component2, couplingStrength= curFactor)
 
 
     def siquanFormat(self):
         """Return the complete problem in the format for the siquan solver"""
-        return [(v, list(k)) for k, v in self.problem.items() if v != 0]
+        return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
 
 
     @classmethod
@@ -364,6 +385,22 @@ class IsingPypsaInterface:
             load = (load * self.kirchhoffFactor) ** 2
             contrib[str((bus, t))] = load
         return contrib
+
+
+    def calcCost(self, result, addConstContribution=True):
+        result = set(result)
+        totalCost = 0.0
+        for spins, weight in self.problem.items():
+            if len(spins) == 1:
+                factor = 1
+            else:
+                factor = -1
+            for spin in spins:
+                if spin in result:
+                    factor *= -1
+            totalCost += factor * weight
+        return totalCost
+
 
     # OLD CODE
 
@@ -494,25 +531,6 @@ class IsingPypsaInterface:
             raise ValueError("No Generator assigned to this index")
         return (key, index % len(self.snapshots))
 
-
-    def calcCost(self, result, addConstContribution=True):
-        result = set(result)
-        totalCost = 0.0
-        for spins, weight in self.problem.items():
-            if len(spins) == 1:
-                factor = 1
-            else:
-                factor = -1
-            for spin in spins:
-                if spin in result:
-                    factor *= -1
-            totalCost += factor * weight
-        if addConstContribution:
-            for node in self.network.buses.index:
-                for t in range(len(self.snapshots)):
-                    totalCost += self.constantCostContribution(node, t)
-            totalCost += self.constantSlackCost()
-        return totalCost
 
     def _startupShutdownCost(self, gen, t):
         lambdaMinUp = self.minUpDownFactor  # for Tminup constraint
@@ -829,34 +847,6 @@ class IsingPypsaInterface:
                         self.lineSlackToIndex(index, t, i),
                         -2 * self.slackVarFactor,
                     )
-
-    def constantCostContribution(self, node, t):
-        totalConstCost = 0
-        maxGenPossible = self.maxGenPossible(node, t)
-        maxLineCapacity = self.totalLineCapacity(node)
-        c_nt = self.generateConstant(node, t)
-        totalConstCost += self.kirchhoffFactor * (
-            0.25 * maxLineCapacity ** 2
-            + maxLineCapacity * c_nt
-            + 0.25 * maxGenPossible ** 2
-            + 0.5 * maxGenPossible * maxLineCapacity
-            + maxGenPossible * c_nt
-            + c_nt ** 2
-        )
-        # these parts are from the quadratic sum where the gen, line, slacks are squared
-        for gen0 in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            totalConstCost += (
-                0.25
-                * self.kirchhoffFactor
-                * self.getGeneratorOutput(gen0, t) ** 2
-            )
-
-        for line in self.getLineFactors(node):
-            for i in range(self.getBinaryLength(line)):
-                totalConstCost += 1.25 * self.kirchhoffFactor * 2 ** (i * 2)
-        return totalConstCost
 
     def constantSlackCost(self):
         totalConstCost = 0.0
