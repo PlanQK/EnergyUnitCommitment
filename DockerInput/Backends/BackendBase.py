@@ -48,6 +48,8 @@ class BackendBase(abc.ABC):
             "scale": "",
             "timeout": "int",  # pypsa; dwave
             "time": "",  # pypsa; dwave
+            "optimizationTime": "float",
+            "postprocessingTime": "float",
             "totalCost": "",  # all
             "dwaveBackend": {"annealing_time": "int",
                              "num_reads": "int",
@@ -89,12 +91,15 @@ class BackendBase(abc.ABC):
             }
 
         def populateMetaInfo(varType: str, varName: str):
-            if varType == "int":
-                return int(self.envMgr[varName])
-            elif varType == "float":
-                return float(self.envMgr[varName])
-            else:
-                return self.envMgr[varName]
+            varValue = self.envMgr[varName]
+            if varType:
+                if not varValue:
+                    varValue = 0
+                if varType == "int":
+                    return int(varValue)
+                elif varType == "float":
+                    return float(varValue)
+            return self.envMgr[varName]
 
         for var in variables:
             if isinstance(variables[var], dict):

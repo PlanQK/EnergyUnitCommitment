@@ -187,9 +187,8 @@ class DwaveTabuSampler(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
-        self.metaInfo["time"] = time.perf_counter() - tic
+        self.metaInfo["serial"] = result.to_serializable()
         self.metaInfo["dwaveBackend"]["energy"] = result.first.energy
         print("done")
         return result
@@ -611,7 +610,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 json.dump(
                     embeddingDict, write_embedding, indent=2
                 )
-
+        self.metaInfo["optimizationTime"] = self.metaInfo["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
         return sampleset
 
 

@@ -4,6 +4,7 @@ from ast import literal_eval
 import siquan
 from .IsingPypsaInterface import IsingPypsaInterface
 from .BackendBase import BackendBase
+import time
 
 
 class ClassicalBackend(BackendBase):
@@ -18,6 +19,7 @@ class ClassicalBackend(BackendBase):
         pass
 
     def processSolution(self, network, transformedProblem, solution):
+        self.metaInfo["postprocessingTime"] = 0.0
         return solution
 
     @staticmethod
@@ -84,10 +86,12 @@ class SqaBackend(ClassicalBackend):
         self.solver.setTSchedule(self.metaInfo["sqaBackend"]["temperatureSchedule"])
         self.solver.setTrotterSlices(self.metaInfo["sqaBackend"]["trotterSlices"])
         self.solver.setSteps(self.metaInfo["sqaBackend"]["optimizationCycles"])
+        tic = time.perf_counter()
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
         )
+        self.metaInfo["optimizationTime"] = time.perf_counter() - tic
         result["state"] = literal_eval(result["state"])
         for key in result:
             self.metaInfo[key] = result[key]

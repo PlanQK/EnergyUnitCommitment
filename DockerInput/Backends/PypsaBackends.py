@@ -17,7 +17,6 @@ class PypsaBackend(BackendBase):
         optimization to metaInfo dictionary. No further postprocessing
         for pypsa is done
         """
-
         # value of bits corresponding to generators in network
         self.metaInfo["solution"] = {}
         self.metaInfo["solution"]["genStates"] = {
@@ -35,6 +34,7 @@ class PypsaBackend(BackendBase):
         }
 
         print(self.metaInfo["solution"]["state"] )
+        self.metaInfo["postprocessingTime"] = 0.0
         return solution
 
 
@@ -121,7 +121,7 @@ class PypsaBackend(BackendBase):
 
         solverstring = str(sol["Solver"])
         solvingTime = solverstring.splitlines()[-1].split()[1]
-        self.metaInfo["time"] = solvingTime
+        self.metaInfo["optimizationTime"] = solvingTime
 
         sol.write()
 
