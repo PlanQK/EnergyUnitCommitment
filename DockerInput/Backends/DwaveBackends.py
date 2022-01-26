@@ -426,6 +426,13 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # choose best self.metaInfo["dwaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
         cutSamples = df.sort_values("energy", ascending=True).iloc[:self.metaInfo["dwaveBackend"]["sampleCutSize"]]
+        cutSamples['quantumCost'] = cutSamples.apply(
+            lambda row: transformedProblem[0].calcCost(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
+
 
         cutSamples['optimizedCost'] = cutSamples.apply(
             lambda row: self.optimizeSampleFlow(
@@ -435,7 +442,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             )[0],
             axis=1
         )
-        self.metaInfo["cutSamples"] = cutSamples[["energy", "optimizedCost"]].to_dict('index')
+        self.metaInfo["cutSamples"] = cutSamples[["energy", "quantumCost", "optimizedCost"]].to_dict('index')
         self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         self.optimizeSampleFlow(
