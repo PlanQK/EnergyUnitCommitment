@@ -96,6 +96,17 @@ class QaoaQiskit():
 
         return qc
 
+
+    def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
+        power = - components["load"]
+
+        for comp in components["flattened"]:
+            i = components["flattened"].index(comp)
+            power += (components["power"][i] * float(bitstring[i]))
+
+        return abs(power)
+
+
     def kirchhoff_satisfied(self, bitstring: str, components: dict) -> float:
         power = 0
         for comp in components["flattened"]:
@@ -127,7 +138,7 @@ class QaoaQiskit():
         avg = 0
         sum_count = 0
         for bitstring, count in counts.items():
-            obj = self.kirchhoff_satisfied(bitstring=bitstring, components=components)
+            obj = self.kirchhoff_satisfied2(bitstring=bitstring, components=components)
             avg += obj * count
             sum_count += count
             self.results_dict[f"rep{self.results_dict['iter_count']}"][f"{bitstring}"] = {"count": count,
@@ -198,7 +209,7 @@ def main():
 
     expectation = qaoa.get_expectation(components=components, shots=1024)
 
-    res = minimize(fun=expectation, x0=[1.0, 5.0], method='COBYLA',
+    res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
                    options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
     # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-cobyla.html#optimize-minimize-cobyla
