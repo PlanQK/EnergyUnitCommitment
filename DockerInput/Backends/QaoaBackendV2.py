@@ -17,44 +17,51 @@ class QaoaQiskit():
         self.results_dict = {"iter_count" : 0}
 
 
-    def power_extraction(self, comp: str, components: dict, network: pypsa.Network) -> float:
-        if comp in components["generators"]:
+    def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
+        if comp in components[bus]["generators"]:
             return float(network.generators[network.generators.index == comp].p_nom)
-        elif comp in components["positiveLines"]:
+        elif comp in components[bus]["positiveLines"]:
             return float(network.lines[network.lines.index == comp].s_nom)
-        elif comp in components["negativeLines"]:
+        elif comp in components[bus]["negativeLines"]:
             return -float(network.lines[network.lines.index == comp].s_nom)
 
 
-    def extract_power_list(self, components: dict, network: pypsa.Network) -> list:
-        power_list = [0] * len(components["flattened"])
-        for comp in components["flattened"]:
-            i = components["flattened"].index(comp)
-            power_list[i] = self.power_extraction(comp=comp, components=components, network=network)
+    def extract_power_list(self, components: dict, network: pypsa.Network, bus: str) -> list:
+        power_list = [0] * len(components[bus][f"flattened_{bus}"])
+        for comp in components[bus][f"flattened_{bus}"]:
+            i = components[bus][f"flattened_{bus}"].index(comp)
+            power_list[i] = self.power_extraction(comp=comp, components=components, network=network, bus=bus)
 
         return power_list
 
 
-    def getBusComponents(self, network: pypsa.Network, bus: str) -> dict:
+    def getBusComponents(self, network: pypsa.Network) -> dict:
         """return all labels of components that connect to a bus as a dictionary
         generators - at this bus
         loads - at this bus
         positiveLines - start in this bus
         negativeLines - end in this bus
         """
-        components = {
-            "generators":
-                list(network.generators[network.generators.bus == bus].index),
-            "positiveLines":
-                list(network.lines[network.lines.bus1 == bus].index),
-            "negativeLines":
-                list(network.lines[network.lines.bus0 == bus].index),
-            "load":
-                sum(list(network.loads[network.loads.bus == bus].p_set)),
-        }
+        components = {}
+        for bus in network.buses.index.values:
+            components[f"{bus}"] = {"generators": list(network.generators[network.generators.bus == bus].index),
+                                    "positiveLines": list(network.lines[network.lines.bus1 == bus].index),
+                                    "negativeLines": list(network.lines[network.lines.bus0 == bus].index),
+                                    "load": sum(list(network.loads[network.loads.bus == bus].p_set)),}
+            components[f"{bus}"][f"flattened_{bus}"] = components[f"{bus}"]["generators"] + \
+                                                       components[f"{bus}"]["positiveLines"] + \
+                                                       components[f"{bus}"]["negativeLines"]
+            components[f"{bus}"]["power"] = self.extract_power_list(components=components, network=network, bus=bus)
 
-        components["flattened"] = components["generators"] + components["positiveLines"] + components["negativeLines"]
-        components["power"] = self.extract_power_list(components=components, network=network)
+        qubit_map = {}
+        qubit = 0
+        for bus in components:
+            for comp in components[f"{bus}"][f"flattened_{bus}"]:
+                if comp not in qubit_map:
+                    qubit_map[f"{comp}"] = qubit
+                    qubit += 1
+
+        components["qubit_map"] = qubit_map
 
         self.results_dict["components"] = components
 
@@ -62,7 +69,7 @@ class QaoaQiskit():
 
 
     def create_qc(self, components: dict, theta: list = [1, 2]) -> QuantumCircuit:
-        nqubits = len(components["flattened"])
+        nqubits = len(components["qubit_map"])
         qc = QuantumCircuit(nqubits)
 
         beta = theta[0]
@@ -74,19 +81,20 @@ class QaoaQiskit():
         qc.barrier()
 
         # add problem Hamiltonian
-        for i in range(nqubits):
-            p_comp1 = components["power"][i]
-            factor_load = -(components["load"]) * p_comp1  # negative load, since it removes power form the node
-            qc.rz(factor_load * gamma, i)
-            qc.barrier()
-            for j in range(nqubits):
-                p_comp2 = components["power"][j]
-                factor = 0.25 * p_comp1 * p_comp2
-                qc.rz(factor * gamma, i)
-                qc.rz(factor * gamma, j)
-                if i != j:
-                    qc.rzz(factor * gamma, i, j)
+        for bus in components:
+            for i in range(len(components[bus][f"flattened_{bus}"])):
+                p_comp1 = components["power"][i]
+                factor_load = -(components["load"]) * p_comp1  # negative load, since it removes power form the node
+                qc.rz(factor_load * gamma, i)
                 qc.barrier()
+                for j in range(nqubits):
+                    p_comp2 = components["power"][j]
+                    factor = 0.25 * p_comp1 * p_comp2
+                    qc.rz(factor * gamma, i)
+                    qc.rz(factor * gamma, j)
+                    if i != j:
+                        qc.rzz(factor * gamma, i, j)
+                    qc.barrier()
 
         # add mixing Hamiltonian
         for i in range(nqubits):
@@ -167,7 +175,7 @@ class QaoaQiskit():
             qc = self.create_qc(components=components, theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             #qc.draw(output="latex")
-            results = backend.run(qc, shots=shots).result()# seed_simulator=10
+            results = backend.run(qc, seed_simulator=10, shots=shots).result()
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
@@ -200,7 +208,7 @@ def main():
     testNetwork.add("Load", "load1", bus="bus1", p_set=2)
     testNetwork.add("Load", "load2", bus="bus2", p_set=1)
 
-    components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
+    components = qaoa.getBusComponents(network=testNetwork)
 
     #components["power"] = [Parameter("x\u2081"), Parameter("x\u2082"), Parameter("x\u2083")]
     #qc_draw = qaoa.create_qc(components=components, theta=[Parameter("\u03B2"), Parameter("\u03B3")])
