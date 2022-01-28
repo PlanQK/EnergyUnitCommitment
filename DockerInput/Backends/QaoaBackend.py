@@ -167,7 +167,7 @@ class QaoaQiskit():
             qc = self.create_qc(components=components, theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             #qc.draw(output="latex")
-            results = backend.run(qc, shots=shots).result()# seed_simulator=10
+            results = backend.run(qc, seed_simulator=10, shots=shots).result()# seed_simulator=10
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
@@ -210,6 +210,7 @@ def main():
     loop_results = {}
 
     for i in range(1, 101):
+        print(i)
         expectation = qaoa.get_expectation(components=components, shots=1024)
 
         res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',

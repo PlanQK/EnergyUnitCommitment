@@ -2,12 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-FILENAME = "QaoaCompare_2022-1-28_10-6-20_913307"
+FILENAME = "QaoaCompare_2022-1-28_12-45-11_457427"
 
 with open(f"results_qaoa/qaoaCompare/{FILENAME}.json") as json_file:
     data = json.load(json_file)
 
 bitstrings = list(data["1"]["counts"].keys())
+bitstrings.sort()
 shots = sum(data["1"]["counts"].values())
 toPlot = [[] for i in range(len(bitstrings))]
 
@@ -26,7 +27,8 @@ bp = ax.boxplot(toPlot, sym='k+', positions=pos, bootstrap=5000)
 
 ax.set_xlabel('bitstrings')
 ax.set_ylabel('probability')
-plt.title(FILENAME)
+plt.title(FILENAME, fontdict = {'fontsize' : 8})
+plt.suptitle(f"rep = {len(data)}, shots = {shots}") # , seed number = 10
 plt.xticks(range(1, 8), bitstrings)
 plt.setp(bp['whiskers'], color='k', linestyle='-')
 plt.setp(bp['fliers'], markersize=3.0)
