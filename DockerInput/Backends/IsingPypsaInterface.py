@@ -4,7 +4,26 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 import typing
 
 
+
+
 class IsingPypsaInterface:
+
+    @classmethod
+    def buildCostFunction(
+        cls,
+        network,
+    ):
+        """Instantiate the appropiate child class and build an Ising formulation """
+
+        envMgr = EnvironmentVariableManager()
+
+        problemFormulation = envMgr["problemFormulation"]
+        if problemFormulation == "fullsplit":
+            IsingObject = fullsplitIsingInterface(network, network.snapshots)
+
+        return IsingObject
+
+
 
     def __init__(self, network, snapshots):
 
@@ -22,11 +41,7 @@ class IsingPypsaInterface:
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
         self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
-        self.slackVarFactor = float(envMgr["slackVarFactor"])
 
-        # read generators and lines from network and encode as qubits
-        self.storeGenerators()
-        self.storeLines()
 
 
     def writeToHighestLevel(self, component):
@@ -89,6 +104,8 @@ class IsingPypsaInterface:
         """returns a list of integers each representing a weight for a qubit.
         A collection of qubits with such a weight distributions represent a line
         with maximum power flow of capacity
+
+        Overwrite this method in child classes 
         """
         return [1 for _ in range(0,capacity,1)]  + [-1 for _ in range(0,capacity,1)]
 
@@ -122,7 +139,12 @@ class IsingPypsaInterface:
 
 
     def getGeneratorStatus(self, gen, solution, time=0):
-        return self.data[self.data[gen]['indices'][time]]
+        return self.data[gen]['indices'][time] in solution
+
+    def getGeneratorOutput(self, gen, solution, time=0):
+        if self.getGeneratorStatus(gen,solution,time):
+            return self.data[self.data[gen]['indices'][time]]
+        return 0.0
 
     def getLineFlow(self, line, solution, time=0):
         """
@@ -340,32 +362,6 @@ class IsingPypsaInterface:
         return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
 
 
-    @classmethod
-    def buildCostFunction(
-        cls,
-        network,
-    ):
-        """Build the complete cost function for an Ising formulation.
-        The cost function is quite complex and I recommend first reading
-        through the mathematical formulation.
-        """
-        problemDict = cls(network, network.snapshots)
-        # problemDict._marginalCosts()
-
-        # for gen in problemDict._startIndex:
-            # for t in range(len(problemDict.snapshots)):
-                # problemDict._startupShutdownCost(gen, t)
-
-        # kirchhoff constraints
-        for time in range(len(problemDict.snapshots)):
-            for node in problemDict.network.buses.index:
-                problemDict.encodeMarginalCosts(node,time)
-                problemDict.encodeKirchhoffConstraint(node,time)
-                problemDict.encodeStartupShutdownCost(node,time)
-
-        return problemDict
-
-
     # @staticmethod
     def addSQASolutionToNetwork(self, network, solutionState):
         for gen in problemDict._startIndex:
@@ -423,7 +419,6 @@ class IsingPypsaInterface:
             contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result)}
         return contrib
 
-
     def calcKirchhoffCostAtBus(self, bus, result):
         contrib = {}
         for t in range(len(self.snapshots)):
@@ -463,6 +458,7 @@ class IsingPypsaInterface:
         shifts it so that better than average generator configuration will be rewarded.
         """
         # reward better than average configurations and penalize worse than average configurations
+        return 0.0
         return self.estimateAverageCostPerPowerGenerated(time)
 
 
@@ -483,12 +479,56 @@ class IsingPypsaInterface:
             print(f"No available Power at timestep: {time}")
             raise ZeroDivisionError
 
+    def calcEffiencyLoss(self, cheapGen, expensiveGen,time=0):
+        """calculates an approximation of the loss of using a generator with higher operational 
+        costs (expensiveGen) compared to using the generator with a lower cost (cheapGen)
+        """
+        cheapCost = self.network.generators["marginal_cost"].loc[cheapGen]
+        expensiveCost = self.network.generators["marginal_cost"].loc[expensiveGen]
+        matchedPower = min(
+                self.data[cheapGen]['weights'][time],
+                self.data[expensiveGen]['weights'][time],
+                )
+        if expensiveCost <= cheapCost:
+            return 0
+        result = (expensiveCost - cheapCost ) * self.monetaryCostFactor * matchedPower
+        return result
+
+        
+
+
+
     def encodeMarginalCosts(self, bus, time):
         """encodes marginal costs for running generators and transmission lines at a single bus.
         This uses an offset calculated in ´marginalCostOffset´, which is a dependent on all generators
         of the entire network for a single time slice"""
 
         components = self.getBusComponents(bus)
+
+        for cheapGenerator in components['generators']:
+            for expensiveGenerator in components['generators']:
+                couplingStrength = self.calcEffiencyLoss(cheapGenerator, expensiveGenerator)
+                if couplingStrength:
+                    self.coupleComponentWithConstant(
+                        expensiveGenerator,
+                        couplingStrength = couplingStrength / \
+                                self.data[cheapGenerator]['weights'][time],
+                        time=time
+                    ) 
+                    self.coupleComponents(
+                        cheapGenerator,
+                        expensiveGenerator,
+                        couplingStrength=couplingStrength / \
+                                (self.data[cheapGenerator]['weights'][time] * \
+                                self.data[expensiveGenerator]['weights'][time]),
+                        time=time
+                    )
+
+
+        return
+
+
+
         costOffset = self.marginalCostOffset(time)
         for generator in components['generators']:
             self.coupleComponentWithConstant(
@@ -502,3 +542,22 @@ class IsingPypsaInterface:
             # TODO What is the cost of transferring power?
             pass
             
+
+
+
+class fullsplitIsingInterface(IsingPypsaInterface):
+
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+
+        # read generators and lines from network and encode as qubits
+        self.storeGenerators()
+        self.storeLines()
+
+        # kirchhoff constraints
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeMarginalCosts(node,time)
+                self.encodeKirchhoffConstraint(node,time)
+                self.encodeStartupShutdownCost(node,time)
+
