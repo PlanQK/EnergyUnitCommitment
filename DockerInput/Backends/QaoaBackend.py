@@ -207,26 +207,37 @@ def main():
     #qc_draw.draw(output="mpl")
     #plt.show()
 
-    expectation = qaoa.get_expectation(components=components, shots=1024)
+    loop_results = {}
 
-    res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
-                   options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
-    # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-cobyla.html#optimize-minimize-cobyla
+    for i in range(1, 101):
+        expectation = qaoa.get_expectation(components=components, shots=1024)
 
-    #store res as serializalbe in results_dict
-    qaoa.results_dict["optimizeResults"] = dict(res)
-    qaoa.results_dict["optimizeResults"]["x"] = res.x.tolist()
-    qaoa.results_dict["optimizeResults"]["success"] = bool(res.success)
+        res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
+                       options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
+        # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-cobyla.html#optimize-minimize-cobyla
 
-    today = datetime.today()
-    filename = f"Qaoa_{today.year}-{today.month}-{today.day}_{today.hour}-{today.minute}-{today.second}_{today.microsecond}.json"
+        #store res as serializalbe in results_dict
+        qaoa.results_dict["optimizeResults"] = dict(res)
+        qaoa.results_dict["optimizeResults"]["x"] = res.x.tolist()
+        qaoa.results_dict["optimizeResults"]["success"] = bool(res.success)
 
-    with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
-        json.dump(qaoa.results_dict, write_file, indent=2)
+        now = datetime.today()
+        filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+            json.dump(qaoa.results_dict, write_file, indent=2)
 
-    plot_histogram(qaoa.results_dict[f"rep{qaoa.results_dict['iter_count']}"]["counts"])
-    plt.show()
+        last_rep = qaoa.results_dict["optimizeResults"]["nfev"]
+        last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
+        loop_results[i] = {"filename": filename,
+                                "counts": last_rep_counts}
+
+    now = datetime.today()
+    filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+    with open(os.path.dirname(__file__) + "/../../results_qaoa/qaoaCompare/" + filename, "w") as write_file:
+        json.dump(loop_results, write_file, indent=2)
+    #plot_histogram(qaoa.results_dict[f"rep{qaoa.results_dict['iter_count']}"]["counts"])
+    #plt.show()
 
 
 if __name__ == "__main__":
