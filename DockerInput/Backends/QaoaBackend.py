@@ -26,6 +26,9 @@ class QaoaQiskit():
                              "optimizeResults": {},
                              }
 
+        with open(os.path.dirname(__file__) + "/../APItoken.json") as json_file:
+            self.APItoken = json.load(json_file)
+
 
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network) -> float:
         if comp in components["generators"]:
@@ -169,7 +172,7 @@ class QaoaQiskit():
         @param nqubits: int: Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
         @return:
         """
-        APIKEY = "90032cce2d7835034d0f1e71b1ea3c19b8024c465fdc5984d5c2022acd74315e89df2359c5a5cc910717e2949f07b97d20fa39d55d031fda655ccecf0b19344a"
+        APIKEY = self.APItoken["IBMQ_API_token"]
         if simulate:
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
