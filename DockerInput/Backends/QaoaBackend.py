@@ -8,7 +8,8 @@ from datetime import datetime
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
-from qiskit.providers.aer import noise
+from qiskit.tools.monitor import job_monitor
+from qiskit.providers.ibmq import least_busy
 from qiskit.circuit import Parameter
 from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
@@ -17,7 +18,8 @@ from scipy.optimize import minimize
 class QaoaQiskit():
     def __init__(self):
         self.results_dict = {"iter_count" : 0,
-                             "simulator" : None,
+                             "simulate" : None,
+                             "noise": None,
                              "shots" : None,
                              "components" : {},
                              "qc" : None,
@@ -158,15 +160,23 @@ class QaoaQiskit():
         return avg / sum_count
 
 
-    def setup_backend(self, simulator: str, simulate: bool, with_noise: bool):
+    def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
+        """
+
+        @param simulator: str: The name of the Quantum Simulator to be used, if simulate is True.
+        @param simulate: bool: If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit.
+        @param noise: bool: If True, noise will be added to the Simulator. If False, no noise will be added. Only works if "simulate" is set to True.
+        @param nqubits: int: Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
+        @return:
+        """
+        APIKEY = "90032cce2d7835034d0f1e71b1ea3c19b8024c465fdc5984d5c2022acd74315e89df2359c5a5cc910717e2949f07b97d20fa39d55d031fda655ccecf0b19344a"
         if simulate:
-            if with_noise:
+            if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
-                APIKEY = "90032cce2d7835034d0f1e71b1ea3c19b8024c465fdc5984d5c2022acd74315e89df2359c5a5cc910717e2949f07b97d20fa39d55d031fda655ccecf0b19344a"
                 IBMQ.save_account(APIKEY, overwrite=True)
                 provider = IBMQ.load_account()
                 #print(provider.backends())
-                device = provider.get_backend("ibmq_santiago")
+                device = provider.get_backend("ibmq_lima")
 
                 # Get noise model from backend
                 noise_model = NoiseModel.from_backend(device)
@@ -185,45 +195,60 @@ class QaoaQiskit():
                 basis_gates = None
 
         else:
-            pass
+            IBMQ.save_account(APIKEY, overwrite=True)
+            provider = IBMQ.load_account()
+            large_enough_devices = provider.backends(
+                filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+            backend = least_busy(large_enough_devices)
+            noise_model = None
+            coupling_map = None
+            basis_gates = None
 
         return backend, noise_model, coupling_map, basis_gates
 
 
-    def get_expectation(self, components: dict, simulator: str, shots: int = 512, simulate: bool = True, with_noise: bool = False):
-        """
-        Runs parametrized circuit
-
-        Args:
-            G: networkx graph
-            p: int,
-                Number of repetitions of unitaries
+    def get_expectation(self, components: dict, simulator: str = "aer_simulator", shots: int = 1024, simulate: bool = True, noise: bool = False):
         """
 
-        #backend = Aer.get_backend(simulator)  # UnitarySimulator, qasm_simulator, aer_simulator
-        #backend.shots = shots
+        @param components: dict: All components to be modeled as a Quantum Circuit
+        @param simulator: str: The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
+        @param shots: int: Number of repetitions of each circuit, for sampling. Default: 1024
+        @param simulate: bool: If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit. Default: True
+        @param noise: bool: If True, noise will be added to the Simulator. If False, no noise will be added. Only works if "simulate" is set to True. Default: False
+        @return:
+        """
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
-                                                                             with_noise=with_noise)
+                                                                             noise=noise,
+                                                                             nqubits=len(components["flattened"]))
 
         self.results_dict["shots"] = shots
-        self.results_dict["simulator"] = simulator
-
+        self.results_dict["simulate"] = simulate
+        self.results_dict["noise"] = noise
 
         def execute_circ(theta):
             qc = self.create_qc(components=components, theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             #qc.draw(output="latex")
-            #results = backend.run(qc, shots=shots).result()# seed_simulator=10
-            results = execute(experiments=qc,
-                              backend=backend,
-                              shots=shots,
-                              noise_model=noise_model,
-                              coupling_map=coupling_map,
-                              basis_gates=basis_gates).result()
+            if simulate:
+                # Run on chosen simulator
+                results = execute(experiments=qc,
+                                  backend=backend,
+                                  shots=shots,
+                                  noise_model=noise_model,
+                                  coupling_map=coupling_map,
+                                  basis_gates=basis_gates).result()
+            else:
+                # Submit job to real device and wait for results
+                job_device = execute(experiments=qc,
+                                     backend=backend,
+                                     shots=shots)
+                job_monitor(job_device)
+                results = job_device.result()
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
+            self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["beta"] = theta[0]
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = theta[1]
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
@@ -258,14 +283,18 @@ def main():
     #qc_draw.draw(output="mpl")
     #plt.show()
 
+    shots = 1024
+    simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
+    simulate = True
+    noise = False
+
     loop_results = {}
 
-    for i in range(1, 101):
+    for i in range(1, 11):
         print(i)
 
         qaoa = QaoaQiskit()
-        shots = 1024
-        simulator = "aer_simulator" # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
+
 
 
         components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
@@ -273,8 +302,8 @@ def main():
         expectation = qaoa.get_expectation(components=components,
                                            simulator=simulator,
                                            shots=shots,
-                                           simulate=True,
-                                           with_noise=True)
+                                           simulate=simulate,
+                                           noise=noise)
 
         res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
                        options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
@@ -294,7 +323,7 @@ def main():
         last_rep = qaoa.results_dict["optimizeResults"]["nfev"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
         loop_results[i] = {"filename" : filename,
-                           "simulator" : simulator,
+                           "backend_name" : qaoa.results_dict["backend_name"],
                            "shots" : shots,
                            "counts" : last_rep_counts}
 
