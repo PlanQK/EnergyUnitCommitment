@@ -6,7 +6,9 @@ import pypsa
 import os.path
 from datetime import datetime
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
-from qiskit import Aer, execute
+from qiskit import Aer, IBMQ, execute
+from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers.aer import noise
 from qiskit.circuit import Parameter
 from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
@@ -14,7 +16,13 @@ from scipy.optimize import minimize
 
 class QaoaQiskit():
     def __init__(self):
-        self.results_dict = {"iter_count" : 0}
+        self.results_dict = {"iter_count" : 0,
+                             "simulator" : None,
+                             "shots" : None,
+                             "components" : {},
+                             "qc" : None,
+                             "optimizeResults": {},
+                             }
 
 
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network) -> float:
@@ -149,7 +157,40 @@ class QaoaQiskit():
         self.results_dict[f"rep{self.results_dict['iter_count']}"]["return"] = avg / sum_count
         return avg / sum_count
 
-    def get_expectation(self, components: dict, shots=512):
+
+    def setup_backend(self, simulator: str, simulate: bool, with_noise: bool):
+        if simulate:
+            if with_noise:
+                # https://qiskit.org/documentation/apidoc/aer_noise.html
+                APIKEY = "90032cce2d7835034d0f1e71b1ea3c19b8024c465fdc5984d5c2022acd74315e89df2359c5a5cc910717e2949f07b97d20fa39d55d031fda655ccecf0b19344a"
+                IBMQ.save_account(APIKEY, overwrite=True)
+                provider = IBMQ.load_account()
+                #print(provider.backends())
+                device = provider.get_backend("ibmq_santiago")
+
+                # Get noise model from backend
+                noise_model = NoiseModel.from_backend(device)
+                # Get coupling map from backend
+                coupling_map = device.configuration().coupling_map
+                # Get the basis gates for the noise model
+                basis_gates = noise_model.basis_gates
+
+                # Select the QasmSimulator from the Aer provider
+                backend = Aer.get_backend(simulator)
+
+            else:
+                backend = Aer.get_backend(simulator)
+                noise_model = None
+                coupling_map = None
+                basis_gates = None
+
+        else:
+            pass
+
+        return backend, noise_model, coupling_map, basis_gates
+
+
+    def get_expectation(self, components: dict, simulator: str, shots: int = 512, simulate: bool = True, with_noise: bool = False):
         """
         Runs parametrized circuit
 
@@ -159,15 +200,27 @@ class QaoaQiskit():
                 Number of repetitions of unitaries
         """
 
-        backend = Aer.get_backend('aer_simulator')  # UnitarySimulator, qasm_simulator, aer_simulator
-        backend.shots = shots
+        #backend = Aer.get_backend(simulator)  # UnitarySimulator, qasm_simulator, aer_simulator
+        #backend.shots = shots
+        backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
+                                                                             simulate=simulate,
+                                                                             with_noise=with_noise)
+
+        self.results_dict["shots"] = shots
+        self.results_dict["simulator"] = simulator
 
 
         def execute_circ(theta):
             qc = self.create_qc(components=components, theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             #qc.draw(output="latex")
-            results = backend.run(qc, seed_simulator=10, shots=shots).result()# seed_simulator=10
+            #results = backend.run(qc, shots=shots).result()# seed_simulator=10
+            results = execute(experiments=qc,
+                              backend=backend,
+                              shots=shots,
+                              noise_model=noise_model,
+                              coupling_map=coupling_map,
+                              basis_gates=basis_gates).result()
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
@@ -181,8 +234,6 @@ class QaoaQiskit():
 
 
 def main():
-    qaoa = QaoaQiskit()
-
     testNetwork = pypsa.Network()
     # add node
     testNetwork.add("Bus", "bus1")
@@ -200,7 +251,7 @@ def main():
     testNetwork.add("Load", "load1", bus="bus1", p_set=2)
     testNetwork.add("Load", "load2", bus="bus2", p_set=1)
 
-    components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
+
 
     #components["power"] = [Parameter("x\u2081"), Parameter("x\u2082"), Parameter("x\u2083")]
     #qc_draw = qaoa.create_qc(components=components, theta=[Parameter("\u03B2"), Parameter("\u03B3")])
@@ -211,7 +262,19 @@ def main():
 
     for i in range(1, 101):
         print(i)
-        expectation = qaoa.get_expectation(components=components, shots=1024)
+
+        qaoa = QaoaQiskit()
+        shots = 1024
+        simulator = "aer_simulator" # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
+
+
+        components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
+
+        expectation = qaoa.get_expectation(components=components,
+                                           simulator=simulator,
+                                           shots=shots,
+                                           simulate=True,
+                                           with_noise=True)
 
         res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
                        options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
@@ -230,8 +293,10 @@ def main():
 
         last_rep = qaoa.results_dict["optimizeResults"]["nfev"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
-        loop_results[i] = {"filename": filename,
-                                "counts": last_rep_counts}
+        loop_results[i] = {"filename" : filename,
+                           "simulator" : simulator,
+                           "shots" : shots,
+                           "counts" : last_rep_counts}
 
     now = datetime.today()
     filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
