@@ -18,7 +18,7 @@ def plotBoxplot(filename: str, plotname: str):
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     shots = data["1"]["shots"]
-    simulator = data["1"]["simulator"]
+    backend = data["1"]["backends"][0]
     toPlot = [[] for i in range(len(bitstrings))]
 
     for key in data:
@@ -37,7 +37,7 @@ def plotBoxplot(filename: str, plotname: str):
 
     ax.set_xlabel('bitstrings')
     ax.set_ylabel('probability')
-    plt.title(f"simulator = {simulator}, shots = {shots}, rep = {len(data)}", fontdict = {'fontsize' : 8})
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)}", fontdict = {'fontsize' : 8})
     plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
     plt.xticks(range(1, len(bitstrings)+1), bitstrings, rotation=70)
@@ -86,10 +86,39 @@ def plotCFoptimization(filename: str, plotname:str):
 
 
 def main():
-    plotCFoptimization(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="optimization evolution with noise")
-    plotCFoptimization(filename="QaoaCompare_2022-1-31_12-35-19_479895", plotname="optimization evolution without noise")
+    plotBoxplot(filename="QaoaCompare_2022-2-1_17-39-28_26095",
+                plotname="simulator no noise using SPSA - maxiter 25")
+    plotBoxplot(filename="QaoaCompare_2022-2-1_18-16-50_858006",
+                plotname="simulator with noise using SPSA - maxiter 25")
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_18-16-50_858006",
+                       plotname="SPSA evolution with noise - maxiter 25")
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-39-28_26095",
+                       plotname="SPSA evolution without noise - maxiter 25")
 
     return
+
+    plotBoxplot(filename="QaoaCompare_2022-2-1_17-14-20_973918",
+                plotname="simulator no noise using SPSA - maxiter 10")
+    plotBoxplot(filename="QaoaCompare_2022-2-1_17-3-6_698242",
+                plotname="simulator with noise using SPSA - maxiter 10")
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-3-6_698242",
+                       plotname="SPSA evolution with noise - maxiter 10")
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-14-20_973918",
+                       plotname="SPSA evolution without noise - maxiter 10")
+
+
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_15-22-52_137642",
+                       plotname="SPSA evolution with noise - maxiter 50")
+    plotCFoptimization(filename="QaoaCompare_2022-2-1_15-52-0_342208",
+                       plotname="SPSA evolution without noise - maxiter 50")
+    plotBoxplot(filename="QaoaCompare_2022-2-1_15-52-0_342208",
+                plotname="simulator no noise using SPSA - maxiter 50")
+    plotBoxplot(filename="QaoaCompare_2022-2-1_15-22-52_137642",
+                plotname="simulator with noise using SPSA - maxiter 50")
+
+    return
+    plotCFoptimization(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="optimization evolution with noise")
+    plotCFoptimization(filename="QaoaCompare_2022-1-31_12-35-19_479895", plotname="optimization evolution without noise")
 
     plotBoxplot(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="aer_simulator with noise")
 

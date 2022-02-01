@@ -1,18 +1,14 @@
-import networkx as nx
-import matplotlib.pyplot as plt
-import sympy
 import json
 import pypsa
 import os.path
 from datetime import datetime
-from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
+from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
+from qiskit.algorithms.optimizers import SPSA
 from qiskit.circuit import Parameter
-from qiskit.visualization import plot_histogram
-import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 class QaoaQiskit():
@@ -295,13 +291,15 @@ def main():
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
     noise = True
+    initial_guess = [1.0, 1.0]
 
     loop_results = {}
 
-    for i in range(1, 11):
+    for i in range(1, 101):
         print(i)
 
         qaoa = QaoaQiskit()
+        spsa = SPSA(maxiter=25)
 
         components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
 
@@ -310,23 +308,26 @@ def main():
                                            shots=shots,
                                            simulate=simulate,
                                            noise=noise)
-
-        res = minimize(fun=expectation, x0=[1.0, 1.0], method='COBYLA',
-                       options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
+        res = spsa.optimize(num_vars=2, objective_function=expectation, initial_point=initial_guess)
+        #res = minimize(fun=expectation, x0=initial_guess, method='COBYLA',
+        #               options={'rhobeg': 1.0, 'maxiter': 1000, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
         # https://docs.scipy.org/doc/scipy/reference/optimize.minimize-cobyla.html#optimize-minimize-cobyla
 
         #store res as serializalbe in results_dict
-        qaoa.results_dict["optimizeResults"] = dict(res)
-        qaoa.results_dict["optimizeResults"]["x"] = res.x.tolist()
-        qaoa.results_dict["optimizeResults"]["success"] = bool(res.success)
+        #qaoa.results_dict["optimizeResults"] = dict(res) # if use COBYLA
+        #qaoa.results_dict["optimizeResults"]["x"] = res.x.tolist() # if use COBYLA
+        #qaoa.results_dict["optimizeResults"]["success"] = bool(res.success) # if use COBYLA
+        qaoa.results_dict["optimizeResults"]["x"] = list(res[0])
+        qaoa.results_dict["optimizeResults"]["fun"] = res[1]
+        qaoa.results_dict["optimizeResults"]["nfev"] = res[2]
 
         now = datetime.today()
         filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
         with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
             json.dump(qaoa.results_dict, write_file, indent=2)
 
-        last_rep = qaoa.results_dict["optimizeResults"]["nfev"]
+        last_rep = qaoa.results_dict["iter_count"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
         loop_results[i] = {"filename" : filename,
                            "optimize_Iterations": qaoa.results_dict["iter_count"],
