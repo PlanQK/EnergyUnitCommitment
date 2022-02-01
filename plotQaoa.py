@@ -68,9 +68,9 @@ def plotCFoptimization(filename: str, plotname:str):
             yData[2].append(subdata[f"rep{j + 1}"]["return"])
             xData.append(j + 1)
 
-        p1 = axs[i].plot(xData, yData[0], "b-", label="beta")
-        p2 = axs[i].plot(xData, yData[1], "r-", label="gamma")
-        p3 = axs[i].plot(xData, yData[2], "g-", label="cost function")
+        axs[i].plot(xData, yData[0], "b-", label="beta")
+        axs[i].plot(xData, yData[1], "r-", label="gamma")
+        axs[i].plot(xData, yData[2], "g-", label="cost function")
         axs[i].set_xlabel('iteration')
         axs[i].set_ylabel('value')
         axs[i].label_outer()
