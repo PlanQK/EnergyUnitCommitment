@@ -29,6 +29,8 @@ class QaoaQiskit():
         with open(os.path.dirname(__file__) + "/../APItoken.json") as json_file:
             self.APItoken = json.load(json_file)
 
+        self.backends = []
+
 
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network) -> float:
         if comp in components["generators"]:
@@ -203,6 +205,7 @@ class QaoaQiskit():
             large_enough_devices = provider.backends(
                 filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
             backend = least_busy(large_enough_devices)
+            #backend = provider.get_backend("ibmq_lima")
             noise_model = None
             coupling_map = None
             basis_gates = None
@@ -252,9 +255,11 @@ class QaoaQiskit():
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["beta"] = theta[0]
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = theta[1]
+            self.results_dict[f"rep{self.results_dict['iter_count']}"]["beta"] = float(theta[0])
+            self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = float(theta[1])
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
+
+            self.backends.append(backend.name())
 
             return self.compute_expectation(counts=counts, components=components)
 
@@ -289,7 +294,7 @@ def main():
     shots = 1024
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
-    noise = False
+    noise = True
 
     loop_results = {}
 
@@ -297,8 +302,6 @@ def main():
         print(i)
 
         qaoa = QaoaQiskit()
-
-
 
         components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
 
@@ -326,7 +329,10 @@ def main():
         last_rep = qaoa.results_dict["optimizeResults"]["nfev"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
         loop_results[i] = {"filename" : filename,
-                           "backend_name" : qaoa.results_dict["backend_name"],
+                           "optimize_Iterations": qaoa.results_dict["iter_count"],
+                           "backends": qaoa.backends,
+                           "simulate" : qaoa.results_dict["simulate"],
+                           "noise": qaoa.results_dict["noise"],
                            "shots" : shots,
                            "counts" : last_rep_counts}
 
