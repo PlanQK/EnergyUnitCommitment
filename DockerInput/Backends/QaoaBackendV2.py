@@ -26,8 +26,6 @@ class QaoaQiskit():
         with open(os.path.dirname(__file__) + "/../APItoken.json") as json_file:
             self.APItoken = json.load(json_file)
 
-        self.backends = []
-
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
         """
         Extracts the power value of the given component and adjusts its sign according to function this component
