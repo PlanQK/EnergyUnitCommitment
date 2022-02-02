@@ -26,6 +26,8 @@ class QaoaQiskit():
         with open(os.path.dirname(__file__) + "/../APItoken.json") as json_file:
             self.APItoken = json.load(json_file)
 
+        self.kirchhoff = {}
+
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
         """
         Extracts the power value of the given component and adjusts its sign according to function this component
@@ -174,6 +176,7 @@ class QaoaQiskit():
                     satisfied for the given network.
         """
 
+        self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring] = {}
         power_total = 0
         for bus in components:
             power = 0
@@ -182,8 +185,11 @@ class QaoaQiskit():
 
                 for comp in components[bus][f"flattened_{bus}"]:
                     i = components[bus][f"flattened_{bus}"].index(comp)
-                    power += (components[bus]["power"][i] * float(bitstring[i]))
+                    i_bit = components["qubit_map"][comp]
+                    power += (components[bus]["power"][i] * float(bitstring[i_bit]))
+                self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
             power_total += abs(power)
+        self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
         return abs(power_total)
 
@@ -323,6 +329,7 @@ class QaoaQiskit():
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["beta"] = float(theta[0])
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = float(theta[1])
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"] = {}
 
             return self.compute_expectation(counts=counts, components=components)
 
@@ -379,6 +386,9 @@ def main():
         filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
         with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
             json.dump(qaoa.results_dict, write_file, indent=2)
+        #filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+        #with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
+        #    json.dump(qaoa.kirchhoff, write_file, indent=2)
 
         last_rep = qaoa.results_dict["iter_count"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]

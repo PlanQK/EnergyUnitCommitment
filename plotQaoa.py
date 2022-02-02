@@ -89,7 +89,7 @@ def plotCFoptimization(filename: str, plotname:str):
 
 
 def main():
-    plotBoxplot(filename="QaoaCompare_2022-2-2_18-49-45_869532",
+    plotBoxplot(filename="QaoaCompare_2022-2-2_19-29-22_281887",
                 plotname="simulator with noise using SPSA - maxiter 50")
     #plotCFoptimization(filename="QaoaCompare_2022-2-2_17-40-14_868831",
     #                   plotname="SPSA evolution with noise - maxiter 50")
