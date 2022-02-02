@@ -19,6 +19,7 @@ class QaoaQiskit():
                              "shots": None,
                              "components": {},
                              "qc": None,
+                             "initial_guess": [],
                              "optimizeResults": {},
                              }
 
@@ -284,7 +285,7 @@ class QaoaQiskit():
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
                                                                              noise=noise,
-                                                                             nqubits=len(components["flattened"]))
+                                                                             nqubits=len(components["qubit_map"]))
 
         self.results_dict["shots"] = shots
         self.results_dict["simulate"] = simulate
@@ -331,7 +332,7 @@ def main():
     testNetwork.add("Bus", "bus2")
     # add generators
     testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=1, p_nom_extendable=False, marginal_cost=5)
-    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=2, p_nom_extendable=False, marginal_cost=5)
+    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=3, p_nom_extendable=False, marginal_cost=5)
     # line
     # p0= [-1,-2]
     # p1= [1, 2]
@@ -346,15 +347,15 @@ def main():
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
     noise = True
-    initial_guess = [1.0, 1.0]
+    initial_guess = [5.0, 5.0]
 
     loop_results = {}
 
-    for i in range(1, 11):
+    for i in range(1, 3):
         print(i)
 
         qaoa = QaoaQiskit()
-        spsa = SPSA(maxiter=100)
+        spsa = SPSA(maxiter=50)
 
         components = qaoa.getComponents(network=testNetwork)
 
@@ -368,6 +369,7 @@ def main():
         qaoa.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
         qaoa.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
         qaoa.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+        qaoa.results_dict["initial_guess"] = initial_guess
 
         now = datetime.today()
         filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
@@ -378,10 +380,10 @@ def main():
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
         loop_results[i] = {"filename": filename,
                            "optimize_Iterations": qaoa.results_dict["iter_count"],
-                           "backends": qaoa.backends,
                            "simulate": qaoa.results_dict["simulate"],
                            "noise": qaoa.results_dict["noise"],
                            "shots": shots,
+                           "initial_guess": initial_guess,
                            "counts": last_rep_counts}
 
     now = datetime.today()

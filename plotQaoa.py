@@ -18,7 +18,10 @@ def plotBoxplot(filename: str, plotname: str):
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     shots = data["1"]["shots"]
-    backend = data["1"]["backends"][0]
+    subfile = data["1"]["filename"][:-5]
+    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
+    initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
     for key in data:
@@ -37,7 +40,7 @@ def plotBoxplot(filename: str, plotname: str):
 
     ax.set_xlabel('bitstrings')
     ax.set_ylabel('probability')
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)}", fontdict = {'fontsize' : 8})
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}", fontdict = {'fontsize' : 8})
     plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
     plt.xticks(range(1, len(bitstrings)+1), bitstrings, rotation=70)
@@ -52,7 +55,7 @@ def plotCFoptimization(filename: str, plotname:str):
     fig, axs = plt.subplots(2, sharex=True, sharey=True)
     fig.set_figheight(7)
 
-    random_list = list(range(1, len(data)))
+    random_list = list(range(1, len(data)+1))
     random.shuffle(random_list)
 
     for i in range(len(axs)):
@@ -86,6 +89,13 @@ def plotCFoptimization(filename: str, plotname:str):
 
 
 def main():
+    plotBoxplot(filename="QaoaCompare_2022-2-2_12-20-14_722644",
+                plotname="simulator with noise using SPSA - maxiter 50")
+    plotCFoptimization(filename="QaoaCompare_2022-2-2_12-20-14_722644",
+                       plotname="SPSA evolution with noise - maxiter 50")
+
+    return
+
     plotBoxplot(filename="QaoaCompare_2022-2-2_9-57-52_224944",
                 plotname="simulator with noise using SPSA - maxiter 100")
     plotCFoptimization(filename="QaoaCompare_2022-2-2_9-57-52_224944",
