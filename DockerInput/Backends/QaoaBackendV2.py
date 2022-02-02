@@ -9,7 +9,6 @@ from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA
 from qiskit.circuit import Parameter
-from scipy.optimize import minimize
 
 
 class QaoaQiskit():
@@ -29,6 +28,19 @@ class QaoaQiskit():
         self.backends = []
 
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
+        """
+        Extracts the power value of the given component and adjusts its sign according to function this component
+        fulfills for the given bus.
+
+        Args:
+            comp: (str) The component from which the power should be extracted.
+            components: (dict) All components to be modeled as a Quantum Circuit.
+            network: (pypsa.Network) The PyPSA network to be analyzed.
+            bus: (str) The bus in which relation the component should be evaluated.
+
+        Returns:
+            (float) The adjusted power value for the given comp.
+        """
         if comp in components[bus]["generators"]:
             return float(network.generators[network.generators.index == comp].p_nom)
         elif comp in components[bus]["positiveLines"]:
@@ -37,6 +49,18 @@ class QaoaQiskit():
             return -float(network.lines[network.lines.index == comp].s_nom)
 
     def extract_power_list(self, components: dict, network: pypsa.Network, bus: str) -> list:
+        """
+        Extracts the power values of the components connected to a bus and stored in the flattened_{bus} list from the
+        PyPSA network and stores them in a list with the same indices as flattened_{bus}.
+
+        Args:
+            components: (dict) All components to be modeled as a Quantum Circuit.
+            network: (pypsa.Network) The PyPSA network to be analyzed.
+            bus: (str) The bus where the components are connected.
+
+        Returns:
+            (list) The power values of the components in flattened_{bus}
+        """
         power_list = [0] * len(components[bus][f"flattened_{bus}"])
         for comp in components[bus][f"flattened_{bus}"]:
             i = components[bus][f"flattened_{bus}"].index(comp)
@@ -44,12 +68,19 @@ class QaoaQiskit():
 
         return power_list
 
-    def getBusComponents(self, network: pypsa.Network) -> dict:
-        """return all labels of components that connect to a bus as a dictionary
-        generators - at this bus
-        loads - at this bus
-        positiveLines - start in this bus
-        negativeLines - end in this bus
+    def getComponents(self, network: pypsa.Network) -> dict:
+        """
+        Separates and organizes all components of a network to be optimized using QAOA.
+        For each bus the generators, positive lines (which add power to the bus), negative lines (which remove power
+        from the bus) and load are accessed and stored in the dictionary, together with a flattened list of generators,
+        positive and negative lines, and the power associated to these components. At last the components are mapped
+        on logical qubits.
+
+        Args:
+            network: (pypsa.Network) The PyPSA network to be analyzed.
+
+        Returns:
+            (dict) All components to be modeled as a Quantum Circuit.
         """
         components = {}
         for bus in network.buses.index.values:
@@ -80,10 +111,13 @@ class QaoaQiskit():
         """
         Creates a quantum circuit based on the components given and the cost function:
 
-        @param components: dict:
-        @param theta: list:
+        Args:
+            components: (dict) All components to be modeled as a Quantum Circuit.
+            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
+                          gamma = theta[1].
 
-        @return: QuantumCircuit: The created quantum circuit.
+        Returns:
+            (QuantumCircuit) The created quantum circuit.
         """
         nqubits = len(components["qubit_map"])
         qc = QuantumCircuit(nqubits)
@@ -125,13 +159,15 @@ class QaoaQiskit():
 
     def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
         """
+        Checks if the kirchhoff constraints are satisfied for the given solution.
 
         Args:
-            bitstring:
-            components:
+            bitstring: (str) The possible solution to the network.
+            components: (dict) All components to be modeled as a Quantum Circuit.
 
         Returns:
-
+            (float) The absolut deviation from the optimal 0, where the kirchhoff constrains would be completely
+                    satisfied for the given network.
         """
         power = 0
         for bus in components:
@@ -186,7 +222,7 @@ class QaoaQiskit():
         Returns:
             (BaseBackend) The backend to be used.
             (NoiseModel) The noise model of the chosen backend, if noise is set to True.
-            (list??) The coupling map of the chosen backend, if noise is set to True.
+            (list) The coupling map of the chosen backend, if noise is set to True.
             (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True.
         """
         APIKEY = self.APItoken["IBMQ_API_token"]
@@ -320,7 +356,7 @@ def main():
         qaoa = QaoaQiskit()
         spsa = SPSA(maxiter=100)
 
-        components = qaoa.getBusComponents(network=testNetwork)
+        components = qaoa.getComponents(network=testNetwork)
 
         expectation = qaoa.get_expectation(components=components,
                                            simulator=simulator,
