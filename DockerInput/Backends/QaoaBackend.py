@@ -138,12 +138,11 @@ class QaoaQiskit():
         Computes expectation value based on measurement results
 
         Args:
-            counts: dict
-                    key as bitstring, val as count
+            counts: (dict) The bitstring is the key and its count the value.
+            components: (dict) All components to be modeled as a Quantum Circuit.
 
         Returns:
-            avg: float
-                  expectation value
+            (float) The expectation value.
         """
 
         avg = 0
@@ -163,12 +162,22 @@ class QaoaQiskit():
 
     def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
         """
+        Sets up the backend based on the settings passed to the function.
 
-        @param simulator: str: The name of the Quantum Simulator to be used, if simulate is True.
-        @param simulate: bool: If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit.
-        @param noise: bool: If True, noise will be added to the Simulator. If False, no noise will be added. Only works if "simulate" is set to True.
-        @param nqubits: int: Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
-        @return:
+        Args:
+            simulator: (str) The name of the Quantum Simulator to be used, if simulate is True.
+            simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit.
+                             If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum
+                             Circuit.
+            noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
+                          if "simulate" is set to True.
+            nqubits: (int) Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
+
+        Returns:
+            (BaseBackend) The backend to be used.
+            (NoiseModel) The noise model of the chosen backend, if noise is set to True.
+            (list??) The coupling map of the chosen backend, if noise is set to True.
+            (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True.
         """
         APIKEY = self.APItoken["IBMQ_API_token"]
         if simulate:
@@ -208,16 +217,23 @@ class QaoaQiskit():
 
         return backend, noise_model, coupling_map, basis_gates
 
-
-    def get_expectation(self, components: dict, simulator: str = "aer_simulator", shots: int = 1024, simulate: bool = True, noise: bool = False):
+    def get_expectation(self, components: dict, simulator: str = "aer_simulator", shots: int = 1024,
+                        simulate: bool = True, noise: bool = False):
         """
+        Builds the objective function, which can be used in a classical solver.
 
-        @param components: dict: All components to be modeled as a Quantum Circuit
-        @param simulator: str: The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
-        @param shots: int: Number of repetitions of each circuit, for sampling. Default: 1024
-        @param simulate: bool: If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit. Default: True
-        @param noise: bool: If True, noise will be added to the Simulator. If False, no noise will be added. Only works if "simulate" is set to True. Default: False
-        @return:
+        Args:
+            components: (dict) All components to be modeled as a Quantum Circuit
+            simulator: (str) The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
+            shots: (int) Number of repetitions of each circuit, for sampling. Default: 1024
+            simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If
+                               False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit.
+                               Default: True
+            noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
+                            if "simulate" is set to True. Default: False
+
+        Returns:
+            (callable) The objective function to be used in a classical solver
         """
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
@@ -299,7 +315,7 @@ def main():
         print(i)
 
         qaoa = QaoaQiskit()
-        spsa = SPSA(maxiter=25)
+        spsa = SPSA(maxiter=100)
 
         components = qaoa.getBusComponents(network=testNetwork, bus="bus1")
 
