@@ -80,7 +80,7 @@ def plotCFoptimization(filename: str, plotname:str):
         axs[i].text(0.53, 0.02, f"data: {subfile}", transform=axs[i].transAxes, fontdict={'fontsize': 8})
         axs[i].set_title(f"rep {rep}", fontdict={'fontsize': 8})
 
-    plt.suptitle(plotname)
+    fig.suptitle(plotname)
     fig.legend(["beta", "gamma", "cost function"], loc="upper right")
     plt.figtext(0.55, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     #plt.show()
@@ -89,10 +89,10 @@ def plotCFoptimization(filename: str, plotname:str):
 
 
 def main():
-    plotBoxplot(filename="QaoaCompare_2022-2-2_12-20-14_722644",
+    plotBoxplot(filename="QaoaCompare_2022-2-2_18-49-45_869532",
                 plotname="simulator with noise using SPSA - maxiter 50")
-    plotCFoptimization(filename="QaoaCompare_2022-2-2_12-20-14_722644",
-                       plotname="SPSA evolution with noise - maxiter 50")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-2_17-40-14_868831",
+    #                   plotname="SPSA evolution with noise - maxiter 50")
 
     return
 

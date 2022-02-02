@@ -132,13 +132,17 @@ class QaoaQiskit():
         qc.barrier()
 
         # add problem Hamiltonian for each bus
+        # theta 2i und 2i+1
+        index = 0
         for bus in components:
+            index += 1
             if bus is not "qubit_map":
+                gamma = theta[index]
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
                     p_comp1 = components[bus]["power"][i]
-                    factor_load = -(
-                    components[bus]["load"]) * p_comp1  # negative load, since it removes power form the node
+                    # negative load, since it removes power form the node
+                    factor_load = -(components[bus]["load"]) * p_comp1
                     qc.rz(factor_load * gamma, i)
                     qc.barrier()
                     for j in range(length):
@@ -149,6 +153,7 @@ class QaoaQiskit():
                         if i != j:
                             qc.rzz(factor * gamma, i, j)
                         qc.barrier()
+                    qc.rx(beta, i)
 
         # add mixing Hamiltonian to each qubit
         for i in range(nqubits):
@@ -167,19 +172,22 @@ class QaoaQiskit():
             components: (dict) All components to be modeled as a Quantum Circuit.
 
         Returns:
-            (float) The absolut deviation from the optimal 0, where the kirchhoff constrains would be completely
+            (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
                     satisfied for the given network.
         """
-        power = 0
+
+        power_total = 0
         for bus in components:
+            power = 0
             if bus is not "qubit_map":
                 power -= components[bus]["load"]
 
                 for comp in components[bus][f"flattened_{bus}"]:
                     i = components[bus][f"flattened_{bus}"].index(comp)
                     power += (components[bus]["power"][i] * float(bitstring[i]))
+            power_total += abs(power)
 
-        return abs(power)
+        return abs(power_total)
 
     def compute_expectation(self, counts: dict, components: dict) -> float:
         """
@@ -318,8 +326,6 @@ class QaoaQiskit():
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = float(theta[1])
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
 
-            self.backends.append(backend.name())
-
             return self.compute_expectation(counts=counts, components=components)
 
         return execute_circ
@@ -347,11 +353,11 @@ def main():
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
     noise = True
-    initial_guess = [5.0, 5.0]
+    initial_guess = [5.0, 1.0, 1.0]
 
     loop_results = {}
 
-    for i in range(1, 3):
+    for i in range(1, 11):
         print(i)
 
         qaoa = QaoaQiskit()
@@ -364,7 +370,7 @@ def main():
                                            shots=shots,
                                            simulate=simulate,
                                            noise=noise)
-        res = spsa.optimize(num_vars=2, objective_function=expectation, initial_point=initial_guess)
+        res = spsa.optimize(num_vars=3, objective_function=expectation, initial_point=initial_guess)
 
         qaoa.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
         qaoa.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
