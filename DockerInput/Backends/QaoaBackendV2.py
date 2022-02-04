@@ -477,11 +477,11 @@ def main():
 
     loop_results = {}
 
-    for i in range(1, 101):
+    for i in range(1, 11):
         print(i)
 
         qaoa = QaoaQiskit()
-        spsa = SPSA(maxiter=50)
+        spsa = SPSA(maxiter=200)
 
         components = qaoa.getComponents(network=testNetwork)
 

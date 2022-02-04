@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 import random
+from statistics import mean
 
 FILENAME = "QaoaCompare_2022-1-31_13-11-6_987313"
 
@@ -10,6 +11,51 @@ def openFile(filename: str, directory: str) -> dict:
         data = json.load(json_file)
 
     return data
+
+
+def plotPropVsCost(filename: str, plotname: str):
+    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+
+    bitstrings = list(data["1"]["counts"].keys())
+    bitstrings.sort()
+    shots = data["1"]["shots"]
+    subfile = data["1"]["filename"][:-5]
+    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
+    initial_guess = data["1"]["initial_guess"]
+    toPlot = [[] for i in range(9)]
+    bitstring_costs = {"0000": 3, "0001": 4, "0010": 5, "0011": 8, "0100": 3, "0101": 0, "0110": 3, "0111": 4,
+                       "1000": 2, "1001": 3, "1010": 4, "1011": 7, "1100": 4, "1101": 1, "1110": 2, "1111": 3}
+
+    for key in data:
+        for bitstring in bitstrings:
+            bitstring_index = bitstring_costs[bitstring]
+            if bitstring in data[key]["counts"]:
+                appendData = data[key]["counts"][bitstring]
+            else:
+                appendData = 0
+            toPlot[bitstring_index].append(appendData / shots)
+    yData = []
+    xData = []
+    for i in range(len(toPlot)):
+        if toPlot[i]:
+            #yData.append(mean(toPlot[i]))
+            yData.append(sum(toPlot[i]) / len(data))
+            xData.append(i)
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(7)
+    ax.plot(xData, yData, "x-")
+
+    ax.set_xlabel('cost function')
+    ax.set_ylabel('probability')
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
+              fontdict={'fontsize': 8})
+    plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.suptitle(plotname)
+
+    #plt.show()
+    plt.savefig(f"plots/{filename}_PropVsCF2.png")
 
 
 def plotBoxplot(filename: str, plotname: str):
@@ -127,10 +173,12 @@ def main():
     #plotCFoptimization(filename="QaoaCompare_2022-2-3_15-40-21_628234",
     #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff +5 & quadriert")
 
-    plotBoxplot(filename="QaoaCompare_2022-2-3_18-27-55_714984",
-                plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach")
-    plotCFoptimization(filename="QaoaCompare_2022-2-3_18-27-55_714984",
-                       plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff einfach")
+    #plotBoxplot(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff einfach")
+    plotPropVsCost(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+                   plotname="probability of costs - maxiter 50 \n kirchhoff einfach")
 
     return
     plotBoxplot(filename="QaoaCompare_2022-2-3_10-25-6_709496",
