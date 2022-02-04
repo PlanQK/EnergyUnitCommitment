@@ -503,6 +503,8 @@ def main():
     #initial_guess = [1.0, 1.0]
     initial_guess = [1.0, 1.0, 1.0]
     #initial_guess = [1.0, 1.0, 1.0, 1.0]
+    max_iter = 50
+    #max_iter = 200
 
     num_vars = len(initial_guess)
 
@@ -513,7 +515,7 @@ def main():
         print(i)
 
         qaoa = QaoaQiskit()
-        spsa = SPSA(maxiter=200)
+        spsa = SPSA(maxiter=max_iter)
 
         components = qaoa.getComponents(network=testNetwork)
 
