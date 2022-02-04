@@ -16,6 +16,8 @@ BINSIZE = 1
 PLOTLIMIT = 500
 # export computing cost rate
 COSTPERHOUR = getenv('costperhour')
+#TODO remove
+HACKCOUNTER = 0
  
 
 def meanOfSquareRoot(values: list) -> float:
@@ -47,7 +49,7 @@ def deviationOfTheMean(values: list) -> float:
     return np.std(values) / np.sqrt(len(values))
 
 
-def cumulativeDistribution(values: list[list[float]]) -> list:
+def cumulativeDistribution(values: list) -> list:
     """
     Reduction method to construct a cumulativeDistribution for a list of lists of values
     It returns a list of values that a histogramm of that list will look like the cumulative
@@ -59,13 +61,7 @@ def cumulativeDistribution(values: list[list[float]]) -> list:
         A list which histogramm is a cumulative distribution
     """
     result = []
-    maxVal = max(values[0])
-    for valueLists in values:
-        curMax = max(valueLists)
-        if curMax > maxVal:
-            maxVal = curMax
-    maxVal += 1
-
+    maxVal = max(max(values,key=max)) + 1
     for valueLists in values:
         for val in valueLists:
             result += list(range(int(val), int(maxVal), 1))
@@ -120,24 +116,28 @@ def averageOfBestPercent(values: list, percentage: float) -> float:
     return np.mean(values[:int(percentage * len(values))])
 
 
-def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
+def extractCutSamples(cutSamplesDictList: object, x_key: str="energy", y_key: str="optimizedCost") -> [list, list]:
     """
     Reduction method to extract data from all shots of a single batch. It creates two lists for making
     a scatter plot: First list consists of the spin glass's systems energy for the x-axis and second list is
-    the corresponding optimized cost of the optimization problem
+    the corresponding optimized cost of the optimization problem. x_key is the dictionary key of the 
+    metric to be extraced and used on the x-axis. y_key is the dictionary key of the 
+    metric to be extraced and used on the y-axis.
 
     @param cutSamplesDictList: object
         List of dicts to be searched through.
+    @param key: str
+        dictionary key of metric to be extracted
     @return: [list, list]
         A list with the extracted energy and one with the optimized costs.
     """
-    energy = []
-    optimizedCost = []
+    x_axis_list = []
+    y_axis_list = []
     for cutSamplesDict in cutSamplesDictList:
         for value in cutSamplesDict.values():
-            energy.append(value["energy"])
-            optimizedCost.append(value["optimizedCost"])
-    return energy, optimizedCost
+            x_axis_list.append(value[x_key])
+            y_axis_list.append(value[y_key])
+    return x_axis_list, y_axis_list
 
 
 def makeFig(plotInfo: dict, outputFile: str,
@@ -168,6 +168,7 @@ def makeFig(plotInfo: dict, outputFile: str,
     """
     fig, ax = plt.subplots()
     for key, values in plotInfo.items():
+
 
         if plottype == "histogramm":
             # if condition is truthy if the function values have not been reduced earlier. thus in 'yvalues' we have a list of
@@ -208,6 +209,15 @@ def makeFig(plotInfo: dict, outputFile: str,
             m, b = np.polyfit(x, y, 1)
             ax.plot(x, [m * z + b for z in x], color='red')
 
+        if plottype == "boxplot":
+            global HACKCOUNTER
+            HACKCOUNTER += 1
+            print("CALLING PLOT")
+            sortedValues = sorted(values)
+            ax.boxplot(
+                    [e[1] for e in sortedValues],
+                    )
+
         # default plot type of a function graph
         if plottype == "line":
             sortedValues = sorted(values)
@@ -230,6 +240,7 @@ def makeFig(plotInfo: dict, outputFile: str,
     else:
         fig.savefig(outputFile + "." + fileformat)
 
+# TODO : probably clashes with default empty string initializes of backend specific variables
 def resolveKey(element: dict, field: str) -> any:
     """
     Finds the given key within the given dictionary, even if the key is nested in it.
@@ -258,6 +269,7 @@ def resolveKey(element: dict, field: str) -> any:
     return out
 
 
+# TODO add embeddings to output data or rewrite how to extract embeddings from embedding dictionarys
 def addEmbeddingInformation(jsonDict: dict) -> dict:
     """
     Add embedding information, specific to the dWave Backends, extracted from their backend specific results.
@@ -339,13 +351,14 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             else:
                 element = addPlottableInformation(jsonDict=element)
 
+        # TODO indentation of for loop + cast error for ""
         for key, values in constraints.items():
-            try:
-                # value of constraint is not in constrains list
-                if float(resolveKey(element, key)) not in values:
-                    break
-            except KeyError:
-                pass
+#            try:
+#                # value of constraint is not in constrains list
+            if float(resolveKey(element, key)) not in values:
+                break
+#            except KeyError:
+#                pass
         # value of constraint is found in constrains list
         else:
             # create a new key using the splitField
@@ -364,7 +377,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
             yvalue = resolveKey(element, yField)
 
-            plotData[key][element[xField]].append(yvalue)
+            plotData[key][xvalue].append(yvalue)
         filesRead += 1
 
     # now perform reduction
@@ -394,6 +407,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
     return result
 
+# TODO odd bug of not working if solver str is empty
 def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFieldList: list = None,
               splitFields: list = ["problemSize"], logscalex: bool = True, logscaley: bool = False,
               PATH: list = None, reductionMethod: list = None, lineNames: list = None,
@@ -508,6 +522,8 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
+
+
     plotGroup("newising_chain_strength_to_cutSamplesCost",
             "qpu_read",
             [
@@ -557,7 +573,7 @@ def main():
             "qpu_read",
             [
             f"*newising_10_[0]_20.nc_110_365_30_0_1_80_365_1",
-            ]
+            ],
             "problemSize",
             yFieldList = ["cutSamples"],
             reductionMethod = [extractCutSamples],
