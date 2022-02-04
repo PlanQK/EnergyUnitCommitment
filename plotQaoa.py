@@ -47,7 +47,7 @@ def plotBoxplot(filename: str, plotname: str):
     plt.setp(bp['whiskers'], color='k', linestyle='-')
     plt.setp(bp['fliers'], markersize=2.0)
     #plt.show()
-    plt.savefig(f"plots/{filename}_boxplot_{plotname}.png")
+    plt.savefig(f"plots/{filename}_boxplot.png")
 
 
 def plotCFoptimization(filename: str, plotname:str):
@@ -63,17 +63,40 @@ def plotCFoptimization(filename: str, plotname:str):
         subfile = data[str(rep)]["filename"][:-5]
         subdata = openFile(filename=subfile, directory="results_qaoa/")
 
-        yData = [[], [], []]
+        l_theta = len(subdata["rep1"]["theta"])
+
+        yData = [[] for j in range(l_theta+1)]
         xData = []
+        leg = []
         for j in range(subdata["iter_count"]):
-            yData[0].append(subdata[f"rep{j + 1}"]["beta"])
-            yData[1].append(subdata[f"rep{j + 1}"]["gamma"])
-            yData[2].append(subdata[f"rep{j + 1}"]["return"])
+            if (l_theta % 2) != 0:
+                yData[0].append(subdata[f"rep{j + 1}"]["theta"][0])
+                for k in range(1, l_theta):
+                    yData[k].append(subdata[f"rep{j + 1}"]["theta"][k])
+            elif (l_theta % 2) == 0:
+                for k in range(int(l_theta/2)):
+                    yData[2*k].append(subdata[f"rep{j + 1}"]["theta"][2*k])
+                    yData[2*k+1].append(subdata[f"rep{j + 1}"]["theta"][2*k+1])
+            yData[l_theta].append(subdata[f"rep{j + 1}"]["return"])
             xData.append(j + 1)
 
-        axs[i].plot(xData, yData[0], "b-", label="beta")
-        axs[i].plot(xData, yData[1], "r-", label="gamma")
-        axs[i].plot(xData, yData[2], "g-", label="cost function")
+        if (l_theta % 2) != 0:
+            axs[i].plot(xData, yData[0], "b-", label="beta")
+            leg.append("beta")
+            for k in range(1, l_theta):
+                axs[i].plot(xData, yData[k], color=((k / l_theta), 0, 0, 1),
+                            label=f"gamma{k}")
+                leg.append(f"gamma{k}")
+        elif (l_theta % 2) == 0:
+            for k in range(int(l_theta / 2)):
+                axs[i].plot(xData, yData[2*k],  color=(0, 0, (1 - (k / l_theta)), 1),
+                            label=f"beta{k}")
+                leg.append(f"beta{k}")
+                axs[i].plot(xData, yData[2*k+1], color=((1 - (k / l_theta)), 0, 0, 1),
+                            label=f"gamma{k}")
+                leg.append(f"gamma{k}")
+        axs[i].plot(xData, yData[l_theta], "g-", label="cost function")
+        leg.append("cost function")
         axs[i].set_xlabel('iteration')
         axs[i].set_ylabel('value')
         axs[i].label_outer()
@@ -81,17 +104,48 @@ def plotCFoptimization(filename: str, plotname:str):
         axs[i].set_title(f"rep {rep}", fontdict={'fontsize': 8})
 
     fig.suptitle(plotname)
-    fig.legend(["beta", "gamma", "cost function"], loc="upper right")
+    fig.legend(leg, loc="upper right")
     plt.figtext(0.55, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     #plt.show()
-    plt.savefig(f"plots/{filename}_CF_optimization_{plotname}.png")
+    plt.savefig(f"plots/{filename}_CF_optimization.png")
 
 
 
 def main():
-    plotBoxplot(filename="QaoaCompare_2022-2-2_19-29-22_281887",
+    #plotBoxplot(filename="QaoaCompare_2022-2-3_16-33-32_116043",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach, complete Hb after each Hp")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-3_16-33-32_116043",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff einfach, complete Hb after each Hp")
+
+    #plotBoxplot(filename="QaoaCompare_2022-2-3_15-29-4_469482",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff quadriert")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-3_15-29-4_469482",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff quadriert")
+
+    #plotBoxplot(filename="QaoaCompare_2022-2-3_15-40-21_628234",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff +5 & quadriert")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-3_15-40-21_628234",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff +5 & quadriert")
+
+    plotBoxplot(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+                plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach")
+    plotCFoptimization(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+                       plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff einfach")
+
+    return
+    plotBoxplot(filename="QaoaCompare_2022-2-3_10-25-6_709496",
+                plotname="simulator with noise using SPSA - maxiter 50 - kirchhoff quadriert, 2 Hp")
+
+    return
+
+    plotBoxplot(filename="QaoaCompare_2022-2-3_10-9-50_335597",
+                plotname="simulator with noise using SPSA - maxiter 50 - kirchhoff quadriert")
+
+    return
+
+    plotBoxplot(filename="QaoaCompare_2022-2-3_9-38-29_848235",
                 plotname="simulator with noise using SPSA - maxiter 50")
-    #plotCFoptimization(filename="QaoaCompare_2022-2-2_17-40-14_868831",
+    #plotCFoptimization(filename="QaoaCompare_2022-2-2_19-43-50_611326",
     #                   plotname="SPSA evolution with noise - maxiter 50")
 
     return

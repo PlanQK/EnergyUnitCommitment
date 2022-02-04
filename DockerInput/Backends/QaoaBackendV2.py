@@ -108,7 +108,7 @@ class QaoaQiskit():
 
         return components
 
-    def create_qc(self, components: dict, theta: list) -> QuantumCircuit:
+    def create_qc1(self, components: dict, theta: list) -> QuantumCircuit:
         """
         Creates a quantum circuit based on the components given and the cost function:
 
@@ -132,7 +132,57 @@ class QaoaQiskit():
         qc.barrier()
 
         # add problem Hamiltonian for each bus
-        # theta 2i und 2i+1
+        for bus in components:
+            if bus is not "qubit_map":
+                length = len(components[bus][f"flattened_{bus}"])
+                for i in range(length):
+                    p_comp1 = components[bus]["power"][i]
+                    # negative load, since it removes power form the node
+                    factor_load = -(components[bus]["load"]) * p_comp1
+                    qc.rz(factor_load * gamma, i)
+                    qc.barrier()
+                    for j in range(length):
+                        p_comp2 = components[bus]["power"][j]
+                        factor = 0.25 * p_comp1 * p_comp2
+                        qc.rz(factor * gamma, i)
+                        qc.rz(factor * gamma, j)
+                        if i != j:
+                            qc.rzz(factor * gamma, i, j)
+                        qc.barrier()
+
+        # add mixing Hamiltonian to each qubit
+        for i in range(nqubits):
+            qc.rx(beta, i)
+
+        qc.measure_all()
+
+        return qc
+
+    def create_qc2(self, components: dict, theta: list) -> QuantumCircuit:
+        # 1 beta & 2 gammas
+        """
+        Creates a quantum circuit based on the components given and the cost function:
+
+        Args:
+            components: (dict) All components to be modeled as a Quantum Circuit.
+            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
+                          gamma = theta[1].
+
+        Returns:
+            (QuantumCircuit) The created quantum circuit.
+        """
+        nqubits = len(components["qubit_map"])
+        qc = QuantumCircuit(nqubits)
+
+        beta = theta[0]
+        gamma = theta[1]
+
+        # add Hadamard gate to each qubit
+        for i in range(nqubits):
+            qc.h(i)
+        qc.barrier()
+
+        # add problem Hamiltonian for each bus
         index = 0
         for bus in components:
             index += 1
@@ -153,11 +203,69 @@ class QaoaQiskit():
                         if i != j:
                             qc.rzz(factor * gamma, i, j)
                         qc.barrier()
-                    qc.rx(beta, i)
+                    #qc.rx(beta, i)
+                    #for i in range(nqubits):
+                    #    qc.rx(beta, i)
 
         # add mixing Hamiltonian to each qubit
         for i in range(nqubits):
             qc.rx(beta, i)
+
+        qc.measure_all()
+
+        return qc
+
+    def create_qc3(self, components: dict, theta: list) -> QuantumCircuit:
+        # 2 betas & 2 gammas
+        """
+        Creates a quantum circuit based on the components given and the cost function:
+
+        Args:
+            components: (dict) All components to be modeled as a Quantum Circuit.
+            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
+                          gamma = theta[1].
+
+        Returns:
+            (QuantumCircuit) The created quantum circuit.
+        """
+        nqubits = len(components["qubit_map"])
+        qc = QuantumCircuit(nqubits)
+
+        beta = theta[0]
+        gamma = theta[1]
+
+        # add Hadamard gate to each qubit
+        for i in range(nqubits):
+            qc.h(i)
+        qc.barrier()
+
+        # add problem Hamiltonian for each bus
+        index = 0
+        for bus in components:
+            if bus is not "qubit_map":
+                beta = theta[2*index]
+                gamma = theta[2*index+1]
+                length = len(components[bus][f"flattened_{bus}"])
+                for i in range(length):
+                    p_comp1 = components[bus]["power"][i]
+                    # negative load, since it removes power form the node
+                    factor_load = -(components[bus]["load"]) * p_comp1
+                    qc.rz(factor_load * gamma, i)
+                    qc.barrier()
+                    for j in range(length):
+                        p_comp2 = components[bus]["power"][j]
+                        factor = 0.25 * p_comp1 * p_comp2
+                        qc.rz(factor * gamma, i)
+                        qc.rz(factor * gamma, j)
+                        if i != j:
+                            qc.rzz(factor * gamma, i, j)
+                        qc.barrier()
+                    qc.rx(beta, i)
+            index += 1
+
+        # add mixing Hamiltonian to each qubit
+        #for i in range(nqubits):
+        #    qc.rx(beta, i)
 
         qc.measure_all()
 
@@ -191,7 +299,11 @@ class QaoaQiskit():
             power_total += abs(power)
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
-        return abs(power_total)
+        #if power_total is not 0:
+        #    power_total += 5
+
+        #return power_total ** 2
+        return power_total
 
     def compute_expectation(self, counts: dict, components: dict) -> float:
         """
@@ -304,7 +416,7 @@ class QaoaQiskit():
         self.results_dict["noise"] = noise
 
         def execute_circ(theta):
-            qc = self.create_qc(components=components, theta=theta)
+            qc = self.create_qc2(components=components, theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             # qc.draw(output="latex")
             if simulate:
@@ -326,8 +438,7 @@ class QaoaQiskit():
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["beta"] = float(theta[0])
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["gamma"] = float(theta[1])
+            self.results_dict[f"rep{self.results_dict['iter_count']}"]["theta"] = list(theta)
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
             self.kirchhoff[f"rep{self.results_dict['iter_count']}"] = {}
 
@@ -358,11 +469,15 @@ def main():
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
     noise = True
-    initial_guess = [5.0, 1.0, 1.0]
+    #initial_guess = [1.0, 1.0]
+    initial_guess = [1.0, 1.0, 1.0]
+    #initial_guess = [1.0, 1.0, 1.0, 1.0]
+
+    num_vars = len(initial_guess)
 
     loop_results = {}
 
-    for i in range(1, 11):
+    for i in range(1, 101):
         print(i)
 
         qaoa = QaoaQiskit()
@@ -375,7 +490,7 @@ def main():
                                            shots=shots,
                                            simulate=simulate,
                                            noise=noise)
-        res = spsa.optimize(num_vars=3, objective_function=expectation, initial_point=initial_guess)
+        res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
 
         qaoa.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
         qaoa.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
