@@ -20,6 +20,7 @@ class QaoaQiskit():
                              "components": {},
                              "qc": None,
                              "initial_guess": [],
+                             "duration": None,
                              "optimizeResults": {},
                              }
 
@@ -453,8 +454,9 @@ def main():
     testNetwork.add("Bus", "bus1")
     testNetwork.add("Bus", "bus2")
     # add generators
-    testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=1, p_nom_extendable=False, marginal_cost=5)
-    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=3, p_nom_extendable=False, marginal_cost=5)
+    testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=2, p_nom_extendable=False, marginal_cost=5)
+    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=4, p_nom_extendable=False, marginal_cost=5)
+    testNetwork.add("Generator", "Gen3", bus="bus2", p_nom=2, p_nom_extendable=False, marginal_cost=5)
     # line
     # p0= [-1,-2]
     # p1= [1, 2]
@@ -463,9 +465,11 @@ def main():
     testNetwork.add("Line", "line2", bus0="bus2", bus1="bus1", x=0.0001, s_nom=2)
     # add load
     testNetwork.add("Load", "load1", bus="bus1", p_set=2)
-    testNetwork.add("Load", "load2", bus="bus2", p_set=1)
+    testNetwork.add("Load", "load2", bus="bus2", p_set=2)
 
-    shots = 1024
+    #shots = 1024
+    shots = 4096
+    #shots = 16384
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = True
     noise = True
@@ -478,6 +482,7 @@ def main():
     loop_results = {}
 
     for i in range(1, 11):
+        time_start = datetime.timestamp(datetime.now())
         print(i)
 
         qaoa = QaoaQiskit()
@@ -490,20 +495,30 @@ def main():
                                            shots=shots,
                                            simulate=simulate,
                                            noise=noise)
-        res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
 
+        #res = spsa.minimize(fun=expectation, x0=initial_guess)
+        #qaoa.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
+        #qaoa.results_dict["optimizeResults"]["fun"] = res.fun  # objective function value
+        #qaoa.results_dict["optimizeResults"]["nfev"] = res.nfev  # number of objective function calls
+
+        res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
         qaoa.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
         qaoa.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
         qaoa.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+
         qaoa.results_dict["initial_guess"] = initial_guess
+
+        time_end = datetime.timestamp(datetime.now())
+        duration = time_end - time_start
+        qaoa.results_dict["duration"] = duration
 
         now = datetime.today()
         filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
         with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
             json.dump(qaoa.results_dict, write_file, indent=2)
-        #filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-        #with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
-        #    json.dump(qaoa.kirchhoff, write_file, indent=2)
+        filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
+            json.dump(qaoa.kirchhoff, write_file, indent=2)
 
         last_rep = qaoa.results_dict["iter_count"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
@@ -513,6 +528,7 @@ def main():
                            "noise": qaoa.results_dict["noise"],
                            "shots": shots,
                            "initial_guess": initial_guess,
+                           "duration": duration,
                            "counts": last_rep_counts}
 
     now = datetime.today()

@@ -23,6 +23,54 @@ def plotPropVsCost(filename: str, plotname: str):
     subdata = openFile(filename=subfile, directory="results_qaoa/")
     backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
     initial_guess = data["1"]["initial_guess"]
+    kirchhoffFileName = "kirchhoff" + data["1"]["filename"][4:-5]
+    kirchhoffData = openFile(filename=kirchhoffFileName, directory="results_qaoa/")
+    bitstring_costs = kirchhoffData["rep1"]
+    toPlot = [[] for i in range(100)]
+    #bitstring_costs = {"0000": 3, "0001": 4, "0010": 5, "0011": 8, "0100": 3, "0101": 0, "0110": 3, "0111": 4,
+    #                   "1000": 2, "1001": 3, "1010": 4, "1011": 7, "1100": 4, "1101": 1, "1110": 2, "1111": 3}
+
+    for key in data:
+        for bitstring in bitstrings:
+            bitstring_index = int(bitstring_costs[bitstring]["total"])
+            if bitstring in data[key]["counts"]:
+                appendData = data[key]["counts"][bitstring]
+            else:
+                appendData = 0
+            toPlot[bitstring_index].append(appendData / shots)
+    yData = []
+    xData = []
+    for i in range(len(toPlot)):
+        if toPlot[i]:  # if toPlot[i] is an empty list it returns False
+            yData.append(mean(toPlot[i]))
+            #yData.append(sum(toPlot[i]) / len(data))
+            xData.append(i)
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(7)
+    ax.plot(xData, yData, "x-")
+
+    ax.set_xlabel('cost function')
+    ax.set_ylabel('probability')
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
+              fontdict={'fontsize': 8})
+    plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.suptitle(plotname)
+
+    #plt.show()
+    plt.savefig(f"plots/{filename}_PropVsCF1.png")
+
+
+def plotPropVsCost4qubit(filename: str, plotname: str):
+    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+
+    bitstrings = list(data["1"]["counts"].keys())
+    bitstrings.sort()
+    shots = data["1"]["shots"]
+    subfile = data["1"]["filename"][:-5]
+    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
+    initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(9)]
     bitstring_costs = {"0000": 3, "0001": 4, "0010": 5, "0011": 8, "0100": 3, "0101": 0, "0110": 3, "0111": 4,
                        "1000": 2, "1001": 3, "1010": 4, "1011": 7, "1100": 4, "1101": 1, "1110": 2, "1111": 3}
@@ -158,6 +206,25 @@ def plotCFoptimization(filename: str, plotname:str):
 
 
 def main():
+    #plotBoxplot(filename="QaoaCompare_2022-2-4_15-22-53_606565",
+    #            plotname="simulator with noise using SPSA - maxiter 200 \n")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-4_15-22-53_606565",
+    #                   plotname="SPSA evolution with noise - maxiter 200 \n")
+    plotPropVsCost(filename="QaoaCompare_2022-2-4_15-22-53_606565",
+                   plotname="probability of costs - maxiter 50 \n ")
+
+    #plotBoxplot(filename="QaoaCompare_2022-2-4_14-36-14_624819",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n optimize")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-4_14-36-14_624819",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n optimize")
+
+    #plotBoxplot(filename="QaoaCompare_2022-2-4_11-28-27_274990",
+    #            plotname="simulator with noise using SPSA - maxiter 50 \n minimize")
+    #plotCFoptimization(filename="QaoaCompare_2022-2-4_11-28-27_274990",
+    #                   plotname="SPSA evolution with noise - maxiter 50 \n minimize")
+    # plotPropVsCost4Qubit(filename="QaoaCompare_2022-2-3_18-27-55_714984",
+    #               plotname="probability of costs - maxiter 50 \n kirchhoff einfach")
+
     #plotBoxplot(filename="QaoaCompare_2022-2-3_16-33-32_116043",
     #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach, complete Hb after each Hp")
     #plotCFoptimization(filename="QaoaCompare_2022-2-3_16-33-32_116043",
@@ -173,12 +240,7 @@ def main():
     #plotCFoptimization(filename="QaoaCompare_2022-2-3_15-40-21_628234",
     #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff +5 & quadriert")
 
-    #plotBoxplot(filename="QaoaCompare_2022-2-3_18-27-55_714984",
-    #            plotname="simulator with noise using SPSA - maxiter 50 \n kirchhoff einfach")
-    #plotCFoptimization(filename="QaoaCompare_2022-2-3_18-27-55_714984",
-    #                   plotname="SPSA evolution with noise - maxiter 50 \n kirchhoff einfach")
-    plotPropVsCost(filename="QaoaCompare_2022-2-3_18-27-55_714984",
-                   plotname="probability of costs - maxiter 50 \n kirchhoff einfach")
+
 
     return
     plotBoxplot(filename="QaoaCompare_2022-2-3_10-25-6_709496",
