@@ -29,15 +29,20 @@ class ClassicalBackend(BackendBase):
             network,
         )
 
-    @staticmethod
-    def transformSolutionToNetwork(network, transformedProblem, solution):
+    def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print(solution["state"])
         print(transformedProblem.getLineValues(solution["state"]))
         print(transformedProblem.individualCostContribution(solution["state"]))
-        kirchhoffCost = 0
+        kirchhoffCost = 0.0
         for key, val in transformedProblem.individualCostContribution(solution["state"]).items():
             kirchhoffCost += val 
         print(f"Total Kirchhoff cost: {kirchhoffCost}")
+        print(transformedProblem.individualMarginalCost(solution["state"]))
+        marginalCost = transformedProblem.calcMarginalCost(solution["state"])
+        print(f"TOTAL MARGINAL COST: {marginalCost}")
+        self.metaInfo["marginalCost"] = transformedProblem.calcMarginalCost(solution["state"])
+
+
         print(
             f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"
         )
@@ -67,6 +72,7 @@ class ClassicalBackend(BackendBase):
         self.metaInfo["totalCost"] = transformedProblem.calcCost(
             result["state"]
         )
+        self.metaInfo["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
         self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
@@ -97,6 +103,7 @@ class SqaBackend(ClassicalBackend):
             self.metaInfo[key] = result[key]
 
         self.metaInfo["totalCost"] = transformedProblem.calcCost(result["state"])
+        self.metaInfo["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
         self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(result["state"])
         print("done")
         return result
