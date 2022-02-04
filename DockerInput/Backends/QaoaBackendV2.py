@@ -448,7 +448,28 @@ class QaoaQiskit():
         return execute_circ
 
 
-def main():
+def createTestNetwork4Qubit() -> pypsa.Network:
+    testNetwork = pypsa.Network()
+    # add node
+    testNetwork.add("Bus", "bus1")
+    testNetwork.add("Bus", "bus2")
+    # add generators
+    testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=1, p_nom_extendable=False, marginal_cost=5)
+    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=3, p_nom_extendable=False, marginal_cost=5)
+    # line
+    # p0= [-1,-2]
+    # p1= [1, 2]
+    # testNetwork.add("Line","line1",bus0="bus1", bus1="bus2",x=0.0001, s_nom=2, p0=p0, p1=p1)
+    testNetwork.add("Line", "line1", bus0="bus1", bus1="bus2", x=0.0001, s_nom=2)
+    testNetwork.add("Line", "line2", bus0="bus2", bus1="bus1", x=0.0001, s_nom=2)
+    # add load
+    testNetwork.add("Load", "load1", bus="bus1", p_set=2)
+    testNetwork.add("Load", "load2", bus="bus2", p_set=1)
+
+    return testNetwork
+
+
+def createTestNetwork5Qubit() -> pypsa.Network:
     testNetwork = pypsa.Network()
     # add node
     testNetwork.add("Bus", "bus1")
@@ -466,6 +487,12 @@ def main():
     # add load
     testNetwork.add("Load", "load1", bus="bus1", p_set=2)
     testNetwork.add("Load", "load2", bus="bus2", p_set=2)
+
+    return testNetwork
+
+
+def main():
+    testNetwork = createTestNetwork4Qubit()
 
     #shots = 1024
     shots = 4096
@@ -516,9 +543,9 @@ def main():
         filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
         with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
             json.dump(qaoa.results_dict, write_file, indent=2)
-        filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
-            json.dump(qaoa.kirchhoff, write_file, indent=2)
+        #filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+        #with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
+        #    json.dump(qaoa.kirchhoff, write_file, indent=2)
 
         last_rep = qaoa.results_dict["iter_count"]
         last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
