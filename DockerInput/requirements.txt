@@ -3,3 +3,5 @@ dwave-ocean-sdk
 xarray
 netcdf4
 networkx
+qiskit
+pylatexenc

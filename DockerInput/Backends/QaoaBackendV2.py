@@ -1,6 +1,9 @@
 import json
+
+import numpy as np
 import pypsa
 import os.path
+from .BackendBase import BackendBase
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
@@ -11,8 +14,10 @@ from qiskit.algorithms.optimizers import SPSA
 from qiskit.circuit import Parameter
 
 
-class QaoaQiskit():
-    def __init__(self):
+class QaoaQiskit(BackendBase):
+    def __init__(self, docker: bool = True):
+        super().__init__()
+        self.metaInfo["results"] = {}
         self.results_dict = {"iter_count": 0,
                              "simulate": None,
                              "noise": None,
@@ -28,6 +33,96 @@ class QaoaQiskit():
             self.APItoken = json.load(json_file)
 
         self.kirchhoff = {}
+        self.docker = docker
+
+    def transformProblemForOptimizer(self, network):
+        print("transforming problem...")
+        return self.getComponents(network=network)
+
+    def transformSolutionToNetwork(self, network, transformedProblem, solution):
+        return network
+
+    def processSolution(self, network, transformedProblem, solution):
+        return solution
+
+    def optimize(self, transformedProblem):
+
+        # shots = 1024
+        shots = 4096
+        # shots = 16384
+        simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
+        simulate = True
+        noise = True
+        # initial_guess = np.array([1.0, 1.0])
+        initial_guess = np.array([1.0, 1.0, 1.0])
+        # initial_guess = np.array([1.0, 1.0, 1.0, 1.0])
+        max_iter = 50
+        # max_iter = 200
+        repetitions = 1
+
+        num_vars = len(initial_guess)
+
+        now = datetime.today()
+
+        for i in range(1, repetitions + 1):
+            time_start = datetime.timestamp(datetime.now())
+            print(f"----------------------------- Iteration {i} ----------------------------------------")
+
+            spsa = SPSA(maxiter=max_iter)
+
+            filename = f"Qaoa_{1}_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+
+            expectation = self.get_expectation(filename=filename,
+                                               components=transformedProblem,
+                                               simulator=simulator,
+                                               shots=shots,
+                                               simulate=simulate,
+                                               noise=noise)
+
+            res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
+            self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
+            self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
+            self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+
+            self.results_dict["initial_guess"] = initial_guess
+
+            time_end = datetime.timestamp(datetime.now())
+            duration = time_end - time_start
+            self.results_dict["duration"] = duration
+
+            # safe final results
+            if self.docker:
+                with open(f"Problemset/{filename}", "w") as write_file:
+                   json.dump(self.results_dict, write_file, indent=2, default=str)
+            else:
+                with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+                    json.dump(self.results_dict, write_file, indent=2, default=str)
+
+            # filename2 = f"Kirchhoff_{i}_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+            # with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
+            #    json.dump(qaoa.kirchhoff, write_file, indent=2)
+
+            last_rep = self.results_dict["iter_count"]
+            last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
+            self.metaInfo["results"][i] = {"filename": filename,
+                                           "optimize_Iterations": self.results_dict["iter_count"],
+                                           "simulate": self.results_dict["simulate"],
+                                           "noise": self.results_dict["noise"],
+                                           "shots": shots,
+                                           "initial_guess": initial_guess,
+                                           "duration": duration,
+                                           "counts": last_rep_counts}
+
+        return self.metaInfo["results"]
+
+    def getMetaInfo(self):
+        return self.metaInfo
+
+    def validateInput(self, path, network):
+        pass
+
+    def handleOptimizationStop(self, path, network):
+        pass
 
     def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
         """
@@ -204,8 +299,8 @@ class QaoaQiskit():
                         if i != j:
                             qc.rzz(factor * gamma, i, j)
                         qc.barrier()
-                    #qc.rx(beta, i)
-                    #for i in range(nqubits):
+                    # qc.rx(beta, i)
+                    # for i in range(nqubits):
                     #    qc.rx(beta, i)
 
         # add mixing Hamiltonian to each qubit
@@ -244,8 +339,8 @@ class QaoaQiskit():
         index = 0
         for bus in components:
             if bus is not "qubit_map":
-                beta = theta[2*index]
-                gamma = theta[2*index+1]
+                beta = theta[2 * index]
+                gamma = theta[2 * index + 1]
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
                     p_comp1 = components[bus]["power"][i]
@@ -265,7 +360,7 @@ class QaoaQiskit():
             index += 1
 
         # add mixing Hamiltonian to each qubit
-        #for i in range(nqubits):
+        # for i in range(nqubits):
         #    qc.rx(beta, i)
 
         qc.measure_all()
@@ -300,10 +395,10 @@ class QaoaQiskit():
             power_total += abs(power)
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
-        #if power_total is not 0:
+        # if power_total is not 0:
         #    power_total += 5
 
-        #return power_total ** 2
+        # return power_total ** 2
         return power_total
 
     def compute_expectation(self, counts: dict, components: dict, filename: str) -> float:
@@ -332,9 +427,13 @@ class QaoaQiskit():
 
         self.results_dict[f"rep{self.results_dict['iter_count']}"]["return"] = avg / sum_count
 
-        #safe results to make sure nothing is lost, even if the code or backend crashes
-        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
-            json.dump(self.results_dict, write_file, indent=2, default=str)
+        # safe results to make sure nothing is lost, even if the code or backend crashes
+        if self.docker:
+            with open(f"Problemset/{filename}", "w") as write_file:
+                json.dump(self.results_dict, write_file, indent=2, default=str)
+        else:
+            with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+                json.dump(self.results_dict, write_file, indent=2, default=str)
 
         return avg / sum_count
 
@@ -502,83 +601,30 @@ def createTestNetwork5Qubit() -> pypsa.Network:
 def main():
     testNetwork = createTestNetwork4Qubit()
 
-    #shots = 1024
+    qaoa = QaoaQiskit(docker=False)
+
+    components = qaoa.transformProblemForOptimizer(network=testNetwork)
+    qaoa.optimize(transformedProblem=components)
+
+    # shots = 1024
     shots = 4096
-    #shots = 16384
+    # shots = 16384
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
     simulate = False
     noise = True
-    #initial_guess = [1.0, 1.0]
+    # initial_guess = [1.0, 1.0]
     initial_guess = [1.0, 1.0, 1.0]
-    #initial_guess = [1.0, 1.0, 1.0, 1.0]
+    # initial_guess = [1.0, 1.0, 1.0, 1.0]
     max_iter = 50
-    #max_iter = 200
+    # max_iter = 200
     repetitions = 1
 
     num_vars = len(initial_guess)
 
-    loop_results = {}
-
-    for i in range(1, repetitions + 1):
-        time_start = datetime.timestamp(datetime.now())
-        print(i)
-
-        qaoa = QaoaQiskit()
-        spsa = SPSA(maxiter=max_iter)
-
-        now = datetime.today()
-        filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-
-        components = qaoa.getComponents(network=testNetwork)
-
-        expectation = qaoa.get_expectation(filename=filename,
-                                           components=components,
-                                           simulator=simulator,
-                                           shots=shots,
-                                           simulate=simulate,
-                                           noise=noise)
-
-        #res = spsa.minimize(fun=expectation, x0=initial_guess)
-        #qaoa.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
-        #qaoa.results_dict["optimizeResults"]["fun"] = res.fun  # objective function value
-        #qaoa.results_dict["optimizeResults"]["nfev"] = res.nfev  # number of objective function calls
-
-        res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-        qaoa.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-        qaoa.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-        qaoa.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
-
-        qaoa.results_dict["initial_guess"] = initial_guess
-
-        time_end = datetime.timestamp(datetime.now())
-        duration = time_end - time_start
-        qaoa.results_dict["duration"] = duration
-
-        #safe final results
-        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
-            json.dump(qaoa.results_dict, write_file, indent=2, default=str)
-
-        #filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-        #with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
-        #    json.dump(qaoa.kirchhoff, write_file, indent=2)
-
-        last_rep = qaoa.results_dict["iter_count"]
-        last_rep_counts = qaoa.results_dict[f"rep{last_rep}"]["counts"]
-        loop_results[i] = {"filename": filename,
-                           "optimize_Iterations": qaoa.results_dict["iter_count"],
-                           "simulate": qaoa.results_dict["simulate"],
-                           "noise": qaoa.results_dict["noise"],
-                           "shots": shots,
-                           "initial_guess": initial_guess,
-                           "duration": duration,
-                           "counts": last_rep_counts}
-
     now = datetime.today()
     filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
     with open(os.path.dirname(__file__) + "/../../results_qaoa/qaoaCompare/" + filename, "w") as write_file:
-        json.dump(loop_results, write_file, indent=2, default=str)
-    # plot_histogram(qaoa.results_dict[f"rep{qaoa.results_dict['iter_count']}"]["counts"])
-    # plt.show()
+        json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
 
 
 if __name__ == "__main__":

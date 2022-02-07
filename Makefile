@@ -35,7 +35,8 @@ MAXORDER = 1
 TIMEOUT = 30
 
 
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[2-7]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_1[2-7]_[0-9]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Qubit_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 
@@ -80,6 +81,11 @@ GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach timeout, $(TIMEOUT), \
 		$(foreach number, ${NUMBERS}, \
 		results_pypsa_glpk_sweep/info_${filename}_${timeout}_${number})))
+
+QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
+		$(foreach timeout, $(TIMEOUT), \
+		$(foreach number, ${NUMBERS}, \
+		results_qaoa_sweep/info_${filename}_${timeout}_${number})))
 		
 
 ## creating rules for result files
@@ -221,6 +227,25 @@ $(foreach filename, $(SWEEPFILES), \
 	$(foreach number, ${NUMBERS}, \
 	$(eval $(call pypsa-glpk, ${filename}, ${timeout}, ${number})))))
 
+# define qaoa target
+
+define qaoa
+results_qaoa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
+	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
+	--env inputNetwork=$(strip $(1)) \
+	--env timeout=$(strip $(2)) \
+	energy:1.0 qaoa
+	mkdir -p results_qaoa_sweep
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3)) results_qaoa_sweep/
+
+endef
+
+$(foreach filename, $(SWEEPFILES), \
+	$(foreach timeout, $(TIMEOUT), \
+	$(foreach number, ${NUMBERS}, \
+	$(eval $(call qaoa, ${filename}, ${timeout}, ${number})))))
+
 # end of creating rules for results
 
 
@@ -255,6 +280,8 @@ quantumAnnealParSweep: $(QUANTUM_ANNEALING_SWEEP_FILES)
 quantumReadSweep: $(QUANTUM_ANNEALING_READ_RESULTS)
 
 pypsa-glpk: $(GLPK_SWEEP_FILES)
+
+qaoa: $(QAOA_SWEEP_FILES)
 
 
 clean:

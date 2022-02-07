@@ -80,7 +80,8 @@ class BackendBase(abc.ABC):
                              "slack_gen_penalty": ""
                              },
             "sqaBackend": {"individualCost": ""
-                           }
+                           },
+            "qaoaBackend": ""
             }
 
         def populateMetaInfo(varType: str, varName: str):
