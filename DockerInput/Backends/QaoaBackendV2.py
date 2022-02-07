@@ -306,13 +306,14 @@ class QaoaQiskit():
         #return power_total ** 2
         return power_total
 
-    def compute_expectation(self, counts: dict, components: dict) -> float:
+    def compute_expectation(self, counts: dict, components: dict, filename: str) -> float:
         """
         Computes expectation value based on measurement results
 
         Args:
             counts: (dict) The bitstring is the key and its count the value.
             components: (dict) All components to be modeled as a Quantum Circuit.
+            filename: (str) The name of the file to which the results shall be safed.
 
         Returns:
             (float) The expectation value.
@@ -330,6 +331,11 @@ class QaoaQiskit():
                                                                                      "sum_count": sum_count}
 
         self.results_dict[f"rep{self.results_dict['iter_count']}"]["return"] = avg / sum_count
+
+        #safe results to make sure nothing is lost, even if the code or backend crashes
+        with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+            json.dump(self.results_dict, write_file, indent=2, default=str)
+
         return avg / sum_count
 
     def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
@@ -389,13 +395,14 @@ class QaoaQiskit():
 
         return backend, noise_model, coupling_map, basis_gates
 
-    def get_expectation(self, components: dict, simulator: str = "aer_simulator", shots: int = 1024,
+    def get_expectation(self, filename: str, components: dict, simulator: str = "aer_simulator", shots: int = 1024,
                         simulate: bool = True, noise: bool = False):
         """
         Builds the objective function, which can be used in a classical solver.
 
         Args:
-            components: (dict) All components to be modeled as a Quantum Circuit
+            filename: (str) The name of the file to which the results shall be safed.
+            components: (dict) All components to be modeled as a Quantum Circuit.
             simulator: (str) The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
             shots: (int) Number of repetitions of each circuit, for sampling. Default: 1024
             simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If
@@ -441,9 +448,10 @@ class QaoaQiskit():
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["theta"] = list(theta)
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
+
             self.kirchhoff[f"rep{self.results_dict['iter_count']}"] = {}
 
-            return self.compute_expectation(counts=counts, components=components)
+            return self.compute_expectation(counts=counts, components=components, filename=filename)
 
         return execute_circ
 
@@ -498,28 +506,33 @@ def main():
     shots = 4096
     #shots = 16384
     simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
-    simulate = True
+    simulate = False
     noise = True
     #initial_guess = [1.0, 1.0]
     initial_guess = [1.0, 1.0, 1.0]
     #initial_guess = [1.0, 1.0, 1.0, 1.0]
     max_iter = 50
     #max_iter = 200
+    repetitions = 1
 
     num_vars = len(initial_guess)
 
     loop_results = {}
 
-    for i in range(1, 11):
+    for i in range(1, repetitions + 1):
         time_start = datetime.timestamp(datetime.now())
         print(i)
 
         qaoa = QaoaQiskit()
         spsa = SPSA(maxiter=max_iter)
 
+        now = datetime.today()
+        filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+
         components = qaoa.getComponents(network=testNetwork)
 
-        expectation = qaoa.get_expectation(components=components,
+        expectation = qaoa.get_expectation(filename=filename,
+                                           components=components,
                                            simulator=simulator,
                                            shots=shots,
                                            simulate=simulate,
@@ -541,10 +554,10 @@ def main():
         duration = time_end - time_start
         qaoa.results_dict["duration"] = duration
 
-        now = datetime.today()
-        filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+        #safe final results
         with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
-            json.dump(qaoa.results_dict, write_file, indent=2)
+            json.dump(qaoa.results_dict, write_file, indent=2, default=str)
+
         #filename2 = f"Kirchhoff_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
         #with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
         #    json.dump(qaoa.kirchhoff, write_file, indent=2)
@@ -563,7 +576,7 @@ def main():
     now = datetime.today()
     filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
     with open(os.path.dirname(__file__) + "/../../results_qaoa/qaoaCompare/" + filename, "w") as write_file:
-        json.dump(loop_results, write_file, indent=2)
+        json.dump(loop_results, write_file, indent=2, default=str)
     # plot_histogram(qaoa.results_dict[f"rep{qaoa.results_dict['iter_count']}"]["counts"])
     # plt.show()
 
