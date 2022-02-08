@@ -5,609 +5,353 @@ import typing
 
 
 class IsingPypsaInterface:
-    def __init__(self, network, snapshots):
-        self.problem = {}
-        self.snapshots = snapshots
-        self._startIndex = {}
+    """
+    class to generate and store an Ising spin glass problem.
 
+    @attribute network: pypsa.Network
+        the network for which to build in ising spin glass problem for
+    @attribute snapshots: list
+        list of snapshots to be considered in problem
+    @attribute allocatedQubits: int
+        number of currently used qubits
+    @attribute problem: dict
+        dictionary that stores ising spin glass interactions
+    @attribute data: dict
+        a dictionary that stores all encoding with qubits related data 
+        for the network components. 
+        @key: int
+            weight of the qubit
+        @key: str
+            data as dictionary corresponding to the component label
+    @attribute kirchhoffFactor: float
+        weight of kirchhoff constraint
+    @attribute monetaryCostFactor: float
+        weight of any monetary cost incurred by a solution
+    @attribute minUpDownFactor: float
+        weight of minimal up/down-time constraint
+    """
+
+    def __init__(self, network, snapshots):
+        """
+        Constructor for an IsingPypsaInterface. It reads all relevant parameters
+        for a problem formulation from the environment and instantiates all attributes
+        that other class method write in and read from. It does not fill any of those
+        attributes with data specific to a chosen problem formulation like component
+        - qubit representations or problem contraint interactions
+
+        @param network: pypsa.Network
+            The pypsa.Network for which to build an Ising spin glass problem
+        @param snapshots: list
+            integer indices of snapshots to consider in Ising spin glass problem
+        @return: IsingPypsaInterface
+            An empty IsingPypsaInterface object
+        """
+
+        # network to be solved
+        self.network = network
+        self.snapshots = snapshots
+
+        # hyper parameters of problem formulation
         envMgr = EnvironmentVariableManager()
         self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
         self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
         self.minUpDownFactor = float(envMgr["minUpDownFactor"])
-        self.slackVarFactor = float(envMgr["slackVarFactor"])
 
-        lineRepresentation = envMgr["lineRepresentation"]
-        self.maxOrder = int(envMgr["maxOrder"])
+        # contains ising coefficients
+        self.problem = {}
 
-        if lineRepresentation == "":
-            self.network = network
-        else:
-            self.lineRepresentation = int(lineRepresentation)
-            self.network = network.copy()
-        # line splitting. Stores data to retrieve original configuration in dict
-        #keys: line name in original network
-        #value: number of components of capacity 2^n-1 the decomposition is made
-        #of. Line names in dummy network for an item (k,v) in the dictionary are
-        #"{k}_split_{i}" for 0 <= i < v
-            self.lineDictionary = {}
-            self.lineNames = network.lines.index
-            for line in self.lineNames:
-                originalLine, numSplits = self.splitLine(
-                        line,
-                        self.network,
-                        self.lineRepresentation,
-                        self.maxOrder
-                )
-                self.lineDictionary[originalLine] = numSplits
-            
-
-        count = 0
-        for i in range(len(self.network.buses)):
-            gen = self.network.generators[
-                self.network.generators.bus == self.network.buses.index[i]
-            ]
-            for name in gen.index:
-                if self.network.generators.committable[name]:
-                    continue
-                self._startIndex[name] = count
-                count += len(self.snapshots)
-
-        # this allows to optimize the flow through lines
-        # requires a binary representation of the number
-        # and an additional variable for the sign
-        self._lineIndices = {}
-        self._lineDirection = {}
-
-        for index in self.network.lines.index:
-            # store the directional qubits first, then the line's binary representations
-            self._lineDirection[index] = count
-            count += len(self.snapshots)
-            # now the representation
-            self._lineIndices[index] = count
-            count += len(self.snapshots) * self.getBinaryLength(index)
-
-        # to avoid cubic or quartic contributions we add slack variables that
-        # store the product of the binary bit and the sign
-        self._slackVarsForQubo = {}
-        self._slackStart = count
-        for index in self.network.lines.index:
-            self._slackVarsForQubo[index] = count
-            count += len(self.snapshots) * self.getBinaryLength(index)
-        self.slackIndex = count
-
-    def addInteraction(self, *args):
-        """Helper function to define an Ising Interaction.
-
-        Can take arbitrary number of arguments:
-        The last argument is the interaction strength.
-        The previous arguments contain the spin ids.
-        """
-        if len(args) < 2:
-            raise ValueError(
-                "An interaction needs at least one spin id and a weight."
-            )
-        if len(args) == 3 and args[0] == args[1]:
-            raise ValueError("Same qubit")
-        for i in range(len(args) - 1):
-            if not isinstance(args[i], int):
-                raise ValueError(
-                    f"The spin id: {args[:-1]} needs to be an integer"
-                )
-        if not isinstance(args[-1], float):
-            raise ValueError("The interaction needs to be a float")
-        if args[-1] != 0:
-            key = tuple(sorted(args[:-1]))
-            # the minus is necessary because the solver has an additional
-            # -1 factor in the couplings
-            self.problem[key] = self.problem.get(key, 0) - args[-1]
-
-    def toVecIndex(self, generator, time=0):
-        """Return the index for the supplied generator at t=0.
-        If the generator was not yet encountered, it creates a new
-        set of indices for the generator and each point in time.
-        """
-        pos = self._startIndex.get(generator, None)
-        if pos is None:
-            return None
-        return pos + time
-
-    def getBinaryLength(self, line):
-        return len(
-            "{0:b}".format(int(np.round(self.network.lines.loc[line].s_nom)))
-        )
-
-    def lineToIndex(self, lineId, time, binaryPos):
-        return (
-            self._lineIndices[lineId]
-            + time * self.getBinaryLength(lineId)
-            + binaryPos
-        )
-
-    def lineDirectionToIndex(self, lineId, time):
-        return self._lineDirection[lineId] + time
-
-    def lineSlackToIndex(self, lineId, time, binaryPos):
-        return (
-            self._slackVarsForQubo[lineId]
-            + time * self.getBinaryLength(lineId)
-            + binaryPos
-        )
-
-    def addSlackVar(self):
-        """Return the index of a newly created slack variable.
-
-        IMPORTANT: This function can only be used after all
-        generators have been added and processed.
-        This should only happen in the init function.
-        """
-        var = self.slackIndex
-        self.slackIndex += 1
-        return var
-
-    def fromVecIndex(self, index):
-        """Return a tuple of generator key and time from a given Spin ID."""
-        for key in self._startIndex:
-            if index < self._startIndex[key] + len(self.snapshots):
-                break
-        if self._slackStart <= index:
-            raise ValueError("No Generator assigned to this index")
-        return (key, index % len(self.snapshots))
-
-    def siquanFormat(self):
-        """Return the complete problem in the format for the siquan solver"""
-        return [(v, list(k)) for k, v in self.problem.items()]
-
-    def numVariables(self):
-        """Return the number of spins."""
-        return self.slackIndex
-
-    def individualCostContribution(self, result):
-        contrib = {}
-        for node in self.network.buses.index:
-            for t in range(len(self.snapshots)):
-                testNetwork = IsingPypsaInterface(self.network, self.snapshots)
-                testNetwork._kirchhoffConstraint(node, t)
-                contrib[str((node, t))] = testNetwork.calcCost(
-                    result, addConstContribution=False
-                ) + self.constantCostContribution(node, t)
-        return contrib
-
-    def calcCost(self, result, addConstContribution=True):
-        result = set(result)
-        totalCost = 0.0
-        for spins, weight in self.problem.items():
-            if len(spins) == 1:
-                factor = 1
-            else:
-                factor = -1
-            for spin in spins:
-                if spin in result:
-                    factor *= -1
-            totalCost += factor * weight
-        if addConstContribution:
-            for node in self.network.buses.index:
-                for t in range(len(self.snapshots)):
-                    totalCost += self.constantCostContribution(node, t)
-            totalCost += self.constantSlackCost()
-        return totalCost
+        # contains encoding data
+        self.data = {}
+        
+        # qubits currently in use/next qubit to use to represent a network component
+        self.allocatedQubits = 0
 
     @classmethod
     def buildCostFunction(
         cls,
         network,
     ):
-        """Build the complete cost function for an Ising formulation.
-        The cost function is quite complex and I recommend first reading
-        through the mathematical formulation.
         """
-        problemDict = cls(network, network.snapshots)
-        problemDict._marginalCosts()
+        factory method to instantiate a child class of IsingPypsaInterface. Additional
+        parameters to determine the appropiate child class are read from the environment.
 
-        for gen in problemDict._startIndex:
-            for t in range(len(problemDict.snapshots)):
-                problemDict._startupShutdownCost(gen, t)
-
-        # kirchhoff constraints
-        for node in problemDict.network.buses.index:
-            for t in range(len(problemDict.snapshots)):
-                problemDict._kirchhoffConstraint(node, t)
-
-        problemDict._addSlackConstraints()
-        return problemDict
-
-    def _marginalCosts(self):
-        for index in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                lenbinary = self.getBinaryLength(index)
-                for i in range(lenbinary):
-                    self.addInteraction(
-                        self._lineIndices[index] + i + lenbinary * t,
-                        0.5 * self.monetaryCostFactor * 2 ** i,
-                    )
-
-        for gen in self._startIndex:
-            for t in range(len(self.snapshots)):
-                # operating cost contribution
-                index = self.toVecIndex(gen, t)
-                val = self.network.generators["marginal_cost"].loc[gen] * (
-                    self.getGeneratorOutput(gen, t)
-                )
-                self.addInteraction(index, self.monetaryCostFactor * val)
-
-    def _startupShutdownCost(self, gen, t):
-        lambdaMinUp = self.minUpDownFactor  # for Tminup constraint
-        lambdaMinDown = self.minUpDownFactor  # for Tmindown constraint
-        index = self.toVecIndex(gen, t)
-        su = self.network.generators["start_up_cost"].loc[gen]
-        sd = self.network.generators["shut_down_cost"].loc[gen]
-
-        Tmindown = min(
-            len(self.snapshots) - t - 1,
-            self.network.generators["min_down_time"].loc[gen],
-        )
-        Tminup = min(
-            len(self.snapshots) - t - 1,
-            self.network.generators["min_up_time"].loc[gen],
-        )
-
-        if t == 0:
-            self.addInteraction(
-                index, 0.5 * self.monetaryCostFactor * (sd - su)
-            )
-
-        elif t == len(self.snapshots) - 1:
-            self.addInteraction(
-                index, 0.5 * self.monetaryCostFactor * (su - sd)
-            )
-
-        else:
-            self.addInteraction(
-                index,
-                index - 1,
-                -0.5 * self.monetaryCostFactor * (su + sd)
-                - lambdaMinUp * Tminup
-                - lambdaMinDown * Tmindown,
-            )
-            self.addInteraction(
-                index, lambdaMinUp * Tminup - lambdaMinDown * Tmindown
-            )
-            self.addInteraction(
-                index - 1,
-                -lambdaMinUp * Tminup + lambdaMinDown * Tmindown,
-            )
-            for deltaT in range(Tminup):
-                self.addInteraction(index + deltaT + 1, -lambdaMinUp)
-                self.addInteraction(index, index + deltaT + 1, -lambdaMinUp)
-                self.addInteraction(index - 1, index + deltaT + 1, lambdaMinUp)
-                self.addInteraction(
-                    index, index - 1, index + deltaT + 1, lambdaMinUp
-                )
-
-            for deltaT in range(Tmindown):
-                self.addInteraction(index + deltaT + 1, lambdaMinDown)
-                self.addInteraction(
-                    index - 1, index + deltaT + 1, lambdaMinDown
-                )
-                self.addInteraction(index, index + deltaT + 1, -lambdaMinDown)
-                self.addInteraction(
-                    index,
-                    index - 1,
-                    index + deltaT + 1,
-                    -lambdaMinDown,
-                )
-
-    def getGeneratorOutput(self, gen, time):
-        """Return the generator output for a given point in time.
-
-        Two values can be used from the Pypsa datamodel:
-            - p: The output of the LOPF optimization. This is not good, because
-                after LOPF we will already have an optimized solution.
-            - p_nom*p_max_pu: this does not need another optimization. The following
-                parameters must be set:
-                p_nom: the maximal output
-                p_max_pu: a time dependent factor how much power can be output
-                    (usually only set for renewables)
+        @param network: pypsa.Network
+            A pypsa network for which to formulate the unit commitment problem as an
+            ising spin glass problem
+        @return: IsingPypsaInterface
+            instance of IsingPypsaInterface child class with complete problem formulation
         """
-        factor = 1.0
-        if gen in self.network.generators_t.p_max_pu:
-            factor = self.network.generators_t.p_max_pu[gen].iloc[time]
-        return factor * self.network.generators.p_nom[gen]
 
-    def getMaxLineEnergy(self, line):
-        """Return the maximum value of energy a line can transport.
+        envMgr = EnvironmentVariableManager()
+        problemFormulation = envMgr["problemFormulation"]
 
-        Currently we round this to the next highest power of 2 (-1)
+        FactoryDictionary = {
+                "fullsplit" : fullsplitIsingInterface,
+                "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,
+                "fullsplitMarginalAsPenalty" : fullsplitMarginalAsPenalty,
+                "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
+                "fullsplitLocalMarginalEstimationDistance" : fullsplitLocalMarginalEstimationDistance,
+                "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
+        }
+        IsingProduct = FactoryDictionary[problemFormulation](network, network.snapshots)
+        return IsingProduct
+
+    def writeToHighestLevel(self, component):
         """
-        return 2 ** self.getBinaryLength(line) - 1
+        After storing all qubits that represent a logical component of the network
+        (generators, lines) this writes the weight of all used qubits i into the
+        data dictionary at the highest level for access as self.data[i]
 
-    def maxGenPossible(self, node, t):
-        maxPossible = 0
-        for gen in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            maxPossible += self.getGeneratorOutput(gen, t)
-        return maxPossible
-
-    def totalLineCapacity(self, node):
-        totalLineCapacity = 0.0
-        lineIdsFactor = self.getLineFactors(node)
-        for lineId1, factor in lineIdsFactor.items():
-            totalLineCapacity += factor * self.getMaxLineEnergy(lineId1)
-        return totalLineCapacity
-
-    def generateConstant(self, node, t):
-        # the helper c_nt calculation
-        c_nt = 0.0
-        # storage
-        for i in self.network.storage_units[
-            self.network.storage_units.bus == node
-        ].index:
-            c_nt += self.network.storage_units_t.p[i].iloc[t]
-        # loads contribution
-        for load in self.network.loads[self.network.loads.bus == node].index:
-            if load in self.network.loads_t.p_set:
-                c_nt -= self.network.loads_t.p_set[load].iloc[t]
-        return c_nt
-
-    def getLineFactors(self, node) -> typing.Dict[str, int]:
-        lineIdsFactor = {}
-        for lineId in self.network.lines[
-            self.network.lines.bus0 == node
-        ].index:
-            lineIdsFactor[lineId] = 1
-        for lineId in self.network.lines[
-            self.network.lines.bus1 == node
-        ].index:
-            lineIdsFactor[lineId] = -1
-        return lineIdsFactor
-
-    def _quadraticGeneratorTerm(self, node, t):
-        """This term is the quadratic contribution for the Kirchhoff constraint."""
-        for gen0 in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            index = self.toVecIndex(gen0, t)
-            if index is None:
-                continue
-            # generator^2 term
-            for gen1 in self.network.generators[
-                self.network.generators.bus == node
-            ].index:
-                index1 = self.toVecIndex(gen1, t)
-                if index1 is None:
-                    # this branch is for non-committable generators
-                    # in our problems these should not appear
-                    val = self.getGeneratorOutput(
-                        gen0, t
-                    ) * self.getGeneratorOutput(gen1, t)
-                    self.addInteraction(
-                        index, 0.5 * self.kirchhoffFactor * val
-                    )
-                elif index == index1:
-                    # a squared variable does not affect the optimization problem
-                    # we can therefore ignore it
-                    continue
-                else:
-                    val = self.getGeneratorOutput(
-                        gen0, t
-                    ) * self.getGeneratorOutput(gen1, t)
-                    self.addInteraction(
-                        index, index1, 1.0 / 4 * self.kirchhoffFactor * val
-                    )
-
-    def _quadraticLineTerms(self, node, t):
-        """This term is the quadratic contribution of the slack variables (lines)
-        for the kirchhoff constraint.
+        @param component: str
+            the label of a network component
+        @return: None
+            modifies the dictionary self.data 
         """
-        lineIdsFactor = self.getLineFactors(node)
-        for lineId1, factor1 in lineIdsFactor.items():
-            lenbinary1 = self.getBinaryLength(lineId1)
-            for i in range(lenbinary1):
-                for lineId2, factor2 in lineIdsFactor.items():
-                    lenbinary2 = self.getBinaryLength(lineId2)
-                    for j in range(lenbinary2):
-                        # add the crossterm between line slack vars and line vars
-                        # because the same loops are needed
-                        self.addInteraction(
-                            self.lineToIndex(lineId1, t, i),
-                            self.lineSlackToIndex(lineId2, t, j),
-                            -self.kirchhoffFactor
-                            * 2 ** i
-                            * 2 ** j
-                            * factor1
-                            * factor2,
-                        )
-                        if lineId1 != lineId2 or i != j:
-                            # cross term between total line sum and individual line
-                            self.addInteraction(
-                                self.lineToIndex(lineId1, t, i),
-                                self.lineToIndex(lineId2, t, j),
-                                self.kirchhoffFactor
-                                / 4
-                                * 2 ** i
-                                * 2 ** j
-                                * factor1
-                                * factor2,
-                            )
-                            # slack vars make up the second quadratic sum
-                            self.addInteraction(
-                                self.lineSlackToIndex(lineId1, t, i),
-                                self.lineSlackToIndex(lineId2, t, j),
-                                self.kirchhoffFactor
-                                * 2 ** i
-                                * 2 ** j
-                                * factor1
-                                * factor2,
-                            )
+        for idx in range(len(self.data[component]['indices'])):
+            self.data[self.data[component]['indices'][idx]] = self.data[component]['weights'][idx]
 
-    def _linearGeneratorTerm(self, node, t):
-        maxGenPossible = self.maxGenPossible(node, t)
-        maxLineCapacity = self.totalLineCapacity(node)
-        c_nt = self.generateConstant(node, t)
-        for gen0 in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            index = self.toVecIndex(gen0, t)
-            if index is None:
-                continue
-            self.addInteraction(
-                index,
-                self.kirchhoffFactor
-                * (0.5 * maxGenPossible + 0.5 * maxLineCapacity + c_nt)
-                * self.getGeneratorOutput(gen0, t),
-            )
 
-    def _linearLineTerms(self, node, t):
-        maxGenPossible = self.maxGenPossible(node, t)
-        maxLineCapacity = self.totalLineCapacity(node)
-        c_nt = self.generateConstant(node, t)
-        lineIdsFactor = self.getLineFactors(node)
-        for lineId1, factor1 in lineIdsFactor.items():
-            lenbinary = self.getBinaryLength(lineId1)
-            for i in range(lenbinary):
-                self.addInteraction(
-                    self.lineSlackToIndex(lineId1, t, i),
-                    self.kirchhoffFactor
-                    * (maxGenPossible + maxLineCapacity + 2 * c_nt)
-                    * factor1
-                    * 2 ** i,
-                )
-                self.addInteraction(
-                    self.lineToIndex(lineId1, t, i),
-                    self.kirchhoffFactor
-                    * (-0.5 * maxLineCapacity - c_nt - 0.5 * maxGenPossible)
-                    * factor1
-                    * 2 ** i,
-                )
+    def storeGenerators(self):
+        """
+        Assigns qubits (int) to each generator in self.network. For each generator it writes
+        generator specific parameters(power, corresponding qubits, size of encoding) into 
+        the dictionary self.data. At last it updates object specific parameters
 
-    def _crossTermGeneratorLine(self, node, t):
-        lineIdsFactor = self.getLineFactors(node)
-        for gen0 in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            index = self.toVecIndex(gen0, t)
-            for lineId1, factor1 in lineIdsFactor.items():
-                lenbinary1 = self.getBinaryLength(lineId1)
-                for i in range(lenbinary1):
-                    val = (
-                        self.kirchhoffFactor
-                        * self.getGeneratorOutput(gen0, t)
-                        * factor1
-                        * 2 ** i
-                    )
-                    if index is None:
-                        self.addInteraction(
-                            self.lineToIndex(lineId1, t, i),
-                            -0.5 * val,
-                        )
-                        self.addInteraction(
-                            self.lineSlackToIndex(lineId1, t, i),
-                            val,
-                        )
-                    else:
-                        self.addInteraction(
-                            index,
-                            self.lineToIndex(lineId1, t, i),
-                            -0.5 * val,
-                        )
-                        self.addInteraction(
-                            index,
-                            self.lineSlackToIndex(lineId1, t, i),
-                            val,
-                        )
+        @return: None
+            modifies self.data and self.allocatedQubits
+        """
 
-    def _addSlackConstraints(self):
-        for index in self.network.lines.index:
-            lenbinary = self.getBinaryLength(index)
-            for t in range(len(self.network.snapshots)):
-                for i in range(lenbinary):
-                    self.addInteraction(
-                        self.lineToIndex(index, t, i),
-                        -self.slackVarFactor,
-                    )
-                    self.addInteraction(
-                        self.lineDirectionToIndex(index, t),
-                        -self.slackVarFactor,
-                    )
-                    self.addInteraction(
-                        self.lineSlackToIndex(index, t, i),
-                        2 * self.slackVarFactor,
-                    )
-                    self.addInteraction(
-                        self.lineToIndex(index, t, i),
-                        self.lineDirectionToIndex(index, t),
-                        self.slackVarFactor,
-                    )
-                    self.addInteraction(
-                        self.lineToIndex(index, t, i),
-                        self.lineSlackToIndex(index, t, i),
-                        -2 * self.slackVarFactor,
-                    )
-                    self.addInteraction(
-                        self.lineDirectionToIndex(index, t),
-                        self.lineSlackToIndex(index, t, i),
-                        -2 * self.slackVarFactor,
-                    )
+        for bus in range(len(self.network.buses)):
+            generatorsAtBus = self.network.generators[
+                self.network.generators.bus == self.network.buses.index[bus]
+            ]
+            for gen in generatorsAtBus.index:
+                self.data[gen] = {
+                        'indices' : [],
+                        'weights' : [],
+                        'encodingLength' : 1
+                }
+                for time in range(len(self.network.snapshots)):
+                    # no generator is supposed to be committable in our problems
+                    if self.network.generators.committable[gen]:
+                        continue
+                    self.data[gen]['indices'].append(self.allocatedQubits)
+                    self.data[gen]['weights'].append(self.network.generators_t.p_max_pu[gen].iloc[time])
+                    self.allocatedQubits += 1
+                self.writeToHighestLevel(gen)
+        return
 
-    def constantCostContribution(self, node, t):
-        totalConstCost = 0
-        maxGenPossible = self.maxGenPossible(node, t)
-        maxLineCapacity = self.totalLineCapacity(node)
-        c_nt = self.generateConstant(node, t)
-        totalConstCost += self.kirchhoffFactor * (
-            0.25 * maxLineCapacity ** 2
-            + maxLineCapacity * c_nt
-            + 0.25 * maxGenPossible ** 2
-            + 0.5 * maxGenPossible * maxLineCapacity
-            + maxGenPossible * c_nt
-            + c_nt ** 2
-        )
-        # these parts are from the quadratic sum where the gen, line, slacks are squared
-        for gen0 in self.network.generators[
-            self.network.generators.bus == node
-        ].index:
-            totalConstCost += (
-                0.25
-                * self.kirchhoffFactor
-                * self.getGeneratorOutput(gen0, t) ** 2
-            )
 
-        for line in self.getLineFactors(node):
-            for i in range(self.getBinaryLength(line)):
-                totalConstCost += 1.25 * self.kirchhoffFactor * 2 ** (i * 2)
-        return totalConstCost
+    def storeLines(self):
+        """
+        wrapper for calling encodeLine to store a qubit representation
+        on all lines at each time slice
+        
+        @return: None
+            modifies self.data and self.allocatedQubits
+        """
+        for line in self.network.lines.index:
+            for time in range(len(self.network.snapshots)):
+            # overwrite this in child classes
+                self.encodeLine(line,time)
+            self.writeToHighestLevel(line)
+
+    def encodeLine(self, line, time):
+        """
+        Allocate qubits to encode a line at a single time slice. The specific encoding
+        of the line is determined by the method "splitCapacity". Other encodings can be
+        obtained by overwriting "splitCapacity" in a child class.
+
+        @param line: str
+            label of the network line to be encoded in qubits
+        @param time: int
+            index of time slice at which to encode the line
+        @return: None
+            modifies self.allocatedQubits and self.data
+
+        """
+        capacity = int(self.network.lines.loc[line].s_nom)
+        weights = self.splitCapacity(capacity)
+        indices = list(range(self.allocatedQubits, self.allocatedQubits + len(weights),1))
+        self.allocatedQubits += len(indices)
+        self.data[line] = {
+                'weights' : weights,
+                'indices' : indices,
+                'encodingLength' : len(weights),
+        }
+        return
+
+    # @abstractmethod
+    def splitCapacity(self, capacity):
+        """
+        Method to split a line which has maximum capacity "capacity". A line split is a 
+        list of lines with varying capacity which can either be on or off. The status of 
+        a line is binary, so it can either carry no power or power equal to it's capacity
+        The direction of flow for each line is also fixed. It is not enforced that a
+        chosen split can only represent flow lower than capacity or all flows that are
+        admissable. 
+
+        @param capacity: int
+            the capacity of the line that is to be split up
+        @return: list
+            a list of integers. Each integer is the capacity of a line of the splitting
+            direciont of flow is encoded as the sign
+        """
+        raise NotImplementedError("No implementation for splitting up a line into multilple components")
+
+    # ------------------------------------------------------------------------
+    # helper functions to obtain represented values
+
+    def getBusComponents(self, bus):
+        """
+        Returns all labels of components that connect to a bus as a dictionary. 
+        For lines that end in this bus, positive power flow is interpreted as
+        increasing available power at the bus. For Lines that start in this bus
+        positive power flow is interpreted as decreasing available power at the bus.
+
+        @param bus: str
+            label of the bus
+        @return: dict
+            @key 'generators'
+                list of labels of generators that are at the bus
+            @key 'positiveLines'
+                list of labels of lines that start in this bus
+            @key 'negativeLines'
+                list of labels of lines that end in this bus
+         - end in this bus
+        """
+        result = {
+                "generators":
+                        list(self.network.generators[
+                                self.network.generators.bus == bus
+                        ].index)
+                    ,
+                "positiveLines" :
+                        list(self.network.lines[
+                                self.network.lines.bus0 == bus
+                        ].index)
+                ,
+                "negativeLines" :
+                        list(self.network.lines[
+                                self.network.lines.bus1 == bus
+                        ].index)
+                ,
+                }
+        return result
+
+
+    def getGeneratorStatus(self, gen, solution, time=0):
+        """
+        return the status of a generator(on, off) in a given solution
+
+        @param gen: str
+            label of the generator
+        @param solution: list
+            list of all qubits which have spin -1 in the solution
+        @param time: time
+            index of time slice for which to get the generator status
+        """
+        return self.data[gen]['indices'][time] in solution
+
+    def getFlowDictionary(self, solution):
+        """
+        builds a dictionary containing all power flows at all time slices for a given
+        solution of qubit spins
+
+        @param solution: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            @key: (str,int)
+                label of line and index of time slice
+        """
+        solution = set(solution)
+        result = {}
+        for lineId in self.network.lines.index:
+            for time in range(len(self.snapshots)):
+                result[(lineId, time)] = self.getEncodedValueOfComponent(lineId, solution, time)
+        return result
+
 
     def getLineValues(self, solution):
-        solution = set(solution)
-        lineValues = {}
-        for lineId in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                value = 0
-                for i in range(self.getBinaryLength(lineId)):
-                    if self.lineToIndex(lineId, t, i) in solution:
-                        value += 2 ** i
-                if self.lineDirectionToIndex(lineId, t) in solution:
-                    value = -value
-                lineValues[(lineId, t)] = value
-        return self.mergeLines(lineValues,self.snapshots)
+        """
+        wrapper for calling getFlowDictionary. It builds a dictionary that contains
+        all power flows at all time slices for a given solution of qubit spins
 
-    def constantSlackCost(self):
-        totalConstCost = 0.0
-        for index in self.network.lines.index:
-            for t in range(len(self.snapshots)):
-                lenbinary = self.getBinaryLength(index)
-                totalConstCost += 3 * self.slackVarFactor * lenbinary
-        return totalConstCost
+        @param solution: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            @key: (str,int)
+                label of line and index of time slice
+        """
+        return self.getFlowDictionary(solution)
 
-    def _kirchhoffConstraint(self, node, t):
-        self._quadraticGeneratorTerm(node, t)
-        self._quadraticLineTerms(node, t)
-        self._linearGeneratorTerm(node, t)
-        self._linearLineTerms(node, t)
-        self._crossTermGeneratorLine(node, t)
 
-    @staticmethod
-    def addSQASolutionToNetwork(network, problemDict, solutionState):
+    def getLoad(self, bus, time=0):
+        """
+        returns the total load at a bus at a given time slice
+
+        @param bus: str
+            label of bus at which to calculate the total load
+        @param time: int
+            index of time slice for which to get the total load
+        """
+        loadsAtCurrentBus = self.network.loads[
+                                    self.network.loads.bus == bus
+                            ].index
+        allLoads = self.network.loads_t['p_set'].iloc[time]
+        result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
+        if result == 0:
+            print(f"Warning: No load at {bus} at timestep {time}")
+        if result < 0:
+            raise ValueError(
+                "negative Load at current Bus"
+            )
+        return result
+
+
+    def getMemoryAdress(self, component, time=0):
+        """
+        Returns a list of all qubits that are used to encode a network component
+        at a given time slice. A component is assumed to be encoded in one block
+        with constant encoding size per time slice and order of time slices
+        being respected in the encoding
+
+        @param component: str
+            label of the network component
+        @param time: int
+            index of time slice for which to get representing qubits
+        @return: list
+            list of integers which are qubits that represent the component
+        """
+        encodingLength = self.data[component]["encodingLength"]
+        return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
+
+
+    def siquanFormat(self):
+        """
+        Return the complete problem in the format for the siquan solver
+        
+        @return: list
+            list of tuples of the form (interaction-coefficient, list(qubits))
+        """
+        return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
+
+
+    # TODO
+    # @staticmethod
+    def addSQASolutionToNetwork(self, network, solutionState):
+        """
+        writes the solution encoded in an ising spin glass problem into the 
+        pypsa network
+        
+        @param network: pypsa.Network
+            the pypsa network in which to write the results
+        @param solutionState: list
+            list of all qubits which have spin -1 in the solution 
+        @return: None
+            modifies network changing generator status and power flows
+        
+        """
         for gen in problemDict._startIndex:
             vec = np.zeros(len(problemDict.snapshots))
             network.generators_t.status[gen] = np.concatenate(
@@ -643,60 +387,793 @@ class IsingPypsaInterface:
 
         return network
 
-
-    def splitLine(self, line, network, lineRepresentation=0, maxOrder=0):
+    def numVariables(self):
         """
-        splits up a line into multiple lines such that each new line
-        has capacity 2^n - 1 for some n. Modifies the network given
-        as an argument and returns the original line name and how
-        many components where used to split it up. Use it on the
-        network stored in self because it modifies it.
+        Return the number of currently used qubits
 
-        lineRepresentation is an upper limit for number of splits. if
-        is is 0, no limit is set
+        @return: int
+            number of qubits in use
         """
-        remaining_s_nom = network.lines.loc[line].s_nom
-        numComponents = 0
-        maxMagnitude = 2 ** self.maxOrder - 1
+        return self.allocatedQubits
 
-        while remaining_s_nom > 0 \
-                and (lineRepresentation == 0 or lineRepresentation > numComponents):
-            binLength = len("{0:b}".format(1+int(np.round(remaining_s_nom))))-1
-            magnitude = 2 ** binLength - 1
-            if maxOrder:
-                magnitude = min(magnitude,maxMagnitude)
-            remaining_s_nom -= magnitude
-            network.add(
-                "Line",
-                f"{line}_split_{numComponents}",
-                bus0=network.lines.loc[line].bus0,
-                bus1=network.lines.loc[line].bus1,
-                s_nom=magnitude
+    def getEncodedValueOfComponent(self, component, result, time=0):
+        """
+        Returns the encoded value of a component according to the spin configuration in result
+        at a given time slice
+
+        @param component: str
+            label of the network component for which to retrieve encoded value
+        @param result: list
+            list of all qubits which have spin -1 in the solution
+        @param time: int
+            index of time slice for which to retrieve encoded value
+        @return: float
+            value of component encoded in the spin configuration of result
+        """
+        value = 0.0
+        encodingLength = self.data[component]["encodingLength"]
+        for idx in range(time*encodingLength, (time+1)*encodingLength,1):
+            if self.data[component]['indices'][idx] in result:
+                value += self.data[component]['weights'][idx]
+        return value
+
+    def calcKirchhoffCostAtBus(self, bus, result):
+        """
+        returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the type (str,int) over all  time slices and the string 
+            alwyays being the chosen bus
+        """
+        contrib = {}
+        for t in range(len(self.snapshots)):
+            load = - self.getLoad(bus,t)
+            components = self.getBusComponents(bus)
+            for gen in components['generators']:
+                load += self.getEncodedValueOfComponent(gen, result, time=t)
+            for lineId in components['positiveLines']:
+                load += self.getEncodedValueOfComponent(lineId, result, time=t)
+            for lineId in components['negativeLines']:
+                load -= self.getEncodedValueOfComponent(lineId, result, time=t)
+            load = (load * self.kirchhoffFactor) ** 2
+            contrib[str((bus, t))] = load
+        return contrib
+
+    def individualCostContribution(self, result):
+        """
+        returns a dictionary which contains the kirchhoff cost incurred at every bus at
+        every time slice
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the form (str,int) over all busses and time slices
+        """
+        # TODO proper cost
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result)}
+        return contrib
+
+    def individualMarginalCost(self, result):
+        """
+        returns a dictionary which contains the marginal cost incurred at every bus 'bus' at
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the type (str,int) over all busses and time slices
+        """
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcMarginalCostAtBus(bus, result)}
+        return contrib
+
+    def calcMarginalCostAtBus(self, bus, result):
+        """
+        returns a dictionary which contains the marginal cost the specified bus 'bus' at
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the type (str,int) over all  time slices and the string 
+            alwyays being the chosen bus
+        """
+        contrib = {}
+        for time in range(len(self.snapshots)):
+            marginalCost = 0.0
+            components = self.getBusComponents(bus)
+            for generator in components['generators']:
+                if self.getGeneratorStatus(generator, result, time):
+                    marginalCost += self.network.generators["marginal_cost"].loc[generator]
+            contrib[str((bus, time))] = marginalCost
+        return contrib
+
+    def calcMarginalCost(self, result):
+        """
+        calculate the total marginal cost incurred by a solution
+
+        @param result: list
+            list of all qubits which have spin -1 in the solution
+        @return: float
+            total marginal cost incurred without monetaryFactor scaling
+        """
+        marginalCost = 0.0
+        for key, val in self.individualMarginalCost(result).items():
+            marginalCost += val 
+        return marginalCost
+
+
+    def calcCost(self, result, addConstContribution=True):
+        """
+        calculates the energy of a spin state including the constant energy contribution
+        
+        @param result: list
+            list of all qubits which have spin -1 in the solution 
+        @return: float
+            the energy of the spin glass state in result
+        
+        """
+        result = set(result)
+        totalCost = 0.0
+        for spins, weight in self.problem.items():
+            if len(spins) == 1:
+                factor = 1
+            else:
+                factor = -1
+            for spin in spins:
+                if spin in result:
+                    factor *= -1
+            totalCost += factor * weight
+        return totalCost
+
+
+    # ------------------------------------------------------------
+    # functions to couple components. The couplings are interpreted as multiplications of QUBO
+    # polynomials. The final interactions are coefficients for an ising spin glass problem
+
+    def addInteraction(self, *args):
+        """
+        Helper function to define an Ising Interaction. The interaction is scaled by all qubit
+        specific weights. For higher order interactions, it performs substitutions of qubits
+        that occur multiple times, which would be constant in an ising spin glass problem.
+        Interactions are stored in the attribute "problem", which is a dictionary
+        Keys are tupels of involved qubits and values are floats
+
+        The method can take an arbitrary number of arguments:
+        The last argument is the interaction strength.
+        The previous arguments contain the spin ids.
+
+        @param args[-1]: float
+            the basic interaction strength before appling qubit weights
+        @param args[:-1]: list
+            list of all qubits that are involved in this interaction
+        @return: None
+            modifies self.problem by adding the strength of the interaction if an interaction
+            coefficient is already set
+        """
+        if len(args) > 3:
+            raise ValueError(
+                "Too many arguments for an interaction"
             )
-            numComponents += 1
+        *key, interactionStrength = args
+        key = tuple(key)
+        for qubit in key:
+            interactionStrength *= self.data[qubit]
 
-        network.remove("Line",line)
-        return (line, numComponents)
+        # if we couple two spins, we check if they are different. If both spins are the same, 
+        # we substitute the product of spins with 1, since 1 * 1 = -1 * -1 = 1 holds. This
+        # makes it into a constant contribution. Doesn't work properly for higer order interactions
+        if len(key) == 2:
+            if key[0] == key[1]:
+                key = tuple([])
+        self.problem[key] = self.problem.get(key,0) - interactionStrength
 
 
-    def mergeLines(self, lineValues, snapshots):
+    def coupleComponentWithConstant(self, component, couplingStrength=1, time=0):
         """
-        For a dictionary of lineValues of the network, whose
-        lines were split up, uses the data in self to calculate
-        the corresponding lineValues in the unmodified network
+        Performs a QUBO multiplication involving a single variable on all qubits which are logically
+        grouped to represent a component at a given time slice. This QUBO multiplication is
+        translated into Ising interactions and then added to the currently stored ising spin glass
+        problem
+
+        @param component: str
+            label of the network component
+        @param couplingStrength: float
+            cofficient of QUBO multiplication by which to scale the interaction. Does not contain 
+            qubit specific weight
+        @param time: int
+            index of time slice for which to couple qubit representing the component
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient
         """
-        if hasattr(self, 'lineDictionary'):
-            result = {}
-            for line, numSplits in self.lineDictionary.items():
-                for snapshot in range(len(snapshots)):
-                    newKey = (line, snapshot)
-                    value = 0
-                    for i in range(numSplits):
-                        splitLineKey = line + "_split_" + str(i)
-                        value += lineValues[(splitLineKey, snapshot)]
-                    result[newKey] = value
-            return result
-        else:
-            return lineValues
+        componentAdress = self.getMemoryAdress(component,time)
+        for qubit in componentAdress:
+            # term with single spin after applying QUBO to Ising transformation
+            self.addInteraction(qubit, 0.5 * couplingStrength)
+            # term with constant cost constribution after applying QUBO to Ising transformation
+            self.addInteraction(0.5 * couplingStrength * self.data[qubit])
+
+
+    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0, additionalTime=None):
+        """
+        Performs a QUBO multiplication involving exactly two components on all qubits which are logically
+        grouped to represent these components at a given time slice. This QUBO multiplication is
+        translated into Ising interactions and then added to the currently stored ising spin glass
+        problem
+
+        @param firstComponent: str
+            label of the first network component
+        @param secondComponent: str
+            label of the second network component
+        @param couplingStrength: float
+            cofficient of QUBO multiplication by which to scale the interaction. Does not contain 
+            qubit specific weights
+        @param time: int
+            index of time slice of the first component for which to couple qubits representing it
+        @param additionalTime: int
+            index of time slice of the second component for which to couple qubits representing it.
+            The default parameter None is used if the time slices of both components are the same 
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient
+        @example:
+            Let X_1, X_2 be the qubits representing firstComponent and Y_1, Y_2 the qubits representing
+            secondComponent. The QUBO product the method translates into ising spin glass coefficients is:
+            (X_1 + X_2) (Y_1 + Y_2) = X_1 Y_1 + X_1 Y_2 + X_2 Y_1 + X_2 Y_2
+        """
+        if additionalTime is None:
+            additionalTime = time
+        firstComponentAdress = self.getMemoryAdress(firstComponent,time)
+        secondComponentAdress = self.getMemoryAdress(secondComponent,additionalTime)
+        # components with 0 weight (power, capacity) vanish in the QUBO formulation
+        if (not firstComponentAdress) or (not secondComponentAdress):
+            return
+
+        # order by memory adress
+        if firstComponentAdress[0] > secondComponentAdress[0]:
+            self.coupleComponents(
+                    secondComponent,
+                    firstComponent,
+                    couplingStrength,
+                    time=time
+            )
+            return
+
+        for first in range(len(firstComponentAdress)):
+            for second in range(len(secondComponentAdress)):
+                # term with two spins after applying QUBO to Ising transformation
+                # if both spins are the same, this will add a constant cost.
+                # addInteraction performs substitution of spin with a constant
+                self.addInteraction(
+                        firstComponentAdress[first],
+                        secondComponentAdress[second],
+                        couplingStrength * 0.25
+                )
+
+                # terms with single spins after applying QUBO to Ising transformation
+                self.addInteraction(
+                        firstComponentAdress[first],
+                        couplingStrength * self.data[secondComponent]['weights'][second] * 0.25
+                )
+                self.addInteraction(
+                        secondComponentAdress[second],
+                        couplingStrength * self.data[firstComponent]['weights'][first] * 0.25
+                )
+
+                # term with constant cost constribution after applying QUBO to Ising transformation
+                self.addInteraction(
+                    self.data[firstComponent]['weights'][first] * \
+                    self.data[secondComponent]['weights'][second] * \
+                    couplingStrength * 0.25
+                )
+
+
+    # ------------------------------------------------------------
+    # encodings of problem constraints
+
+    def encodeKirchhoffConstraint(self, bus, time=0):
+        """
+        Adds the kirchhoff constraint at a bus to the problem formulation. The kirchhoff constraint
+        is that the sum of all power generating elements (generators, lines ) is equal to the sum of 
+        all load generating elements (bus specific load, lines). Deviation from equality is penalized
+        quadratically 
+
+        @param bus: str
+            label of the bus at which to enforce the kirchhoff constraint
+        @param time: int
+            index of time slice at which to enforce the kirchhoff contraint
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient
+        """
+        components = self.getBusComponents(bus)
+        flattenedComponenents = components['generators'] + \
+                components['positiveLines'] + \
+                components['negativeLines']
+        demand = self.getLoad(bus, time=time)
+
+        # constant load contribution to cost function so that a configuration that fulfills the
+        # kirchhoff contraint has energy 0
+        self.addInteraction(demand ** 2)
+        for component1 in flattenedComponenents:
+            factor = 1.0
+            if component1 in components['negativeLines']:
+                factor *= -1.0
+            # reward/penalty term for matching/adding load
+            self.coupleComponentWithConstant(component1, - 2.0 * factor * demand)
+            for component2 in flattenedComponenents:
+                if component2 in components['negativeLines']:
+                    curFactor = -factor
+                else:
+                    curFactor = factor
+                # attraction/repulsion term for different/same sign of power at components
+                self.coupleComponents(component1, component2, couplingStrength=curFactor)
+
+    def encodeStartupShutdownCost(self, bus, time=0):
+        """
+        Adds the startup and shutdown costs for every generator attached to the bus. Those
+        costs are monetary costs incurred whenever a generator changes its status from one
+        time slice to the next. The first time slice doesn't incurr costs because the status
+        of the generators before is unknown
+        
+        @param bus: str
+            label of the bus at which to add startup and shutdown cost
+        @param time: int
+            index of time slice which contains the generator status after a status change
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient 
+        
+        """
+
+        # no previous information on first time step or when out of bounds
+        if time == 0 or time >= len(self.snapshots):
+            return
+
+        generators = self.getBusComponents(bus)['generators']
+
+        for generator in generators:
+            startup_cost = self.network.generators["start_up_cost"].loc[generator]
+            shutdown_cost = self.network.generators["shut_down_cost"].loc[generator]
+
+            # start up costs
+            # summands of (1-g_{time-1})  * g_{time})
+            self.coupleComponentWithConstant(
+                    generator,
+                    couplingStrength=self.monetaryCostFactor * startup_cost,
+                    time=time
+            )
+            self.coupleComponents(
+                    generator,
+                    generator,
+                    couplingStrength= -self.monetaryCostFactor * startup_cost,
+                    time = time,
+                    additionalTime = time -1
+            )
+
+            # shutdown costs
+            # summands of g_{time-1} * (1-g_{time})
+            self.coupleComponentWithConstant(
+                    generator,
+                    couplingStrength=self.monetaryCostFactor * shutdown_cost,
+                    time=time-1
+            )
+            self.coupleComponents(
+                    generator,
+                    generator,
+                    couplingStrength= -self.monetaryCostFactor * shutdown_cost,
+                    time = time,
+                    additionalTime = time -1
+            )
+
+
+class fullsplitIsingInterface(IsingPypsaInterface):
+    """
+    This class provides a line splitting method by using as many integer sized steps
+    as possible. A line of capacity 'c' is thus represented by 2*c qubits
+    of weight 1.
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # read generators and lines from network and encode as qubits
+        self.storeGenerators()
+        self.storeLines()
+
+    def splitCapacity(self, capacity):
+        """
+        Method to split a line which has maximum capacity "capacity". A line split is a 
+        list of lines with varying capacity which can either be on or off. The status of 
+        a line is binary, so it can either carry no power or power equal to it's capacity
+        The direction of flow for each line is also fixed. It is not enforced that a
+        chosen split can only represent flow lower than capacity or all flows that are
+        admissable. the line split is represented by the capacity of the it's components
+
+        @param capacity: int
+            the capacity of the line that is to be split up
+        @return: list
+            a list of integers. Each integer is the capacity of a line of the splitting
+            direction of flow is encoded as the sign
+        """
+        return [1 for _ in range(0,capacity,1)]  + [-1 for _ in range(0,capacity,1)]
+
+
+class fullsplitDirectInefficiencyPenalty(fullsplitIsingInterface):
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem formulation specific parameters
+        # problem constraints: kirchhoff, startup/shutdown, marginal cost
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
+                self.encodeMarginalCosts(node,time)
+                self.encodeStartupShutdownCost(node,time)
+
+    def calcEffiencyLoss(self, cheapGen, expensiveGen,time=0):
+        """
+        calculates an approximation of the loss of using a generator with higher operational 
+        costs compared to using the generator with a lower cost 
+
+        @param cheapGen: str
+            generator label with lower marginal cost per MW produced
+        @param expensiveGen: str
+            generator label that has hower marginal cost per MW produced
+        @return: float:
+            a value that can be used as a coupling strength for penalizing using the expensive generator
+        """
+        cheapCost = self.network.generators["marginal_cost"].loc[cheapGen]
+        expensiveCost = self.network.generators["marginal_cost"].loc[expensiveGen]
+        result = max(0,(expensiveCost - cheapCost )) * self.monetaryCostFactor 
+        return result
+
+
+    def encodeMarginalCosts(self, bus, time):
+        """
+        encodes marginal costs for running generators at a single bus by penalizing expensive
+        generators and adding rewards to that generator if cheaper generators are also on
+
+        @param bus: str
+            label of the bus at which to add marginal costs
+        @param time: int
+            index of time slice for which to add marginal costs
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient
+        """
+        FACTOR = 1.0
+        generators = self.getBusComponents(bus)['generators']
+        sortedGenerators = sorted(
+                generators,
+                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
+        )
+        numGenerators = len(generators)
+        for idx, cheapGen in enumerate(sortedGenerators):
+            for _, expensiveGen in enumerate(sortedGenerators, start=idx + 1):
+                couplingStrength = self.calcEffiencyLoss(cheapGen, expensiveGen)
+                self.coupleComponentWithConstant(
+                    expensiveGen,
+                    couplingStrength =   1.0 / (len(generators) - idx) * couplingStrength * FACTOR,
+                    time=time
+                ) 
+                self.coupleComponents(
+                    cheapGen,
+                    expensiveGen,
+                    couplingStrength= - 1.0 / (len(generators)- idx) * couplingStrength * FACTOR,
+                    time=time
+                )
+        return
+
+
+class fullsplitNoMarginalCost(fullsplitIsingInterface):
+    """
+    This class uses a 'fullsplit' to encode lines. It optimizes according to the kirchhoff
+    constraint, but doesn't consider any marginal costs incurred
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem constraints: kirchhoff
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
+
+class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
+    """
+    class for building an ising spin glass problem for optimizing marginal costs
+    while respecting the kirchoff constraint. We represent it by substituting generator
+    marginal cost by their difference to the most efficient generator. then we estimate
+    a lower bound of the marginal cost at every bus. The marginal cost constraint is then given
+    as minimizing the squared distance of incurred marginal cost to the estimated marginal cost
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem constraints: kirchhoff, startup/shutdown, marginal cost
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
+                self.encodeMarginalCosts(node,time)
+                self.encodeStartupShutdownCost(node,time)
+
+    def chooseOffset(self, sortedGenerators):
+        """
+        calculates a float by which to offset all marginal costs. The chosen offset is the
+        marginal cost of the most efficient generator plus a constant
+
+        @param sortedGenerators: list
+            a list of generators already sorted by their minimal cost in ascending order
+        @return: float
+             a float by which to offset all marginal costs of network components
+        """
+        REL_POS = 0.3 * len(sortedGenerators)
+        CONST_IDX_OFFSET =  0.0
+        idx = int(CONST_IDX_OFFSET + REL_POS )
+        result = self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+        marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
+        return result
+
+    def estimateMarginalCostAtBus(self, bus, time):
+        """
+        estimates a lower bound for marginal costs incurred by matching the load at the bus
+        only with generators that are at this bus
+        
+        @param bus: str
+            but at which to estimate marginal costs
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @return: float, float
+            returns an estimation of the incurred marginal cost if the marginal costs of generators
+            are all offset by the second return value
+        """
+        LOAD_FACTOR = 1.0
+        remainingLoad = self.getLoad(bus, time) * LOAD_FACTOR
+        generators = self.getBusComponents(bus)['generators']
+        sortedGenerators = sorted(
+                generators,
+                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
+        )
+        offset = self.chooseOffset(sortedGenerators)
+        costEstimation = 0.0
+        for generator in sortedGenerators:
+            if remainingLoad <= 0:
+                break
+            suppliedPower = min(remainingLoad, self.data[generator]['weights'][0])
+            costEstimation += suppliedPower * (self.network.generators["marginal_cost"].loc[generator] - offset)
+            remainingLoad -= suppliedPower
+        return costEstimation, offset
+
+    def encodeMarginalCosts(self, bus, time):
+        """
+        encodes marginal costs at a bus by first estimating a lower bound of unavoidable marginal costs
+        Then deviation in the marginal cost from that estimation are penalized quadratically
+        
+        @param bus: str
+            but at which to estimate marginal costs
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @return: None 
+             modifies self.problem. Adds to previously written interaction cofficient 
+        """
+        # linear scale of constraint
+        FACTOR = 0.20
+        # linear scale of marginal costs
+        ESTIMATOR_FACTOR = 1.0
+        components = self.getBusComponents(bus)
+        flattenedComponenents = components['generators'] + \
+                components['positiveLines'] + \
+                components['negativeLines']
+
+        estimatedCost, offset = self.estimateMarginalCostAtBus(bus,time)
     
+        def calculateCost(component):
+            if component in components['generators']:
+                return self.network.generators["marginal_cost"].loc[component]-offset
+            return 0.0
+        
+        self.addInteraction(0.25 * estimatedCost ** 2)
+        for gen1 in flattenedComponenents:
+            self.coupleComponentWithConstant(
+                    gen1,
+                    - 2.0 * calculateCost(gen1) * \
+                            estimatedCost *  \
+                            self.monetaryCostFactor * \
+                            FACTOR * \
+                            ESTIMATOR_FACTOR 
+                    )
+            for gen2 in flattenedComponenents:
+                curFactor = self.monetaryCostFactor * \
+                                calculateCost(gen1) * \
+                                calculateCost(gen2) * \
+                                FACTOR * \
+                                ESTIMATOR_FACTOR ** 2
+                self.coupleComponents(
+                        gen1,
+                        gen2,
+                        couplingStrength=curFactor
+                )
+
+
+class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
+
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem constraints: kirchhoff, startup/shutdown, marginal cost
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
+                self.encodeMarginalCosts(node,time)
+                self.encodeStartupShutdownCost(node,time)
+
+    def calcAverageCostPerPowerGenerated(self, time=0):
+        """
+        calculates average cost power unit produced if all generators
+        were switched on.
+
+        @param time: int
+            index of time slice for which to calculate average marginal costs
+        @return: float
+            the average marginal cost of all generators weighted by power output
+        """
+        maxCost = 0.0
+        maxPower = 0.0
+        for generator in self.network.generators.index:
+            currentPower = self.network.generators_t.p_max_pu[generator].iloc[time]
+            maxCost += currentPower * self.network.generators["marginal_cost"].loc[generator]
+            maxPower += currentPower
+        return float(maxCost / maxPower)
+
+    def marginalCostOffset(self, bus, time=0):
+        """
+        returns a float by which all generator marginal costs per power will be offset.
+        Since every generator will be offset, this will not change relative costs between them
+        It changes the range of energy contributions this constraint provides. Adding marginal
+        costs as a cost to the QUBO formulation will penalize all generator configurations. The offset
+        shifts it so that better than average generator configuration will be rewarded.
+        
+        @param bus: str
+            label of the bus at which to add marginal costs
+        @param time: int
+            index of time slice for which to add marginal costs
+        @return: float
+            a float that in is in the range of generator marginal costs
+        """
+        return 0.8 * self.calcAverageCostPerPowerGenerated(time)
+
+    def encodeMarginalCosts(self, bus, time):
+        """
+        encodes marginal costs for running generators and transmission lines at a single bus.
+        This uses an offset calculated in ´marginalCostOffset´, which is a dependent on all generators
+        of the entire network for a single time slice
+
+        @param bus: str
+            label of the bus at which to add marginal costs
+        @param time: int
+            index of time slice for which to add marginal cost
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient 
+        """
+        # temporary for scaling without rebuilding image by changing run.py 
+        FACTOR = 1.0
+        generators = self.getBusComponents(bus)['generators']
+        costOffset = self.marginalCostOffset(bus,time)
+        for generator in generators:
+            self.coupleComponentWithConstant(
+                    generator, 
+                    couplingStrength=self.monetaryCostFactor * \
+                            FACTOR * \
+                            (self.network.generators["marginal_cost"].loc[generator] - \
+                            costOffset),
+                    time=time
+            )
+
+
+class fullsplitGlobalCostSquare(fullsplitIsingInterface):
+    """
+    class for building an ising spin glass problem for optimizing marginal costs
+    while respecting the kirchhoff constraint. The marginal costs of using generators
+    are considered one single global constraint. The square of marginal costs is encoded
+    into the energy and thus minimized
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        for time in range(len(self.snapshots)):
+            self.encodeMarginalCosts(time)
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
+                self.encodeStartupShutdownCost(node,time)
+
+    def chooseOffset(self, sortedGenerators):
+        """
+        calculates a float by which to offset all marginal costs. It tries to center the resulting
+        marginal cost around the marginal cost of the optimal solution. this means that in a best 
+        case scenario, the optimal solution incurrs a penalty of 0 when using a minimal square 
+        constraint on the offset marginal cost
+        
+        @param sortedGenerators: list
+            a list of generators already sorted by their minimal cost in ascending order
+        @return: float
+             a float by which to offset all marginal costs of network components
+        """
+        REL_POS = 3.5
+        CONST_IDX_OFFSET = 0.0
+        idx =  int(CONST_IDX_OFFSET + len(sortedGenerators)/ REL_POS)
+        return self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+
+    def estimateGlobalMarginalCost(self, time, expectedAdditonalCost=0.0):
+        """
+        estimates a lower bound of incurred marginal costs if locality of generators could be
+        ignored at a given time slice. Unavoidable baseline costs of matching the load is ignored. 
+        The offset to reduce baseline costs to 0 and estimated marginal cost with a constant is returned
+
+        @param time: int
+            index of time slice for which to calculate lower bound of offset marginal cost
+        @param expectedAdditonalCost: float
+            constant by which to offset the returned marginal cost bound
+        @return: float, float
+            lower bound of global marginal cost
+            offset that was subtracted from marginal costs of all generators to calculate lower bound
+        """
+        load = 0.0
+        for bus in self.network.buses.index:
+            load += self.getLoad(bus,time)
+
+        sortedGenerators = sorted(
+                self.network.generators.index,
+                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
+        )
+        offset = self.chooseOffset(sortedGenerators)
+        costEstimation = 0.0
+        for generator in sortedGenerators:
+            if load <= 0:
+                break
+            suppliedPower = min(load, self.data[generator]['weights'][0])
+            costEstimation += suppliedPower * (self.network.generators["marginal_cost"].loc[generator] - offset)
+            load -= suppliedPower
+        return costEstimation+expectedAdditonalCost, offset
+
+
+    def encodeMarginalCosts(self, time):
+        """
+        The marginal costs of using generators
+        are considered one single global constraint. The square of marginal costs is encoded
+        into the energy and thus minimized
+
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @param expectedAdditonalCost: float
+            float by which lower estimate off marginal cost is offset
+        @return: None 
+            modifies self.problem. Adds to previously written interaction cofficient 
+        """
+        FACTOR = 2.000
+        ESTIMATORFAC = 1.0
+
+        estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
+        generators = self.network.generators.index
+
+        load = 0.0
+        for bus in self.network.buses.index:
+            load += self.getLoad(bus,time)
+       
+        for gen1 in generators:
+            # reward/penalty term for matching/adding load
+            marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
+            self.coupleComponentWithConstant(
+                    gen1,
+                    - 2.0 * marginalCostGen1* \
+                            self.monetaryCostFactor * \
+                            ESTIMATORFAC * \
+                            FACTOR
+                    )
+            for gen2 in generators:
+                marginalCostGen2 = self.network.generators["marginal_cost"].loc[gen2] - offset
+                curFactor = self.monetaryCostFactor * \
+                                marginalCostGen1 * \
+                                marginalCostGen2 * \
+                                FACTOR * \
+                                ESTIMATORFAC ** 2
+                self.coupleComponents(
+                        gen1,
+                        gen2,
+                        couplingStrength=curFactor
+                )
 

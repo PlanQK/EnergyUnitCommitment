@@ -48,8 +48,9 @@ class BackendBase(abc.ABC):
             "problemSize": "",
             "scale": "",
             "timeout": "int",  # pypsa; dwave
-            "time": "",  # pypsa; dwave
             "totalCost": "",  # all
+            "optimizationTime" : "",
+            "postprocessingTime" : "",
             "dwaveBackend": {"annealing_time": "int",
                              "num_reads": "int",
                              "chain_strength": "int",
@@ -71,16 +72,19 @@ class BackendBase(abc.ABC):
                              "energy": ""
                              },
             "isingInterface": {"kirchhoffFactor": "float",
-                               "slackVarFactor": "float",
                                "monetaryCostFactor": "float",
                                "minUpDownFactor": "float",
-                               "lineRepresentation": "int",
-                               "maxOrder": "int"
+                               "problemFormulation": "",
                                },
             "pypsaBackend": {"solver_name": "",
                              "slack_gen_penalty": ""
                              },
-            "sqaBackend": {"individualCost": ""
+            "sqaBackend": {"individualCost": "",
+                           "seed": "int",
+                           "transverseFieldSchedule": "",
+                           "temperatureSchedule": "",
+                           "trotterSlices": "int",
+                           "optimizationCycles": "int",
                            },
             "qaoaBackend": ""
             }
@@ -98,11 +102,8 @@ class BackendBase(abc.ABC):
                 self.metaInfo[var] = {}
                 for dictVar in variables[var]:
                     self.metaInfo[var][dictVar] = populateMetaInfo(varType=variables[var][dictVar], varName=dictVar)
-                    if var == "isingInterface":
-                        setattr(self, dictVar, float(self.metaInfo[var][dictVar]))
             else:
                 self.metaInfo[var] = populateMetaInfo(varType=variables[var], varName=var)
-
 
         self.metaInfo["fileName"] = self.envMgr["outputInfo"]
         self.metaInfo["inputFile"] = "_".join(self.metaInfo["fileName"].split("_")[1:5])

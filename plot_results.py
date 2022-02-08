@@ -7,28 +7,57 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path
+from os import path, getenv
 
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
 FILEFORMAT = "png"
 BINSIZE = 1
 PLOTLIMIT = 500
+# export computing cost rate
+COSTPERHOUR = getenv('costperhour')
+ 
+
+def meanOfSquareRoot(values: list) -> float:
+    """
+    Reduction method to reduce the given values into one float by first applying 
+    a square root to all values and then averaging them by using "mean"-method"
+
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
+    return np.mean([np.sqrt(value) for value in values])
+
+
+def meanOfAnnealingComputingCost(values : list) -> float :
+    return np.mean([COSTPERHOUR*value for value in values])
 
 
 def deviationOfTheMean(values: list) -> float:
     """
-        Reduction method to reduce the given values into one float using the "deviation of the mean"-method
+    Reduction method to reduce the given values into one float using the "deviation of the mean"-method
 
-        @param values: list
-            A list of values to be reduced.
-        @return: float
-            Reduced value.
-        """
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     return np.std(values) / np.sqrt(len(values))
 
 
-def cumulativeDistribution(values: list) -> list:
+def cumulativeDistribution(values: list[list[float]]) -> list:
+    """
+    Reduction method to construct a cumulativeDistribution for a list of lists of values
+    It returns a list of values that a histogramm of that list will look like the cumulative
+    distribution of all values
+
+    @param values: list
+        A list of lists of values for which to construct a cumulative Distribution
+    @param: list
+        A list which histogramm is a cumulative distribution
+    """
     result = []
     maxVal = max(values[0])
     for valueLists in values:
@@ -45,13 +74,13 @@ def cumulativeDistribution(values: list) -> list:
 
 def averageOfBetterThanMedian(values: list) -> float:
     """
-        Reduction method to reduce the given values into one float using the "average of better than median"-method
+    Reduction method to reduce the given values into one float using the "average of better than median"-method
 
-        @param values: list
-            A list of values to be reduced.
-        @return: float
-            Reduced value.
-        """
+    @param values: list
+        A list of values to be reduced.
+    @return: float
+        Reduced value.
+    """
     median = np.median(values)
     result = 0
     count = 0
@@ -93,7 +122,9 @@ def averageOfBestPercent(values: list, percentage: float) -> float:
 
 def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
     """
-    Used to create scatter plots from a single run.
+    Reduction method to extract data from all shots of a single batch. It creates two lists for making
+    a scatter plot: First list consists of the spin glass's systems energy for the x-axis and second list is
+    the corresponding optimized cost of the optimization problem
 
     @param cutSamplesDictList: object
         List of dicts to be searched through.
@@ -170,8 +201,9 @@ def makeFig(plotInfo: dict, outputFile: str,
             for e in values:
                 x += e[1][0]
                 y += e[1][1]
-            ax.scatter(x, y, s=10)
 
+            ax.scatter(x,y,s=8)
+            
             # linear regression
             m, b = np.polyfit(x, y, 1)
             ax.plot(x, [m * z + b for z in x], color='red')
@@ -190,12 +222,13 @@ def makeFig(plotInfo: dict, outputFile: str,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     fig.suptitle(title)
+
+
     if fileformat == "":
         fig.savefig(outputFile + ".png")
         fig.savefig(outputFile + ".pdf")
     else:
         fig.savefig(outputFile + "." + fileformat)
-
 
 def resolveKey(element: dict, field: str) -> any:
     """
@@ -274,7 +307,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
     Extracts the information to be plotted.
 
     @param fileRegex: str
-        A regular expressions to get the data
+        A glob pattern to get the data
     @param xField: str
         The name of the x-Axis key. Nested keys can be reached by providing a list of strings, which represent the path
         through the nested dicts.
@@ -306,32 +339,32 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             else:
                 element = addPlottableInformation(jsonDict=element)
 
-    for key, values in constraints.items():
-        try:
-            # value of constraint is not in constrains list
-            if float(resolveKey(element, key)) not in values:
-                break
-        except KeyError:
-            pass
-    # value of constraint is found in constrains list
-    else:
-        # create a new key using the splitField
-        key = tuple(
-            e
-            for e in [
-                splitField + "=" + str(resolveKey(element, splitField) or "")
-                for splitField in splitFields
-            ]
-        )
+        for key, values in constraints.items():
+            try:
+                # value of constraint is not in constrains list
+                if float(resolveKey(element, key)) not in values:
+                    break
+            except KeyError:
+                pass
+        # value of constraint is found in constrains list
+        else:
+            # create a new key using the splitField
+            key = tuple(
+                e
+                for e in [
+                    splitField + "=" + str(resolveKey(element, splitField) or "")
+                    for splitField in splitFields
+                ]
+            )
 
-        xvalue = resolveKey(element, xField)
+            xvalue = resolveKey(element, xField)
 
-        if xvalue not in plotData[key]:
-            plotData[key][xvalue] = []
+            if xvalue not in plotData[key]:
+                plotData[key][xvalue] = []
 
-        yvalue = resolveKey(element, yField)
+            yvalue = resolveKey(element, yField)
 
-        plotData[key][element[xField]].append(yvalue)
+            plotData[key][element[xField]].append(yvalue)
         filesRead += 1
 
     # now perform reduction
@@ -360,7 +393,6 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
         print(f"files read for {fileRegex} : {filesRead}")
 
     return result
-
 
 def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFieldList: list = None,
               splitFields: list = ["problemSize"], logscalex: bool = True, logscaley: bool = False,
@@ -394,7 +426,7 @@ def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFie
         Turns the y-axis into a log scale.
     @param PATH: list
         A list of the paths to the data. It has to be the same size as fileRegexList. If nothing is given the data is
-        searched for in a standard folder.
+        searched for in the standard folder f'results_{solver}_sweep'.
     @param reductionMethod: func
         A list of functions to be used to reduce values into one float value. It has to be the same size as
         fileRegexList.
@@ -475,6 +507,210 @@ def main():
 
     global BINSIZE
     BINSIZE = 1
+
+    plotGroup("newising_chain_strength_to_cutSamplesCost",
+            "qpu_read",
+            [
+            "*newising_20_[0]_20.nc_[1]00_365*"
+            ],
+            "chain_strength",
+            yFieldList = ["cutSamplesCost"],
+            splitFields=["annealing_time"],
+            logscalex=False,
+            )
+
+    for chain in [50, 70, 90]:
+        regex = f"*newising_20_[0]_20.nc_[1]00_365_30_0_1_{chain}_365_1"
+        plotGroup(f"cumulativeCostDistribution_for_100_Anneal_{chain}_chain_strength",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["sampleValues"],
+                reductionMethod = [cumulativeDistribution],
+                errorMethod = None,
+                splitFields=["annealing_time"],
+                plottype="histogramm",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+        plotGroup(f"scatterplot_new_ising_100_Anneal_{chain}_chain_strength",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["cutSamples"],
+                reductionMethod = [extractCutSamples],
+                errorMethod = None,
+                splitFields = ["annealing_time"],
+                plottype="scatterCutSample",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+    return
+
+    plotGroup(f"scatterplot_new_ising_365Anneal",
+            "qpu_read",
+            [
+            f"*newising_10_[0]_20.nc_110_365_30_0_1_80_365_1",
+            ]
+            "problemSize",
+            yFieldList = ["cutSamples"],
+            reductionMethod = [extractCutSamples],
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+    return
+
+
+
+
+    # TODO add embeddings for other scales for first plot
+
+    regex = 'embedding_rep_0_ord_1_nocostnewising*.nc.json'
+    plotGroup("embedding_size_to_embeddedQubits_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["embeddedQubits"],
+            splitFields=["scale"],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+    plotGroup("embedding_size_to_logicalQubits_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["logicalQubits"],
+            splitFields=[],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+    plotGroup("embedding_scale_to_embedFactor_newising",
+            "qpu",
+            [
+            regex,
+            ],
+            xField = "problemSize",
+            yFieldList = ["embedFactor"],
+            splitFields=[],
+            PATH=["sweepNetworks"],
+            embeddingData = True,
+            logscalex=False,
+            logscaley=False,
+            )
+
+
+
+    regex = "*input_[7-9]_*_20.nc_*_70_0_[01]_250_1"
+    constraints={'mangledTotalAnnealTime' : [19,20],
+            'chain_strength' : [250],
+            'slackVarFactor' : [70.0],
+            'maxOrder' : [0,1],
+    }
+    plotGroup("annealReadRatio_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            ],
+            "annealReadRatio",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow"],
+            splitFields=[],
+            logscalex=True,
+            reductionMethod=[meanOfSquareRoot]*3,
+            constraints=constraints,
+            )
+    plotGroup("annealTime_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            ],
+            "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow"],
+            reductionMethod=[meanOfSquareRoot]*3,
+            logscalex=True,
+            splitFields=[],
+            constraints=constraints,
+            )
+
+    return
+
+
+
+    plotGroup(f"scatterplot_energy_to_optimizedCost_for_anneal_split",
+            "qpu_read",
+            [
+            f"*put_15_[0]_20.nc_5_365_30_0_1_80_365_1",
+            f"*put_15_[0]_20.nc_1000_365_30_0_1_80_365_1",
+            f"*put_15_[0]_20.nc_2000_365_30_0_1_80_365_1"
+            ],
+            "problemSize",
+            yFieldList = ["cutSamples"]*3,
+            reductionMethod = [extractCutSamples]*3,
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+    return
+
+
+    for annealTime in [1,5,110,1000,2000]:
+        regex = f"*put_15_[0]_20.nc_{annealTime}_365_30_0_1_80_365_1"
+        plotGroup(f"scatterplot_energy_to_optimizedCost_for_anneal_{annealTime}",
+                "qpu_read",
+                [
+                regex,
+                ],
+                "problemSize",
+                yFieldList = ["cutSamples"],
+                reductionMethod = [extractCutSamples],
+                errorMethod = None,
+                splitFields = [],
+                plottype="scatterCutSample",
+                logscalex=False,
+                xlabel="energy",
+                ylabel="cost",
+        )
+
+    regex = '*put_15_[0]_20.nc_110_365_30_0_1_80_365_1'
+    plotGroup("cumulativeCostDistribution_for_fullInitialEnergies",
+            "qpu_read",
+            [
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["cutSamples"],
+            reductionMethod = [extractCutSamples],
+            errorMethod = None,
+            splitFields = [],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
 
     regex = '*nocostinput_*'
     plotGroup("afterChange_cumulativeCostDistribution_for_fullInitialEnergies",
@@ -605,6 +841,7 @@ def main():
               logscalex=False,
               logscaley=False,
               )
+
 
     # TODO add embeddings for other scales for first plot
     plotGroup("embedding_size_to_embeddedQubits",

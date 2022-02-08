@@ -28,6 +28,7 @@ from pandas import value_counts
 class DwaveTabuSampler(BackendBase):
     def __init__(self, config: dict):
         super().__init__(config=config)
+        self.time = 0.0
         #self.solver = tabu.Tabusampler()
 
     def validateInput(self, path, network):
@@ -180,16 +181,15 @@ class DwaveTabuSampler(BackendBase):
             print(f"Total output at {snapshot}: {power}")
             print(f"Total load at {snapshot}: {load}")
 
-        network = transformedProblem[0].addSQASolutionToNetwork(
-            network, transformedProblem[0], solutionState
-        )
+        # network = transformedProblem.addSQASolutionToNetwork(
+        #      network, solutionState
+        # )
         return network
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        tic = time.perf_counter()
         result = self.solver.sample(transformedProblem[1])
-        self.metaInfo["time"] = time.perf_counter() - tic
+        self.metaInfo["serial"] = result.to_serializable()
         self.metaInfo["dwaveBackend"]["energy"] = result.first.energy
         print("done")
         return result
@@ -216,6 +216,7 @@ class DwaveCloudHybrid(DwaveCloud):
         self.sampler = LeapHybridSampler(solver=self.solver,
                                          token=self.token)
         self.metaInfo["dwaveBackend"]["solver_id"] = self.solver
+        self.time = 0.0
 
         # TODO write more info on solution to metaInfo
 
@@ -257,8 +258,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{networkPath}/embedding_' \
-                        f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
-                        f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
+                        f'rep_{self.metaInfo["isingInterface"]["problemFormulation"]}_' \
                         f'{network}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
@@ -336,6 +336,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.token = self.envMgr["dwaveAPIToken"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
+
 
         # additional info
         if self.metaInfo["timeout"] < 0:
@@ -427,7 +428,15 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # choose best self.metaInfo["dwaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
         cutSamples = df.sort_values("energy", ascending=True).iloc[:self.metaInfo["dwaveBackend"]["sampleCutSize"]]
+        cutSamples['quantumCost'] = cutSamples.apply(
+            lambda row: transformedProblem[0].calcCost(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
 
+
+        self.time = 0.0
         cutSamples['optimizedCost'] = cutSamples.apply(
             lambda row: self.optimizeSampleFlow(
                 row[:-3],
@@ -436,9 +445,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
             )[0],
             axis=1
         )
-        self.metaInfo["cutSamples"] = cutSamples[["energy", "optimizedCost"]].to_dict('index')
+        self.metaInfo["postprocessingTime"] = self.time
+
+        self.metaInfo["cutSamples"] = cutSamples[["energy", "quantumCost", "optimizedCost"]].to_dict('index')
         self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
+        self.time = 0.0
         self.optimizeSampleFlow(
             self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"]),
             self.network,
@@ -467,7 +479,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
         imbalances across all buses so they can still be improved. 
         """
 
+        tic = time.perf_counter()
         FlowSolution = edmonds_karp(graph, "superSource", "superSink")
+        toc = time.perf_counter()
+        self.time += toc - tic
 
         # key errors occur iff there is no power generated or no load at a bus.
         # Power can still flow through the bus, but no cost is incurred
@@ -602,8 +617,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         if not hasattr(self, 'embedding'):
             embeddingPath = f'{self.networkPath}/embedding_' \
-                            f'rep_{self.metaInfo["isingInterface"]["lineRepresentation"]}_' \
-                            f'ord_{self.metaInfo["isingInterface"]["maxOrder"]}_' \
+                            f'rep_{self.metaInfo["isingInterface"]["problemFormulation"]}_' \
                             f'{self.networkName}.json'
 
             embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
@@ -611,7 +625,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 json.dump(
                     embeddingDict, write_embedding, indent=2
                 )
-
+        self.metaInfo["optimizationTime"] = self.metaInfo["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
         return sampleset
 
 

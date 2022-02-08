@@ -24,6 +24,7 @@ DEFAULT_ENV_VARIABLES = {
     "slackVarFactor": 70.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
+    "problemFormulation": "fullsplit",
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "annealing_time": 500,
