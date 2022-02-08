@@ -1,11 +1,12 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
-REPETITIONS := 1
+REPETITIONS := 6
 
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Backends,target=/energy/Backends
+PREFIX := infoNocost
 
 
 
@@ -15,9 +16,11 @@ NUMBERS = $(shell seq 1 ${REPETITIONS})
 # sqa parameters
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
 TRANSVERSE_HIGH = $(shell seq 8.0 1.0 8)
-OPTIMIZATIONCYCLES = 500
+OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
+OPTIMIZATIONCYCLES = 400
 #OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
-TROTTERSLICES = 128
+TROTTERSLICES = $(shell seq 10 10 100)
+TROTTERSLICES = 1500
 
 # classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
@@ -25,21 +28,25 @@ CLASSICAL_LOW_TEMP = $(shell seq 0.5 0.5 0.5)
 
 # dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
 # dwaveAPIToken
-ANNEAL_TIME = $(shell seq 100 50 100)
+ANNEAL_TIME = $(shell seq 100 500 100)
 NUM_READS = $(shell seq 200 20 200)
-CHAINSTRENGTH = 80 
+#CHAINSTRENGTH = $(shell seq 60 30 60) 
+CHAINSTRENGTH = 60
 SAMPLECUTSIZE = $(shell seq 200 4 200)
 
 # Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
-PROBLEMFORMULATION = fullsplit
-
+PROBLEMFORMULATION = fullsplitGlobalCostSquare
+#PROBLEMFORMULATION = fullsplitMarginalAsPenalty
+#PROBLEMFORMULATION = fullsplitNoMarginalCost
+#PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
+#PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
 
 # glpk parameter
 TIMEOUT = 30
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][5]_1[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 
@@ -49,7 +56,7 @@ CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach optimizationCycles, ${OPTIMIZATIONCYCLES}, \
 		$(foreach trotterSlices, ${TROTTERSLICES}, \
 		$(foreach number, ${NUMBERS}, \
-		results_classical_parameter_sweep/info_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_{trotterSlices}_${number}))))))
+		results_classical_parameter_sweep/${PREFIX}_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_{trotterSlices}_${number}))))))
 
 SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach temp, ${SIQUAN_TEMP}, \
@@ -58,7 +65,7 @@ SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach trotterSlices, ${TROTTERSLICES}, \
 		$(foreach problemFormulation, ${PROBLEMFORMULATION}, \
 		$(foreach number, ${NUMBERS}, \
-		results_sqa_sweep/info_${filename}_${temp}_${transverse}_${optimizationCycles}_${trotterSlices}_${problemFormulation}_${number})))))))
+		results_sqa_sweep/${PREFIX}_${filename}_${temp}_${transverse}_${optimizationCycles}_${trotterSlices}_${problemFormulation}_${number})))))))
 
 QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach anneal_time, ${ANNEAL_TIME}, \
@@ -66,7 +73,7 @@ QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach problemFormulation, ${PROBLEMFORMULATION}, \
 		$(foreach chain_strength, ${CHAINSTRENGTH}, \
 		$(foreach number, ${NUMBERS}, \
-		results_qpu_sweep/info_${filename}_${anneal_time}_${num_reads}_${problemFormulation}_${chain_strength}_${number}))))))
+		results_qpu_sweep/${PREFIX}_${filename}_${anneal_time}_${num_reads}_${problemFormulation}_${chain_strength}_${number}))))))
 
 QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach anneal_time, ${ANNEAL_TIME}, \
@@ -75,12 +82,12 @@ QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach chain_strength, ${CHAINSTRENGTH}, \
 		$(foreach sampleCutSize, ${SAMPLECUTSIZE}, \
 		$(foreach number, ${NUMBERS}, \
-		results_qpu_read_sweep/info_${filename}_${anneal_time}_${num_reads}_${problemFormulation}_${chain_strength}_${sampleCutSize}_${number})))))))
+		results_qpu_read_sweep/${PREFIX}_${filename}_${anneal_time}_${num_reads}_${problemFormulation}_${chain_strength}_${sampleCutSize}_${number})))))))
 
 GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach timeout, $(TIMEOUT), \
 		$(foreach number, ${NUMBERS}, \
-		results_pypsa_glpk_sweep/info_${filename}_${timeout}_${number})))
+		results_pypsa_glpk_sweep/${PREFIX}_${filename}_${timeout}_${number})))
 		
 
 ## creating rules for result files
@@ -89,18 +96,18 @@ GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 # define classical parameter sweep targets
 
 define classicalParameterSweep
-results_classical_parameter_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_classical_parameter_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	$(MOUNTBACKENDPATH) \
 	--env temperatureSchedule=[$(strip $(2)),$(strip $(3))] \
 	--env transverseFieldSchedule=[0] \
 	--env optimizationCycles=$(strip $(4)) \
 	--env trotterSlices=$(strip $(5)) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
+	--env outputinfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 classical
 	mkdir -p results_classical_parameter_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_classical_parameter_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_classical_parameter_sweep/
 
 endef
 
@@ -116,7 +123,7 @@ $(foreach filename, $(SWEEPFILES), \
 # define siquan sweep targets
 
 define sqaParameterSweep
-results_sqa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_sqa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	$(MOUNTBACKENDPATH) \
 	--env temperatureSchedule=[$(strip $(2)),iF,0.0001] \
@@ -124,11 +131,11 @@ results_sqa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$
 	--env optimizationCycles=$(strip $(4)) \
 	--env trotterSlices=$(strip $(5)) \
 	--env problemFormulation=$(strip $(6)) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 sqa
 	mkdir -p results_sqa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) results_sqa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) results_sqa_sweep/
 
 endef
 
@@ -145,19 +152,19 @@ $(foreach filename, $(SWEEPFILES), \
 # define D-Wave qpu targets
 
 define qpuParameterSweep
-results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_qpu_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	$(MOUNTBACKENDPATH) \
 	--env annealing_time=$(strip $(2)) \
 	--env num_reads=$(strip $(3)) \
 	--env problemFormulation=$(strip $(4)) \
 	--env chain_strength=$(strip $(5)) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env dwaveAPIToken=$(dwaveAPIToken) \
 	energy:1.0 dwave-qpu
 	mkdir -p results_qpu_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_qpu_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_qpu_sweep/
 
 endef
 
@@ -173,8 +180,8 @@ $(foreach filename, $(SWEEPFILES), \
 # define targets for old sample data
 
 define qpuReadSweep
-results_qpu_read_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): docker.tmp \
-		results_qpu_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(7))
+results_qpu_read_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): docker.tmp \
+		results_qpu_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(7))
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	$(MOUNTBACKENDPATH) \
 			--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep/,target=/energy/results_qpu \
@@ -183,12 +190,12 @@ results_qpu_read_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(
 	--env problemFormulation=$(strip $(4)) \
 	--env chain_strength=$(strip $(5)) \
 	--env sampleCutSize=$(strip $(6)) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) \
 	--env inputNetwork=$(strip $(1)) \
-	--env inputInfo=results_qpu/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(7)) \
+	--env inputInfo=results_qpu/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(7)) \
 	energy:1.0 dwave-read-qpu
 	mkdir -p results_qpu_read_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) results_qpu_read_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) results_qpu_read_sweep/
 
 endef
 
@@ -205,15 +212,15 @@ $(foreach filename, $(SWEEPFILES), \
 # define glpk targets
 
 define pypsa-glpk
-results_pypsa_glpk_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_pypsa_glpk_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
 	$(MOUNTBACKENDPATH) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
 	energy:1.0 pypsa-glpk
 	mkdir -p results_pypsa_glpk_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3)) results_pypsa_glpk_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3)) results_pypsa_glpk_sweep/
 
 endef
 
