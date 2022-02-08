@@ -55,6 +55,7 @@ class DwaveTabuSampler(BackendBase):
         lineValues = transformedProblem[0].getLineValues(solutionState)
         indCostCon = transformedProblem[0].individualCostContribution(solutionState)
         totalCost = transformedProblem[0].calcCost(solutionState)
+        self.metaInfo["marginalCost"] = transformedProblem[0].calcMarginalCost(solutionState)
         self.metaInfo["totalCost"] = totalCost
 
         resultDict = {
@@ -153,16 +154,15 @@ class DwaveTabuSampler(BackendBase):
             min_deviation = df['deviation_from_opt_load'].min()
             ClosestSamples = df[df['deviation_from_opt_load'] == min_deviation]
             result_row = ClosestSamples.loc[ClosestSamples['energy'].idxmin()]
-            return result_row[:-3]
+            return result_row[:-4].to_dict()
 
         # interpret strategy as index in sample df
         try:
-            return df.iloc[strategy][:-3]
+            return df.iloc[strategy][:-4].to_dict()
         except TypeError:
             raise ValueError("The chosen strategy for picking a sample is not supported")
 
-    @classmethod
-    def transformSolutionToNetwork(cls, network, transformedProblem, solution):
+    def transformSolutionToNetwork(self, network, transformedProblem, solution):
 
         solutionState = solution['solutionState']
 
@@ -425,6 +425,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             costKey="ClosestFlow"
         )
 
+
         # choose best self.metaInfo["dwaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
         cutSamples = df.sort_values("energy", ascending=True).iloc[:self.metaInfo["dwaveBackend"]["sampleCutSize"]]
@@ -447,12 +448,36 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
         self.metaInfo["postprocessingTime"] = self.time
 
-        self.metaInfo["cutSamples"] = cutSamples[["energy", "quantumCost", "optimizedCost"]].to_dict('index')
+        cutSamples['marginalCost'] = cutSamples.apply(
+            lambda row: transformedProblem[0].calcMarginalCost(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
+
+
+
+
+        self.metaInfo["cutSamples"] = cutSamples[[
+                                                    "energy",
+                                                    "quantumCost",
+                                                    "optimizedCost",
+                                                    'marginalCost'
+                                                    ]].to_dict('index')
         self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
+        chosenSample = self.choose_sample(
+                solution,
+                self.network,
+                strategy=self.metaInfo["dwaveBackend"]["strategy"]
+                )
+        print(chosenSample)
+        self.metaInfo["marginalCost"] = transformedProblem[0].calcMarginalCost(
+            [id for id, value in chosenSample.items() if value == -1]
+        )
         self.time = 0.0
         self.optimizeSampleFlow(
-            self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"]),
+            chosenSample,
             self.network,
             costKey="optimizedStrategySample"
         )

@@ -438,6 +438,8 @@ class IsingPypsaInterface:
                 load += self.getEncodedValueOfComponent(lineId, result, time=t)
             for lineId in components['negativeLines']:
                 load -= self.getEncodedValueOfComponent(lineId, result, time=t)
+            if load:
+                print(f"IMBALANCE AT {bus}::{load}")
             load = (load * self.kirchhoffFactor) ** 2
             contrib[str((bus, t))] = load
         return contrib
@@ -490,7 +492,8 @@ class IsingPypsaInterface:
             components = self.getBusComponents(bus)
             for generator in components['generators']:
                 if self.getGeneratorStatus(generator, result, time):
-                    marginalCost += self.network.generators["marginal_cost"].loc[generator]
+                    marginalCost += self.network.generators["marginal_cost"].loc[generator] * \
+                                    self.data[generator]['weights'][0]
             contrib[str((bus, time))] = marginalCost
         return contrib
 
@@ -904,11 +907,13 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         @return: float
              a float by which to offset all marginal costs of network components
         """
-        REL_POS = 0.3 * len(sortedGenerators)
+        REL_POS = 0.6 * len(sortedGenerators)
         CONST_IDX_OFFSET =  0.0
         idx = int(CONST_IDX_OFFSET + REL_POS )
         result = self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+        print(f"OFFSET: {result}")
         marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
+        print(f"MEAN: {np.mean(marginalCostList)}")
         return result
 
     def estimateMarginalCostAtBus(self, bus, time):
@@ -968,6 +973,14 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
             if component in components['generators']:
                 return self.network.generators["marginal_cost"].loc[component]-offset
             return 0.0
+
+        print(f"CURRENTLY AT BUS: {bus}")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        qubits = [ self.data[gen]['indices'][0] for gen in components['generators'] ] 
+        print(f"GENERATORQUBITS: {qubits}")
+        power = [ self.data[gen]['weights'][0] for gen in components['generators']] 
+        print(f"GENERATORPOWER_: {power}")
+        print("---------------------------------------")
         
         self.addInteraction(0.25 * estimatedCost ** 2)
         for gen1 in flattenedComponenents:
@@ -1052,7 +1065,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
             modifies self.problem. Adds to previously written interaction cofficient 
         """
         # temporary for scaling without rebuilding image by changing run.py 
-        FACTOR = 1.0
+        FACTOR = 3.0
         generators = self.getBusComponents(bus)['generators']
         costOffset = self.marginalCostOffset(bus,time)
         for generator in generators:
@@ -1144,7 +1157,7 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         @return: None 
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        FACTOR = 2.000
+        FACTOR = 0.100
         ESTIMATORFAC = 1.0
 
         estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
@@ -1153,7 +1166,16 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         load = 0.0
         for bus in self.network.buses.index:
             load += self.getLoad(bus,time)
-       
+
+        print(f"CURRENTLY AT BUS: {bus}")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        qubits = [ self.data[gen]['indices'][0] for gen in generators ] 
+        print(f"GENERATORQUBITS: {qubits}")
+        power = [ self.data[gen]['weights'][0] for gen in generators] 
+        print(f"GENERATORPOWER_: {power}")
+        print("---------------------------------------")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        
         for gen1 in generators:
             # reward/penalty term for matching/adding load
             marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
