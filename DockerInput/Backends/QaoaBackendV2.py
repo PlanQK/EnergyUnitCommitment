@@ -609,21 +609,6 @@ def main():
     components = qaoa.transformProblemForOptimizer(network=testNetwork)
     qaoa.optimize(transformedProblem=components)
 
-    # shots = 1024
-    shots = 4096
-    # shots = 16384
-    simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
-    simulate = False
-    noise = True
-    # initial_guess = [1.0, 1.0]
-    initial_guess = [1.0, 1.0, 1.0]
-    # initial_guess = [1.0, 1.0, 1.0, 1.0]
-    max_iter = 50
-    # max_iter = 200
-    repetitions = 1
-
-    num_vars = len(initial_guess)
-
     now = datetime.today()
     filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
     with open(os.path.dirname(__file__) + "/../../results_qaoa/qaoaCompare/" + filename, "w") as write_file:
