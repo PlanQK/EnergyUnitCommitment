@@ -8,7 +8,6 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 
 # config file
 CONFIG = "config.yaml"
-TOKENS = "APItoken.yaml"
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
