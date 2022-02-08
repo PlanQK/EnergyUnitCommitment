@@ -26,8 +26,8 @@ from pandas import value_counts
 
 
 class DwaveTabuSampler(BackendBase):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: dict):
+        super().__init__(config=config)
         #self.solver = tabu.Tabusampler()
 
     def validateInput(self, path, network):
@@ -199,8 +199,8 @@ class DwaveTabuSampler(BackendBase):
 
 
 class DwaveSteepestDescent(DwaveTabuSampler):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: dict):
+        super().__init__(config=config)
         self.solver = greedy.SteepestDescentSolver()
 
 
@@ -209,8 +209,8 @@ class DwaveCloud(DwaveTabuSampler):
 
 
 class DwaveCloudHybrid(DwaveCloud):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: dict):
+        super().__init__(config=config)
         self.token = self.envMgr["dwaveAPIToken"]
         self.solver = "hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
@@ -331,8 +331,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
             time.sleep(1)
         return sampleset
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: dict):
+        super().__init__(config=config)
         self.token = self.envMgr["dwaveAPIToken"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()

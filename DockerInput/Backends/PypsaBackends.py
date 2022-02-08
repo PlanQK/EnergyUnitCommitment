@@ -137,8 +137,8 @@ class PypsaBackend(BackendBase):
         return self.metaInfo
 
     
-    def __init__(self, solver_name = "glpk", slack_gen_penalty = 100.0):
-        super().__init__()
+    def __init__(self, config: dict, solver_name = "glpk", slack_gen_penalty = 100.0):
+        super().__init__(config=config)
         self.metaInfo["pypsaBackend"]["solver_name"] = solver_name
         self.metaInfo["pypsaBackend"]["slack_gen_penalty"] = slack_gen_penalty
 
@@ -148,10 +148,10 @@ class PypsaBackend(BackendBase):
 
 class PypsaFico(PypsaBackend):
 
-    def __init__(self):
-        super().__init__(solver_name="fico")
+    def __init__(self, config: dict):
+        super().__init__(config=config, solver_name="fico")
 
 class PypsaGlpk(PypsaBackend):
 
-    def __init__(self):
-        super().__init__(solver_name="glpk")
+    def __init__(self, config: dict):
+        super().__init__(config=config, solver_name="glpk")

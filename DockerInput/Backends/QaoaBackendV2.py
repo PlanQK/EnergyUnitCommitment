@@ -15,12 +15,19 @@ from qiskit.circuit import Parameter
 
 
 class QaoaQiskit(BackendBase):
-    def __init__(self, docker: bool = True):
-        super().__init__()
+    def __init__(self, config: dict, docker: bool = True):
+        super().__init__(config=config)
         self.metaInfo["results"] = {}
+        self.resetResultDict()
+
+        self.kirchhoff = {}
+        self.docker = docker
+
+    def resetResultDict(self):
         self.results_dict = {"iter_count": 0,
                              "simulate": None,
                              "noise": None,
+                             "backend_name": None,
                              "shots": None,
                              "components": {},
                              "qc": None,
@@ -28,12 +35,6 @@ class QaoaQiskit(BackendBase):
                              "duration": None,
                              "optimizeResults": {},
                              }
-
-        with open(os.path.dirname(__file__) + "/../APItoken.json") as json_file:
-            self.APItoken = json.load(json_file)
-
-        self.kirchhoff = {}
-        self.docker = docker
 
     def transformProblemForOptimizer(self, network):
         print("transforming problem...")
@@ -47,18 +48,13 @@ class QaoaQiskit(BackendBase):
 
     def optimize(self, transformedProblem):
 
-        # shots = 1024
-        shots = 4096
-        # shots = 16384
-        simulator = "aer_simulator"  # UnitarySimulator, qasm_simulator, aer_simulator, statevector_simulator
-        simulate = True
-        noise = True
-        # initial_guess = np.array([1.0, 1.0])
-        initial_guess = np.array([1.0, 1.0, 1.0])
-        # initial_guess = np.array([1.0, 1.0, 1.0, 1.0])
-        max_iter = 50
-        # max_iter = 200
-        repetitions = 1
+        shots = self.config["QaoaBackend"]["shots"]
+        simulator = self.config["QaoaBackend"]["simulator"]
+        simulate = self.config["QaoaBackend"]["simulate"]
+        noise = self.config["QaoaBackend"]["noise"]
+        initial_guess = np.array(self.config["QaoaBackend"]["initial_guess"])
+        max_iter = self.config["QaoaBackend"]["max_iter"]
+        repetitions = self.config["QaoaBackend"]["repetitions"]
 
         num_vars = len(initial_guess)
 
@@ -70,7 +66,9 @@ class QaoaQiskit(BackendBase):
 
             spsa = SPSA(maxiter=max_iter)
 
-            filename = f"Qaoa_{1}_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
+            self.resetResultDict()
+
+            filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}__{i}.json"
 
             expectation = self.get_expectation(filename=filename,
                                                components=transformedProblem,
@@ -108,6 +106,7 @@ class QaoaQiskit(BackendBase):
                                            "optimize_Iterations": self.results_dict["iter_count"],
                                            "simulate": self.results_dict["simulate"],
                                            "noise": self.results_dict["noise"],
+                                           "backend_name": self.results_dict["backend_name"],
                                            "shots": shots,
                                            "initial_guess": initial_guess,
                                            "duration": duration,
@@ -229,7 +228,7 @@ class QaoaQiskit(BackendBase):
 
         # add problem Hamiltonian for each bus
         for bus in components:
-            if bus is not "qubit_map":
+            if bus != "qubit_map":
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
                     p_comp1 = components[bus]["power"][i]
@@ -282,7 +281,7 @@ class QaoaQiskit(BackendBase):
         index = 0
         for bus in components:
             index += 1
-            if bus is not "qubit_map":
+            if bus != "qubit_map":
                 gamma = theta[index]
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
@@ -338,7 +337,7 @@ class QaoaQiskit(BackendBase):
         # add problem Hamiltonian for each bus
         index = 0
         for bus in components:
-            if bus is not "qubit_map":
+            if bus != "qubit_map":
                 beta = theta[2 * index]
                 gamma = theta[2 * index + 1]
                 length = len(components[bus][f"flattened_{bus}"])
@@ -384,7 +383,7 @@ class QaoaQiskit(BackendBase):
         power_total = 0
         for bus in components:
             power = 0
-            if bus is not "qubit_map":
+            if bus != "qubit_map":
                 power -= components[bus]["load"]
 
                 for comp in components[bus][f"flattened_{bus}"]:
@@ -395,7 +394,7 @@ class QaoaQiskit(BackendBase):
             power_total += abs(power)
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
-        # if power_total is not 0:
+        # if power_total != 0:
         #    power_total += 5
 
         # return power_total ** 2
@@ -456,11 +455,11 @@ class QaoaQiskit(BackendBase):
             (list) The coupling map of the chosen backend, if noise is set to True.
             (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True.
         """
-        APIKEY = self.APItoken["IBMQ_API_token"]
+        api_key = self.config["APItoken"]["IBMQ_API_token"]
         if simulate:
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
-                IBMQ.save_account(APIKEY, overwrite=True)
+                IBMQ.save_account(api_key, overwrite=True)
                 provider = IBMQ.load_account()
                 # print(provider.backends())
                 device = provider.get_backend("ibmq_lima")
@@ -482,7 +481,7 @@ class QaoaQiskit(BackendBase):
                 basis_gates = None
 
         else:
-            IBMQ.save_account(APIKEY, overwrite=True)
+            IBMQ.save_account(api_key, overwrite=True)
             provider = IBMQ.load_account()
             large_enough_devices = provider.backends(
                 filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
@@ -518,9 +517,13 @@ class QaoaQiskit(BackendBase):
                                                                              noise=noise,
                                                                              nqubits=len(components["qubit_map"]))
 
+        self.metaInfo["qaoaBackend"] = backend.configuration().to_dict()
+
         self.results_dict["shots"] = shots
         self.results_dict["simulate"] = simulate
         self.results_dict["noise"] = noise
+        self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
+
 
         def execute_circ(theta):
             qc = self.create_qc2(components=components, theta=theta)
@@ -544,7 +547,7 @@ class QaoaQiskit(BackendBase):
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
+            #self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["theta"] = list(theta)
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
 

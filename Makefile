@@ -6,8 +6,13 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
 
+# config file
+CONFIG = "config.yaml"
+TOKENS = "APItoken.yaml"
+
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
+TIME = $(shell date +"%Y-%m-%d_%H-%M-%S")
 
 # sqa parameters
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
@@ -85,7 +90,8 @@ GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach timeout, $(TIMEOUT), \
 		$(foreach number, ${NUMBERS}, \
-		results_qaoa_sweep/info_${filename}_${timeout}_${number})))
+		$(foreach time, ${TIME}, \
+		results_qaoa_sweep/info_${filename}_${timeout}_${number}_${time}))))
 		
 
 ## creating rules for result files
@@ -230,21 +236,23 @@ $(foreach filename, $(SWEEPFILES), \
 # define qaoa target
 
 define qaoa
-results_qaoa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_qaoa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
+	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
-	energy:1.0 qaoa
+	energy:1.0 qaoa $(CONFIG)
 	mkdir -p results_qaoa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3)) results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_* results_qaoa_sweep/
 
 endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach timeout, $(TIMEOUT), \
 	$(foreach number, ${NUMBERS}, \
-	$(eval $(call qaoa, ${filename}, ${timeout}, ${number})))))
+	$(foreach time, ${TIME}, \
+	$(eval $(call qaoa, ${filename}, ${timeout}, ${number}, ${time}))))))
 
 # end of creating rules for results
 

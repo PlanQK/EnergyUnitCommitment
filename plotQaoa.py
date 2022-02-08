@@ -7,23 +7,30 @@ from statistics import mean
 FILENAME = "QaoaCompare_2022-1-31_13-11-6_987313"
 
 def openFile(filename: str, directory: str) -> dict:
-    with open(f"{directory}{filename}.json") as json_file:
+    with open(f"{directory}{filename}") as json_file:
         data = json.load(json_file)
 
     return data
 
 
-def plotPropVsCost(filename: str, plotname: str):
-    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotPropVsCost(docker: bool, filename: str, plotname: str):
+    if docker:
+        data = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = data["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
 
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     shots = data["1"]["shots"]
-    subfile = data["1"]["filename"][:-5]
-    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    subfile = data["1"]["filename"]
+    if docker:
+        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
+    else:
+        subdata = openFile(filename=subfile, directory="results_qaoa/")
     backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
     initial_guess = data["1"]["initial_guess"]
-    kirchhoffFileName = "kirchhoff" + data["1"]["filename"][4:-5]
+    kirchhoffFileName = "kirchhoff" + data["1"]["filename"][4:]
     kirchhoffData = openFile(filename=kirchhoffFileName, directory="results_qaoa/")
     bitstring_costs = kirchhoffData["rep1"]
     toPlot = [[] for i in range(100)]
@@ -54,21 +61,28 @@ def plotPropVsCost(filename: str, plotname: str):
     ax.set_ylabel('probability')
     plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
               fontdict={'fontsize': 8})
-    plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
 
     #plt.show()
     plt.savefig(f"plots/{filename}_PropVsCF1.png")
 
 
-def plotPropVsCost4qubit(filename: str, plotname: str):
-    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotPropVsCost4qubit(docker: bool, filename: str, plotname: str):
+    if docker:
+        data = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = data["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
 
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     shots = data["1"]["shots"]
-    subfile = data["1"]["filename"][:-5]
-    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    subfile = data["1"]["filename"]
+    if docker:
+        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
+    else:
+        subdata = openFile(filename=subfile, directory="results_qaoa/")
     backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
     initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(9)]
@@ -99,21 +113,28 @@ def plotPropVsCost4qubit(filename: str, plotname: str):
     ax.set_ylabel('probability')
     plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
               fontdict={'fontsize': 8})
-    plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
 
     #plt.show()
     plt.savefig(f"plots/{filename}_PropVsCF2.png")
 
 
-def plotBoxplot(filename: str, plotname: str):
-    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotBoxplot(docker: bool, filename: str, plotname: str):
+    if docker:
+        data = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = data["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
 
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     shots = data["1"]["shots"]
-    subfile = data["1"]["filename"][:-5]
-    subdata = openFile(filename=subfile, directory="results_qaoa/")
+    subfile = data["1"]["filename"]
+    if docker:
+        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
+    else:
+        subdata = openFile(filename=subfile, directory="results_qaoa/")
     backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
     initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
@@ -135,7 +156,7 @@ def plotBoxplot(filename: str, plotname: str):
     ax.set_xlabel('bitstrings')
     ax.set_ylabel('probability')
     plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}", fontdict = {'fontsize' : 8})
-    plt.figtext(0.5, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
     plt.xticks(range(1, len(bitstrings)+1), bitstrings, rotation=70)
     plt.setp(bp['whiskers'], color='k', linestyle='-')
@@ -144,8 +165,12 @@ def plotBoxplot(filename: str, plotname: str):
     plt.savefig(f"plots/{filename}_boxplot.png")
 
 
-def plotCFoptimization(filename: str, plotname:str):
-    data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotCFoptimization(docker: bool, filename: str, plotname:str):
+    if docker:
+        data = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = data["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
     fig, axs = plt.subplots(2, sharex=True, sharey=True)
     fig.set_figheight(7)
 
@@ -154,8 +179,11 @@ def plotCFoptimization(filename: str, plotname:str):
 
     for i in range(len(axs)):
         rep = random_list[i]
-        subfile = data[str(rep)]["filename"][:-5]
-        subdata = openFile(filename=subfile, directory="results_qaoa/")
+        subfile = data[str(rep)]["filename"]
+        if docker:
+            subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
+        else:
+            subdata = openFile(filename=subfile, directory="results_qaoa/")
 
         l_theta = len(subdata["rep1"]["theta"])
 
@@ -199,13 +227,17 @@ def plotCFoptimization(filename: str, plotname:str):
 
     fig.suptitle(plotname)
     fig.legend(leg, loc="upper right")
-    plt.figtext(0.55, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     #plt.show()
     plt.savefig(f"plots/{filename}_CF_optimization.png")
 
 
 
 def main():
+    plotBoxplot(docker= True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-07_17-54-30",
+                plotname="simulator with noise using SPSA - maxiter 50 \n docker run")
+    return
+
     #plotBoxplot(filename="QaoaCompare_2022-2-4_15-22-53_606565",
     #            plotname="simulator with noise using SPSA - maxiter 200 \n")
     #plotCFoptimization(filename="QaoaCompare_2022-2-4_15-22-53_606565",

@@ -4,10 +4,11 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 
 
 class BackendBase(abc.ABC):
-    def __init__(self):
+    def __init__(self, config: dict):
         self.envMgr = EnvironmentVariableManager()
         self.metaInfo = {}
         self.buildMetaInfo()
+        self.config = config
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):

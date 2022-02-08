@@ -3,7 +3,7 @@ The docker container loads the pypsa model and performs the optimization of the 
 """
 
 import sys
-import json
+import json, yaml
 import random
 import pypsa
 import Backends
@@ -81,11 +81,13 @@ def main():
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    assert len(sys.argv) == 2, errorMsg
+    assert len(sys.argv) == 3, errorMsg
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
     OptimizerClass = ganBackends[sys.argv[1]]
-    optimizer = OptimizerClass()
+    with open(sys.argv[2]) as file:
+        config = yaml.safe_load(file)
+    optimizer = OptimizerClass(config=config)
     try:
         optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
     except ValueError:

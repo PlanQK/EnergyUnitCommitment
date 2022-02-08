@@ -7,8 +7,8 @@ from .BackendBase import BackendBase
 
 
 class ClassicalBackend(BackendBase):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: dict):
+        super().__init__(config=config)
         self.solver = siquan.DTSQA()
 
     def validateInput(self, path, network):
