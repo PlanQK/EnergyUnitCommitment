@@ -7,13 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path, getenv
-
-import abc
+from os import path, getenv, sep
 
 import pandas as pd
-
-
 
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
@@ -120,15 +116,14 @@ def cumulativeDistribution(values: list) -> list:
         for val in valueLists:
             result += list(range(int(val), int(maxVal), 1))
     return [result]
-
     
 
 class PlottingAgent:
     """
     class for creating plots. on initialization reads and prepares data files. Plots based on that 
-    data can then be created and written by calling class methods
+    data can then be created and written by calling makeFigure
     """
-    def __init__(self, globDict):
+    def __init__(self, globDict, fileformat = "png"):
         """
         constructor for a plotting agent. On initialization, constructs a DataExtractionAgent to handle
         data management
@@ -138,57 +133,211 @@ class PlottingAgent:
         """
         self.dataExtractionAgent = DataExtractionAgent(globDict, suffix="sweep")
         self.savepath = "plots"
+        self.fileformat = fileformat
 
-    def makeBoxplot(self,*args):
-        pass
+
+    def getDataPoints(self,
+                    xField, 
+                    yFieldList,
+                    splittingFields,
+                    constraints,
+        ):
+        """
+        returns all stored data points with x-value in xField and y-values in yFieldList. 
+        The result is a dictonary with keys being the index of the groupby by the
+        chosen splittingFields. The value is a dictionary over the chosen yFields with values being a pair or
+        lists. The first one consists of x-values and the second entry consists of unsanitized y-values
+        
+        @param xField: str
+            label of the columns containing x-values
+        @param yFieldList: str
+            list of labels of the columns containing y-values
+        @param splittingFields: list
+            list of labels by which columns to groupby the points
+        @param constraints: dict
+            rules for restricting which data to access from the stored data frame
+        @return: dict
+             a dictonary over groupby indices with values being dictionaries over yField labels
+        """
+        dataFrame = self.dataExtractionAgent.getData(constraints)[[xField] + yFieldList + splittingFields]
+        dataFrame = dataFrame[dataFrame[xField].notna()]
+        result = {}
+        if splittingFields:
+            groupedDataFrame = dataFrame.groupby(splittingFields).agg(list)
+            for idx in groupedDataFrame.index:
+                key = tuple(
+                    [
+                        splitField + "=" + str(idx[counter])
+                        for counter, splitField in enumerate(splittingFields)
+                    ]
+                )
+                result[key] = {
+                        yField : (groupedDataFrame.loc[idx][xField], groupedDataFrame.loc[idx][yField]) for yField in yFieldList
+                }
+        else:
+            result[tuple()] = {
+                        yField : (dataFrame[xField], dataFrame[yField]) for yField in yFieldList
+                }
+        return result
     
-    def makeLineplot(self, plotname: str, 
-            xField: str, 
-            yFieldList: list, 
-            constraintsList: list = [],
-            NamesList = None,
+    def filterPointsByNa(self,xValues, yValue):
+        """
+        a method to filter two lists by all indices in which in at least one of them occurs a NaN value
+        
+        @param xValues: list
+            a list of values representing a coordinate on the x-axiy
+        @param yValues: list
+            a list of values representing a coordinate on the y-axis
+        @return: (list,list)
+            a filtered pair of xValues and yValues
+        """
+        filteredXValues = [x for idx, x in enumerate(xValues) if pd.notna(x) and pd.notna(yValues[idx])]
+        filteredYValues = [y for idx, y in enumerate(yValues) if pd.notna(y) and pd.notna(yValues[idx])]
+        return filteredXValues, filteredYValues 
+
+    def aggregateData(self, xValues, yValues, aggregationMethods):
+        """
+        aggregation nethod for a list of yValues grouped by their corresponding xValue
+        
+        @param xValues: list
+            list of xValues for points in a data set
+        @param yValues: list
+            list if yValues for points in a data set
+        @param aggregationMethods: list
+            list of arguments that are accepted by pandas data frames' groupby as aggregation methods
+        @return: pd.DataFrame
+            a pd.DataFrame with xValues as indices of a groupby by the argument aggregationMethods
+        """
+        if len(xValues) != len(yValues):
+            raise ValueError("data lists are of unequal length")
+        df = pd.DataFrame({"xField" : xValues, "yField" : yValues})
+        df = df[df["yField"].notna() & df["yField"].notna()]
+        grouped = df.groupby("xField").agg(aggregationMethods)
+        return grouped["yField"]
+
+    def makeFigure(self,
+            plotname: str,
+            xField: str = "problemSize", 
+            yFieldList: list = ["totalCost"], 
             splitFields: list = [],
-            reductionMethod=np.mean,
-            errorMethod=deviationOfTheMean,
-            xlabel: str = None, ylabel: str = None,
-            logscalex: bool = False, logscaley: bool = False,
+            constraints: dict = {},
+            aggregateMethod = None,
+            errorMethod = None,
+            logscalex: bool = False,
+            logscaley: bool = False,
+            xlabel: str = None,
+            ylabel: str = None,
+            title: str = None,
+            plottype: str = "line", 
+            **kwargs
     ):
-        pass
-    
-    def makeScatterplot(self,
-                xField: str, 
-                yFieldList: list, 
-                constraintsList: list = [],
-                xlabel: str = None, ylabel: str = None,
-                logscalex: bool = False, logscaley: bool = False,
-        ):
-        pass
-    
-    def makeHistogramm(self,
-                xField: str, 
-                yField: str, 
-                constraintsList: list = [],
-                xlabel: str = None, ylabel: str = None,
-                logscalex: bool = False, logscaley: bool = False,
-        ):
-        pass
-     
+        fig, ax = plt.subplots()
+
+
+        data = self.getDataPoints(
+                        xField=xField,
+                        yFieldList=yFieldList,
+                        constraints=constraints,
+                        splittingFields=splitFields
+        )
+
+        for splitfieldKey, dataDictionary in data.items():
+            for yField, yFieldValues in dataDictionary.items() :
+                xCoordinateList = yFieldValues[0]
+                yCoordinateList = yFieldValues[1]
+                if splitfieldKey:
+                    label = str(splitfieldKey) + "_" + yField
+                else:
+                    label = yField
+                yFieldListStripped = ", ".join(yFieldList)
+
+                if plottype == "line":
+                    yValues = self.aggregateData(
+                            yFieldValues[0],
+                            yFieldValues[1],
+                            ['mean',deviationOfTheMean]
+                    )
+                    ax.errorbar(yValues.index,
+                            yValues.iloc[:,0],
+                            label=label,
+                            yerr=yValues.iloc[:,1],
+                            **kwargs)
+
+                if plottype == "scatterplot":
+                    ax.scatter(xCoordinateList,yCoordinateList,s=7, **kwargs, label=label)
+                    # linear regression
+                    m, b = np.polyfit(xCoordinateList, yCoordinateList, 1)
+                    ax.plot(xCoordinateList, [m * z + b for z in xCoordinateList], color='red', label=label)
+
+                if plottype == "histogramm":
+                    ax.hist(yCoordinateList,label=label, **kwargs)
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "count"
+
+                if plottype == "boxplot":
+                    ax.boxplot(yCoordinateList)
+                    if xlabel is None:
+                        xlabel = " "
+
+                if plottype == "cumulative":
+                    if True:
+                        sorted_data = np.sort(yCoordinateList)
+                        plt.step(sorted_data, np.arange(sorted_data.size), label=label)
+                    else:
+                        values, base = np.histogram(yCoordinateList, bins=40)
+                        cumulative = np.cumsum(values)
+                        plt.step(base[:-1], cumulative, label=label)
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "count"
+                    
+                if plottype == "density":
+                    sns.kdeplot(
+                            list(yCoordinateList),
+                            label=label,
+                            clip =(0.0, max(yCoordinateList))
+                    )
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "density"
+
+        if xlabel is None:
+            xlabel = xField
+        if ylabel is None:
+            ylabel = yFieldList
+        if title is None:
+            title = plottype
+
+        # adjusting additonal settings
+        plt.legend()
+        if logscalex:
+            ax.set_xscale("log")
+        if logscaley:
+            ax.set_yscale("log")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        fig.suptitle(title)
+        savepath = self.savepath + sep + plotname + "." + self.fileformat
+        fig.savefig(savepath)
+         
 
 class DataExtractionAgent:
     """
     class for reading, building and accessing optimization data in a pandas data frame
     """ 
-
     # a dictonary to look up which solver specific dictionaries are saved in json files
     # of that solver
     solverKeys = {
-        "sqa" : ["sqaBackend", "isingInterface"],
-        "qpu" : ["dwaveBackend", "isingInterface","cutSamples"],
-        "qpu_read" : ["dwaveBackend", "isingInterface","cutSamples"],
-        "pypsa_glpk" : ["pypsaBackend"],
-        "classical" : []
+            "sqa" : ["sqaBackend", "isingInterface"],
+            "qpu" : ["dwaveBackend", "isingInterface","cutSamples"],
+            "qpu_read" : ["dwaveBackend", "isingInterface","cutSamples"],
+            "pypsa_glpk" : ["pypsaBackend"],
+            "classical" : []
     }
-
     # list of all keys for data entries, that every result file of a solver has
     generalFields = [
             "fileName",
@@ -201,6 +350,34 @@ class DataExtractionAgent:
             "optimizationTime",
             "postprocessingTime",
     ]
+
+
+    def __init__(self, globDict: dict, constraints={}, suffix: str = "sweep"):
+        """
+        constructor for a data extraction. data files specified in globDict are read, filtered by
+        constraints and then saved into a pandas data frame. stored data can be queried by a getter
+        for a given solver, the data is read from the folder f"{solver}_results_{suffix}"
+        
+        @param globDict: dict
+            a dictionary with keys specifying a solver and the value a being a list of glob expressions
+            to specify files
+        @param constraints: dict
+            a dictionary that describes by which rules to filter the files read
+        @param suffix: str
+            suffix or results folder in which to apply glob. 
+        """
+        self.pathDictionary = {
+            solver : "_".join(["results",solver,"sweep"]) for solver in self.solverKeys.keys()
+        }
+        self.globDict = globDict
+        # last used constraints dictionary used in getting data
+        self.constraints = {}
+        self.df = pd.DataFrame()
+        for solver, globList in globDict.items():
+            self.df = self.df.append(self.extractData(solver, globList,))
+        self.df = self.filterByConstraint(self.df, constraints)
+        self.df = self.df.apply(pd.to_numeric, errors='ignore')
+
 
     def expandSolverDict(self, dictKey, dictValue):
         """
@@ -226,33 +403,6 @@ class DataExtractionAgent:
         return [dictValue]
 
 
-    def __init__(self, globDict: dict, constraints={}, suffix: str = "sweep"):
-        """
-        constructor for a data extraction. data files specified in globDict are read, filtered by
-        constraints and then saved into a pandas data frame. stored data can be queried by a getter
-        for a given solver, the data is read from the folder f"{solver}_results_{suffix}"
-        
-        @param globDict: dict
-            a dictionary with keys specifying a solver and the value a being a list of glob expressions
-            to specify files
-        @param constraints: dict
-            a dictionary that describes by which rules to filter the files read
-        @param suffix: str
-            suffix or results folder in which to apply glob. 
-        """
-        self.pathDictionary = {
-            solver : "_".join(["results",solver,"sweep"]) for solver in self.solverKeys.keys()
-        }
-        self.globDict = globDict
-        # last used constraints dictionary used in getting data
-        self.constraints = {}
-        self.df = pd.DataFrame()
-        self.filesRead = 0
-        for solver, globList in globDict.items():
-            self.df = self.df.append(self.extractData(solver, globList, constraints))
-        self.df = self.filterByConstraint(self.df, constraints)
-
-
     def filterByConstraint(self, dataFrame, constraints):
         """
         method to filter data frame by constraints. This class implements the filter rule as a
@@ -268,11 +418,11 @@ class DataExtractionAgent:
         """
         result = dataFrame 
         for key, value in self.constraints.items():
-            result = result[result[key].isin(value) | results[key].isna()]
+            result = result[result[key].isin(value) | result[key].isna()]
         return result
 
 
-    def getData(self,constraints: dict = None):
+    def getData(self, constraints: dict = None):
         """
         getter for accessing result data. The results are filtered by constraints. if constraints are None
         reuses the constraints of the previous query
@@ -289,7 +439,7 @@ class DataExtractionAgent:
         return self.filterByConstraint(self.df, self.constraints)
 
 
-    def extractData(self, solver, globList, constraints = {}):
+    def extractData(self, solver, globList,):
         """
         extracts all relevant data to be saved in a pandas DataFrame from the results of a given solver. 
         The result files to be read are specified in a list of globs expressions
@@ -305,13 +455,15 @@ class DataExtractionAgent:
         result = pd.DataFrame()
         for globExpr in globList:
             for fileName in glob.glob(path.join(self.pathDictionary[solver], globExpr)):
-                result = result.append(self.extractDataFromFile(solver, fileName, constraints))
+                result = result.append(self.extractDataFromFile(solver, fileName,))
         return result
         
-    def extractDataFromFile(self,solver, fileName, constraints):
+
+    def extractDataFromFile(self,solver, fileName,):
         """
         reads the result file of a solver and builds a pandas data frame containing a entry for
-        run saved in the file
+        each run saved in the file
+
         @param solver: str
             label of the solver for which to extract data
         @param fileName: str
@@ -330,11 +482,7 @@ class DataExtractionAgent:
         ]
         for solverDependentField in solverDependentData:
             generalData = pd.merge(generalData, pd.DataFrame(solverDependentField), how="cross")
-        
-        # TODO add constraints
-        self.filesRead += 1
         return generalData
-
 
 
 def extractInformation(fileRegex: str, xField: str, yField: str,
@@ -486,8 +634,6 @@ def makeFig(plotInfo: dict, outputFile: str,
     """
     fig, ax = plt.subplots()
     for key, values in plotInfo.items():
-
-
         if plottype == "histogramm":
             # if condition is truthy if the function values have not been reduced earlier. thus in 'yvalues' we have a list of
             # values that go in to the histogramm with weight 1.
@@ -521,6 +667,7 @@ def makeFig(plotInfo: dict, outputFile: str,
                 x += e[1][0]
                 y += e[1][1]
 
+
             ax.scatter(x,y,s=8)
             
             # linear regression
@@ -540,7 +687,7 @@ def makeFig(plotInfo: dict, outputFile: str,
         if plottype == "line":
             sortedValues = sorted(values)
             ax.errorbar([e[0] for e in sortedValues], [e[1] for e in sortedValues], label=key,
-                        yerr=[e[2] / 2.0 for e in sortedValues])
+                        yerr=[e[2] for e in sortedValues])
 
     plt.legend()
     if logscalex:
@@ -745,7 +892,83 @@ def main():
     BINSIZE = 1
 
     regex = "*Nocost*5input_1[5]_[0]_20*fullsplit*"
-    DataAgent = DataExtractionAgent({"qpu" : [regex]} , "sweep")
+    regex = "*1[0-4]_[0-9]_20.nc_100_200_full*60_200_1"
+    #DataAgent = DataExtractionAgent({"qpu_read" : [regex]} , "sweep")
+
+    PlotAgent = PlottingAgent({"qpu_read" : [regex]})
+
+    PlotAgent.makeFigure("testplot",
+            xField="quantumCost",
+            yFieldList=["optimizedCost"],
+            splitFields=[],
+            aggregateMethod='mean'
+            )
+    PlotAgent.makeFigure("testscatter",
+            xField="quantumCost",
+            yFieldList=["optimizedCost"],
+            constraints={"problemSize" : [14]},
+            plottype="scatterplot",
+            )
+    PlotAgent.makeFigure("testplotsize",
+            xField="problemSize",
+            yFieldList=["LowestEnergy"],
+            constraints={"sample_id" : [1]},
+            splitFields=[],
+            aggregateMethod='mean',
+            errorMethod=deviationOfTheMean,
+            )
+    PlotAgent.makeFigure("testhistogramm",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="histogramm",
+            bins=100,
+            )
+    PlotAgent.makeFigure("testcumulative",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="cumulative",
+            bins=100,
+            )
+    PlotAgent.makeFigure("testdensity",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="density",
+#            constraints={"problemSize" : [14]}
+            )
+    PlotAgent.makeFigure("testboxplot",
+            yFieldList=["quantumCost"],
+            plottype="boxplot",
+            )
+
+
+    regex = "*1[0-4]_[0-4]_20.nc_100_200_full*60_200_1"
+#    plotGroup(f"scatterplot_nocostinput_100_Anneal_70_chain_strength",
+#            "qpu_read",
+#            [
+#            regex,
+#            ],
+#            "problemSize",
+#            yFieldList = ["cutSamples"],
+#            reductionMethod = [extractCutSamples],
+#            errorMethod = None,
+#            splitFields = ["annealing_time"],
+#            plottype="scatterCutSample",
+#            logscalex=False,
+#            xlabel="energy",
+#            ylabel="cost",
+#    )
+    plotGroup(f"problemsize_to_cost_nocostinput_100_Anneal_70_chain_strength",
+            "qpu_read",
+            [
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["totalCost"],
+            reductionMethod = [np.mean],
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="line",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
 
     return
 
