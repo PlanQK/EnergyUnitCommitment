@@ -120,22 +120,19 @@ def plotPropVsCost4qubit(docker: bool, filename: str, plotname: str):
     plt.savefig(f"plots/{filename}_PropVsCF2.png")
 
 
-def plotBoxplot(docker: bool, filename: str, plotname: str):
+def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
     if docker:
-        data = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = data["results"]
+        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = dataAll["results"]
     else:
         data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
 
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
+    #bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
+    #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
     shots = data["1"]["shots"]
-    subfile = data["1"]["filename"]
-    if docker:
-        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
-    else:
-        subdata = openFile(filename=subfile, directory="results_qaoa/")
-    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
+    backend = dataAll["qaoaBackend"]["backend_name"]
     initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
@@ -162,10 +159,10 @@ def plotBoxplot(docker: bool, filename: str, plotname: str):
     plt.setp(bp['whiskers'], color='k', linestyle='-')
     plt.setp(bp['fliers'], markersize=2.0)
     #plt.show()
-    plt.savefig(f"plots/{filename}_boxplot.png")
+    plt.savefig(f"plots/BP_{savename}.png")
 
 
-def plotCFoptimization(docker: bool, filename: str, plotname:str):
+def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str):
     if docker:
         data = openFile(filename=filename, directory="results_qaoa_sweep/")
         data = data["results"]
@@ -229,13 +226,180 @@ def plotCFoptimization(docker: bool, filename: str, plotname:str):
     fig.legend(leg, loc="upper right")
     plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     #plt.show()
-    plt.savefig(f"plots/{filename}_CF_optimization.png")
+    plt.savefig(f"plots/CF_{savename}.png")
+
+
+def plotBPandCF(docker: bool, filename: str, extraPlotInfo:str, savename: str):
+    if docker:
+        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = dataAll["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+
+    plotBoxplot(docker=docker, filename=filename, plotname=plotname, savename=savename)
 
 
 
 def main():
-    plotBoxplot(docker= True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-07_17-54-30",
-                plotname="simulator with noise using SPSA - maxiter 50 \n docker run")
+    # COBYLA
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_15-31-59",
+                plotname="COBYLA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="state_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_15-31-49",
+                plotname="COBYLA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="qasm_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_15-24-45",
+                plotname="COBYLA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+
+    return
+    # 4bit kirch^2
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-42",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3, kirch^2",
+                savename="state_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-51",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3, kirch^2",
+                savename="qasm_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-49-00",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3, kirch^2",
+                savename="aer_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-42",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, statevector",
+                       savename="state_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-51",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, qasm",
+                       savename="qasm_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-49-00",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, aer",
+                       savename="aer_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+
+    # 4bit gInverse kirch^2
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-31",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1, kirch^2",
+                savename="state_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-22",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1, kirch^2",
+                savename="qasm_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-12",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1, kirch^2",
+                savename="aer_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-31",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, statevector",
+                       savename="state_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-22",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, qasm",
+                       savename="qasm_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-12",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, aer",
+                       savename="aer_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+
+    # 4bit gInverse
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-35-57",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1",
+                savename="state_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-07",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1",
+                savename="qasm_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-20",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1",
+                savename="aer_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-35-57",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, statevector",
+                       savename="state_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-07",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, qasm",
+                       savename="qasm_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-20",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, aer",
+                       savename="aer_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+
+    # 4bit g3 & g12
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-20-35",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=12",
+                savename="state_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-21",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=12",
+                savename="qasm_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-51",
+                plotname="SPSA without noise - maxiter 50 \n g1=3, g2=12",
+                savename="aer_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-20-35",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, statevector",
+                       savename="state_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-21",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, qasm",
+                       savename="qasm_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-51",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, aer",
+                       savename="aer_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+
+    # 5bit
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_11-33-18",
+                plotname="SPSA without noise - maxiter 50 \n g1=2, g2=4, g3=2",
+                savename="state_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-53",
+                plotname="SPSA without noise - maxiter 50 \n g1=2, g2=4, g3=2",
+                savename="qasm_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-37",
+                plotname="SPSA without noise - maxiter 50 \n g1=2, g2=4, g3=2",
+                savename="aer_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_11-33-18",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, statevector",
+                       savename="state_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-53",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, qasm",
+                       savename="qasm_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-37",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, aer",
+                       savename="aer_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+
+    # 4bit
+    # without noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_09-59-35",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="state_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-10",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="qasm_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-57",
+                plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_09-59-35",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, statevector",
+                       savename="state_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-10",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, qasm",
+                       savename="qasm_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-57",
+                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, aer",
+                       savename="aer_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    # 4bit
+    # with noise
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-44-43",
+                plotname="SPSA with noise - maxiter 50 \n g1=1, g2=3",
+                savename="state_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-41",
+                plotname="SPSA with noise - maxiter 50 \n g1=1, g2=3",
+                savename="qasm_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-34",
+                plotname="SPSA with noise - maxiter 50 \n g1=1, g2=3",
+                savename="aer_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-44-43",
+                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, statevector",
+                       savename="state_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-41",
+                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, qasm",
+                       savename="qasm_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-34",
+                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, aer",
+                       savename="aer_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
     return
 
     #plotBoxplot(filename="QaoaCompare_2022-2-4_15-22-53_606565",

@@ -12,6 +12,7 @@ from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA
 from qiskit.circuit import Parameter
+from scipy.optimize import minimize
 
 
 class QaoaQiskit(BackendBase):
@@ -64,8 +65,6 @@ class QaoaQiskit(BackendBase):
             time_start = datetime.timestamp(datetime.now())
             print(f"----------------------------- Iteration {i} ----------------------------------------")
 
-            spsa = SPSA(maxiter=max_iter)
-
             self.resetResultDict()
 
             filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}__{i}.json"
@@ -76,11 +75,23 @@ class QaoaQiskit(BackendBase):
                                                shots=shots,
                                                simulate=simulate,
                                                noise=noise)
+            if self.config["QaoaBackend"]["classical_optimizer"] is "SPSA":
+                spsa = SPSA(maxiter=max_iter)
+                res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
+                self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
+                self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
+                self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
 
-            res = spsa.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-            self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-            self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-            self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+            else:
+            #elif self.config["QaoaBackend"]["classical_optimizer"] is "COBYLA":
+                res = minimize(fun=expectation, x0=initial_guess, method='COBYLA',
+                               options={'rhobeg': 1.0, 'maxiter': max_iter, 'tol': 0.0001, 'disp': False, 'catol': 0.0002})
+                #https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html
+                #https://docs.scipy.org/doc/scipy/reference/optimize.minimize-cobyla.html#optimize-minimize-cobyla
+
+                self.results_dict["optimizeResults"]["x"] = res.x.tolist() # if use COBYLA
+                self.results_dict["optimizeResults"]["fun"] = res.fun
+                self.results_dict["optimizeResults"]["nfev"] = res.nfev
 
             self.results_dict["initial_guess"] = initial_guess
 

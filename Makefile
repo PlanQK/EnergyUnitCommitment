@@ -17,7 +17,7 @@ CONFIG = "config.yaml"
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
-TIME = $(shell date +"%Y-%m-%d_%H-%M-%S")
+TIME := $(shell date +"%Y-%m-%d_%H-%M-%S")
 
 # sqa parameters
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)

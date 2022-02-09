@@ -6,9 +6,9 @@ from EnvironmentVariableManager import EnvironmentVariableManager
 class BackendBase(abc.ABC):
     def __init__(self, config: dict):
         self.envMgr = EnvironmentVariableManager()
+        self.config = config
         self.metaInfo = {}
         self.buildMetaInfo()
-        self.config = config
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):
@@ -51,6 +51,7 @@ class BackendBase(abc.ABC):
             "totalCost": "",  # all
             "optimizationTime" : "",
             "postprocessingTime" : "",
+            "config": self.config,
             "dwaveBackend": {"annealing_time": "int",
                              "num_reads": "int",
                              "chain_strength": "int",
