@@ -269,6 +269,9 @@ def main():
     plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_14-04-09",
                 extraPlotInfo="g1=1, g2=3, fixed QC",
                 savename="aer_4qubit_g1-1_g2-3_yesNoise_fixedQC_initial-2_maxiter200_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_15-34-44",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_fixedQC_initial-2_maxiter200_shots4096_rep10")
 
     return
     # COBYLA

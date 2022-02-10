@@ -242,7 +242,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qaoa
 results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
 	energy:1.0 qaoa $(CONFIG)
