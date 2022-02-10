@@ -92,6 +92,8 @@ class IsingPypsaInterface:
                 "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
                 "fullsplitLocalMarginalEstimationDistance" : fullsplitLocalMarginalEstimationDistance,
                 "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
+                "binarysplitIsingInterface" : binarysplitIsingInterface,
+                "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
         }
         IsingProduct = FactoryDictionary[problemFormulation](network, network.snapshots)
         return IsingProduct
@@ -136,7 +138,7 @@ class IsingPypsaInterface:
                     if self.network.generators.committable[gen]:
                         continue
                     self.data[gen]['indices'].append(self.allocatedQubits)
-                    self.data[gen]['weights'].append(self.network.generators_t.p_max_pu[gen].iloc[time])
+                    self.data[gen]['weights'].append(self.getNominalPower(gen,time))
                     self.allocatedQubits += 1
                 self.writeToHighestLevel(gen)
         return
@@ -239,6 +241,23 @@ class IsingPypsaInterface:
                 }
         return result
 
+    def getNominalPower(self,generator, time=0,):
+        """
+        returns the nominal power at a time step saved in the network
+        
+        Args:
+            generator: (str) generator label
+            time: (int) index of time slice for which to get nominal power
+        Returns:
+            (float) maximum power available at generator in time slice at time
+        """
+        try:
+            p_max_pu = self.network.generators_t.p_max_pu[generator].iloc[time]
+        except KeyError:
+            p_max_pu = 1.0
+        nominalPower = self.network.generators.p_nom[generator] * p_max_pu
+        return nominalPower
+
 
     def getGeneratorStatus(self, gen, solution, time=0):
         """
@@ -286,7 +305,7 @@ class IsingPypsaInterface:
         return self.getFlowDictionary(solution)
 
 
-    def getLoad(self, bus, time=0):
+    def getLoad(self, bus, time=0, silent=True):
         """
         returns the total load at a bus at a given time slice
 
@@ -301,7 +320,10 @@ class IsingPypsaInterface:
         allLoads = self.network.loads_t['p_set'].iloc[time]
         result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result == 0:
-            print(f"Warning: No load at {bus} at timestep {time}")
+            if not silent:
+                print(f"Warning: No load at {bus} at timestep {time}.\nFalling back to constant load")
+            allLoads = self.network.loads['p_set']
+            result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result < 0:
             raise ValueError(
                 "negative Load at current Bus"
@@ -326,6 +348,22 @@ class IsingPypsaInterface:
         encodingLength = self.data[component]["encodingLength"]
         return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
 
+    def getQubitMapping(self,time=0):
+        """
+        returns a dictionary on which qubits which network components were mapped for
+        representation in an ising spin glass problem
+        
+        Args:
+            time: (int) index of time slice for which to get qubit map
+        Returns:
+            (dict) dictionary with network labels as keys and qubit lists as values
+        """
+
+        return {
+                component : self.getMemoryAdress(component,time) 
+                for component in self.data.keys() 
+                if isinstance(component,str)
+                }
 
     def siquanFormat(self):
         """
@@ -335,6 +373,32 @@ class IsingPypsaInterface:
             list of tuples of the form (interaction-coefficient, list(qubits))
         """
         return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
+
+    def getInteraction(self,*args):
+        """
+        returns the interaction coeffiecient of a list of qubits
+        
+        Args:
+            *args: (list) a list of integers representing qubits
+        Returns:
+            (float) the interaction strength between all qubits in args
+        """
+        sortedUniqueArguments = tuple(sorted(set(args)))
+        return self.problem.get(sortedUniqueArguments, 0.0)
+
+
+    def getHamiltonianMatrix(self,):
+        """
+        returns a matrix containing the ising hamiltonian
+        
+        Returns:
+            (list) a list of list representing the hamiltonian matrix
+        """
+        qubits = range(self.allocatedQubits)
+        hamiltonian = [
+                [self.getInteraction(i,j) for i in qubits] for j in qubits
+        ]
+        return hamiltonian
 
 
     # TODO
@@ -417,7 +481,7 @@ class IsingPypsaInterface:
                 value += self.data[component]['weights'][idx]
         return value
 
-    def calcKirchhoffCostAtBus(self, bus, result):
+    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
         """
         returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
         every time slice 'time' as {(bus,time) : value} 
@@ -438,11 +502,13 @@ class IsingPypsaInterface:
                 load += self.getEncodedValueOfComponent(lineId, result, time=t)
             for lineId in components['negativeLines']:
                 load -= self.getEncodedValueOfComponent(lineId, result, time=t)
+            if load and not silent:
+                print(f"IMBALANCE AT {bus}::{load}")
             load = (load * self.kirchhoffFactor) ** 2
             contrib[str((bus, t))] = load
         return contrib
 
-    def individualCostContribution(self, result):
+    def individualCostContribution(self, result,silent=True):
         """
         returns a dictionary which contains the kirchhoff cost incurred at every bus at
         every time slice
@@ -455,7 +521,7 @@ class IsingPypsaInterface:
         # TODO proper cost
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result)}
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
         return contrib
 
     def individualMarginalCost(self, result):
@@ -490,7 +556,8 @@ class IsingPypsaInterface:
             components = self.getBusComponents(bus)
             for generator in components['generators']:
                 if self.getGeneratorStatus(generator, result, time):
-                    marginalCost += self.network.generators["marginal_cost"].loc[generator]
+                    marginalCost += self.network.generators["marginal_cost"].loc[generator] * \
+                                    self.data[generator]['weights'][0]
             contrib[str((bus, time))] = marginalCost
         return contrib
 
@@ -904,11 +971,13 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         @return: float
              a float by which to offset all marginal costs of network components
         """
-        REL_POS = 0.3 * len(sortedGenerators)
+        REL_POS = 0.6 * len(sortedGenerators)
         CONST_IDX_OFFSET =  0.0
         idx = int(CONST_IDX_OFFSET + REL_POS )
         result = self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+        print(f"OFFSET: {result}")
         marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
+        print(f"MEAN: {np.mean(marginalCostList)}")
         return result
 
     def estimateMarginalCostAtBus(self, bus, time):
@@ -968,6 +1037,14 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
             if component in components['generators']:
                 return self.network.generators["marginal_cost"].loc[component]-offset
             return 0.0
+
+        print(f"CURRENTLY AT BUS: {bus}")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        qubits = [ self.data[gen]['indices'][0] for gen in components['generators'] ] 
+        print(f"GENERATORQUBITS: {qubits}")
+        power = [ self.data[gen]['weights'][0] for gen in components['generators']] 
+        print(f"GENERATORPOWER_: {power}")
+        print("---------------------------------------")
         
         self.addInteraction(0.25 * estimatedCost ** 2)
         for gen1 in flattenedComponenents:
@@ -1016,7 +1093,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
         maxCost = 0.0
         maxPower = 0.0
         for generator in self.network.generators.index:
-            currentPower = self.network.generators_t.p_max_pu[generator].iloc[time]
+            currentPower = self.getNominalPower(generator, time)
             maxCost += currentPower * self.network.generators["marginal_cost"].loc[generator]
             maxPower += currentPower
         return float(maxCost / maxPower)
@@ -1052,7 +1129,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
             modifies self.problem. Adds to previously written interaction cofficient 
         """
         # temporary for scaling without rebuilding image by changing run.py 
-        FACTOR = 1.0
+        FACTOR = 3.0
         generators = self.getBusComponents(bus)['generators']
         costOffset = self.marginalCostOffset(bus,time)
         for generator in generators:
@@ -1144,7 +1221,7 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         @return: None 
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        FACTOR = 2.000
+        FACTOR = 0.100
         ESTIMATORFAC = 1.0
 
         estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
@@ -1153,7 +1230,16 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         load = 0.0
         for bus in self.network.buses.index:
             load += self.getLoad(bus,time)
-       
+
+        print(f"CURRENTLY AT BUS: {bus}")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        qubits = [ self.data[gen]['indices'][0] for gen in generators ] 
+        print(f"GENERATORQUBITS: {qubits}")
+        power = [ self.data[gen]['weights'][0] for gen in generators] 
+        print(f"GENERATORPOWER_: {power}")
+        print("---------------------------------------")
+        print(f"ESTIMATED COST: {estimatedCost}")
+        
         for gen1 in generators:
             # reward/penalty term for matching/adding load
             marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
@@ -1177,3 +1263,44 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
                         couplingStrength=curFactor
                 )
 
+
+class binarysplitIsingInterface(IsingPypsaInterface):
+    """
+    This class provides a line splitting method by using two qubits for full power flow in
+    either direction
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # read generators and lines from network and encode as qubits
+        self.storeGenerators()
+        self.storeLines()
+
+    def splitCapacity(self, capacity):
+        """
+        Method to split a line which has maximum capacity "capacity". A line split is a 
+        list of lines with varying capacity which can either be on or off. The status of 
+        a line is binary, so it can either carry no power or power equal to it's capacity
+        The direction of flow for each line is also fixed. It is not enforced that a
+        chosen split can only represent flow lower than capacity or all flows that are
+        admissable. the line split is represented by the capacity of the it's components
+
+        @param capacity: int
+            the capacity of the line that is to be split up
+        @return: list
+            a list of integers. Each integer is the capacity of a line of the splitting
+            direction of flow is encoded as the sign
+        """
+        return [capacity, - capacity]
+
+
+class binarysplitNoMarginalCost(binarysplitIsingInterface):
+    """
+    This class uses a 'binarysplit' to encode lines. It optimizes according to the kirchhoff
+    constraint, but doesn't consider any marginal costs incurred
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem constraints: kirchhoff
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)

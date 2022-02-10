@@ -89,6 +89,7 @@ class PypsaBackend(BackendBase):
             exceeded_demand = 0
             missing_demand = 0
             totalCost = 0
+            print(f"MODEL:\n{self.model.generator_p.get_values()}")
             for bus in network.buses.index:
                 cur_neg_slack = self.model.generator_p.get_values()[(f"neg_slack_{bus}",snapshot)]
                 exceeded_demand += cur_neg_slack
@@ -104,6 +105,12 @@ class PypsaBackend(BackendBase):
 
                 if not (cur_neg_slack + cur_pos_slack):
                     print(f"OPTIMAL LOAD AT {bus}")
+
+            marginalCost = 0.0
+            for generator in network.generators.index:
+                marginalCost += self.model.generator_p.get_values()[(generator,snapshot)] * \
+                        network.generators["marginal_cost"].loc[generator]
+            print(f"MARGINAL COST AT {snapshot}:: {marginalCost}")
 
             dev_from_optimum_gen = exceeded_demand + missing_demand
             if dev_from_optimum_gen == 0:

@@ -19,12 +19,12 @@ DEFAULT_ENV_VARIABLES = {
     "optimizationCycles": 1000,
     "temperatureSchedule": "[0.1,iF,0.0001]",
     "transverseFieldSchedule": "[10,.1]",
-    "monetaryCostFactor": 0.0,
+    "monetaryCostFactor": 0.1,
     "kirchhoffFactor": 1.0,
     "slackVarFactor": 70.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
-    "problemFormulation": "fullsplit",
+    "problemFormulation": "fullsplitMarginalAsPenalty",
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "annealing_time": 500,
@@ -38,7 +38,7 @@ DEFAULT_ENV_VARIABLES = {
     "postprocess": "flow",
     "timeout": "-1",
     "maxOrder": 0,
-    "sampleCutSize": 100,
+    "sampleCutSize": 200,
     "threshold": 0.5
 }
 
@@ -91,20 +91,20 @@ def main():
     optimizer = OptimizerClass(config=config)
     try:
         optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
-    except ValueError:
+    except TypeError:
         print("network has been blacklisted for this optimizer and timeout value")
-        print("stopping optimization")
+        print("abort optimization")
         return
 
     pypsaNetwork = pypsa.Network(f"Problemset/{str(envMgr['inputNetwork'])}")
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
 
-    try:
-        solution = optimizer.optimize(transformedProblem)
-    except ValueError:
-        optimizer.handleOptimizationStop("Problemset",str(envMgr['inputNetwork']))
-        print("stopping optimization")
-        return
+#    try:
+    solution = optimizer.optimize(transformedProblem)
+#    except ValueError:
+#        optimizer.handleOptimizationStop("Problemset",str(envMgr['inputNetwork']))
+#        print("stopping optimization during solving")
+#       return
 
     processedSolution = optimizer.processSolution(
         pypsaNetwork, transformedProblem, solution

@@ -49,6 +49,7 @@ class BackendBase(abc.ABC):
             "scale": "",
             "timeout": "int",  # pypsa; dwave
             "totalCost": "",  # all
+            "marginalCost": "", # all
             "optimizationTime" : "",
             "postprocessingTime" : "",
             "config": "",

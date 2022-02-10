@@ -7,7 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path, getenv
+from os import path, getenv, sep
+
+import pandas as pd
 
 RESULT_SUFFIX = "sweep"
 PRINT_NUM_READ_FILES = False
@@ -16,8 +18,10 @@ BINSIZE = 1
 PLOTLIMIT = 500
 # export computing cost rate
 COSTPERHOUR = getenv('costperhour')
+#TODO remove
+HACKCOUNTER = 0
  
-
+    
 def meanOfSquareRoot(values: list) -> float:
     """
     Reduction method to reduce the given values into one float by first applying 
@@ -45,31 +49,6 @@ def deviationOfTheMean(values: list) -> float:
         Reduced value.
     """
     return np.std(values) / np.sqrt(len(values))
-
-
-def cumulativeDistribution(values: list[list[float]]) -> list:
-    """
-    Reduction method to construct a cumulativeDistribution for a list of lists of values
-    It returns a list of values that a histogramm of that list will look like the cumulative
-    distribution of all values
-
-    @param values: list
-        A list of lists of values for which to construct a cumulative Distribution
-    @param: list
-        A list which histogramm is a cumulative distribution
-    """
-    result = []
-    maxVal = max(values[0])
-    for valueLists in values:
-        curMax = max(valueLists)
-        if curMax > maxVal:
-            maxVal = curMax
-    maxVal += 1
-
-    for valueLists in values:
-        for val in valueLists:
-            result += list(range(int(val), int(maxVal), 1))
-    return [result]
 
 
 def averageOfBetterThanMedian(values: list) -> float:
@@ -120,184 +99,390 @@ def averageOfBestPercent(values: list, percentage: float) -> float:
     return np.mean(values[:int(percentage * len(values))])
 
 
-def extractCutSamples(cutSamplesDictList: object) -> [list, list]:
+def cumulativeDistribution(values: list) -> list:
     """
-    Reduction method to extract data from all shots of a single batch. It creates two lists for making
-    a scatter plot: First list consists of the spin glass's systems energy for the x-axis and second list is
-    the corresponding optimized cost of the optimization problem
+    Reduction method to construct a cumulativeDistribution for a list of lists of values
+    It returns a list of values that a histogramm of that list will look like the cumulative
+    distribution of all values
 
-    @param cutSamplesDictList: object
-        List of dicts to be searched through.
-    @return: [list, list]
-        A list with the extracted energy and one with the optimized costs.
+    @param values: list
+        A list of lists of values for which to construct a cumulative Distribution
+    @param: list
+        A list which histogramm is a cumulative distribution
     """
-    energy = []
-    optimizedCost = []
-    for cutSamplesDict in cutSamplesDictList:
-        for value in cutSamplesDict.values():
-            energy.append(value["energy"])
-            optimizedCost.append(value["optimizedCost"])
-    return energy, optimizedCost
+    result = []
+    maxVal = max(max(values,key=max)) + 1
+    for valueLists in values:
+        for val in valueLists:
+            result += list(range(int(val), int(maxVal), 1))
+    return [result]
+    
 
-
-def makeFig(plotInfo: dict, outputFile: str,
-            logscalex: bool = False, logscaley: bool = False, xlabel: str = None, ylabel: str = None, title: str = None,
-            fileformat: str = "pdf", plottype: str = "line", ) -> None:
+class PlottingAgent:
     """
-    Generates the plot and saves it to the specified location.
-
-    @param plotInfo: dict
-        The data to be plotted.
-    @param outputFile: str
-        The path to where the plot will be saved.
-    @param logscalex: bool
-        Turns the x-axis into a log scale.
-    @param logscaley: bool
-        Turns the y-axis into a log scale.
-    @param xlabel: str
-        The label of the x-axis.
-    @param ylabel: str
-        The label of the y-axis.
-    @param title: str
-        The title of the figure.
-    @param fileformat: str
-        The format of the saved file.
-    @param plottype: str
-        Indicates the type of plot to be created, e.g. scatter, line, etc..
-    @return: None
+    class for creating plots. on initialization reads and prepares data files. Plots based on that 
+    data can then be created and written by calling makeFigure
     """
-    fig, ax = plt.subplots()
-    for key, values in plotInfo.items():
-
-        if plottype == "histogramm":
-            # if condition is truthy if the function values have not been reduced earlier. thus in 'yvalues' we have a list of
-            # values that go in to the histogramm with weight 1.
-            # if the condition is falsy, the xField should be the yvalues we want to plot, using arbitrary yvalues that
-            # get reduced by len, thus counting how often a particular value appears in xField
-            if hasattr(values[0][1], "__getitem__"):
-                for entries in values:
-                    flattenedList = [item for sublist in entries[1] for item in sublist]
-                    if not flattenedList:
-                        continue
-                    ax.hist(flattenedList, bins=[i * BINSIZE for i in range(int(min(flattenedList) / BINSIZE) - 2,
-                                                                            int(max(flattenedList) / BINSIZE) + 2, 1)],
-                            label=key)
-            else:
-                sortedValues = sorted(values)
-                ax.hist([e[0] for e in values], bins=[i * BINSIZE for i in range(0, PLOTLIMIT // BINSIZE + 1, 1)],
-                        label=key, weights=[e[1] for e in sortedValues])
-
-        if plottype == "scatterplot":
-            # no use yet
-            pass
-
-        # in order to make a scatterplot of all shots for one file, we need to break
-        # convention and put all relevant data as a dict where we would usually put
-        # the y-value. We have to transform that into points to be plotted by giving
-        # a reduction method, that can also extract the data from the dictionary
-        if plottype == "scatterCutSample":
-            x = []
-            y = []
-            for e in values:
-                x += e[1][0]
-                y += e[1][1]
-
-            ax.scatter(x,y,s=8)
-            
-            # linear regression
-            m, b = np.polyfit(x, y, 1)
-            ax.plot(x, [m * z + b for z in x], color='red')
-
-        # default plot type of a function graph
-        if plottype == "line":
-            sortedValues = sorted(values)
-            ax.errorbar([e[0] for e in sortedValues], [e[1] for e in sortedValues], label=key,
-                        yerr=[e[2] / 2.0 for e in sortedValues])
-
-    plt.legend()
-    if logscalex:
-        ax.set_xscale("log")
-    if logscaley:
-        ax.set_yscale("log")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    fig.suptitle(title)
+    def __init__(self, globDict, fileformat = "png"):
+        """
+        constructor for a plotting agent. On initialization, constructs a DataExtractionAgent to handle
+        data management
+        
+        @param globDict: dict
+            a dictionary containg lists of glob expressions for the solver whose data will be plotted
+        """
+        self.dataExtractionAgent = DataExtractionAgent(globDict, suffix="sweep")
+        self.savepath = "plots"
+        self.fileformat = fileformat
 
 
-    if fileformat == "":
-        fig.savefig(outputFile + ".png")
-        fig.savefig(outputFile + ".pdf")
-    else:
-        fig.savefig(outputFile + "." + fileformat)
+    def getDataPoints(self,
+                    xField, 
+                    yFieldList,
+                    splittingFields,
+                    constraints,
+        ):
+        """
+        returns all stored data points with x-value in xField and y-values in yFieldList. 
+        The result is a dictonary with keys being the index of the groupby by the
+        chosen splittingFields. The value is a dictionary over the chosen yFields with values being a pair or
+        lists. The first one consists of x-values and the second entry consists of unsanitized y-values
+        
+        @param xField: str
+            label of the columns containing x-values
+        @param yFieldList: str
+            list of labels of the columns containing y-values
+        @param splittingFields: list
+            list of labels by which columns to groupby the points
+        @param constraints: dict
+            rules for restricting which data to access from the stored data frame
+        @return: dict
+             a dictonary over groupby indices with values being dictionaries over yField labels
+        """
+        dataFrame = self.dataExtractionAgent.getData(constraints)[[xField] + yFieldList + splittingFields]
+        dataFrame = dataFrame[dataFrame[xField].notna()]
+        result = {}
+        if splittingFields:
+            groupedDataFrame = dataFrame.groupby(splittingFields).agg(list)
+            for idx in groupedDataFrame.index:
+                key = tuple(
+                    [
+                        splitField + "=" + str(idx[counter])
+                        for counter, splitField in enumerate(splittingFields)
+                    ]
+                )
+                result[key] = {
+                        yField : (groupedDataFrame.loc[idx][xField], groupedDataFrame.loc[idx][yField]) for yField in yFieldList
+                }
+        else:
+            result[tuple()] = {
+                        yField : (dataFrame[xField], dataFrame[yField]) for yField in yFieldList
+                }
+        return result
+    
+    def filterPointsByNa(self,xValues, yValue):
+        """
+        a method to filter two lists by all indices in which in at least one of them occurs a NaN value
+        
+        @param xValues: list
+            a list of values representing a coordinate on the x-axiy
+        @param yValues: list
+            a list of values representing a coordinate on the y-axis
+        @return: (list,list)
+            a filtered pair of xValues and yValues
+        """
+        filteredXValues = [x for idx, x in enumerate(xValues) if pd.notna(x) and pd.notna(yValues[idx])]
+        filteredYValues = [y for idx, y in enumerate(yValues) if pd.notna(y) and pd.notna(yValues[idx])]
+        return filteredXValues, filteredYValues 
 
-def resolveKey(element: dict, field: str) -> any:
+    def aggregateData(self, xValues, yValues, aggregationMethods):
+        """
+        aggregation nethod for a list of yValues grouped by their corresponding xValue
+        
+        @param xValues: list
+            list of xValues for points in a data set
+        @param yValues: list
+            list if yValues for points in a data set
+        @param aggregationMethods: list
+            list of arguments that are accepted by pandas data frames' groupby as aggregation methods
+        @return: pd.DataFrame
+            a pd.DataFrame with xValues as indices of a groupby by the argument aggregationMethods
+        """
+        if len(xValues) != len(yValues):
+            raise ValueError("data lists are of unequal length")
+        df = pd.DataFrame({"xField" : xValues, "yField" : yValues})
+        df = df[df["yField"].notna() & df["yField"].notna()]
+        grouped = df.groupby("xField").agg(aggregationMethods)
+        return grouped["yField"]
+
+    def makeFigure(self,
+            plotname: str,
+            xField: str = "problemSize", 
+            yFieldList: list = ["totalCost"], 
+            splitFields: list = [],
+            constraints: dict = {},
+            aggregateMethod = None,
+            errorMethod = None,
+            logscalex: bool = False,
+            logscaley: bool = False,
+            xlabel: str = None,
+            ylabel: str = None,
+            title: str = None,
+            plottype: str = "line", 
+            **kwargs
+    ):
+        fig, ax = plt.subplots()
+
+
+        data = self.getDataPoints(
+                        xField=xField,
+                        yFieldList=yFieldList,
+                        constraints=constraints,
+                        splittingFields=splitFields
+        )
+
+        for splitfieldKey, dataDictionary in data.items():
+            for yField, yFieldValues in dataDictionary.items() :
+                xCoordinateList = yFieldValues[0]
+                yCoordinateList = yFieldValues[1]
+                if splitfieldKey:
+                    label = str(splitfieldKey) + "_" + yField
+                else:
+                    label = yField
+                yFieldListStripped = ", ".join(yFieldList)
+
+                if plottype == "line":
+                    yValues = self.aggregateData(
+                            yFieldValues[0],
+                            yFieldValues[1],
+                            ['mean',deviationOfTheMean]
+                    )
+                    ax.errorbar(yValues.index,
+                            yValues.iloc[:,0],
+                            label=label,
+                            yerr=yValues.iloc[:,1],
+                            **kwargs)
+
+                if plottype == "scatterplot":
+                    ax.scatter(xCoordinateList,yCoordinateList,s=7, **kwargs, label=label)
+                    # linear regression
+                    m, b = np.polyfit(xCoordinateList, yCoordinateList, 1)
+                    ax.plot(xCoordinateList, [m * z + b for z in xCoordinateList], color='red', label=label)
+
+                if plottype == "histogramm":
+                    ax.hist(yCoordinateList,label=label, **kwargs)
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "count"
+
+                if plottype == "boxplot":
+                    ax.boxplot(yCoordinateList)
+                    if xlabel is None:
+                        xlabel = " "
+
+                if plottype == "cumulative":
+                    if True:
+                        sorted_data = np.sort(yCoordinateList)
+                        plt.step(sorted_data, np.arange(sorted_data.size), label=label)
+                    else:
+                        values, base = np.histogram(yCoordinateList, bins=40)
+                        cumulative = np.cumsum(values)
+                        plt.step(base[:-1], cumulative, label=label)
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "count"
+                    
+                if plottype == "density":
+                    sns.kdeplot(
+                            list(yCoordinateList),
+                            label=label,
+                            clip =(0.0, max(yCoordinateList))
+                    )
+                    if xlabel is None:
+                        xlabel = yFieldListStripped
+                    if ylabel is None:
+                        ylabel = "density"
+
+        if xlabel is None:
+            xlabel = xField
+        if ylabel is None:
+            ylabel = yFieldList
+        if title is None:
+            title = plottype
+
+        # adjusting additonal settings
+        plt.legend()
+        if logscalex:
+            ax.set_xscale("log")
+        if logscaley:
+            ax.set_yscale("log")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        fig.suptitle(title)
+        savepath = self.savepath + sep + plotname + "." + self.fileformat
+        fig.savefig(savepath)
+         
+
+class DataExtractionAgent:
     """
-    Finds the given key within the given dictionary, even if the key is nested in it.
-
-    @param element: dict
-        The dict to be searched through.
-    @param field: str
-        The key to be searched for.
-    @return: any
-        The value of the specific key.
-    """
-    out = None
-    # search for key in the given dict
-    if field in element:
-        out = element[field]
-    # if key is not found, loop through all elements of the dict. If they are a dict themselves, enter and perform the
-    # search again
-    else:
-        for key in element:
-            if isinstance(element[key], dict):
-                out = resolveKey(element[key], field)
-                # if the key and therefore a value for it is found, break out of the loop and return the value
-                if out is not None:
-                    break
-
-    return out
-
-
-def addEmbeddingInformation(jsonDict: dict) -> dict:
-    """
-    Add embedding information, specific to the dWave Backends, extracted from their backend specific results.
-
-    @param jsonDict: dict
-        The dict where the embedding inforamtion is extracted from and added to.
-    @return: dict
-        The adjusted input dict.
-    """
-    embeddingDict = jsonDict["info"]["embedding_context"]["embedding"]
-    logicalQubits = [int(key) for key in embeddingDict.keys()]
-    embeddedQubits = [item for sublist in embeddingDict.values() for item in sublist]
-
-    jsonDict["dwaveBackend"]["embeddedQubits"] = len(embeddedQubits)
-    jsonDict["dwaveBackend"]["logicalQubits"] = len(logicalQubits)
-    jsonDict["dwaveBackend"]["embedFactor"] = float(jsonDict["dwaveBackend"]["embeddedQubits"]) \
-                                              / float(jsonDict["dwaveBackend"]["logicalQubits"])
-
-    return jsonDict
+    class for reading, building and accessing optimization data in a pandas data frame
+    """ 
+    # a dictonary to look up which solver specific dictionaries are saved in json files
+    # of that solver
+    solverKeys = {
+            "sqa" : ["sqaBackend", "isingInterface"],
+            "qpu" : ["dwaveBackend", "isingInterface","cutSamples"],
+            "qpu_read" : ["dwaveBackend", "isingInterface","cutSamples"],
+            "pypsa_glpk" : ["pypsaBackend"],
+            "classical" : []
+    }
+    # list of all keys for data entries, that every result file of a solver has
+    generalFields = [
+            "fileName",
+            "inputFile",
+            "problemSize",
+            "scale",
+            "timeout",
+            "totalCost",
+            "marginalCost",
+            "optimizationTime",
+            "postprocessingTime",
+    ]
 
 
-def addPlottableInformation(jsonDict: dict) -> dict:
-    """
-    Add plottable information, specific to the dWave Backends, extracted from their backend specific results.
+    def __init__(self, globDict: dict, constraints={}, suffix: str = "sweep"):
+        """
+        constructor for a data extraction. data files specified in globDict are read, filtered by
+        constraints and then saved into a pandas data frame. stored data can be queried by a getter
+        for a given solver, the data is read from the folder f"{solver}_results_{suffix}"
+        
+        @param globDict: dict
+            a dictionary with keys specifying a solver and the value a being a list of glob expressions
+            to specify files
+        @param constraints: dict
+            a dictionary that describes by which rules to filter the files read
+        @param suffix: str
+            suffix or results folder in which to apply glob. 
+        """
+        self.pathDictionary = {
+            solver : "_".join(["results",solver,"sweep"]) for solver in self.solverKeys.keys()
+        }
+        self.globDict = globDict
+        # last used constraints dictionary used in getting data
+        self.constraints = {}
+        self.df = pd.DataFrame()
+        for solver, globList in globDict.items():
+            self.df = self.df.append(self.extractData(solver, globList,))
+        self.df = self.filterByConstraint(self.df, constraints)
+        self.df = self.df.apply(pd.to_numeric, errors='ignore')
 
-    @param jsonDict: dict
-        The dict where the plottable inforamtion is extracted from and added to.
-    @return: dict
-        The adjusted input dict.
-    """
-    if "cutSamples" in jsonDict:
-        jsonDict["dwaveBackend"]["sampleValues"] = [jsonDict["cutSamples"][key]["optimizedCost"]
-                                                    for key in jsonDict["cutSamples"].keys()]
 
-    # often, one of those two solutions is significantly better than the other
-    if jsonDict["dwaveBackend"]["LowestFlow"] is not None:
-        jsonDict["dwaveBackend"]["minChoice"] = min(jsonDict["dwaveBackend"]["LowestFlow"],
-                                                    jsonDict["dwaveBackend"]["ClosestFlow"])
+    def expandSolverDict(self, dictKey, dictValue):
+        """
+        expand a dictionary containing solver dependent information into a list of dictionary
+        to seperate information of seperate runs saved in the same file
+        
+        @param dictKey: str
+            dictionary key that was used to accessed solver depdendent data
+        @param dictValue: str
+            dictionary that contains solver specific data to be expanded
+        @return: list
+            a list of dictionaries which are to be used in a cross product
+        """
+        if dictKey == "cutSamples":
+            result = [
+                    {
+                        "sample_id": key,
+                        **value 
+                    }
+                    for key, value in dictValue.items()
+            ]
+            return result
+        return [dictValue]
 
-    return jsonDict
+
+    def filterByConstraint(self, dataFrame, constraints):
+        """
+        method to filter data frame by constraints. This class implements the filter rule as a
+        dictionary with a key, value pair filtering the data frame for rows that have a non trivial entry
+        in the column key by checking if that value is an element in value
+        
+        @param dataFrame: pd.DataFrame
+            a data frame on which to apply the constraints
+        @param constraints: dict
+            a parameter that describes by which rules to filter the data frame. 
+        @return: pd.DataFrame
+            a data frame filtered accoring to the given constraints
+        """
+        result = dataFrame 
+        for key, value in self.constraints.items():
+            result = result[result[key].isin(value) | result[key].isna()]
+        return result
+
+
+    def getData(self, constraints: dict = None):
+        """
+        getter for accessing result data. The results are filtered by constraints. if constraints are None
+        reuses the constraints of the previous query
+        
+        @param constraints: dict
+            a dictionary with data frame columns indices as key and lists of values. The data frame 
+            is filtered by rows that contain such a value in that columns
+        
+        @return: pd.DataFrame
+            a data frame of all relevant data filtered by constraints
+        """
+        if constraints is not None:
+            self.constraints = constraints
+        return self.filterByConstraint(self.df, self.constraints)
+
+
+    def extractData(self, solver, globList,):
+        """
+        extracts all relevant data to be saved in a pandas DataFrame from the results of a given solver. 
+        The result files to be read are specified in a list of globs expressions
+        
+        @param solver: str
+            label of the solver for which to extract data
+        @param globList: list
+            list of strings, which are glob expressions to specifiy result files
+        @return: pd.DataFrame
+            a pandas data frame containing all relevant data of the solver results
+        """
+        # plotData = collections.defaultdict(collections.defaultdict)
+        result = pd.DataFrame()
+        for globExpr in globList:
+            for fileName in glob.glob(path.join(self.pathDictionary[solver], globExpr)):
+                result = result.append(self.extractDataFromFile(solver, fileName,))
+        return result
+        
+
+    def extractDataFromFile(self,solver, fileName,):
+        """
+        reads the result file of a solver and builds a pandas data frame containing a entry for
+        each run saved in the file
+
+        @param solver: str
+            label of the solver for which to extract data
+        @param fileName: str
+            path of the file that contains solver results
+        @return: pd.DataFrame
+            a pandas data frame containing a row for every run saved in the file
+        """
+        with open(fileName) as file:
+            fileData = json.load(file)
+        # Data Frame containing a single row with columns as the data fields that every solver run
+        # contains. Additional solver dependent information is merged on this data frame
+        generalData = pd.DataFrame({key : [fileData[key]] for key in self.generalFields})
+        solverDependentData = [
+                self.expandSolverDict(solverDependentKey, fileData[solverDependentKey])
+                for solverDependentKey in self.solverKeys[solver]
+        ]
+        for solverDependentField in solverDependentData:
+            generalData = pd.merge(generalData, pd.DataFrame(solverDependentField), how="cross")
+        return generalData
 
 
 def extractInformation(fileRegex: str, xField: str, yField: str,
@@ -339,13 +524,14 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             else:
                 element = addPlottableInformation(jsonDict=element)
 
+        # TODO indentation of for loop + cast error for ""
         for key, values in constraints.items():
-            try:
-                # value of constraint is not in constrains list
-                if float(resolveKey(element, key)) not in values:
-                    break
-            except KeyError:
-                pass
+#            try:
+#                # value of constraint is not in constrains list
+            if float(resolveKey(element, key)) not in values:
+                break
+#            except KeyError:
+#                pass
         # value of constraint is found in constrains list
         else:
             # create a new key using the splitField
@@ -364,7 +550,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
             yvalue = resolveKey(element, yField)
 
-            plotData[key][element[xField]].append(yvalue)
+            plotData[key][xvalue].append(yvalue)
         filesRead += 1
 
     # now perform reduction
@@ -374,7 +560,7 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
             if isinstance(innerKey, str):
                 # H, T in sqa data
                 if innerKey.startswith("["):
-                    xvalue = innerKey[1:-1].split(',')[0]
+                    xvalue = innerKey[1:-1].split(',')
                 else:
                     xvalue = innerKey
             else:
@@ -394,6 +580,203 @@ def extractInformation(fileRegex: str, xField: str, yField: str,
 
     return result
 
+
+
+def extractCutSamples(cutSamplesDictList: object, x_key: str="energy", y_key: str="optimizedCost") -> [list, list]:
+    """
+    Reduction method to extract data from all shots of a single batch. It creates two lists for making
+    a scatter plot: First list consists of the spin glass's systems energy for the x-axis and second list is
+    the corresponding optimized cost of the optimization problem. x_key is the dictionary key of the 
+    metric to be extraced and used on the x-axis. y_key is the dictionary key of the 
+    metric to be extraced and used on the y-axis.
+
+    @param cutSamplesDictList: object
+        List of dicts to be searched through.
+    @param key: str
+        dictionary key of metric to be extracted
+    @return: [list, list]
+        A list with the extracted energy and one with the optimized costs.
+    """
+    x_axis_list = []
+    y_axis_list = []
+    for cutSamplesDict in cutSamplesDictList:
+        for value in cutSamplesDict.values():
+            x_axis_list.append(value[x_key])
+            y_axis_list.append(value[y_key])
+    return x_axis_list, y_axis_list
+
+
+def makeFig(plotInfo: dict, outputFile: str,
+            logscalex: bool = False, logscaley: bool = False, xlabel: str = None, ylabel: str = None, title: str = None,
+            fileformat: str = "pdf", plottype: str = "line", ) -> None:
+    """
+    Generates the plot and saves it to the specified location.
+
+    @param plotInfo: dict
+        The data to be plotted.
+    @param outputFile: str
+        The path to where the plot will be saved.
+    @param logscalex: bool
+        Turns the x-axis into a log scale.
+    @param logscaley: bool
+        Turns the y-axis into a log scale.
+    @param xlabel: str
+        The label of the x-axis.
+    @param ylabel: str
+        The label of the y-axis.
+    @param title: str
+        The title of the figure.
+    @param fileformat: str
+        The format of the saved file.
+    @param plottype: str
+        Indicates the type of plot to be created, e.g. scatter, line, etc..
+    @return: None
+    """
+    fig, ax = plt.subplots()
+    for key, values in plotInfo.items():
+        if plottype == "histogramm":
+            # if condition is truthy if the function values have not been reduced earlier. thus in 'yvalues' we have a list of
+            # values that go in to the histogramm with weight 1.
+            # if the condition is falsy, the xField should be the yvalues we want to plot, using arbitrary yvalues that
+            # get reduced by len, thus counting how often a particular value appears in xField
+            if hasattr(values[0][1], "__getitem__"):
+                for entries in values:
+                    flattenedList = [item for sublist in entries[1] for item in sublist]
+                    if not flattenedList:
+                        continue
+                    ax.hist(flattenedList, bins=[i * BINSIZE for i in range(int(min(flattenedList) / BINSIZE) - 2,
+                                                                            int(max(flattenedList) / BINSIZE) + 2, 1)],
+                            label=key)
+            else:
+                sortedValues = sorted(values)
+                ax.hist([e[0] for e in values], bins=[i * BINSIZE for i in range(0, PLOTLIMIT // BINSIZE + 1, 1)],
+                        label=key, weights=[e[1] for e in sortedValues])
+
+        if plottype == "scatterplot":
+            # no use yet
+            pass
+
+        # in order to make a scatterplot of all shots for one file, we need to break
+        # convention and put all relevant data as a dict where we would usually put
+        # the y-value. We have to transform that into points to be plotted by giving
+        # a reduction method, that can also extract the data from the dictionary
+        if plottype == "scatterCutSample":
+            x = []
+            y = []
+            for e in values:
+                x += e[1][0]
+                y += e[1][1]
+
+
+            ax.scatter(x,y,s=8)
+            
+            # linear regression
+            m, b = np.polyfit(x, y, 1)
+            ax.plot(x, [m * z + b for z in x], color='red')
+
+        if plottype == "boxplot":
+            global HACKCOUNTER
+            HACKCOUNTER += 1
+            print("CALLING PLOT")
+            sortedValues = sorted(values)
+            ax.boxplot(
+                    [e[1] for e in sortedValues],
+                    )
+
+        # default plot type of a function graph
+        if plottype == "line":
+            sortedValues = sorted(values)
+            ax.errorbar([e[0] for e in sortedValues], [e[1] for e in sortedValues], label=key,
+                        yerr=[e[2] for e in sortedValues])
+
+    plt.legend()
+    if logscalex:
+        ax.set_xscale("log")
+    if logscaley:
+        ax.set_yscale("log")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.suptitle(title)
+
+
+    if fileformat == "":
+        fig.savefig(outputFile + ".png")
+        fig.savefig(outputFile + ".pdf")
+    else:
+        fig.savefig(outputFile + "." + fileformat)
+
+# TODO : probably clashes with default empty string initializes of backend specific variables
+def resolveKey(element: dict, field: str) -> any:
+    """
+    Finds the given key within the given dictionary, even if the key is nested in it.
+
+    @param element: dict
+        The dict to be searched through.
+    @param field: str
+        The key to be searched for.
+    @return: any
+        The value of the specific key.
+    """
+    out = None
+    # search for key in the given dict
+    if field in element:
+        out = element[field]
+    # if key is not found, loop through all elements of the dict. If they are a dict themselves, enter and perform the
+    # search again
+    else:
+        for key in element:
+            if isinstance(element[key], dict):
+                out = resolveKey(element[key], field)
+                # if the key and therefore a value for it is found, break out of the loop and return the value
+                if out is not None:
+                    break
+
+    return out
+
+
+# TODO add embeddings to output data or rewrite how to extract embeddings from embedding dictionarys
+def addEmbeddingInformation(jsonDict: dict) -> dict:
+    """
+    Add embedding information, specific to the dWave Backends, extracted from their backend specific results.
+
+    @param jsonDict: dict
+        The dict where the embedding inforamtion is extracted from and added to.
+    @return: dict
+        The adjusted input dict.
+    """
+    embeddingDict = jsonDict["info"]["embedding_context"]["embedding"]
+    logicalQubits = [int(key) for key in embeddingDict.keys()]
+    embeddedQubits = [item for sublist in embeddingDict.values() for item in sublist]
+
+    jsonDict["dwaveBackend"]["embeddedQubits"] = len(embeddedQubits)
+    jsonDict["dwaveBackend"]["logicalQubits"] = len(logicalQubits)
+    jsonDict["dwaveBackend"]["embedFactor"] = float(jsonDict["dwaveBackend"]["embeddedQubits"]) \
+                                              / float(jsonDict["dwaveBackend"]["logicalQubits"])
+
+    return jsonDict
+
+
+def addPlottableInformation(jsonDict: dict) -> dict:
+    """
+    Add plottable information, specific to the dWave Backends, extracted from their backend specific results.
+
+    @param jsonDict: dict
+        The dict where the plottable inforamtion is extracted from and added to.
+    @return: dict
+        The adjusted input dict.
+    """
+    if "cutSamples" in jsonDict:
+        jsonDict["dwaveBackend"]["sampleValues"] = [jsonDict["cutSamples"][key]["optimizedCost"]
+                                                    for key in jsonDict["cutSamples"].keys()]
+
+    # often, one of those two solutions is significantly better than the other
+    if jsonDict["dwaveBackend"]["LowestFlow"] is not None:
+        jsonDict["dwaveBackend"]["minChoice"] = min(jsonDict["dwaveBackend"]["LowestFlow"],
+                                                    jsonDict["dwaveBackend"]["ClosestFlow"])
+
+    return jsonDict
+
+# TODO odd bug of not working if solver str is empty
 def plotGroup(plotname: str, solver: str, fileRegexList: list, xField: str, yFieldList: list = None,
               splitFields: list = ["problemSize"], logscalex: bool = True, logscaley: bool = False,
               PATH: list = None, reductionMethod: list = None, lineNames: list = None,
@@ -508,6 +891,355 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
+    regex = "*Nocost*5input_1[5]_[0]_20*fullsplit*"
+    regex = "*1[0-4]_[0-9]_20.nc_100_200_full*60_200_1"
+    #DataAgent = DataExtractionAgent({"qpu_read" : [regex]} , "sweep")
+
+    PlotAgent = PlottingAgent({"qpu_read" : [regex]})
+
+    PlotAgent.makeFigure("testplot",
+            xField="quantumCost",
+            yFieldList=["optimizedCost"],
+            splitFields=[],
+            aggregateMethod='mean'
+            )
+    PlotAgent.makeFigure("testscatter",
+            xField="quantumCost",
+            yFieldList=["optimizedCost"],
+            constraints={"problemSize" : [14]},
+            plottype="scatterplot",
+            )
+    PlotAgent.makeFigure("testplotsize",
+            xField="problemSize",
+            yFieldList=["LowestEnergy"],
+            constraints={"sample_id" : [1]},
+            splitFields=[],
+            aggregateMethod='mean',
+            errorMethod=deviationOfTheMean,
+            )
+    PlotAgent.makeFigure("testhistogramm",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="histogramm",
+            bins=100,
+            )
+    PlotAgent.makeFigure("testcumulative",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="cumulative",
+            bins=100,
+            )
+    PlotAgent.makeFigure("testdensity",
+            yFieldList=["quantumCost", "optimizedCost"],
+            plottype="density",
+#            constraints={"problemSize" : [14]}
+            )
+    PlotAgent.makeFigure("testboxplot",
+            yFieldList=["quantumCost"],
+            plottype="boxplot",
+            )
+
+
+    regex = "*1[0-4]_[0-4]_20.nc_100_200_full*60_200_1"
+#    plotGroup(f"scatterplot_nocostinput_100_Anneal_70_chain_strength",
+#            "qpu_read",
+#            [
+#            regex,
+#            ],
+#            "problemSize",
+#            yFieldList = ["cutSamples"],
+#            reductionMethod = [extractCutSamples],
+#            errorMethod = None,
+#            splitFields = ["annealing_time"],
+#            plottype="scatterCutSample",
+#            logscalex=False,
+#            xlabel="energy",
+#            ylabel="cost",
+#    )
+    plotGroup(f"problemsize_to_cost_nocostinput_100_Anneal_70_chain_strength",
+            "qpu_read",
+            [
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["totalCost"],
+            reductionMethod = [np.mean],
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="line",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+
+    return
+
+    constraints = {
+            'annealing_time' : [100],
+            'num_reads' : [200],
+            'problemSize' : [10,11,12,13,14],
+            'chain_strength' : [60],
+    }
+    plotGroup("scale_to_cost_median",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "scale",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[len]*4,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+            )
+    plotGroup("scale_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "scale",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[np.mean]*4,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+    )
+
+    return
+
+
+    constraints = {
+            'annealing_time' : [100],
+            'num_reads' : [200],
+            'problemSize' : [10,11,12,13,14]
+    }
+    plotGroup("chain_strength_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "chain_strength",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[np.mean]*4 ,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+            )
+    plotGroup("chain_strength_to_cost_median",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "chain_strength",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[len]*4 ,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+            )
+
+    constraints = {
+            'annealing_time' : [100],
+            'num_reads' : [200],
+            'problemSize' : list(range(10,45,1)),
+    }
+    plotGroup("size_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[np.mean]*4,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+            )
+    plotGroup("size_to_cost_median",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[len]*4,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+            )
+
+    constraints = {
+            'annealing_time' : [10,50,100,200,300,500,1000,1500,2000],
+            'num_reads' : [200],
+            'chain_strength' : [60],
+            'problemSize' : [10,11,12,13,14]
+    }
+    plotGroup("annealTime_to_cost_mean",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[np.mean]*4 ,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+    )
+    plotGroup("annealTime_to_cost_median",
+            "qpu",
+            [
+            regex,
+            regex,
+            regex,
+            regex,
+            ],
+            "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            splitFields=[],
+            logscalex=False,
+            reductionMethod=[len]*4 ,
+            errorMethod=deviationOfTheMean,
+            constraints=constraints,
+    )
+    
+ 
+    return
+
+    regex =  "*15_0_20.nc_0.1_8.0_*_fullsplit*"
+    plotGroup("trotterslices_to_cost",
+              "sqa",
+              [
+                  regex
+              ],
+              "optimizationCycles",
+              yFieldList=["totalCost"],
+              splitFields=["trotterSlices"],
+              reductionMethod=[np.mean] ,
+              logscalex=False,
+              constraints={
+                    "optimizationCycles" : [4,6,8,10]
+              }
+              )
+    return
+
+    constraints={"problemSize" : [12]}
+    regex= "*Nocost*input_??_*nc*10*_fullsplit*"
+
+    plotGroup("trotterSlices_to_cost_boxplot",
+        "sqa",
+        [
+        regex,
+        ],
+        "trotterSlices",
+        yFieldList = ["totalCost"],
+        splitFields=[],
+        logscalex=False,
+        reductionMethod=[lambda x :x] ,
+        constraints=constraints,
+        plottype="boxplot",
+    )
+    return
+
+    plotGroup("trotterSlices_to_cost_mean_split_optCycles",
+        "sqa",
+        [
+        regex,
+        ],
+        "trotterSlices",
+        yFieldList = ["totalCost"],
+        splitFields=["optimizationCycles"],
+        logscalex=False,
+        reductionMethod=[np.mean] ,
+        errorMethod=deviationOfTheMean,
+        constraints=constraints,
+    )
+
+    plotGroup("optimizationCycles_to_totalCost_mean",
+        "sqa",
+        [
+        regex,
+        ],
+        "optimizationCycles",
+        yFieldList = ["totalCost",],
+        splitFields=["trotterSlices"],
+        logscalex=False,
+        reductionMethod=[np.mean],
+        errorMethod=deviationOfTheMean,
+        constraints=constraints,
+    )
+    
+
+    return
+    
+
+
+
+    regex =  "*15_0_20.nc_0.1_8.0_*_fullsplit*"
+    plotGroup("trotterslices_to_cost",
+              "sqa",
+              [
+                  regex
+              ],
+              "optimizationCycles",
+              yFieldList=["totalCost"],
+              splitFields=["trotterSlices"],
+              reductionMethod=[np.mean] ,
+              logscalex=False,
+              constraints={
+                    "optimizationCycles" : [4,6,8,10,12,14,16,20,40,100]
+              }
+              )
+
+    return
+
+    regex = "*15_0_20.nc_100_200_full*70_200_1"
+    plotGroup(f"scatterplot_nocostinput_100_Anneal_70_chain_strength",
+            "qpu_read",
+            [
+            regex,
+            ],
+            "problemSize",
+            yFieldList = ["cutSamples"],
+            reductionMethod = [extractCutSamples],
+            errorMethod = None,
+            splitFields = ["annealing_time"],
+            plottype="scatterCutSample",
+            logscalex=False,
+            xlabel="energy",
+            ylabel="cost",
+    )
+
+    return
+
+
+
     plotGroup("newising_chain_strength_to_cutSamplesCost",
             "qpu_read",
             [
@@ -557,7 +1289,7 @@ def main():
             "qpu_read",
             [
             f"*newising_10_[0]_20.nc_110_365_30_0_1_80_365_1",
-            ]
+            ],
             "problemSize",
             yFieldList = ["cutSamples"],
             reductionMethod = [extractCutSamples],
