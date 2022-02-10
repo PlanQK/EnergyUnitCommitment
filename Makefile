@@ -240,14 +240,14 @@ $(foreach filename, $(SWEEPFILES), \
 # define qaoa target
 
 define qaoa
-results_qaoa_sweep/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--env outputInfo=info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
 	energy:1.0 qaoa $(CONFIG)
 	mkdir -p results_qaoa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/info_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_qaoa_sweep/
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_* results_qaoa_sweep/
 
 endef
