@@ -229,20 +229,61 @@ def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str)
     plt.savefig(f"plots/CF_{savename}.png")
 
 
-def plotBPandCF(docker: bool, filename: str, extraPlotInfo:str, savename: str):
-    if docker:
-        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = dataAll["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
+    dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
 
-    plotBoxplot(docker=docker, filename=filename, plotname=plotname, savename=savename)
+    if dataAll["config"]["QaoaBackend"]["noise"]:
+        noise = "with noise"
+    else:
+        noise = "without noise"
+    optimizer = dataAll["config"]["QaoaBackend"]["classical_optimizer"]
+    maxiter = dataAll["config"]["QaoaBackend"]["max_iter"]
+    plotnameBP = f"{optimizer} {noise} - maxiter {maxiter} \n {extraPlotInfo}"
+    plotnameCF = f"{optimizer} CF evolution {noise} - maxiter {maxiter} \n {extraPlotInfo}"
+
+    plotBoxplot(docker=True, filename=filename, plotname=plotnameBP, savename=savename)
+    plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
 
 
 
 def main():
+    # fixed QC
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_11-30-03",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_11-40-01",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_yesNoise_fixedQC_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_11-53-34",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_fixedQC_initial-2_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_12-02-05",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_COBYLA_fixedQC_initial-2_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_12-10-36",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_yesNoise_fixedQC_initial-2_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_14-01-39",
+                extraPlotInfo="g1=1, g2=3, fixed QC",
+                savename="aer_4qubit_g1-1_g2-3_yesNoise_COBYLA_fixedQC_initial-2_maxiter50_shots4096_rep10")
+
+    return
     # COBYLA
     # without noise
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_17-32-05",
+                extraPlotInfo="g1=1, g2=3",
+                savename="state_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_17-32-18",
+                extraPlotInfo="g1=1, g2=3",
+                savename="qasm_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_17-32-32",
+                extraPlotInfo="g1=1, g2=3",
+                savename="aer_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")
+
+    return
+    # COBYLA
+    # without noise
+    # separate plots
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_15-31-59",
                 plotname="COBYLA without noise - maxiter 50 \n g1=1, g2=3",
                 savename="state_4qubit_g1-1_g2-3_noNoise_COBYLA_maxiter50_shots4096_rep10")

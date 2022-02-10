@@ -51,7 +51,7 @@ class BackendBase(abc.ABC):
             "totalCost": "",  # all
             "optimizationTime" : "",
             "postprocessingTime" : "",
-            "config": self.config,
+            "config": "",
             "dwaveBackend": {"annealing_time": "int",
                              "num_reads": "int",
                              "chain_strength": "int",
@@ -110,5 +110,10 @@ class BackendBase(abc.ABC):
         self.metaInfo["inputFile"] = "_".join(self.metaInfo["fileName"].split("_")[1:5])
         self.metaInfo["problemSize"] = int(self.metaInfo["fileName"].split("_")[2])
         self.metaInfo["scale"] = int(self.metaInfo["fileName"].split("_")[4][:-3])
+
+        self.metaInfo["config"] = {}
+        for key in self.config:
+            if key != "APItoken":
+                self.metaInfo["config"][key] = self.config[key]
 
         return
