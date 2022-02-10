@@ -92,6 +92,8 @@ class IsingPypsaInterface:
                 "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
                 "fullsplitLocalMarginalEstimationDistance" : fullsplitLocalMarginalEstimationDistance,
                 "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
+                "binarysplitIsingInterface" : binarysplitIsingInterface,
+                "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
         }
         IsingProduct = FactoryDictionary[problemFormulation](network, network.snapshots)
         return IsingProduct
@@ -1261,3 +1263,44 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
                         couplingStrength=curFactor
                 )
 
+
+class binarysplitIsingInterface(IsingPypsaInterface):
+    """
+    This class provides a line splitting method by using two qubits for full power flow in
+    either direction
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # read generators and lines from network and encode as qubits
+        self.storeGenerators()
+        self.storeLines()
+
+    def splitCapacity(self, capacity):
+        """
+        Method to split a line which has maximum capacity "capacity". A line split is a 
+        list of lines with varying capacity which can either be on or off. The status of 
+        a line is binary, so it can either carry no power or power equal to it's capacity
+        The direction of flow for each line is also fixed. It is not enforced that a
+        chosen split can only represent flow lower than capacity or all flows that are
+        admissable. the line split is represented by the capacity of the it's components
+
+        @param capacity: int
+            the capacity of the line that is to be split up
+        @return: list
+            a list of integers. Each integer is the capacity of a line of the splitting
+            direction of flow is encoded as the sign
+        """
+        return [capacity, - capacity]
+
+
+class binarysplitNoMarginalCost(binarysplitIsingInterface):
+    """
+    This class uses a 'binarysplit' to encode lines. It optimizes according to the kirchhoff
+    constraint, but doesn't consider any marginal costs incurred
+    """
+    def __init__(self, network, snapshots):
+        super().__init__(network, snapshots)
+        # problem constraints: kirchhoff
+        for time in range(len(self.snapshots)):
+            for node in self.network.buses.index:
+                self.encodeKirchhoffConstraint(node,time)
