@@ -136,7 +136,7 @@ class IsingPypsaInterface:
                     if self.network.generators.committable[gen]:
                         continue
                     self.data[gen]['indices'].append(self.allocatedQubits)
-                    self.data[gen]['weights'].append(self.network.generators_t.p_max_pu[gen].iloc[time])
+                    self.data[gen]['weights'].append(self.getNominalPower(gen,time))
                     self.allocatedQubits += 1
                 self.writeToHighestLevel(gen)
         return
@@ -239,6 +239,23 @@ class IsingPypsaInterface:
                 }
         return result
 
+    def getNominalPower(self,generator, time=0,):
+        """
+        returns the nominal power at a time step saved in the network
+        
+        Args:
+            generator: (str) generator label
+            time: (int) index of time slice for which to get nominal power
+        Returns:
+            (float) maximum power available at generator in time slice at time
+        """
+        try:
+            p_max_pu = self.network.generators_t.p_max_pu[generator].iloc[time]
+        except KeyError:
+            p_max_pu = 1.0
+        nominalPower = self.network.generators.p_nom[generator] * p_max_pu
+        return nominalPower
+
 
     def getGeneratorStatus(self, gen, solution, time=0):
         """
@@ -286,7 +303,7 @@ class IsingPypsaInterface:
         return self.getFlowDictionary(solution)
 
 
-    def getLoad(self, bus, time=0):
+    def getLoad(self, bus, time=0, silent=True):
         """
         returns the total load at a bus at a given time slice
 
@@ -301,7 +318,10 @@ class IsingPypsaInterface:
         allLoads = self.network.loads_t['p_set'].iloc[time]
         result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result == 0:
-            print(f"Warning: No load at {bus} at timestep {time}")
+            if not silent:
+                print(f"Warning: No load at {bus} at timestep {time}.\nFalling back to constant load")
+            allLoads = self.network.loads['p_set']
+            result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result < 0:
             raise ValueError(
                 "negative Load at current Bus"
@@ -326,6 +346,22 @@ class IsingPypsaInterface:
         encodingLength = self.data[component]["encodingLength"]
         return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
 
+    def getQubitMapping(self,time=0):
+        """
+        returns a dictionary on which qubits which network components were mapped for
+        representation in an ising spin glass problem
+        
+        Args:
+            time: (int) index of time slice for which to get qubit map
+        Returns:
+            (dict) dictionary with network labels as keys and qubit lists as values
+        """
+
+        return {
+                component : self.getMemoryAdress(component,time) 
+                for component in self.data.keys() 
+                if isinstance(component,str)
+                }
 
     def siquanFormat(self):
         """
@@ -335,6 +371,32 @@ class IsingPypsaInterface:
             list of tuples of the form (interaction-coefficient, list(qubits))
         """
         return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
+
+    def getInteraction(self,*args):
+        """
+        returns the interaction coeffiecient of a list of qubits
+        
+        Args:
+            *args: (list) a list of integers representing qubits
+        Returns:
+            (float) the interaction strength between all qubits in args
+        """
+        sortedUniqueArguments = tuple(sorted(set(args)))
+        return self.problem.get(sortedUniqueArguments, 0.0)
+
+
+    def getHamiltonianMatrix(self,):
+        """
+        returns a matrix containing the ising hamiltonian
+        
+        Returns:
+            (list) a list of list representing the hamiltonian matrix
+        """
+        qubits = range(self.allocatedQubits)
+        hamiltonian = [
+                [self.getInteraction(i,j) for i in qubits] for j in qubits
+        ]
+        return hamiltonian
 
 
     # TODO
@@ -417,7 +479,7 @@ class IsingPypsaInterface:
                 value += self.data[component]['weights'][idx]
         return value
 
-    def calcKirchhoffCostAtBus(self, bus, result):
+    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
         """
         returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
         every time slice 'time' as {(bus,time) : value} 
@@ -438,13 +500,13 @@ class IsingPypsaInterface:
                 load += self.getEncodedValueOfComponent(lineId, result, time=t)
             for lineId in components['negativeLines']:
                 load -= self.getEncodedValueOfComponent(lineId, result, time=t)
-            if load:
+            if load and not silent:
                 print(f"IMBALANCE AT {bus}::{load}")
             load = (load * self.kirchhoffFactor) ** 2
             contrib[str((bus, t))] = load
         return contrib
 
-    def individualCostContribution(self, result):
+    def individualCostContribution(self, result,silent=True):
         """
         returns a dictionary which contains the kirchhoff cost incurred at every bus at
         every time slice
@@ -457,7 +519,7 @@ class IsingPypsaInterface:
         # TODO proper cost
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result)}
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
         return contrib
 
     def individualMarginalCost(self, result):
@@ -1029,7 +1091,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
         maxCost = 0.0
         maxPower = 0.0
         for generator in self.network.generators.index:
-            currentPower = self.network.generators_t.p_max_pu[generator].iloc[time]
+            currentPower = self.getNominalPower(generator, time)
             maxCost += currentPower * self.network.generators["marginal_cost"].loc[generator]
             maxPower += currentPower
         return float(maxCost / maxPower)
