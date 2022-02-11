@@ -332,10 +332,11 @@ class QaoaQiskit():
         # add problem Hamiltonian
         for i in range(len(hamiltonian)):
             for j in range(i, len(hamiltonian[i])):
-                if i == j:
-                    qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
-                else:
-                    qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
+                if hamiltonian[i][j] != 0.0:
+                    if i == j:
+                        qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
+                    else:
+                        qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
         qc.barrier()
         qc.barrier()
 
@@ -761,25 +762,25 @@ def main():
 
     qaoa = QaoaQiskit(config=config, docker=False)
     components = qaoa.transformProblemForOptimizer(network=netImport)
-    """theta = [Parameter("\u03B2"), Parameter("\u03B3")]
 
-    
-    qc = qaoa.create_qc1(components=components, theta=theta)
-    drawnQc = qc.draw(output="latex_source")
+    """
+    theta = [Parameter("\u03B2"), Parameter("\u03B3")]
+    config["QaoaBackend"]["qcGeneration"] = "Iteration"
+    componentsIter = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIter = qaoa.create_qc1(components=componentsIter, theta=theta)
+    qcIterDrawn = qcIter.draw(output="latex_source")
+    config["QaoaBackend"]["qcGeneration"] = "Ising"
+    componentsIsing = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"], theta=theta)
+    qcIsingDrawn = qcIsing.draw(output="latex_source")
 
-    transformedProblem = IsingPypsaInterface.buildCostFunction(testNetwork)
-    hamiltonian = transformedProblem.getHamiltonianMatrix()
-    QuMap = transformedProblem.getQubitMapping()
+    qcCompare = {"Iteration": qcIterDrawn,
+                 "Ising": qcIsingDrawn}
 
-    isingCompare = {"drawnQc": drawnQc,
-                    "QaoaQubitMapping": components["qubit_map"],
-                    "hamiltonianMatrix": hamiltonian,
-                    "IsingQubitMapping": QuMap
-    }
+    with open("qcCompare.json", "w") as write_file:
+        json.dump(qcCompare, write_file, indent=2, default=str)
+    """
 
-    with open("IsingCompare.json", "w") as write_file:
-        json.dump(isingCompare, write_file, indent=2, default=str)
-"""
     qaoa.optimize(transformedProblem=components)
 
     now = datetime.today()

@@ -323,10 +323,11 @@ class QaoaQiskit(BackendBase):
         # add problem Hamiltonian
         for i in range(len(hamiltonian)):
             for j in range(i, len(hamiltonian[i])):
-                if i == j:
-                    qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
-                else:
-                    qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
+                if hamiltonian[i][j] != 0.0:
+                    if i == j:
+                        qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
+                    else:
+                        qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
         qc.barrier()
         qc.barrier()
 

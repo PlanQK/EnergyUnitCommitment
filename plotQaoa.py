@@ -247,6 +247,21 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
 
 
 def main():
+    # Ising vs Iteration
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-03-35",
+                extraPlotInfo="g1=1, g2=3, Ising QC",
+                savename="aer_4qubit_Ising_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-03-18",
+                extraPlotInfo="g1=1, g2=3, Ising QC",
+                savename="aer_4qubit_Ising_g1-1_g2-3_yesNoise_fixedQC_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_14-07-23",
+                extraPlotInfo="g1=1, g2=3, Iteration QC",
+                savename="aer_4qubit_Iteration_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_14-07-33",
+                extraPlotInfo="g1=1, g2=3, Iteration QC",
+                savename="aer_4qubit_Iteration_g1-1_g2-3_yesNoise_fixedQC_maxiter50_shots4096_rep100")
+
+    return
     # used Ising network
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_14-01-21",
                 extraPlotInfo="g1=1, g2=3, Ising network",
