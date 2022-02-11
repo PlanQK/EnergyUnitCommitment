@@ -79,6 +79,13 @@ ganBackends = {
 
 
 def main():
+    with open(sys.argv[2]) as file:
+        config = yaml.safe_load(file)
+
+    #TODO: move away from env_variables and pass direct to functions??
+    #TODO: use config.yaml to set env_variables??
+    DEFAULT_ENV_VARIABLES["problemFormulation"] = config["IsingInterface"]["problemFormulation"]
+
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
@@ -86,8 +93,7 @@ def main():
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
     OptimizerClass = ganBackends[sys.argv[1]]
-    with open(sys.argv[2]) as file:
-        config = yaml.safe_load(file)
+
     optimizer = OptimizerClass(config=config)
     try:
         optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))

@@ -247,6 +247,13 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
 
 
 def main():
+    # used Ising network
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_14-01-21",
+                extraPlotInfo="g1=1, g2=3, Ising network",
+                savename="aer_4qubit_IsingNet_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep10")
+
+    return
+
     # fixed QC
     plotBPandCF(filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-10_11-30-03",
                 extraPlotInfo="g1=1, g2=3, fixed QC",

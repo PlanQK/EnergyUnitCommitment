@@ -29,6 +29,7 @@ class QaoaQiskit():
         self.resetResultDict()
 
         self.kirchhoff = {}
+        self.components = {}
         self.docker = docker
 
     def resetResultDict(self):
@@ -73,6 +74,7 @@ class QaoaQiskit():
             print(f"----------------------------- Iteration {i} ----------------------------------------")
 
             self.resetResultDict()
+            self.results_dict["components"] = self.components
 
             filename = f"Qaoa_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}__{i}.json"
 
@@ -140,31 +142,27 @@ class QaoaQiskit():
     def handleOptimizationStop(self, path, network):
         pass
 
-    def power_extraction(self, comp: str, components: dict, network: pypsa.Network, bus: str) -> float:
+    def get_power(self, comp: str, network: pypsa.Network, type: str) -> float:
         """
         Extracts the power value of the given component and adjusts its sign according to function this component
         fulfills for the given bus.
 
         Args:
             comp: (str) The component from which the power should be extracted.
-            components: (dict) All components to be modeled as a Quantum Circuit.
             network: (pypsa.Network) The PyPSA network to be analyzed.
-            bus: (str) The bus in which relation the component should be evaluated.
+            type: (str) The type of the component, "line" or "gen".
 
         Returns:
-            (float) The adjusted power value for the given comp.
+            (float) The power value for the given comp.
         """
-        if comp in components[bus]["generators"]:
+        if type == "gen":
             return float(network.generators[network.generators.index == comp].p_nom)
-        elif comp in components[bus]["positiveLines"]:
+        elif type == "line":
             return float(network.lines[network.lines.index == comp].s_nom)
-        elif comp in components[bus]["negativeLines"]:
-            return -float(network.lines[network.lines.index == comp].s_nom)
 
-    def extract_power_list(self, components: dict, network: pypsa.Network, bus: str) -> list:
+    def buildPowerAndQubits(self, components: dict, network: pypsa.Network, bus: str) -> dict:
         """
-        Extracts the power values of the components connected to a bus and stored in the flattened_{bus} list from the
-        PyPSA network and stores them in a list with the same indices as flattened_{bus}.
+        Builds up the power and qubits lists stored in the components dictionary and returns it.
 
         Args:
             components: (dict) All components to be modeled as a Quantum Circuit.
@@ -172,14 +170,26 @@ class QaoaQiskit():
             bus: (str) The bus where the components are connected.
 
         Returns:
-            (list) The power values of the components in flattened_{bus}
+            (dict) The components dictionary with the power and qubits lists for this bus.
         """
-        power_list = [0] * len(components[bus][f"flattened_{bus}"])
-        for comp in components[bus][f"flattened_{bus}"]:
-            i = components[bus][f"flattened_{bus}"].index(comp)
-            power_list[i] = self.power_extraction(comp=comp, components=components, network=network, bus=bus)
+        qubit_map = components["qubit_map"]
+        for comp in components[bus]["generators"]:
+            components[bus]["qubits"].append(qubit_map[comp][0])
+            components[bus]["power"].append(self.get_power(comp=comp, network=network, type="gen"))
+        for comp in components[bus]["positiveLines"]:
+            components[bus]["power"].append(self.get_power(comp=comp, network=network, type="line"))
+            if network.lines[network.lines.index == comp].bus1[0] == bus:
+                components[bus]["qubits"].append(qubit_map[comp][0])
+            elif network.lines[network.lines.index == comp].bus0[0] == bus:
+                components[bus]["qubits"].append(qubit_map[comp][1])
+        for comp in components[bus]["negativeLines"]:
+            components[bus]["power"].append(-self.get_power(comp=comp, network=network, type="line"))
+            if network.lines[network.lines.index == comp].bus1[0] == bus:
+                components[bus]["qubits"].append(qubit_map[comp][1])
+            elif network.lines[network.lines.index == comp].bus0[0] == bus:
+                components[bus]["qubits"].append(qubit_map[comp][0])
 
-        return power_list
+        return components
 
     def getComponents(self, network: pypsa.Network) -> dict:
         """
@@ -196,29 +206,47 @@ class QaoaQiskit():
             (dict) All components to be modeled as a Quantum Circuit.
         """
         components = {}
+
+        print(f"getComponents: generators: \n {network.generators}")
+        print(f"getComponents: lines: \n {network.lines}")
+
+        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
+            qubit_map = {}
+            qubit = 0
+            for comp in list(network.generators.index):
+                qubit_map[comp] = [qubit]
+                qubit += 1
+            for comp in list(network.lines.index):
+                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
+                qubit += 2
+        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
+            qubit_map = transformedProblem.getQubitMapping()
+            print(f"getComponents: qubit_map: {qubit_map}")
+
+        components["qubit_map"] = qubit_map
+
         for bus in network.buses.index.values:
             components[bus] = {"generators": list(network.generators[network.generators.bus == bus].index),
-                               "positiveLines": list(network.lines[network.lines.bus1 == bus].index),
-                               "negativeLines": list(network.lines[network.lines.bus0 == bus].index),
+                               "positiveLines": list(network.lines[network.lines.bus1 == bus].index) +
+                                                list(network.lines[network.lines.bus0 == bus].index),
+                               # lines are bidirectional
+                               "negativeLines": list(network.lines[network.lines.bus1 == bus].index) +
+                                                list(network.lines[network.lines.bus0 == bus].index),
                                "load": sum(list(network.loads[network.loads.bus == bus].p_set)), }
             components[bus][f"flattened_{bus}"] = components[bus]["generators"] + \
                                                   components[bus]["positiveLines"] + \
                                                   components[bus]["negativeLines"]
-            components[bus]["power"] = self.extract_power_list(components=components, network=network, bus=bus)
+            components[bus]["power"] = []
             components[bus]["qubits"] = []
+            components = self.buildPowerAndQubits(components=components, network=network, bus=bus)
 
-        qubit_map = {}
-        qubit = 0
-        for bus in components:
-            for comp in components[bus][f"flattened_{bus}"]:
-                if comp not in qubit_map:
-                    qubit_map[comp] = qubit
-                    qubit += 1
-                components[bus]["qubits"].append(qubit_map[comp])
+        components["hamiltonian"] = []
+        if self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+            components["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+            print(f"getComponents: hamiltonian: {components['hamiltonian']}")
 
-        components["qubit_map"] = qubit_map
-
-        self.results_dict["components"] = components
+        self.components = components
 
         return components
 
@@ -234,7 +262,8 @@ class QaoaQiskit():
         Returns:
             (QuantumCircuit) The created quantum circuit.
         """
-        nqubits = len(components["qubit_map"])
+        lastKey = list(components["qubit_map"])[-1]
+        nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
 
         beta = theta[0]
@@ -248,7 +277,7 @@ class QaoaQiskit():
 
         # add problem Hamiltonian for each bus
         for bus in components:
-            if bus != "qubit_map":
+            if bus != "qubit_map" and bus != "hamiltonian":
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
                     p_comp1 = components[bus]["power"][i]
@@ -276,6 +305,48 @@ class QaoaQiskit():
 
         return qc
 
+    def create_qcIsing(self, hamiltonian: dict, theta: list) -> QuantumCircuit:
+        """
+        Creates a quantum circuit based on the hamiltonian matrix given.
+
+        Args:
+            hamiltonian: (dict) The matrix representing the problem Hamiltonian.
+            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
+                          gamma = theta[1].
+
+        Returns:
+            (QuantumCircuit) The created quantum circuit.
+        """
+        nqubits = len(hamiltonian)
+        qc = QuantumCircuit(nqubits)
+
+        beta = theta[0]
+        gamma = theta[1]
+
+        # add Hadamard gate to each qubit
+        for i in range(nqubits):
+            qc.h(i)
+        qc.barrier()
+        qc.barrier()
+
+        # add problem Hamiltonian
+        for i in range(len(hamiltonian)):
+            for j in range(i, len(hamiltonian[i])):
+                if i == j:
+                    qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
+                else:
+                    qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
+        qc.barrier()
+        qc.barrier()
+
+        # add mixing Hamiltonian to each qubit
+        for i in range(nqubits):
+            qc.rx(beta, i)
+
+        qc.measure_all()
+
+        return qc
+
     def create_qc2(self, components: dict, theta: list) -> QuantumCircuit:
         # 1 beta & 2 gammas
         """
@@ -289,7 +360,8 @@ class QaoaQiskit():
         Returns:
             (QuantumCircuit) The created quantum circuit.
         """
-        nqubits = len(components["qubit_map"])
+        lastKey = list(components["qubit_map"])[-1]
+        nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
 
         beta = theta[0]
@@ -304,7 +376,7 @@ class QaoaQiskit():
         index = 0
         for bus in components:
             index += 1
-            if bus != "qubit_map":
+            if bus != "qubit_map" and bus != "hamiltonian":
                 gamma = theta[index]
                 length = len(components[bus][f"flattened_{bus}"])
                 for i in range(length):
@@ -346,7 +418,8 @@ class QaoaQiskit():
         Returns:
             (QuantumCircuit) The created quantum circuit.
         """
-        nqubits = len(components["qubit_map"])
+        lastKey = list(components["qubit_map"])[-1]
+        nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
 
         # add Hadamard gate to each qubit
@@ -357,7 +430,7 @@ class QaoaQiskit():
         # add problem Hamiltonian for each bus
         index = 0
         for bus in components:
-            if bus != "qubit_map":
+            if bus != "qubit_map" and bus != "hamiltonian":
                 beta = theta[2 * index]
                 gamma = theta[2 * index + 1]
                 length = len(components[bus][f"flattened_{bus}"])
@@ -405,12 +478,12 @@ class QaoaQiskit():
         power_total = 0
         for bus in components:
             power = 0
-            if bus != "qubit_map":
+            if bus != "qubit_map" and bus != "hamiltonian":
                 power -= components[bus]["load"]
 
                 for comp in components[bus][f"flattened_{bus}"]:
                     i = components[bus][f"flattened_{bus}"].index(comp)
-                    i_bit = components["qubit_map"][comp]
+                    i_bit = components[bus]["qubits"][i]
                     power += (components[bus]["power"][i] * float(bitstring[i_bit]))
                 self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
             power_total += abs(power)
@@ -534,10 +607,12 @@ class QaoaQiskit():
         Returns:
             (callable) The objective function to be used in a classical solver
         """
+        lastKey = list(components["qubit_map"])[-1]
+        nqubits = components["qubit_map"][lastKey][-1] + 1
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
                                                                              noise=noise,
-                                                                             nqubits=len(components["qubit_map"]))
+                                                                             nqubits=nqubits)
 
         self.metaInfo["qaoaBackend"] = backend.configuration().to_dict()
 
@@ -548,7 +623,10 @@ class QaoaQiskit():
 
 
         def execute_circ(theta):
-            qc = self.create_qc1(components=components, theta=theta)
+            if self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
+                qc = self.create_qc1(components=components, theta=theta)
+            elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"], theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             #qc.draw(output="latex")
             if simulate:
@@ -676,14 +754,16 @@ def main():
     testNetwork = createTestNetwork4QubitIsing()
     testNetwork2 = createTestNetwork4Qubit()
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
+    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc")
 
     with open(os.path.dirname(__file__) + "/../config.yaml") as file:
         config = yaml.safe_load(file)
 
     qaoa = QaoaQiskit(config=config, docker=False)
-    theta = [Parameter("\u03B2"), Parameter("\u03B3")]
+    components = qaoa.transformProblemForOptimizer(network=netImport)
+    """theta = [Parameter("\u03B2"), Parameter("\u03B3")]
 
-    components = qaoa.transformProblemForOptimizer(network=testNetwork2)
+    
     qc = qaoa.create_qc1(components=components, theta=theta)
     drawnQc = qc.draw(output="latex_source")
 
@@ -699,7 +779,7 @@ def main():
 
     with open("IsingCompare.json", "w") as write_file:
         json.dump(isingCompare, write_file, indent=2, default=str)
-
+"""
     qaoa.optimize(transformedProblem=components)
 
     now = datetime.today()

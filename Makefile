@@ -41,6 +41,7 @@ CHAINSTRENGTH = 60
 SAMPLECUTSIZE = $(shell seq 200 4 200)
 
 # Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
+#PROBLEMFORMULATION = binarysplitNoMarginalCost
 PROBLEMFORMULATION = fullsplitGlobalCostSquare
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty
 #PROBLEMFORMULATION = fullsplitNoMarginalCost
@@ -53,7 +54,7 @@ TIMEOUT = 30
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][5]_1[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Qubit_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 
