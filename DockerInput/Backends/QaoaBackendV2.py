@@ -596,8 +596,7 @@ class QaoaQiskit(BackendBase):
         """
         lastKey = list(components["qubit_map"])[-1]
         nqubits = components["qubit_map"][lastKey][-1] + 1
-        print(f"nqubits = {nqubits}")
-        print(components["qubit_map"])
+
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
                                                                              noise=noise,
