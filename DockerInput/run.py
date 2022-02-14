@@ -79,6 +79,9 @@ ganBackends = {
 
 
 def main():
+    assert len(sys.argv) == 3, errorMsg
+    assert sys.argv[1] in ganBackends.keys(), errorMsg
+
     with open(sys.argv[2]) as file:
         config = yaml.safe_load(file)
 
@@ -89,8 +92,7 @@ def main():
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    assert len(sys.argv) == 3, errorMsg
-    assert sys.argv[1] in ganBackends.keys(), errorMsg
+    config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
     OptimizerClass = ganBackends[sys.argv[1]]
 

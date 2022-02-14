@@ -232,26 +232,113 @@ def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str)
 def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
     dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
 
-    if dataAll["config"]["QaoaBackend"]["noise"]:
-        noise = "with noise"
+    if dataAll["config"]["QaoaBackend"]["simulate"]:
+        if dataAll["config"]["QaoaBackend"]["noise"]:
+            noise = "with noise"
+        else:
+            noise = "without noise"
     else:
-        noise = "without noise"
+        noise = "on QPU"
     optimizer = dataAll["config"]["QaoaBackend"]["classical_optimizer"]
     maxiter = dataAll["config"]["QaoaBackend"]["max_iter"]
     plotnameBP = f"{optimizer} {noise} - maxiter {maxiter} \n {extraPlotInfo}"
     plotnameCF = f"{optimizer} CF evolution {noise} - maxiter {maxiter} \n {extraPlotInfo}"
 
     plotBoxplot(docker=True, filename=filename, plotname=plotnameBP, savename=savename)
-    plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
+    if len(dataAll["results"]) > 1:
+        plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
 
 
 
 def main():
+    #Iteration vs IterastionMatrix
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-33-38",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-33-27",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-34-18",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-33-53",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep100")
+
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-18-35",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-18-25",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_14-37-58",
+                extraPlotInfo="g1=1, g2=3, Ising QC - kirch^2",
+                savename="aer_4qubit_Ising-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_14-31-52",
+                extraPlotInfo="g1=1, g2=3, Ising QC - kirch^2",
+                savename="aer_4qubit_Ising-kirch^2_SPSA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_14-20-07",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_14-19-54",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_SPSA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_12-36-35",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_12-36-52",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_g1-1_g2-3_noNoise_maxiter50_shots4096_rep100")
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_12-33-40",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_12-29-11",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_09-41-18",
+                extraPlotInfo="g1=1, g2=3, Ising QC - +Hamiltonian",
+                savename="aer_4qubit_Ising-posHam_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_09-45-47",
+                extraPlotInfo="g1=1, g2=3, Ising QC - -Hamiltonian",
+                savename="aer_4qubit_Ising-negHam_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_10-26-15",
+                extraPlotInfo="g1=1, g2=3, Ising QC - -Hamiltonian, [2][3] = 4",
+                savename="aer_4qubit_Ising-negHam-4_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep10")
+    return
+    # real run
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-02-31",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Ising_g1-1_g2-3_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-02-00",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Ising_g1-1_g2-3_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-01-18",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Ising_g1-1_g2-3_maxiter50_shots4096_rep1")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-04-24",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Iteration_g1-1_g2-3_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-03-57",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Iteration_g1-1_g2-3_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_17-03-28",
+                extraPlotInfo="g1=1, g2=3",
+                savename="QPU_4qubit_Iteration_g1-1_g2-3_maxiter50_shots4096_rep1")
+
+    return
+
     # Ising vs Iteration
-    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-03-35",
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-43-28",
                 extraPlotInfo="g1=1, g2=3, Ising QC",
                 savename="aer_4qubit_Ising_g1-1_g2-3_noNoise_fixedQC_maxiter50_shots4096_rep100")
-    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-03-18",
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_16-43-39",
                 extraPlotInfo="g1=1, g2=3, Ising QC",
                 savename="aer_4qubit_Ising_g1-1_g2-3_yesNoise_fixedQC_maxiter50_shots4096_rep100")
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-11_14-07-23",
