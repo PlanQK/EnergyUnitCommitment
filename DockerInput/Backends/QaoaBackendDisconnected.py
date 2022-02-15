@@ -252,7 +252,7 @@ class QaoaQiskit():
 
         return components
 
-    def addHpAsIteration(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
+    def addHpIter(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
         """
         Appends the problem Hamiltonian to a quantum circuit by iterating through the cost function and appending
         single gates.
@@ -288,21 +288,18 @@ class QaoaQiskit():
 
         return qc
 
-    def addHpAsMatrix(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
+    def calculateHpMatrix(self, components: dict, nqubits: int) -> list:
         """
-        Appends the problem Hamiltonian to a quantum circuit by creating a hamiltonian matrix and appending combined
-        gates at the end using this matrix.
+        Creates the Hamiltonian Matrix for the given problem.
 
         Args:
-            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
-            gamma: (float) The optimizable value for the problem Hamiltonian.
             components: (dict) All components to be modeled as a Quantum Circuit.
+            nqubits: (int) The number of qubits in the network.
 
         Returns:
-            (QuantumCircuit) The appended quantum circuit.
+            (list) The Hamiltonian Matrix.
         """
-        nqubits = qc.num_qubits
-        hp = [[0.0, 0.0, 0.0, 0.0] for i in range(nqubits)]
+        hp = [[0.0 for j in range(nqubits)] for i in range(nqubits)]
         for bus in components:
             if bus != "qubit_map" and bus != "hamiltonian":
                 length = len(components[bus][f"flattened_{bus}"])
@@ -321,8 +318,21 @@ class QaoaQiskit():
                         if i != j:
                             hp[i_qubit][j_qubit] += factor  # qc.rzz(factor * gamma, qubit_comp1, qubit_comp2)
                             hp[j_qubit][i_qubit] += factor  # creates the symmetry in Hp
+        return hp
 
+    def addHpMatrix(self, qc: QuantumCircuit, gamma: float, nqubits: int, hp: list) -> QuantumCircuit:
+        """
+        Appends the problem Hamiltonian to a quantum circuit using the Hamiltonian matrix.
 
+        Args:
+            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
+            gamma: (float) The optimizable value for the problem Hamiltonian.
+            nqubits: (int) The number of qubits in the network.
+            hp: (list) The Hamiltonian Matrix.
+
+        Returns:
+            (QuantumCircuit) The appended quantum circuit.
+        """
 
         for i in range(nqubits):
             for j in range(i, nqubits):
@@ -334,7 +344,25 @@ class QaoaQiskit():
         qc.barrier()
         qc.barrier()
 
-        components["hamiltonian"] = hp
+        return qc
+
+    def addHb(self, qc: QuantumCircuit, beta: float, nqubits: int) -> QuantumCircuit:
+        """
+        Appends the mixer Hamiltonian to a quantum circuit.
+
+        Args:
+            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
+            beta: (float) The optimizable value for the mixer Hamiltonian.
+            nqubits: (int) The number of qubits in the network.
+
+        Returns:
+            (QuantumCircuit) The appended quantum circuit.
+        """
+
+        for i in range(nqubits):
+            qc.rx(beta, i)
+        qc.barrier()
+        qc.barrier()
 
         return qc
 
@@ -364,13 +392,12 @@ class QaoaQiskit():
         qc.barrier()
 
         if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qc = self.addHpAsMatrix(qc=qc, gamma=gamma, components=components)
+            components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
+            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"])
         elif self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
-            qc = self.addHpAsIteration(qc=qc, gamma=gamma, components=components)
+            qc = self.addHpIter(qc=qc, gamma=gamma, components=components)
 
-        # add mixing Hamiltonian to each qubit
-        for i in range(nqubits):
-            qc.rx(beta, i)
+        qc = self.addHb(qc=qc, beta=beta, nqubits=nqubits)
 
         qc.measure_all()
 
@@ -419,64 +446,6 @@ class QaoaQiskit():
 
         return qc
 
-    def create_qc2(self, components: dict, theta: list) -> QuantumCircuit:
-        # 1 beta & 2 gammas
-        """
-        Creates a quantum circuit based on the components given and the cost function:
-
-        Args:
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
-                          gamma = theta[1].
-
-        Returns:
-            (QuantumCircuit) The created quantum circuit.
-        """
-        lastKey = list(components["qubit_map"])[-1]
-        nqubits = components["qubit_map"][lastKey][-1] + 1
-        qc = QuantumCircuit(nqubits)
-
-        beta = theta[0]
-
-        # add Hadamard gate to each qubit
-        for i in range(nqubits):
-            qc.h(i)
-        qc.barrier()
-        qc.barrier()
-
-        # add problem Hamiltonian for each bus
-        index = 0
-        for bus in components:
-            index += 1
-            if bus != "qubit_map" and bus != "hamiltonian":
-                gamma = theta[index]
-                length = len(components[bus][f"flattened_{bus}"])
-                for i in range(length):
-                    p_comp1 = components[bus]["power"][i]
-                    qubit_comp1 = components[bus]["qubits"][i]
-                    # negative load, since it removes power form the node
-                    factor_load = -(components[bus]["load"]) * p_comp1
-                    qc.rz(factor_load * gamma, qubit_comp1)
-                    qc.barrier()
-                    for j in range(length):
-                        p_comp2 = components[bus]["power"][j]
-                        qubit_comp2 = components[bus]["qubits"][j]
-                        factor = 0.25 * p_comp1 * p_comp2
-                        qc.rz(factor * gamma, qubit_comp1)
-                        qc.rz(factor * gamma, qubit_comp2)
-                        if i != j:
-                            qc.rzz(factor * gamma, qubit_comp1, qubit_comp2)
-                qc.barrier()
-                qc.barrier()
-
-        # add mixing Hamiltonian to each qubit
-        for i in range(nqubits):
-            qc.rx(beta, i)
-
-        qc.measure_all()
-
-        return qc
-
     def create_qc3(self, components: dict, theta: list) -> QuantumCircuit:
         # 2 betas & 2 gammas
         """
@@ -484,8 +453,8 @@ class QaoaQiskit():
 
         Args:
             components: (dict) All components to be modeled as a Quantum Circuit.
-            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
-                          gamma = theta[1].
+            theta: (list) The optimizable values of the quantum circuit. Four arguments needed: [beta0, gamma0, beta1,
+            gamma1].
 
         Returns:
             (QuantumCircuit) The created quantum circuit.
@@ -493,41 +462,22 @@ class QaoaQiskit():
         lastKey = list(components["qubit_map"])[-1]
         nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
+        components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
+        beta0 = theta[0]
+        gamma0 = theta[1]
+        beta1 = theta[2]
+        gamma1 = theta[3]
 
         # add Hadamard gate to each qubit
         for i in range(nqubits):
             qc.h(i)
         qc.barrier()
 
-        # add problem Hamiltonian for each bus
-        index = 0
-        for bus in components:
-            if bus != "qubit_map" and bus != "hamiltonian":
-                beta = theta[2 * index]
-                gamma = theta[2 * index + 1]
-                length = len(components[bus][f"flattened_{bus}"])
-                for i in range(length):
-                    p_comp1 = components[bus]["power"][i]
-                    qubit_comp1 = components[bus]["qubits"][i]
-                    # negative load, since it removes power form the node
-                    factor_load = -(components[bus]["load"]) * p_comp1
-                    qc.rz(factor_load * gamma, qubit_comp1)
-                    qc.barrier()
-                    for j in range(length):
-                        p_comp2 = components[bus]["power"][j]
-                        qubit_comp2 = components[bus]["qubits"][j]
-                        factor = 0.25 * p_comp1 * p_comp2
-                        qc.rz(factor * gamma, qubit_comp1)
-                        qc.rz(factor * gamma, qubit_comp2)
-                        if i != j:
-                            qc.rzz(factor * gamma, qubit_comp1, qubit_comp2)
-                        qc.barrier()
-                    qc.rx(beta, i)
-            index += 1
+        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHb(qc=qc, beta=beta0, nqubits=nqubits)
 
-        # add mixing Hamiltonian to each qubit
-        # for i in range(nqubits):
-        #    qc.rx(beta, i)
+        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHb(qc=qc, beta=beta1, nqubits=nqubits)
 
         qc.measure_all()
 
@@ -696,7 +646,10 @@ class QaoaQiskit():
 
         def execute_circ(theta):
             if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or "IterationMatrix":
-                qc = self.create_qc1(components=components, theta=theta)
+                if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
+                    qc = self.create_qc1(components=components, theta=theta)
+                elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
+                    qc = self.create_qc3(components=components, theta=theta)
             elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
                 qc = self.create_qcIsing(hamiltonian=components["hamiltonian"], theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
@@ -827,7 +780,7 @@ def main():
         "timeout": "-1",
         "maxOrder": 0,
         "sampleCutSize": 200,
-        "threshold": 0.5
+        "threshold": 0.5,
         "outputInfoTime": ""
     }
     testNetwork = createTestNetwork4QubitIsing()
@@ -835,7 +788,8 @@ def main():
     now = datetime.today()
     DEFAULT_ENV_VARIABLES["outputInfoTime"] = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
-    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc")
+    #netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc")
+    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork5QubitIsing_2_0_20.nc")
 
     with open(os.path.dirname(__file__) + "/../config.yaml") as file:
         config = yaml.safe_load(file)

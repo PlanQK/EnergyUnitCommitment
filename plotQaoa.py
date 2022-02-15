@@ -127,6 +127,7 @@ def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
     else:
         data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
 
+
     bitstrings = list(data["1"]["counts"].keys())
     bitstrings.sort()
     #bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
@@ -160,6 +161,60 @@ def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
     plt.setp(bp['fliers'], markersize=2.0)
     #plt.show()
     plt.savefig(f"plots/BP_{savename}.png")
+
+
+def plotBoxplotBest(docker: bool, filename: str, plotname: str, savename: str):
+    if docker:
+        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = dataAll["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+
+    cutoff = {}
+    for key in data:
+        if docker:
+            subdata = openFile(filename=data[key]["filename"], directory="results_qaoa_sweep/")
+        else:
+            subdata = openFile(filename=data[key]["filename"], directory="results_qaoa/")
+        cutoff[key] = subdata["optimizeResults"]["fun"]
+
+    cutoff = dict(sorted(cutoff.items(), key=lambda item: item[1]))
+
+    bitstrings = list(data["1"]["counts"].keys())
+    bitstrings.sort()
+    # bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
+    #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
+    shots = data["1"]["shots"]
+    backend = dataAll["qaoaBackend"]["backend_name"]
+    initial_guess = data["1"]["initial_guess"]
+    toPlot = [[] for i in range(len(bitstrings))]
+
+    for i in range(int(len(cutoff)*0.5)):
+        key = list(cutoff.keys())[i]
+        for bitstring in bitstrings:
+            bitstring_index = bitstrings.index(bitstring)
+            if bitstring in data[key]["counts"]:
+                appendData = data[key]["counts"][bitstring]
+            else:
+                appendData = 0
+            toPlot[bitstring_index].append(appendData / shots)
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(7)
+    pos = np.arange(len(toPlot)) + 1
+    bp = ax.boxplot(toPlot, sym='k+', positions=pos, bootstrap=5000)
+
+    ax.set_xlabel('bitstrings')
+    ax.set_ylabel('probability')
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
+              fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.suptitle(plotname)
+    plt.xticks(range(1, len(bitstrings) + 1), bitstrings, rotation=70)
+    plt.setp(bp['whiskers'], color='k', linestyle='-')
+    plt.setp(bp['fliers'], markersize=2.0)
+    # plt.show()
+    plt.savefig(f"plots/BPB_{savename}.png")
 
 
 def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str):
@@ -242,16 +297,128 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
     optimizer = dataAll["config"]["QaoaBackend"]["classical_optimizer"]
     maxiter = dataAll["config"]["QaoaBackend"]["max_iter"]
     plotnameBP = f"{optimizer} {noise} - maxiter {maxiter} \n {extraPlotInfo}"
+    plotnameBPB = f"{optimizer} {noise} - maxiter {maxiter}, best 50% \n {extraPlotInfo}"
     plotnameCF = f"{optimizer} CF evolution {noise} - maxiter {maxiter} \n {extraPlotInfo}"
 
     plotBoxplot(docker=True, filename=filename, plotname=plotnameBP, savename=savename)
+    plotBoxplotBest(docker=True, filename=filename, plotname=plotnameBPB, savename=savename)
     if len(dataAll["results"]) > 1:
         plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
 
+def plotHistCF(docker: bool, filename: str, plotname:str, savename: str):
+    if docker:
+        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
+        data = dataAll["results"]
+    else:
+        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+
+    shots = data["1"]["shots"]
+    backend = dataAll["qaoaBackend"]["backend_name"]
+    initial_guess = data["1"]["initial_guess"]
+
+    toPlot = []
+    x = []
+    for key in data:
+        if docker:
+            tempData = openFile(filename=data[key]["filename"], directory="results_qaoa_sweep/")
+        else:
+            tempData = openFile(filename=data[key]["filename"], directory="results_qaoa/")
+        toPlot.append(float(tempData["optimizeResults"]["fun"]))
+        x.append(int(key))
+        bins = int(key)
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(7)
+
+    #n, bins, patches = plt.hist(x=x, weights=toPlot, histtype='step')
+    plt.bar(x=x, height=toPlot)
+    ax.set_xlabel('repetition')
+    ax.set_ylabel('cost function')
+    plt.xticks(x)
+    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
+              fontdict={'fontsize': 8})
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.suptitle(plotname)
+    # plt.show()
+    plt.savefig(f"plots/HCF_{savename}.png")
 
 
 def main():
+    #state, qasm, aer
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-09-48",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-11-03",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-05-52",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="qasm_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-06-16",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="qasm_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-05-38",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="state_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-06-38",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="state_4qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    return
+    #5qubit
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_09-25-00",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_5qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_09-30-47",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_5qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-2_g2-4_g3-2_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_09-30-19",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_5qubit_IterMatrix-kirch^2_2Hp-2Hb_SPSA_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_09-30-31",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_5qubit_IterMatrix-kirch^2_2Hp-2Hb_SPSA_g1-2_g2-4_g3-2_yesNoise_maxiter50_shots4096_rep10")
+
+    return
+    plotHistCF(docker=True, filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_09-25-00",
+               plotname="COBYLA no noise \n g1=2, g2=4, g3=2, IterMatrix QC - 2Hp & 2Hb",
+               savename="aer_5qubit_IterMatrix-kirch^2_2Hp-2Hb_COBYLA_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotHistCF(docker=True, filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-53-54",
+               plotname="SPSA with noise \n g1=1, g2=3, IterMatrix QC - kirch^2",
+               savename="aer_4qubit_IterMatrix-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBoxplotBest(docker=True, filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-53-54",
+                    plotname="SPSA with noise \n g1=1, g2=3, IterMatrix QC - kirch^2",
+                    savename="aer_4qubit_IterMatrix-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    return
+
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_08-27-39",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - kirch^2",
+                savename="aer_5qubit_IterMatrix-kirch^2_SPSA_g1-2_g2-4_g3-2_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_08-27-29",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - kirch^2",
+                savename="aer_5qubit_IterMatrix-kirch^2_SPSA_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_08-28-00",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - kirch^2",
+                savename="aer_5qubit_IterMatrix-kirch^2_COBYLA_g1-2_g2-4_g3-2_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork5QubitIsing_2_0_20.nc_30_1_2022-02-15_08-28-21",
+                extraPlotInfo="g1=2, g2=4, g3=2, IterMatrix QC - kirch^2",
+                savename="aer_5qubit_IterMatrix-kirch^2_COBYLA_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+
+    return
     #Iteration vs IterastionMatrix
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-53-54",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-51-06",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
+                savename="aer_4qubit_IterMatrix-kirch^2_SPSA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-54-17",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_SPSA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_17-55-00",
+                extraPlotInfo="g1=1, g2=3, Iter QC - kirch^2",
+                savename="aer_4qubit_Iter-kirch^2_SPSA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep100")
+
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-14_15-33-38",
                 extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",
                 savename="aer_4qubit_IterMatrix-kirch^2_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep100")

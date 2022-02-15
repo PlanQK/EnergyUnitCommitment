@@ -55,6 +55,7 @@ TIMEOUT = 30
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][5]_1[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
 
@@ -244,9 +245,10 @@ define qaoa
 results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
-	--env outputInfoTime=$(strip $(4))
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
+	--cpus="1.5" \
+	--memory=500m \
 	energy:1.0 qaoa $(CONFIG)
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_qaoa_sweep/

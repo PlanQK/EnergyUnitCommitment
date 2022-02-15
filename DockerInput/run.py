@@ -92,7 +92,8 @@ def main():
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
+    config["QaoaBackend"]["outputInfoTime"] = str(envMgr['outputInfo'])[-19:]
+
 
     OptimizerClass = ganBackends[sys.argv[1]]
 
