@@ -71,7 +71,14 @@ class QaoaQiskit(BackendBase):
             self.resetResultDict()
             self.results_dict["components"] = self.components
 
-            filename = f"Qaoa_{self.config['QaoaBackend']['outputInfoTime']}__{i}.json"
+            filename_date = self.config["QaoaBackend"]["filenameSplit"][7]
+            filename_time = self.config["QaoaBackend"]["filenameSplit"][8]
+            if len(self.config["QaoaBackend"]["filenameSplit"]) == 10:
+                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+            elif len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
+                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+                filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
+            filename = f"Qaoa_{filename_date}_{filename_time}_{filename_config}__{i}.json"
 
             expectation = self.get_expectation(filename=filename,
                                                components=transformedProblem,

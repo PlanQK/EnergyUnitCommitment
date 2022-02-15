@@ -82,7 +82,7 @@ def main():
     assert len(sys.argv) == 3, errorMsg
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
-    with open(sys.argv[2]) as file:
+    with open("Configs/" + sys.argv[2]) as file:
         config = yaml.safe_load(file)
 
     #TODO: move away from env_variables and pass direct to functions??
@@ -92,8 +92,8 @@ def main():
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    config["QaoaBackend"]["outputInfoTime"] = str(envMgr['outputInfo'])[-19:]
-
+    filenameSplit = str(envMgr['outputInfo']).split("_")
+    config["QaoaBackend"]["filenameSplit"] = filenameSplit
 
     OptimizerClass = ganBackends[sys.argv[1]]
 

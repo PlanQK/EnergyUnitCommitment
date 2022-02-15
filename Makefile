@@ -7,13 +7,15 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 #PROBLEMDIRECTORY := $(shell pwd)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Backends,target=/energy/Backends
-MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/config.yaml,target=/energy/config.yaml
-MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGPATH)
+MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs/config.yaml,target=/energy/config.yaml
+MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs,target=/energy/Configs
+MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 PREFIX := infoNocost
 
 
 # config file
-CONFIG = "config.yaml"
+#CONFIGFILES = "config.yaml"
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[0-9][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -102,7 +104,8 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach timeout, $(TIMEOUT), \
 		$(foreach number, ${NUMBERS}, \
 		$(foreach time, ${TIME}, \
-		results_qaoa_sweep/${PREFIX}_${filename}_${timeout}_${number}_${time}))))
+		$(foreach config, ${CONFIGFILES}, \
+		results_qaoa_sweep/${PREFIX}_${filename}_${timeout}_${number}_${time}_${config})))))
 
 
 ## creating rules for result files
@@ -242,17 +245,17 @@ $(foreach filename, $(SWEEPFILES), \
 # define qaoa target
 
 define qaoa
-results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
 	--cpus="1.5" \
 	--memory=500m \
-	energy:1.0 qaoa $(CONFIG)
+	energy:1.0 qaoa $(strip $(5))
 	mkdir -p results_qaoa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)) results_qaoa_sweep/
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_$(strip $(4))* results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_$(strip $(4))_$(strip $(5))* results_qaoa_sweep/
 
 endef
 
@@ -260,7 +263,8 @@ $(foreach filename, $(SWEEPFILES), \
 	$(foreach timeout, $(TIMEOUT), \
 	$(foreach number, ${NUMBERS}, \
 	$(foreach time, ${TIME}, \
-	$(eval $(call qaoa, ${filename}, ${timeout}, ${number}, ${time}))))))
+	$(foreach config, ${CONFIGFILES}, \
+	$(eval $(call qaoa, ${filename}, ${timeout}, ${number}, ${time}, ${config})))))))
 
 # end of creating rules for results
 
