@@ -33,6 +33,9 @@ class QaoaQiskit():
         self.kirchhoff = {}
         self.components = {}
         self.docker = docker
+        if config["QaoaBackend"]["noise"] or (not config["QaoaBackend"]["simulate"]):
+            IBMQ.save_account(config["APItoken"]["IBMQ_API_token"], overwrite=True)
+            self.provider = IBMQ.load_account()
 
     def resetResultDict(self):
         self.results_dict = {"iter_count": 0,
@@ -576,10 +579,9 @@ class QaoaQiskit():
         if simulate:
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
-                IBMQ.save_account(api_key, overwrite=True)
-                provider = IBMQ.load_account()
-                # print(provider.backends())
-                device = provider.get_backend("ibmq_lima")
+                large_enough_devices = self.provider.backends(
+                    filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+                device = least_busy(large_enough_devices)
 
                 # Get noise model from backend
                 noise_model = NoiseModel.from_backend(device)
@@ -598,9 +600,7 @@ class QaoaQiskit():
                 basis_gates = None
 
         else:
-            IBMQ.save_account(api_key, overwrite=True)
-            provider = IBMQ.load_account()
-            large_enough_devices = provider.backends(
+            large_enough_devices = self.provider.backends(
                 filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
             backend = least_busy(large_enough_devices)
             # backend = provider.get_backend("ibmq_lima")
