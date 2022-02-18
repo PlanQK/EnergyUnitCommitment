@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 import numpy as np
 import json
 import random
@@ -189,7 +190,7 @@ def plotBoxplotBest(docker: bool, filename: str, plotname: str, savename: str):
     initial_guess = data["1"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
-    for i in range(int(len(cutoff)*0.5)):
+    for i in range(int(len(cutoff)*0.5)):#only plot best 50%
         key = list(cutoff.keys())[i]
         for bitstring in bitstrings:
             bitstring_index = bitstrings.index(bitstring)
@@ -342,8 +343,170 @@ def plotHistCF(docker: bool, filename: str, plotname:str, savename: str):
     # plt.show()
     plt.savefig(f"plots/HCF_{savename}.png")
 
+def getCFvalue(filename: str, directory: str) -> float:
+    subdata = openFile(filename=filename, directory=directory)
+    cfValue = subdata["optimizeResults"]["fun"]
+
+    return cfValue
+
+def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str):
+    cutoff = {}
+    toPlot = {}
+    bitstrings = ["0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111",
+                  "1000", "1001", "1010", "1011", "1100", "1101", "1110", "1111"]
+    for i in range(len(filenames)):
+        directory = "results_qaoa_sweep/"
+        dataAll = openFile(filename=filenames[i], directory=directory)
+        data = dataAll["results"]
+
+        shots = dataAll["config"]["QaoaBackend"]["shots"]
+
+        cutoff[i] = {}
+
+        for key in data:
+            cutoff[i][key] = getCFvalue(filename=data[key]["filename"], directory=directory)
+
+        cutoff[i] = dict(sorted(cutoff[i].items(), key=lambda item: item[1]))
+
+        toPlot[i] = [[] for j in range(len(bitstrings))]
+        for bitstring in bitstrings:
+            bitstring_index = bitstrings.index(bitstring)
+            for j in range(int(len(cutoff[i]) * 0.5)):  # only plot best 50%
+                key = list(cutoff[i].keys())[j]
+                if bitstring in data[key]["counts"]:
+                    appendData = data[key]["counts"][bitstring]
+                else:
+                    appendData = 0
+                toPlot[i][bitstring_index].append(appendData / shots)
+
+    def set_box_color(bp, color):
+        plt.setp(bp['boxes'], color=color)
+        plt.setp(bp['whiskers'], color=color)
+        plt.setp(bp['caps'], color=color)
+        plt.setp(bp['medians'], color=color)
+        plt.setp(bp['fliers'], color=color, markersize=2.0)
+
+    fig = plt.figure(figsize=(13,5))
+
+    nPlots = len(filenames)
+    if nPlots == 2:
+        boxWidth = 0.6
+        boxDistance = [-0.5, 0.5]
+    elif nPlots == 3:
+        boxWidth = 0.5
+        boxDistance = [-0.75, 0, 0.75]
+    elif nPlots == 4:
+        boxWidth = 0.4
+        boxDistance = [-0.9, -0.3, 0.3, 0.9]
+
+    for i in range(nPlots):
+        bp = plt.boxplot(toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i], sym='', widths=boxWidth)
+        set_box_color(bp, colors[i])
+        plt.plot([], c=colors[i], label=labels[i])
+
+    plt.legend()
+
+    plt.xticks(range(0, len(bitstrings) * nPlots, nPlots), bitstrings, rotation=70)
+    plt.xlim(-2, len(bitstrings) * nPlots - 2)
+    plt.tight_layout()
+    plt.xlabel('bitstrings')
+    plt.ylabel('probability')
+    fig.set_figheight(7)
+    fig.set_figwidth(15)
+    #plt.show()
+    plt.savefig(f"plots/BP_{savename}.png")
 
 def main():
+    blueDark = "#003C50"
+    blueMedium = "#005C7B"
+    blueLight = "#008DBB"
+    orangeDark = "#B45E00"
+    orangeMedium = "#F07D00"
+    orangeLight = "#FFB15D"
+
+    #tests
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_10.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_12.yaml"]
+    labels = ["COBYLA w/ noise", "SPSA100 w/ noise", "SPSA200 w/ noise"]
+    title = ""
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_COBYLA_SPSA100_200_yesNoise")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_01.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_09.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_11.yaml"]
+    labels = ["COBYLA w/o noise", "SPSA100 w/o noise", "SPSA200 w/o noise"]
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_COBYLA_SPSA100_200_noNoise")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_06.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_08.yaml"]
+    labels = ["AER-simulator w/ noise", "QASM-simulater w/ noise", "statevector-simulator w/ noise"]
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_aer_qasm_state_yesNoise")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_01.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_05.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_07.yaml"]
+    labels = ["AER-simulator w/o noise", "QASM-simulater w/o noise", "statevector-simulator w/o noise"]
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_aer_qasm_state_noNoise")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_01.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_03.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_04.yaml"]
+    labels = ["Matrix w/o noise", "Iteration w/o noise", "Matrix w/ noise", "Iteration w/ noise"]
+    colors = [orangeLight, blueLight, orangeMedium, blueMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_Iteration_vs_Matrix")
+    return
+    # initial guess + Hp, Hb vs 2Hp, 2Hb
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-50-37_config_01.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial1")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-50-37_config_02.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial2")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-50-37_config_03.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial3")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-50-37_config_04.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial4")
+
+    return
+    #initial guess
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-39-59_config_01.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial1")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-39-59_config_02.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial2")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-39-59_config_03.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial3")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-39-59_config_04.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10_initial4")
+
+    return
+    #Hp, Hb vs 2Hp, 2Hb
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-17-55_config_04.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-17-55_config_02.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC - 2Hp & 2Hb",
+                savename="aer_4qubit_IterMatrix_2Hp-2Hb_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-17-55_config_03.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-17-55_config_01.yaml",
+                extraPlotInfo="g1=1, g2=3, IterMatrix QC",
+                savename="aer_4qubit_IterMatrix_COBYLA_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+
+    return
     #state, qasm, aer
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_11-09-48",
                 extraPlotInfo="g1=1, g2=3, IterMatrix QC - kirch^2",

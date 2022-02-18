@@ -1,17 +1,23 @@
 # Please make a copy of this file and call it config.yaml. Make sure not to share it on GitHub, as you will need to
 # add sensitive information, e.g. API token.
 # Use this newly created copy to adjust all configurations.
-APItoken: # your tokens here
+APItoken: # your token here
     IBMQ_API_token: ""
     dWave_API_token: ""
+
 QaoaBackend:
     shots: 4096 # max 20,000
     simulate: True # if True: use simulator; if False: use real IBMQ QPU (IBMQ API token required)
-    noise: True # if True: use simulator with noise model (IBMQ API token required); if False: use simulator without noise model
-    simulator: "aer_simulator" # qasm_simulator, aer_simulator, statevector_simulator
-    initial_guess: [ 1.0, 1.0, 1.0 ] # [beta, gamma1, gamma2]; [ 1.0, 1.0, 1.0, 1.0 ] -> [beta1, gamma1, beta2, gamma2]; [ 1.0, 1.0 ] -> [beta, gamma]
-    max_iter: 50 # maximum iterations of SPSA optimizer
+    noise: False # if True: use simulator with noise model (IBMQ API token required); if False: use simulator without noise model
+    simulator: "aer_simulator" # qasm_simulator, aer_simulator, statevector_simulator, aer_simulator_statevector
+    initial_guess: [ 1.0, 1.0, 1.0, 1.0 ] # [ 1.0, 1.0, 1.0 ] -> [beta, gamma1, gamma2]; [ 1.0, 1.0, 1.0, 1.0 ] -> [beta0, gamma0, beta1, gamma1]; [ 1.0, 1.0 ] -> [beta, gamma]
+    max_iter: 100 # maximum iterations of classical optimizer
     repetitions: 1 # number of experiment repetitons
+    classical_optimizer: "COBYLA" # SPSA, COBYLA
+    qcGeneration: "IterationMatrix" # Ising, Iteration, IterationMatrix
+
+IsingInterface:
+    problemFormulation: "binarysplitNoMarginalCost"
 
 SQABackend:
     shots: 10

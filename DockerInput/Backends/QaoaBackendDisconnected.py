@@ -17,6 +17,11 @@ from scipy.optimize import minimize
 from IsingPypsaInterface import IsingPypsaInterface
 from EnvironmentVariableManager import EnvironmentVariableManager
 
+from qiskit_optimization import QuadraticProgram
+from qiskit_optimization.algorithms import MinimumEigenOptimizer
+from qiskit.algorithms import QAOA
+from qiskit.utils import algorithm_globals, QuantumInstance
+
 
 class QaoaQiskit():
     def __init__(self, config: dict, docker: bool = True):
@@ -788,10 +793,10 @@ def main():
     now = datetime.today()
     DEFAULT_ENV_VARIABLES["outputInfoTime"] = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
-    #netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc")
-    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork5QubitIsing_2_0_20.nc")
+    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc")
+    #netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/testNetwork5QubitIsing_2_0_20.nc")
 
-    with open(os.path.dirname(__file__) + "/../config.yaml") as file:
+    with open(os.path.dirname(__file__) + "/../Configs/config.yaml") as file:
         config = yaml.safe_load(file)
 
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
@@ -799,6 +804,21 @@ def main():
     qaoa = QaoaQiskit(config=config, docker=False)
     components = qaoa.transformProblemForOptimizer(network=netImport)
 
+    """
+    # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
+    # https://blog.xa0.de/post/Solving-QUBOs-with-qiskit-QAOA-example/
+    # https://qiskit.org/documentation/optimization/stubs/qiskit_optimization.QuadraticProgram.html
+    components["hamiltonian"] = qaoa.calculateHpMatrix(components=components, nqubits=4)
+    qp = QuadraticProgram()
+    #[qp.binary_var() for _ in range(components["hamiltonian"].shape[0])]
+    [qp.binary_var() for _ in range(4)]
+    qp.minimize(quadratic=components["hamiltonian"])
+
+    quantum_instance = QuantumInstance(Aer.get_backend('qasm_simulator'))
+    qaoa_mes = QAOA(quantum_instance=quantum_instance)
+    qaoa = MinimumEigenOptimizer(qaoa_mes)
+    qaoa_result = qaoa.solve(qp)
+    """
     """
     theta = [Parameter("\u03B2"), Parameter("\u03B3")]
     config["QaoaBackend"]["qcGeneration"] = "Iteration"

@@ -14,8 +14,8 @@ PREFIX := infoNocost
 
 
 # config file
-CONFIGFILES = "config.yaml"
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[0-9][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+#CONFIGFILES = "config.yaml"
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[0-9][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -250,8 +250,6 @@ results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $
 	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) \
 	--env inputNetwork=$(strip $(1)) \
 	--env timeout=$(strip $(2)) \
-	--cpus="1.5" \
-	--memory=500m \
 	energy:1.0 qaoa $(strip $(5))
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) results_qaoa_sweep/
