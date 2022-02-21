@@ -24,7 +24,7 @@ DEFAULT_ENV_VARIABLES = {
     "slackVarFactor": 70.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
-    "problemFormulation": "fullsplitMarginalAsPenalty",
+    "problemFormulation": "fullsplitNoMarginalCost",
     "dwaveAPIToken": "",
     "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
     "annealing_time": 500,
@@ -79,21 +79,26 @@ ganBackends = {
 
 
 def main():
-    assert len(sys.argv) == 3, errorMsg
+    #assert len(sys.argv) == 3, errorMsg
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
-    with open("Configs/" + sys.argv[2]) as file:
-        config = yaml.safe_load(file)
+    if len(sys.argv) == 3:
+        with open("Configs/" + sys.argv[2]) as file:
+            config = yaml.safe_load(file)
+        DEFAULT_ENV_VARIABLES["problemFormulation"] = config["IsingInterface"]["problemFormulation"]
+    else:
+        config = {}
 
     #TODO: move away from env_variables and pass direct to functions??
     #TODO: use config.yaml to set env_variables??
-    DEFAULT_ENV_VARIABLES["problemFormulation"] = config["IsingInterface"]["problemFormulation"]
+
 
     # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
     filenameSplit = str(envMgr['outputInfo']).split("_")
-    config["QaoaBackend"]["filenameSplit"] = filenameSplit
+    if len(sys.argv) == 3:
+        config["QaoaBackend"]["filenameSplit"] = filenameSplit
 
     OptimizerClass = ganBackends[sys.argv[1]]
 
