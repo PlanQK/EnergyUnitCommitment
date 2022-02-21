@@ -33,7 +33,6 @@ class PypsaBackend(BackendBase):
                 for line,value in self.model.passive_branch_p.get_values().items()
         }
 
-        print(self.metaInfo["solution"]["state"] )
         self.metaInfo["postprocessingTime"] = 0.0
         return solution
 
@@ -82,14 +81,13 @@ class PypsaBackend(BackendBase):
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print("Writing from pyoyo model to network is not implemented")
         
-        print(self.metaInfo["solution"]["genStates"] )
-        print(self.metaInfo["solution"]["lineValues"] )
+#        print(self.metaInfo["solution"]["genStates"] )
+#        print(self.metaInfo["solution"]["lineValues"] )
 
         for snapshot in network.snapshots:
             exceeded_demand = 0
             missing_demand = 0
             totalCost = 0
-            print(f"MODEL:\n{self.model.generator_p.get_values()}")
             for bus in network.buses.index:
                 cur_neg_slack = self.model.generator_p.get_values()[(f"neg_slack_{bus}",snapshot)]
                 exceeded_demand += cur_neg_slack
@@ -110,7 +108,12 @@ class PypsaBackend(BackendBase):
             for generator in network.generators.index:
                 marginalCost += self.model.generator_p.get_values()[(generator,snapshot)] * \
                         network.generators["marginal_cost"].loc[generator]
+            self.metaInfo["marginalCost"] = marginalCost
+            self.metaInfo["powerImbalance"] = cur_neg_slack + cur_pos_slack
+            self.metaInfo["kirchhoffCost"] = totalCost
+
             print(f"MARGINAL COST AT {snapshot}:: {marginalCost}")
+
 
             dev_from_optimum_gen = exceeded_demand + missing_demand
             if dev_from_optimum_gen == 0:

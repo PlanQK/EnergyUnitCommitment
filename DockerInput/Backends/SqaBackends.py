@@ -34,7 +34,7 @@ class ClassicalBackend(BackendBase):
         print(transformedProblem.getLineValues(solution["state"]))
         print(transformedProblem.individualCostContribution(solution["state"]))
         kirchhoffCost = 0.0
-        for key, val in transformedProblem.individualCostContribution(solution["state"]).items():
+        for key, val in transformedProblem.individualCostContribution(solution["state"],silent=False).items():
             kirchhoffCost += val 
         print(f"Total Kirchhoff cost: {kirchhoffCost}")
         print(transformedProblem.individualMarginalCost(solution["state"]))
