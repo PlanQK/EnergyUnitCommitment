@@ -647,7 +647,7 @@ class IsingPypsaInterface:
                 "Too many arguments for an interaction"
             )
         *key, interactionStrength = args
-        key = tuple(key)
+        key = tuple(sorted(key))
         for qubit in key:
             interactionStrength *= self.data[qubit]
 
@@ -717,16 +717,6 @@ class IsingPypsaInterface:
         secondComponentAdress = self.getMemoryAdress(secondComponent,additionalTime)
         # components with 0 weight (power, capacity) vanish in the QUBO formulation
         if (not firstComponentAdress) or (not secondComponentAdress):
-            return
-
-        # order by memory adress
-        if firstComponentAdress[0] > secondComponentAdress[0]:
-            self.coupleComponents(
-                    secondComponent,
-                    firstComponent,
-                    couplingStrength,
-                    time=time
-            )
             return
 
         for first in range(len(firstComponentAdress)):
