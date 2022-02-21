@@ -123,7 +123,7 @@ class PlottingAgent:
     class for creating plots. on initialization reads and prepares data files. Plots based on that 
     data can then be created and written by calling makeFigure
     """
-    def __init__(self, globDict, fileformat = "png"):
+    def __init__(self, globDict, constraints={}, fileformat = "png"):
         """
         constructor for a plotting agent. On initialization, constructs a DataExtractionAgent to handle
         data management
@@ -131,10 +131,9 @@ class PlottingAgent:
         @param globDict: dict
             a dictionary containg lists of glob expressions for the solver whose data will be plotted
         """
-        self.dataExtractionAgent = DataExtractionAgent(globDict, suffix="sweep")
+        self.dataExtractionAgent = DataExtractionAgent(globDict, constraints=constraints, suffix="sweep")
         self.savepath = "plots"
         self.fileformat = fileformat
-
 
     def getDataPoints(self,
                     xField, 
@@ -165,14 +164,20 @@ class PlottingAgent:
         if splittingFields:
             groupedDataFrame = dataFrame.groupby(splittingFields).agg(list)
             for idx in groupedDataFrame.index:
+                if isinstance(idx,int):
+                    idx_tuple = idx ,
+                else:
+                    idx_tuple = idx
+
                 key = tuple(
                     [
-                        splitField + "=" + str(idx[counter])
+                        splitField + "=" + str(idx_tuple[counter])
                         for counter, splitField in enumerate(splittingFields)
                     ]
                 )
                 result[key] = {
-                        yField : (groupedDataFrame.loc[idx][xField], groupedDataFrame.loc[idx][yField]) for yField in yFieldList
+                        yField : (groupedDataFrame.loc[idx][xField], groupedDataFrame.loc[idx][yField]) 
+                        for yField in yFieldList
                 }
         else:
             result[tuple()] = {
@@ -229,6 +234,7 @@ class PlottingAgent:
             ylabel: str = None,
             title: str = None,
             plottype: str = "line", 
+            regression: bool = True,
             **kwargs
     ):
         fig, ax = plt.subplots()
@@ -240,6 +246,7 @@ class PlottingAgent:
                         constraints=constraints,
                         splittingFields=splitFields
         )
+        print(data)
 
         for splitfieldKey, dataDictionary in data.items():
             for yField, yFieldValues in dataDictionary.items() :
@@ -252,10 +259,14 @@ class PlottingAgent:
                 yFieldListStripped = ", ".join(yFieldList)
 
                 if plottype == "line":
+                    if aggregateMethod is None:
+                        aggregateMethod = 'mean'
+                    if errorMethod is None:
+                        errorMethod = deviationOfTheMean
                     yValues = self.aggregateData(
                             yFieldValues[0],
                             yFieldValues[1],
-                            ['mean',deviationOfTheMean]
+                            [aggregateMethod, errorMethod]
                     )
                     ax.errorbar(yValues.index,
                             yValues.iloc[:,0],
@@ -264,10 +275,13 @@ class PlottingAgent:
                             **kwargs)
 
                 if plottype == "scatterplot":
-                    ax.scatter(xCoordinateList,yCoordinateList,s=7, **kwargs, label=label)
+                    if 's' not in kwargs:
+                        kwargs['s'] = 7
+                    ax.scatter(xCoordinateList,yCoordinateList, **kwargs, label=label)
                     # linear regression
-                    m, b = np.polyfit(xCoordinateList, yCoordinateList, 1)
-                    ax.plot(xCoordinateList, [m * z + b for z in xCoordinateList], color='red', label=label)
+                    if regression:
+                        m, b = np.polyfit(xCoordinateList, yCoordinateList, 1)
+                        ax.plot(xCoordinateList, [m * z + b for z in xCoordinateList], color='red', label=label)
 
                 if plottype == "histogramm":
                     ax.hist(yCoordinateList,label=label, **kwargs)
@@ -375,8 +389,9 @@ class DataExtractionAgent:
         self.df = pd.DataFrame()
         for solver, globList in globDict.items():
             self.df = self.df.append(self.extractData(solver, globList,))
-        self.df = self.filterByConstraint(self.df, constraints)
+        self.df = self.filterByConstraint(constraints)
         self.df = self.df.apply(pd.to_numeric, errors='ignore')
+        print(self.df)
 
 
     def expandSolverDict(self, dictKey, dictValue):
@@ -403,7 +418,7 @@ class DataExtractionAgent:
         return [dictValue]
 
 
-    def filterByConstraint(self, dataFrame, constraints):
+    def filterByConstraint(self, constraints):
         """
         method to filter data frame by constraints. This class implements the filter rule as a
         dictionary with a key, value pair filtering the data frame for rows that have a non trivial entry
@@ -416,8 +431,8 @@ class DataExtractionAgent:
         @return: pd.DataFrame
             a data frame filtered accoring to the given constraints
         """
-        result = dataFrame 
-        for key, value in self.constraints.items():
+        result = self.df
+        for key, value in constraints.items():
             result = result[result[key].isin(value) | result[key].isna()]
         return result
 
@@ -434,9 +449,7 @@ class DataExtractionAgent:
         @return: pd.DataFrame
             a data frame of all relevant data filtered by constraints
         """
-        if constraints is not None:
-            self.constraints = constraints
-        return self.filterByConstraint(self.df, self.constraints)
+        return self.filterByConstraint(constraints)
 
 
     def extractData(self, solver, globList,):
@@ -475,7 +488,11 @@ class DataExtractionAgent:
             fileData = json.load(file)
         # Data Frame containing a single row with columns as the data fields that every solver run
         # contains. Additional solver dependent information is merged on this data frame
-        generalData = pd.DataFrame({key : [fileData[key]] for key in self.generalFields})
+
+        generalData = pd.DataFrame({"solver" : solver, 
+                                **{key : [fileData[key]] for key in self.generalFields}
+                                }
+        )
         solverDependentData = [
                 self.expandSolverDict(solverDependentKey, fileData[solverDependentKey])
                 for solverDependentKey in self.solverKeys[solver]
@@ -891,11 +908,147 @@ def main():
     global BINSIZE
     BINSIZE = 1
 
-    regex = "*Nocost*5input_1[5]_[0]_20*fullsplit*"
+#    regex = "*Nocost*5input_1[5]_[0]_20*fullsplit*"
     regex = "*1[0-4]_[0-9]_20.nc_100_200_full*60_200_1"
     #DataAgent = DataExtractionAgent({"qpu_read" : [regex]} , "sweep")
 
-    PlotAgent = PlottingAgent({"qpu_read" : [regex]})
+    networkbatch = "infoNocost_220124cost5input_" 
+
+    PlotAgent = PlottingAgent({
+            "sqa" : [networkbatch+ "*[36592]0_?_20.nc*"],
+            "pypsa_glpk" : [networkbatch+ "*[36592]0_?_20.nc*"],
+    },
+    constraints={
+        "problemSize" : [30,60,90,120,150],
+        "trotterSlices" : [500],
+    })
+    PlotAgent.makeFigure("large_problem_sqa_glpk",
+            splitFields=["solver"], 
+    )
+    PlotAgent.makeFigure("large_problem_time_sqa_glpk",
+            yFieldList = ["optimizationTime"],
+            splitFields=["solver"], 
+    )
+    PlotAgent.makeFigure("large_problem_time_and_cost_sqa_glpk",
+            yFieldList = ["optimizationTime", "totalCost"],
+            splitFields=["solver"], 
+    )
+    
+    return
+
+    PlotAgent = PlottingAgent({
+                    "qpu" : [networkbatch + "1[0-9]_[0-9]_20.nc_*_200_fullsplit_60_1" ,
+                        networkbatch + "1[5-9]_1[0-9]_20.nc_*_200_fullsplit_60_1"
+                    ],
+#                    "pypsa_glpk" : [networkbatch + "1[0-9]_[0-9]_20.nc_30_?"],
+                    },
+                    constraints={}
+                    )
+
+    constraints={"annealing_time" : [100],  }
+    PlotAgent.makeFigure("annealing_time_to_cost_len",
+            xField = "annealing_time",
+            yFieldList = ["totalCost",],
+            constraints = {"sample_id" : [0]},
+            aggregateMethod = len,
+            errorMethod= lambda x: 0,
+            )
+    PlotAgent.makeFigure("problemsize_to_cost_mean",
+            xField = "problemSize",
+            yFieldList=["LowestEnergy", "LowestFlow", "ClosestFlow"],
+            constraints={"sample_id" : [1], **constraints}
+            )
+    PlotAgent.makeFigure("problemsize_to_optimized_quantum_cost_mean",
+            xField = "problemSize",
+            yFieldList=["quantumCost", "optimizedCost"],
+            constraints=constraints
+            )
+    PlotAgent.makeFigure("problemsize_to_optimized_quantum_cost_mean_constraint_100",
+            xField = "problemSize",
+            yFieldList=["quantumCost", "optimizedCost"],
+            constraints={"quantumCost" : list(range(100)) , **constraints}
+            )
+    PlotAgent.makeFigure("problemsize_to_maxcut_totalcost_mean",
+            xField = "problemSize",
+            yFieldList=["LowestEnergy", "cutSamplesCost"],
+            constraints={"sample_id" : [1], **constraints}
+            )
+    PlotAgent.makeFigure("annealing_time_to_cost_mean",
+            xField = "annealing_time",
+            yFieldList = ["totalCost", "LowestFlow","ClosestFlow","cutSamplesCost"],
+            constraints = {"problemSize" : [10,11,12,13], "sample_id" : [0], },
+            )
+    PlotAgent.makeFigure("annealing_time_to_cost_len",
+            xField = "annealing_time",
+            yFieldList = ["totalCost",],
+            constraints = {"problemSize" : [10,11,12,13], "sample_id" : [0], },
+            aggregateMethod = len,
+            errorMethod= lambda x: 0,
+            )
+#    networklist = ["".join(["Nocost_220124cost5input_15_",str(i),"_20.nc"]) for i in [0,1,2]]
+#    for i in [0,1,2]:
+#        PlotAgent.makeFigure(f"scatter_quantumcost_to_optimizedcost_{i}",
+#                xField="quantumCost",
+#                yFieldList=["optimizedCost"],
+#                constraints={"inputFile" : [networklist],
+#                        "annealing_time" : [100]},
+#                plottype="scatterplot"
+#                )
+
+    networkbatch = "infoNocost_220124cost5input_" 
+    PlotAgent = PlottingAgent({
+                    "sqa" : [networkbatch + "1[3-5]_[0-9]_20.nc_0.1_8.0_*_fullsplit_1" ,
+                    ],
+                    },
+                    constraints={
+                        "trotterSlices" : list(range(10,110,10)),
+                        "optimizationCycles" : list(range(4,10,2))+list(range(10,100,5))
+                    }
+                    )
+    PlotAgent.makeFigure("optimizationCycles_to_cost_mean",
+            xField="optimizationCycles",
+            yFieldList=["totalCost"],
+            )
+    PlotAgent.makeFigure("optimizationCycles_to_cost_mean_split_trotter",
+            xField="optimizationCycles",
+            yFieldList=["totalCost"],
+            splitFields=["trotterSlices"],
+            constraints={"trotterSlices" : [10,20,40,80,100]}
+            )
+    PlotAgent.makeFigure("trotter_to_cost_mean",
+            xField="trotterSlices",
+            yFieldList=["totalCost"],
+            )
+    PlotAgent.makeFigure("trotter_to_cost_mean_split_optimizationCycles",
+            xField="trotterSlices",
+            yFieldList=["totalCost"],
+            splitFields=["optimizationCycles"],
+            constraints={"optimizationCycles" : [4,10,30,70]}
+            )
+    PlotAgent.makeFigure(f"scatter_trotter_to_cost",
+            xField="trotterSlices",
+            yFieldList=["totalCost"],
+            splitFields=["optimizationCycles"],
+            constraints={"optimizationCycles": [4, 30 ,70]},
+            plottype="scatterplot",
+            s=12,
+            regression=False,
+            )
+    PlotAgent.makeFigure(f"scatter_optimizationCycles_to_cost",
+            xField="optimizationCycles",
+            yFieldList=["totalCost"],
+            splitFields=["trotterSlices"],
+            constraints={"optimizationCycles": [4, 30 ,70]},
+            plottype="scatterplot",
+            s=12,
+            regression=False,
+            )
+
+    PlotAgent = PlottingAgent({
+                "qpu_read" : [networkbatch + "1[0-9]_[0-9]_20.nc_100_200_fullsplit_60_100_1"],
+                })
+
+#    PlotAgent = PlottingAgent({"qpu_read" : [regex]})
 
     PlotAgent.makeFigure("testplot",
             xField="quantumCost",
@@ -908,6 +1061,7 @@ def main():
             yFieldList=["optimizedCost"],
             constraints={"problemSize" : [14]},
             plottype="scatterplot",
+            s=5,
             )
     PlotAgent.makeFigure("testplotsize",
             xField="problemSize",
@@ -937,6 +1091,7 @@ def main():
             plottype="boxplot",
             )
 
+    return
 
     regex = "*1[0-4]_[0-4]_20.nc_100_200_full*60_200_1"
 #    plotGroup(f"scatterplot_nocostinput_100_Anneal_70_chain_strength",
