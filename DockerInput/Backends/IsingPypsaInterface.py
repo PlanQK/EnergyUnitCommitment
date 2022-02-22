@@ -66,6 +66,7 @@ class IsingPypsaInterface:
         # qubits currently in use/next qubit to use to represent a network component
         self.allocatedQubits = 0
 
+
     @classmethod
     def buildCostFunction(
         cls,
@@ -81,10 +82,8 @@ class IsingPypsaInterface:
         @return: IsingPypsaInterface
             instance of IsingPypsaInterface child class with complete problem formulation
         """
-
         envMgr = EnvironmentVariableManager()
         problemFormulation = envMgr["problemFormulation"]
-
         FactoryDictionary = {
                 "fullsplit" : fullsplitNoMarginalCost,
                 "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,
@@ -95,8 +94,8 @@ class IsingPypsaInterface:
                 "binarysplitIsingInterface" : binarysplitIsingInterface,
                 "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
         }
-        IsingProduct = FactoryDictionary[problemFormulation](network, network.snapshots)
-        return IsingProduct
+        return FactoryDictionary[problemFormulation](network, network.snapshots)
+
 
     def writeToHighestLevel(self, component):
         """
@@ -113,6 +112,32 @@ class IsingPypsaInterface:
             self.data[self.data[component]['indices'][idx]] = self.data[component]['weights'][idx]
 
 
+    def encodeGenerator(self, generator, time):
+        """
+        Allocate qubits to encode a generator at a single time splice. THe specific encoding
+        for this method is that a generator's is assumed to be binary and either supplying
+        full power or no power.
+        
+        Args:
+            bus: (str) label of the generator to be encoded in qubits
+            time: (int) index of time slice for which to encode the generator
+        Returns:
+            (None) modifies self.allocatedQubits and self.data
+        """
+        # no generator is supposed to be committable in our problems
+        if self.network.generators.committable[generator]:
+            return
+        weights = [self.getNominalPower(generator, time)]
+        indices = range(self.allocatedQubits, self.allocatedQubits + len(weights))
+        self.allocatedQubits += len(indices)
+        self.data[generator] = {
+                'indices' : indices,
+                'weights' : weights,
+                'encodingLength' : len(weights),
+        }
+        return
+    
+
     def storeGenerators(self):
         """
         Assigns qubits (int) to each generator in self.network. For each generator it writes
@@ -122,25 +147,10 @@ class IsingPypsaInterface:
         @return: None
             modifies self.data and self.allocatedQubits
         """
-
-        for bus in range(len(self.network.buses)):
-            generatorsAtBus = self.network.generators[
-                self.network.generators.bus == self.network.buses.index[bus]
-            ]
-            for gen in generatorsAtBus.index:
-                self.data[gen] = {
-                        'indices' : [],
-                        'weights' : [],
-                        'encodingLength' : 1
-                }
-                for time in range(len(self.network.snapshots)):
-                    # no generator is supposed to be committable in our problems
-                    if self.network.generators.committable[gen]:
-                        continue
-                    self.data[gen]['indices'].append(self.allocatedQubits)
-                    self.data[gen]['weights'].append(self.getNominalPower(gen,time))
-                    self.allocatedQubits += 1
-                self.writeToHighestLevel(gen)
+        for generator in self.network.generators.index:
+            for time in range(len(self.network.snapshots)):
+                self.encodeGenerator(generator, time)
+            self.writeToHighestLevel(generator)
         return
 
 
@@ -158,6 +168,7 @@ class IsingPypsaInterface:
                 self.encodeLine(line,time)
             self.writeToHighestLevel(line)
 
+
     def encodeLine(self, line, time):
         """
         Allocate qubits to encode a line at a single time slice. The specific encoding
@@ -170,7 +181,6 @@ class IsingPypsaInterface:
             index of time slice at which to encode the line
         @return: None
             modifies self.allocatedQubits and self.data
-
         """
         capacity = int(self.network.lines.loc[line].s_nom)
         weights = self.splitCapacity(capacity)
@@ -182,6 +192,7 @@ class IsingPypsaInterface:
                 'encodingLength' : len(weights),
         }
         return
+
 
     # @abstractmethod
     def splitCapacity(self, capacity):
@@ -226,20 +237,18 @@ class IsingPypsaInterface:
                 "generators":
                         list(self.network.generators[
                                 self.network.generators.bus == bus
-                        ].index)
-                    ,
+                        ].index),
                 "positiveLines" :
                         list(self.network.lines[
                                 self.network.lines.bus0 == bus
-                        ].index)
-                ,
+                        ].index),
                 "negativeLines" :
                         list(self.network.lines[
                                 self.network.lines.bus1 == bus
-                        ].index)
-                ,
+                        ].index),
                 }
         return result
+
 
     def getNominalPower(self,generator, time=0,):
         """
@@ -255,8 +264,7 @@ class IsingPypsaInterface:
             p_max_pu = self.network.generators_t.p_max_pu[generator].iloc[time]
         except KeyError:
             p_max_pu = 1.0
-        nominalPower = self.network.generators.p_nom[generator] * p_max_pu
-        return nominalPower
+        return self.network.generators.p_nom[generator] * p_max_pu
 
 
     def getGeneratorStatus(self, gen, solution, time=0):
@@ -271,6 +279,7 @@ class IsingPypsaInterface:
             index of time slice for which to get the generator status
         """
         return self.data[gen]['indices'][time] in solution
+
 
     def getFlowDictionary(self, solution):
         """
@@ -331,7 +340,7 @@ class IsingPypsaInterface:
         return result
 
 
-    def getMemoryAdress(self, component, time=0):
+    def getRepresentingQubits(self, component, time=0):
         """
         Returns a list of all qubits that are used to encode a network component
         at a given time slice. A component is assumed to be encoded in one block
@@ -348,6 +357,7 @@ class IsingPypsaInterface:
         encodingLength = self.data[component]["encodingLength"]
         return self.data[component]["indices"][time * encodingLength : (time+1) * encodingLength]
 
+
     def getQubitMapping(self,time=0):
         """
         returns a dictionary on which qubits which network components were mapped for
@@ -358,12 +368,10 @@ class IsingPypsaInterface:
         Returns:
             (dict) dictionary with network labels as keys and qubit lists as values
         """
-
-        return {
-                component : self.getMemoryAdress(component,time) 
+        return {component : self.getRepresentingQubits(component, time)
                 for component in self.data.keys() 
-                if isinstance(component,str)
-                }
+                if isinstance(component,str)}
+                
 
     def siquanFormat(self):
         """
@@ -373,6 +381,7 @@ class IsingPypsaInterface:
             list of tuples of the form (interaction-coefficient, list(qubits))
         """
         return [(v, list(k)) for k, v in self.problem.items() if v != 0 and len(k) > 0]
+
 
     def getInteraction(self,*args):
         """
@@ -400,6 +409,16 @@ class IsingPypsaInterface:
         ]
         return hamiltonian
 
+    
+    def getHamiltonianEigenvalues(self,):
+        """
+        returns the eigenvalues and normalized eigenvectors of the hamiltonian matrix
+        
+        Returns:
+            (np.ndarray) a numpy array containing all eigenvalues
+        """
+        return np.linalg.eigh(self.getHamiltonianMatrix())
+
 
     # TODO
     # @staticmethod
@@ -414,7 +433,6 @@ class IsingPypsaInterface:
             list of all qubits which have spin -1 in the solution 
         @return: None
             modifies network changing generator status and power flows
-        
         """
         for gen in problemDict._startIndex:
             vec = np.zeros(len(problemDict.snapshots))
@@ -448,8 +466,8 @@ class IsingPypsaInterface:
         network.generators_t.status[gen] = np.concatenate(
             [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
         )
-
         return network
+
 
     def numVariables(self):
         """
@@ -459,6 +477,7 @@ class IsingPypsaInterface:
             number of qubits in use
         """
         return self.allocatedQubits
+
 
     def getEncodedValueOfComponent(self, component, result, time=0):
         """
@@ -481,9 +500,10 @@ class IsingPypsaInterface:
                 value += self.data[component]['weights'][idx]
         return value
 
+
     def calcPowerImbalanceAtBus(self, bus, result, silent=True):
         """
-        returns the absolute of the power imbalance/mismatch at a bus
+        returns the absolute value of the power imbalance/mismatch at a bus
         
         Args:
             bus: (str) label of the bus at which to calculate power imbalance
@@ -519,11 +539,10 @@ class IsingPypsaInterface:
             dictionary with keys of the type (str,int) over all  time slices and the string 
             alwyays being the chosen bus
         """
-        result = {
+        return {
                 key : (imbalance * self.kirchhoffFactor) ** 2
                 for key, imbalance in self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
                 }
-        return result 
 
 
     def individualCostContribution(self, result,silent=True):
@@ -536,11 +555,11 @@ class IsingPypsaInterface:
         @return: dict
             dictionary with keys of the form (str,int) over all busses and time slices
         """
-        # TODO proper cost
         contrib = {}
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
         return contrib
+
 
     def individualMarginalCost(self, result):
         """
@@ -556,6 +575,7 @@ class IsingPypsaInterface:
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calcMarginalCostAtBus(bus, result)}
         return contrib
+
 
     def calcMarginalCostAtBus(self, bus, result):
         """
@@ -579,6 +599,7 @@ class IsingPypsaInterface:
             contrib[str((bus, time))] = marginalCost
         return contrib
 
+
     def calcMarginalCost(self, result):
         """
         calculate the total marginal cost incurred by a solution
@@ -594,7 +615,7 @@ class IsingPypsaInterface:
         return marginalCost
 
 
-    def calcCost(self, result, addConstContribution=True):
+    def calcCost(self, result, ):
         """
         calculates the energy of a spin state including the constant energy contribution
         
@@ -602,7 +623,6 @@ class IsingPypsaInterface:
             list of all qubits which have spin -1 in the solution 
         @return: float
             the energy of the spin glass state in result
-        
         """
         result = set(result)
         totalCost = 0.0
@@ -616,7 +636,6 @@ class IsingPypsaInterface:
                     factor *= -1
             totalCost += factor * weight
         return totalCost
-
 
     # ------------------------------------------------------------
     # functions to couple components. The couplings are interpreted as multiplications of QUBO
@@ -653,7 +672,7 @@ class IsingPypsaInterface:
 
         # if we couple two spins, we check if they are different. If both spins are the same, 
         # we substitute the product of spins with 1, since 1 * 1 = -1 * -1 = 1 holds. This
-        # makes it into a constant contribution. Doesn't work properly for higer order interactions
+        # makes it into a constant contribution. Doesn't work for higer order interactions
         if len(key) == 2:
             if key[0] == key[1]:
                 key = tuple([])
@@ -677,7 +696,7 @@ class IsingPypsaInterface:
         @return: None
             modifies self.problem. Adds to previously written interaction cofficient
         """
-        componentAdress = self.getMemoryAdress(component,time)
+        componentAdress = self.getRepresentingQubits(component, time)
         for qubit in componentAdress:
             # term with single spin after applying QUBO to Ising transformation
             self.addInteraction(qubit, 0.5 * couplingStrength)
@@ -713,8 +732,8 @@ class IsingPypsaInterface:
         """
         if additionalTime is None:
             additionalTime = time
-        firstComponentAdress = self.getMemoryAdress(firstComponent,time)
-        secondComponentAdress = self.getMemoryAdress(secondComponent,additionalTime)
+        firstComponentAdress = self.getRepresentingQubits(firstComponent, time)
+        secondComponentAdress = self.getRepresentingQubits(secondComponent, additionalTime)
         # components with 0 weight (power, capacity) vanish in the QUBO formulation
         if (not firstComponentAdress) or (not secondComponentAdress):
             return
@@ -950,7 +969,8 @@ class fullsplitNoMarginalCost(fullsplitIsingInterface):
         # problem constraints: kirchhoff
         for time in range(len(self.snapshots)):
             for node in self.network.buses.index:
-                self.encodeKirchhoffConstraint(node,time)
+                self.encodeKirchhoffConstraint(node, time)
+
 
 class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
     """
@@ -968,6 +988,7 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
                 self.encodeKirchhoffConstraint(node,time)
                 self.encodeMarginalCosts(node,time)
                 self.encodeStartupShutdownCost(node,time)
+
 
     def chooseOffset(self, sortedGenerators):
         """
@@ -987,6 +1008,7 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
         print(f"MEAN: {np.mean(marginalCostList)}")
         return result
+
 
     def estimateMarginalCostAtBus(self, bus, time):
         """
@@ -1017,6 +1039,7 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
             costEstimation += suppliedPower * (self.network.generators["marginal_cost"].loc[generator] - offset)
             remainingLoad -= suppliedPower
         return costEstimation, offset
+
 
     def encodeMarginalCosts(self, bus, time):
         """
@@ -1088,6 +1111,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
                 self.encodeMarginalCosts(node,time)
                 self.encodeStartupShutdownCost(node,time)
 
+
     def calcAverageCostPerPowerGenerated(self, time=0):
         """
         calculates average cost power unit produced if all generators
@@ -1106,6 +1130,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
             maxPower += currentPower
         return float(maxCost / maxPower)
 
+
     def marginalCostOffset(self, bus, time=0):
         """
         returns a float by which all generator marginal costs per power will be offset.
@@ -1122,6 +1147,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
             a float that in is in the range of generator marginal costs
         """
         return 0.8 * self.calcAverageCostPerPowerGenerated(time)
+
 
     def encodeMarginalCosts(self, bus, time):
         """
@@ -1166,6 +1192,7 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
                 self.encodeKirchhoffConstraint(node,time)
                 self.encodeStartupShutdownCost(node,time)
 
+
     def chooseOffset(self, sortedGenerators):
         """
         calculates a float by which to offset all marginal costs. It tries to center the resulting
@@ -1182,6 +1209,7 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         CONST_IDX_OFFSET = 0.0
         idx =  int(CONST_IDX_OFFSET + len(sortedGenerators)/ REL_POS)
         return self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+
 
     def estimateGlobalMarginalCost(self, time, expectedAdditonalCost=0.0):
         """
