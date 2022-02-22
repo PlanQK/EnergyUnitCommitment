@@ -97,6 +97,10 @@ class IsingPypsaInterface:
         return FactoryDictionary[problemFormulation](network, network.snapshots)
 
 
+    def numVariables(self, ):
+        return self.allocatedQubits
+
+
     def writeToHighestLevel(self, component):
         """
         After storing all qubits that represent a logical component of the network
@@ -469,16 +473,6 @@ class IsingPypsaInterface:
         return network
 
 
-    def numVariables(self):
-        """
-        Return the number of currently used qubits
-
-        @return: int
-            number of qubits in use
-        """
-        return self.allocatedQubits
-
-
     def getEncodedValueOfComponent(self, component, result, time=0):
         """
         Returns the encoded value of a component according to the spin configuration in result
@@ -509,7 +503,8 @@ class IsingPypsaInterface:
             bus: (str) label of the bus at which to calculate power imbalance
             result: (list) list of all qubits which have spin -1 in the solution 
 
-        Returns: (dict) dictionary with keys of the type (str,int) over all  time
+        Returns:
+            (dict) dictionary with keys of the type (str, int) over all  time
                         slices and the string alwyays being the chosen bus
         """
         contrib = {}
@@ -526,6 +521,23 @@ class IsingPypsaInterface:
                 print(f"IMBALANCE AT {bus}::{load}")
             contrib[str((bus, t))] = load 
         return contrib
+
+
+    def calcPowerImbalance(self, solution):
+        """
+        returns the sum of all absolutes values of power imbalances at each bus.
+        This is practically like kirchhoff cost except with linear penalty
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+        Returns:
+            (float) the sum of all absolute values of every ower imbalance at every bus
+        """
+        powerImbalance = 0.0
+        for bus in self.network.buses.index:
+            for _, item in self.calcPowerImbalanceAtBus.items():
+                powerImbalance += abs(val)
+        return powerImbalance
 
 
     def calcKirchhoffCostAtBus(self, bus, result, silent=True):
@@ -545,10 +557,27 @@ class IsingPypsaInterface:
                 }
 
 
-    def individualCostContribution(self, result,silent=True):
+    def calcKirchhoffCost(self, solution):
+        """
+        calculate the total unscaled kirchhoffcost incurred by a solution
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+            
+        Returns:
+            (float) total kirchhoff cost incurred without kirchhoffFactor scaling
+        """
+        kirchhoffCost = 0.0
+        for bus in self.network.buses.index:
+            for _, val in self.calcPowerImbalanceAtBus(bus, solution).items():
+                kirchhoffCost += val ** 2
+        return kirchhoffCost
+
+
+    def individualCostContribution(self, result, silent=True):
         """
         returns a dictionary which contains the kirchhoff cost incurred at every bus at
-        every time slice
+        every time slice scaled by the KirchhoffFactor
 
         @param result: list
            list of all qubits which have spin -1 in the solution 
@@ -558,6 +587,39 @@ class IsingPypsaInterface:
         contrib = {}
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
+        return contrib
+
+
+    def individualKirchhoffCost(self, solution, silent=True):
+        """
+        returns a dictionary which contains the kirchhoff cost incurred at every bus at 
+        every time slice without being scaled by the kirchhofffactor
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+        Returns:
+            dictionary with keys of the form (str,int) over all busses and time slices
+        """
+        return {
+                key : imbalance ** 2
+                for key, imbalance in self.individualPowerImbalance(bus, result, silent=silent).items()
+                }
+
+
+    def individualPowerImbalance(self, solution, silent=True):
+        """
+        returns a dictionary which contains the power imbalance at each bus at every time slice
+        with respect to their type (too much or to little power) via it's sign
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+            silent: (bool) true if the steps when building the result should not print anything
+        Returns:
+            (dict) dictionary with keys of the form (str, int) over all busses and time slices
+        """
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcPowerImbalanceAtBus(bus, solution, silent=silent)}
         return contrib
 
 
@@ -600,7 +662,7 @@ class IsingPypsaInterface:
         return contrib
 
 
-    def calcMarginalCost(self, result):
+    def calcMarginalCost(self, solution):
         """
         calculate the total marginal cost incurred by a solution
 
@@ -610,7 +672,7 @@ class IsingPypsaInterface:
             total marginal cost incurred without monetaryFactor scaling
         """
         marginalCost = 0.0
-        for key, val in self.individualMarginalCost(result).items():
+        for key, val in self.individualMarginalCost(solution).items():
             marginalCost += val 
         return marginalCost
 
@@ -807,6 +869,7 @@ class IsingPypsaInterface:
                 # attraction/repulsion term for different/same sign of power at components
                 self.coupleComponents(component1, component2, couplingStrength=curFactor)
 
+
     def encodeStartupShutdownCost(self, bus, time=0):
         """
         Adds the startup and shutdown costs for every generator attached to the bus. Those
@@ -820,9 +883,7 @@ class IsingPypsaInterface:
             index of time slice which contains the generator status after a status change
         @return: None
             modifies self.problem. Adds to previously written interaction cofficient 
-        
         """
-
         # no previous information on first time step or when out of bounds
         if time == 0 or time >= len(self.snapshots):
             return
