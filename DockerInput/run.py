@@ -21,7 +21,7 @@ DEFAULT_ENV_VARIABLES = {
     "transverseFieldSchedule": "[10,.1]",
     "monetaryCostFactor": 0.1,
     "kirchhoffFactor": 1.0,
-    "slackVarFactor": 70.0,
+    "slackVarFactor": 60.0,
     "minUpDownFactor": 0.0,
     "trotterSlices": 32,
     "problemFormulation": "fullsplitNoMarginalCost",
