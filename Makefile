@@ -10,7 +10,7 @@ MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Bac
 MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs/config.yaml,target=/energy/config.yaml
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs,target=/energy/Configs
 MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
-PREFIX := infoNocost
+PREFIX := infoNocostFixed
 
 
 # config file
@@ -25,10 +25,10 @@ TIME := $(shell date +"%Y-%m-%d_%H-%M-%S")
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
 TRANSVERSE_HIGH = $(shell seq 8.0 1.0 8)
 OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES = 400
+OPTIMIZATIONCYCLES = 20
 #OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
 TROTTERSLICES = $(shell seq 10 10 100)
-TROTTERSLICES = 1500
+TROTTERSLICES = 20
 
 # classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
@@ -44,9 +44,9 @@ SAMPLECUTSIZE = $(shell seq 200 4 200)
 
 # Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
 #PROBLEMFORMULATION = binarysplitNoMarginalCost
-PROBLEMFORMULATION = fullsplitGlobalCostSquare
+#PROBLEMFORMULATION = fullsplitGlobalCostSquare
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty
-#PROBLEMFORMULATION = fullsplitNoMarginalCost
+PROBLEMFORMULATION = fullsplitNoMarginalCost
 #PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
 #PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
 
@@ -55,8 +55,8 @@ TIMEOUT = 30
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][5]_1[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_[2-3]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][0]_[0-4]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
@@ -67,7 +67,7 @@ CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach optimizationCycles, ${OPTIMIZATIONCYCLES}, \
 		$(foreach trotterSlices, ${TROTTERSLICES}, \
 		$(foreach number, ${NUMBERS}, \
-		results_classical_sweep/${PREFIX}_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_{trotterSlices}_${number}))))))
+		results_classical_parameter_sweep/${PREFIX}_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_${trotterSlices}_${number}))))))
 
 SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach temp, ${SIQUAN_TEMP}, \
@@ -120,7 +120,7 @@ results_classical_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(st
 	--env transverseFieldSchedule=[0] \
 	--env optimizationCycles=$(strip $(4)) \
 	--env trotterSlices=$(strip $(5)) \
-	--env outputinfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 classical
 	mkdir -p results_classical_sweep
