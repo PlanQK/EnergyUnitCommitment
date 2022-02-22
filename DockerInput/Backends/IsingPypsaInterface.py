@@ -86,7 +86,7 @@ class IsingPypsaInterface:
         problemFormulation = envMgr["problemFormulation"]
 
         FactoryDictionary = {
-                "fullsplit" : fullsplitIsingInterface,
+                "fullsplit" : fullsplitNoMarginalCost,
                 "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,
                 "fullsplitMarginalAsPenalty" : fullsplitMarginalAsPenalty,
                 "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
@@ -481,16 +481,16 @@ class IsingPypsaInterface:
                 value += self.data[component]['weights'][idx]
         return value
 
-    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
+    def calcPowerImbalanceAtBus(self, bus, result, silent=True):
         """
-        returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
-        every time slice 'time' as {(bus,time) : value} 
+        returns the absolute of the power imbalance/mismatch at a bus
+        
+        Args:
+            bus: (str) label of the bus at which to calculate power imbalance
+            result: (list) list of all qubits which have spin -1 in the solution 
 
-        @param result: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the type (str,int) over all  time slices and the string 
-            alwyays being the chosen bus
+        Returns: (dict) dictionary with keys of the type (str,int) over all  time
+                        slices and the string alwyays being the chosen bus
         """
         contrib = {}
         for t in range(len(self.snapshots)):
@@ -504,9 +504,27 @@ class IsingPypsaInterface:
                 load -= self.getEncodedValueOfComponent(lineId, result, time=t)
             if load and not silent:
                 print(f"IMBALANCE AT {bus}::{load}")
-            load = (load * self.kirchhoffFactor) ** 2
-            contrib[str((bus, t))] = load
+            contrib[str((bus, t))] = load 
         return contrib
+
+
+    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
+        """
+        returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           
+        @return: dict
+            dictionary with keys of the type (str,int) over all  time slices and the string 
+            alwyays being the chosen bus
+        """
+        result = {
+                key : (imbalance * self.kirchhoffFactor) ** 2
+                for key, imbalance in self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
+                }
+        return result 
+
 
     def individualCostContribution(self, result,silent=True):
         """
@@ -629,7 +647,7 @@ class IsingPypsaInterface:
                 "Too many arguments for an interaction"
             )
         *key, interactionStrength = args
-        key = tuple(key)
+        key = tuple(sorted(key))
         for qubit in key:
             interactionStrength *= self.data[qubit]
 
@@ -699,16 +717,6 @@ class IsingPypsaInterface:
         secondComponentAdress = self.getMemoryAdress(secondComponent,additionalTime)
         # components with 0 weight (power, capacity) vanish in the QUBO formulation
         if (not firstComponentAdress) or (not secondComponentAdress):
-            return
-
-        # order by memory adress
-        if firstComponentAdress[0] > secondComponentAdress[0]:
-            self.coupleComponents(
-                    secondComponent,
-                    firstComponent,
-                    couplingStrength,
-                    time=time
-            )
             return
 
         for first in range(len(firstComponentAdress)):

@@ -50,6 +50,7 @@ class BackendBase(abc.ABC):
             "timeout": "int",  # pypsa; dwave
             "totalCost": "",  # all
             "marginalCost": "", # all
+            "powerImbalance" : "",
             "optimizationTime" : "",
             "postprocessingTime" : "",
             "config": "",
