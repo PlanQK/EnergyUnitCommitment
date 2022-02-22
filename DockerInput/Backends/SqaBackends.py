@@ -6,13 +6,6 @@ from .IsingPypsaInterface import IsingPypsaInterface
 from .BackendBase import BackendBase
 import time
 
-class AbstractSqaBackend(BackendBase):
-    """
-    An abstract class for methods that are used by both solvers
-    using the sqa solver
-    """
-   
-
 
 class ClassicalBackend(BackendBase):
     def __init__(self, config: dict):
@@ -37,7 +30,6 @@ class ClassicalBackend(BackendBase):
         )
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
-
         self.printResults(transformedProblem, solution)
         # transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
@@ -117,7 +109,6 @@ class ClassicalBackend(BackendBase):
         )
         return
     
-
     def writeResultsToMetaInfo(self, result, transformedProblem):
         """
         This writes solution specific values of the optimizer result and the ising spin glass
@@ -141,7 +132,6 @@ class ClassicalBackend(BackendBase):
         self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(
                 result["state"]
         )
- 
 
 
 class SqaBackend(ClassicalBackend):
