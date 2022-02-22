@@ -390,7 +390,6 @@ class DataExtractionAgent:
             self.df = self.df.append(self.extractData(solver, globList,))
         self.df = self.filterByConstraint(constraints)
         self.df = self.df.apply(pd.to_numeric, errors='ignore')
-        print(self.df)
 
 
     def expandSolverDict(self, dictKey, dictValue):
