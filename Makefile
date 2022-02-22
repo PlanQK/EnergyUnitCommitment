@@ -67,7 +67,7 @@ CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach optimizationCycles, ${OPTIMIZATIONCYCLES}, \
 		$(foreach trotterSlices, ${TROTTERSLICES}, \
 		$(foreach number, ${NUMBERS}, \
-		results_classical_parameter_sweep/${PREFIX}_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_{trotterSlices}_${number}))))))
+		results_classical_sweep/${PREFIX}_${filename}_${hightemp}_${lowtemp}_${optimizationCycles}_{trotterSlices}_${number}))))))
 
 SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach temp, ${SIQUAN_TEMP}, \
@@ -114,7 +114,7 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 # define classical parameter sweep targets
 
 define classicalParameterSweep
-results_classical_parameter_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_classical_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--env temperatureSchedule=[$(strip $(2)),$(strip $(3))] \
 	--env transverseFieldSchedule=[0] \
@@ -123,8 +123,8 @@ results_classical_parameter_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip 
 	--env outputinfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 classical
-	mkdir -p results_classical_parameter_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_classical_parameter_sweep/
+	mkdir -p results_classical_sweep
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6)) results_classical_sweep/
 
 endef
 
