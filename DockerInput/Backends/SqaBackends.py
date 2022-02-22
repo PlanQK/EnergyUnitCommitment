@@ -48,7 +48,6 @@ class ClassicalBackend(BackendBase):
         print("starting optimization...")
         self.configureSolver(HSchedule="[0]")
         tic = time.perf_counter()
-        result = self.solver.kirchhoffCost = 0.0
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
