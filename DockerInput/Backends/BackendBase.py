@@ -40,8 +40,9 @@ class BackendBase(abc.ABC):
 
     def buildMetaInfo(self):
 
-        # reading variables from environment. If "int" or "float" are defined the environment variables will cast to
-        # that type. If nothing is defined, they will be kept as String-type.
+        # reading variables from environment. If "int" or "float" are defined the 
+        # environment variables will cast to that type. If nothing is defined, 
+        # they will be kept as String-type.
         variables = {
             "fileName": "",
             "inputFile": "",
@@ -51,6 +52,7 @@ class BackendBase(abc.ABC):
             "totalCost": "",  # all
             "marginalCost": "", # all
             "powerImbalance" : "",
+            "kirchhoffCost": "",
             "optimizationTime" : "",
             "postprocessingTime" : "",
             "config": "",
@@ -78,6 +80,8 @@ class BackendBase(abc.ABC):
                                "monetaryCostFactor": "float",
                                "minUpDownFactor": "float",
                                "problemFormulation": "",
+                               "hamiltonian": "",
+                               "eigenValues": "",
                                },
             "pypsaBackend": {"solver_name": "",
                              "slack_gen_penalty": ""
@@ -104,7 +108,9 @@ class BackendBase(abc.ABC):
             if isinstance(variables[var], dict):
                 self.metaInfo[var] = {}
                 for dictVar in variables[var]:
-                    self.metaInfo[var][dictVar] = populateMetaInfo(varType=variables[var][dictVar], varName=dictVar)
+                    self.metaInfo[var][dictVar] = populateMetaInfo(
+                            varType=variables[var][dictVar], varName=dictVar
+                    )
             else:
                 self.metaInfo[var] = populateMetaInfo(varType=variables[var], varName=var)
 

@@ -36,12 +36,15 @@ class ClassicalBackend(BackendBase):
         kirchhoffCost = 0.0
         for key, val in transformedProblem.individualCostContribution(solution["state"],silent=False).items():
             kirchhoffCost += val 
-        print(f"Total Kirchhoff cost: {kirchhoffCost}")
+        print(f"Total Kirchhoff cost: {transformedProblem.calcKirchhoffCost(solution['state'])}")
         print(transformedProblem.individualMarginalCost(solution["state"]))
         marginalCost = transformedProblem.calcMarginalCost(solution["state"])
-        print(f"TOTAL MARGINAL COST: {marginalCost}")
-        self.metaInfo["marginalCost"] = transformedProblem.calcMarginalCost(solution["state"])
-
+        powerImbalance = transformedProblem.calcPowerImbalance(solution["state"])
+        print(f"Total power imbalance: {powerImbalance}")
+        print(f"Total marginal cost: {marginalCost}")
+        self.metaInfo["marginalCost"] = marginalCost
+        self.metaInfo["kirchhoffCost"] = kirchhoffCost
+        self.metaInfo["powerImbalance"] = powerImbalance
 
         print(
             f"Total cost (with constant terms): {transformedProblem.calcCost(solution['state'])}"

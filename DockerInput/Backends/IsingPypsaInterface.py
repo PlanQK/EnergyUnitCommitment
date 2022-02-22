@@ -518,7 +518,7 @@ class IsingPypsaInterface:
             for lineId in components['negativeLines']:
                 load -= self.getEncodedValueOfComponent(lineId, result, time=t)
             if load and not silent:
-                print(f"IMBALANCE AT {bus}::{load}")
+                print(f"Imbalance at {bus}::{load}")
             contrib[str((bus, t))] = load 
         return contrib
 
@@ -535,8 +535,8 @@ class IsingPypsaInterface:
         """
         powerImbalance = 0.0
         for bus in self.network.buses.index:
-            for _, item in self.calcPowerImbalanceAtBus.items():
-                powerImbalance += abs(val)
+            for _, imbalance in self.calcPowerImbalanceAtBus(bus, solution).items():
+                powerImbalance += abs(imbalance)
         return powerImbalance
 
 
