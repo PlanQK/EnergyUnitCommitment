@@ -404,6 +404,8 @@ class DataExtractionAgent:
         @return: list
             a list of dictionaries which are to be used in a cross product
         """
+        # normal return value if no special case for expansion applies
+        result = [dictValue] 
         if dictKey == "cutSamples":
             result = [
                     {
@@ -412,8 +414,18 @@ class DataExtractionAgent:
                     }
                     for key, value in dictValue.items()
             ]
-            return result
-        return [dictValue]
+        if dictKey == "sqaBackend":
+            eigenValues = sorted(dictValue["eigenValues"])
+            del dictValue["eigenValues"]
+            result = [
+                    {
+                        "order_ev": idx,
+                        "eigenValue": eigenValue,
+                        **dictValue
+                    }
+                    for idx, eigenValue in enumerate(eigenValues) 
+            ]
+        return result
 
 
     def filterByConstraint(self, constraints):
