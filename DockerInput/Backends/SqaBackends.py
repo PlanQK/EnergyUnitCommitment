@@ -105,8 +105,9 @@ class ClassicalBackend(BackendBase):
         print(f"Marginal Cost at each bus: {transformedProblem.individualMarginalCost(solution['state'])}")
         print(f"Total marginal cost: {self.metaInfo['marginalCost']}")
         print(
-            f"Total cost (with constant terms): {self.metaInfo['totalCost']}" 
+            f"Total cost (with constant terms): {self.metaInfo['totalCost']}\n" 
         )
+        print(f"Eigenvalues: {self.metaInfo['sqaBackend']['eigenValues']}\n")
         return
     
     def writeResultsToMetaInfo(self, result, transformedProblem):
@@ -132,6 +133,8 @@ class ClassicalBackend(BackendBase):
         self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(
                 result["state"]
         )
+        self.metaInfo["sqaBackend"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
+        self.metaInfo["sqaBackend"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
 
 
 class SqaBackend(ClassicalBackend):
