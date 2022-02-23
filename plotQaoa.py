@@ -1,8 +1,13 @@
+import itertools
+
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 import numpy as np
 import json
 import random
+
+from numpy import median
+
 from statistics import mean
 from scipy.optimize import curve_fit
 
@@ -350,7 +355,8 @@ def getCFvalue(filename: str, directory: str) -> float:
 
     return cfValue
 
-def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str, title: str = "Comparision Boxplot"):
+def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str,
+                            title: str = "Comparision Boxplot", cut: float = 0.5):
     cutoff = {}
     toPlot = {}
     bitstrings = ["0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111",
@@ -372,7 +378,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         toPlot[i] = [[] for j in range(len(bitstrings))]
         for bitstring in bitstrings:
             bitstring_index = bitstrings.index(bitstring)
-            for j in range(int(len(cutoff[i]) * 0.5)):  # only plot best 50%
+            for j in range(int(len(cutoff[i]) * cut)):  # only plot best cut
                 key = list(cutoff[i].keys())[j]
                 if bitstring in data[key]["counts"]:
                     appendData = data[key]["counts"][bitstring]
@@ -416,7 +422,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     fig.set_figheight(7)
     fig.set_figwidth(15)
     #plt.show()
-    plt.savefig(f"plots/BP_{savename}.png")
+    plt.savefig(f"plots/BP_{savename}_cut{cut}.png")
 
 def plotShots_CF(filenamesNnoise: list, filenamesYnoise: list, savename: str, title: str = "Shots vs cost function"):
     plotXno = []
@@ -437,15 +443,17 @@ def plotShots_CF(filenamesNnoise: list, filenamesYnoise: list, savename: str, ti
         cutoff = []
         for key in dataNo:
             cutoff.append(getCFvalue(filename=dataNo[key]["filename"], directory=directory))
+            #cutoff.append(dataNo[key]["counts"]["0101"] / dataNo[key]["shots"])
         cutoff.sort()
-        cutoff = cutoff[:50]
+        #cutoff = cutoff[:50]
         plotYno.append(sum(cutoff) / len(cutoff))
 
         cutoff = []
         for key in dataYes:
             cutoff.append(getCFvalue(filename=dataYes[key]["filename"], directory=directory))
+            #cutoff.append(dataYes[key]["counts"]["0101"] / dataYes[key]["shots"])
         cutoff.sort()
-        cutoff = cutoff[:50]
+        #cutoff = cutoff[:50]
         plotYyes.append(sum(cutoff) / len(cutoff))
 
     f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
@@ -505,6 +513,76 @@ def plotOptTime_CF(filenames: list, savename: str, title: str = "optimization ti
     plt.show()
     #plt.savefig(f"plots/Shots_{savename}.png")
 
+def intTupleToString(a: tuple):
+    string = ""
+    for i in range(len(a)):
+        string += str(a[i])
+
+    return string
+
+def getBitstrings(nBits: int):
+    bitstrings = []
+    tupleBits = list(itertools.product([0,1], repeat=nBits))
+    for i in range(len(tupleBits)):
+        bitstrings.append(intTupleToString(tupleBits[i]))
+
+    return bitstrings
+
+def plotCF(filename: str, plotname:str, savename: str):
+    data = openFile(filename=filename, directory="results_qaoa_sweep/")
+    shots = data["config"]["QaoaBackend"]["shots"]
+    data = data["results"]
+    bitstrings = getBitstrings(nBits=4)
+
+    plotData = {"cf": [],
+                "beta": [],
+                "gamma": [],
+                "duration": []}
+    cfData = []
+    prop0101Data = []
+    shots0101Data = []
+    plotDataFull = {"cf": [],
+                    "beta": [],
+                    "gamma": []}
+    for bitstring in bitstrings:
+        plotDataFull[bitstring] = []
+        plotData[bitstring] = []
+
+    for key in data:
+        tempFilename = data[key]["filename"]
+        tempData = openFile(filename=tempFilename, directory="results_qaoa_sweep/")
+        if all(bitstring in data[key]["counts"] for bitstring in bitstrings):
+            plotData["cf"].append(tempData["optimizeResults"]["fun"])
+            plotData["beta"].append(tempData["optimizeResults"]["x"][0])
+            plotData["gamma"].append(tempData["optimizeResults"]["x"][1])
+            plotData["duration"].append(tempData["duration"])
+            for bitstring in bitstrings:
+                plotData[bitstring].append(data[key]["counts"][bitstring])
+
+            for i in range(1, tempData["iter_count"] + 1):
+                if all(bitstring in tempData[f"rep{i}"]["counts"] for bitstring in bitstrings):
+                    plotDataFull["cf"].append(tempData[f"rep{i}"]["return"])
+                    plotDataFull["beta"].append(tempData[f"rep{i}"]["theta"][0])
+                    plotDataFull["gamma"].append(tempData[f"rep{i}"]["theta"][1])
+                    for bitstring in bitstrings:
+                        plotDataFull[bitstring].append(tempData[f"rep{i}"]["counts"][bitstring])
+    yDataMedian = median(plotData["cf"])
+    yData2 = []
+    for i in range(len(plotData["cf"])):
+        if plotData["cf"][i] <= yDataMedian:
+            yData2.append(plotData["cf"][i])
+
+    #plt.scatter(x=plotDataFull["cf"], y=plotDataFull["0101"])
+    #plt.show()
+    plt.plot(plotData["duration"])
+    plt.xlabel('repetition')
+    plt.ylabel('cost function')
+
+    plt.title(plotname)
+    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
+    plt.show()
+    #plt.savefig(f"plots/CF_{savename}.png")
+
 def main():
     blueDark = "#003C50"
     blueMedium = "#005C7B"
@@ -513,7 +591,169 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
+    plotCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+           plotname="SPSA100 costfunction distribution",
+           savename="4qubit_SPSA100_20000_yesNoise")
+
+
+    return
     #test v2
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_72.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_73.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_74.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "SPSA200 without noise with different number of shots"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA200_noNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA200_noNoise_1024_4096_20000", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_75.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_76.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "SPSA200 with noise with different number of shots"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA200_yesNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA200_yesNoise_1024_4096_20000", title=title, cut=1.0)
+
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_63.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_69.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_75.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision with noise"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_1024", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_1024", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_64.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_70.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_76.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision with noise"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_4096", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_4096", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision with noise"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise_20000", title=title, cut=1.0)
+
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_60.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_61.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_62.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "COBYLA without noise with different number of shots"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_noNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_noNoise_1024_4096_20000", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_63.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_64.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "COBYLA with noise with different number of shots"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_yesNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_yesNoise_1024_4096_20000", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_66.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_67.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_68.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "SPSA100 without noise with different number of shots"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA100_noNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA100_noNoise_1024_4096_20000", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_69.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_70.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml"]
+    labels = ["1024", "4096", "20,000"]
+    title = "SPSA100 with noise with different number of shots"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA100_yesNoise_1024_4096_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA100_yesNoise_1024_4096_20000", title=title, cut=1.0)
+
+    return
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_60.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_66.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_72.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision without noise"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_1024", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_1024", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_61.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_67.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_73.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision without noise"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_4096", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_4096", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_62.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_68.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_74.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision without noise"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_20000", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise_20000", title=title, cut=1.0)
+
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_17.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_19.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_21.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision with noise"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_yesNoise", title=title)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_16.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_18.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_20.yaml"]
+    labels = ["COBYLA", "SPSA100", "SPSA200"]
+    title = "classical optimizer comparision without noise"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA_SPSA100_SPSA200_noNoise", title=title)
+
+    return
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_17-42-55_config_44.yaml",
                 extraPlotInfo="",
                 savename="QPU_4qubit_IterMatrix_COBYLA_g1-1_g2-3_maxiter50_shots20000_rep10")
@@ -534,19 +774,17 @@ def main():
                        "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_12.yaml",
                        "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_13.yaml",
                        "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_14.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_15.yaml",
                        "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_40.yaml",
                        "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_42.yaml"]
-    filenamesYnoise = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_30.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_31.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_32.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_33.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_34.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_35.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_36.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_37.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_41.yaml",
-                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_43.yaml"]
+    filenamesYnoise = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_50.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_51.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_52.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_53.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_54.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_55.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_56.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_57.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_58.yaml"]
     plotShots_CF(filenamesNnoise=filenamesNnoise, filenamesYnoise=filenamesYnoise, savename="4qubit_shots_CF")
     return
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_08-34-00_config_23.yaml",
@@ -576,6 +814,26 @@ def main():
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_Iteration_vs_Matrix", title=title)
 
+    return
+    # optimizer tests
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-23_16-43-37_config.yaml",
+                extraPlotInfo="CRS",
+                savename="CRS_4qubit_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-23_11-31-00_config.yaml",
+                extraPlotInfo="COBYLA new",
+                savename="COBYLA_new_4qubit_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-23_11-08-27_config.yaml",
+                extraPlotInfo="COBYLA old",
+                savename="COBYLA_old_4qubit_rep10")
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-23_11-08-27_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-23_11-31-00_config.yaml"]
+    labels = ["COBYLA old", "COBYLA new"]
+    title = "COBYLA comparision with noise"
+    colors = [blueLight, blueMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLAold-COBYLAnew_yesNoise", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLAold-COBYLAnew_yesNoise", title=title, cut=1.0)
     return
     #tests v1
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
