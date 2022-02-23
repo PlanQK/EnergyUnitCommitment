@@ -93,6 +93,7 @@ class IsingPypsaInterface:
                 "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
                 "binarysplitIsingInterface" : binarysplitIsingInterface,
                 "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
+                "fullsplitMarginalAsPenaltyAverageOffset" : fullsplitMarginalAsPenaltyAverageOffset,
         }
         return FactoryDictionary[problemFormulation](network, network.snapshots)
 
@@ -978,8 +979,8 @@ class fullsplitDirectInefficiencyPenalty(fullsplitIsingInterface):
         @return: float:
             a value that can be used as a coupling strength for penalizing using the expensive generator
         """
-        cheapCost = self.network.generators["marginal_cost"].loc[cheapGen]
-        expensiveCost = self.network.generators["marginal_cost"].loc[expensiveGen]
+        cheapCost = self.network.generators["marginal_cost"].loc[cheapGen] 
+        expensiveCost = self.network.generators["marginal_cost"].loc[expensiveGen] 
         result = max(0,(expensiveCost - cheapCost )) * self.monetaryCostFactor 
         return result
 
@@ -988,6 +989,7 @@ class fullsplitDirectInefficiencyPenalty(fullsplitIsingInterface):
         """
         encodes marginal costs for running generators at a single bus by penalizing expensive
         generators and adding rewards to that generator if cheaper generators are also on
+        Doesn't even come close to an optimum
 
         @param bus: str
             label of the bus at which to add marginal costs
@@ -1008,13 +1010,18 @@ class fullsplitDirectInefficiencyPenalty(fullsplitIsingInterface):
                 couplingStrength = self.calcEffiencyLoss(cheapGen, expensiveGen)
                 self.coupleComponentWithConstant(
                     expensiveGen,
-                    couplingStrength =   1.0 / (len(generators) - idx) * couplingStrength * FACTOR,
+                    couplingStrength =   1.0 / (len(generators) - idx) * \
+                            self.getNominalPower(cheapGen, time) * \
+                            couplingStrength * \
+                            FACTOR,
                     time=time
                 ) 
                 self.coupleComponents(
                     cheapGen,
                     expensiveGen,
-                    couplingStrength= - 1.0 / (len(generators)- idx) * couplingStrength * FACTOR,
+                    couplingStrength=  - 1.0 / (len(generators)- idx) * \
+                            couplingStrength * \
+                            FACTOR,
                     time=time
                 )
         return
@@ -1172,43 +1179,18 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
                 self.encodeMarginalCosts(node,time)
                 self.encodeStartupShutdownCost(node,time)
 
-
-    def calcAverageCostPerPowerGenerated(self, time=0):
-        """
-        calculates average cost power unit produced if all generators
-        were switched on.
-
-        @param time: int
-            index of time slice for which to calculate average marginal costs
-        @return: float
-            the average marginal cost of all generators weighted by power output
-        """
-        maxCost = 0.0
-        maxPower = 0.0
-        for generator in self.network.generators.index:
-            currentPower = self.getNominalPower(generator, time)
-            maxCost += currentPower * self.network.generators["marginal_cost"].loc[generator]
-            maxPower += currentPower
-        return float(maxCost / maxPower)
-
-
-    def marginalCostOffset(self, bus, time=0):
+    def marginalCostOffset(self, ):
         """
         returns a float by which all generator marginal costs per power will be offset.
         Since every generator will be offset, this will not change relative costs between them
         It changes the range of energy contributions this constraint provides. Adding marginal
         costs as a cost to the QUBO formulation will penalize all generator configurations. The offset
-        shifts it so that better than average generator configuration will be rewarded.
+        shifts it so that the cheapest generator doesn't get any penalty
         
-        @param bus: str
-            label of the bus at which to add marginal costs
-        @param time: int
-            index of time slice for which to add marginal costs
         @return: float
             a float that in is in the range of generator marginal costs
         """
-        return 0.8 * self.calcAverageCostPerPowerGenerated(time)
-
+        return min(self.network.generators["marginal_cost"])
 
     def encodeMarginalCosts(self, bus, time):
         """
@@ -1224,9 +1206,9 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
             modifies self.problem. Adds to previously written interaction cofficient 
         """
         # temporary for scaling without rebuilding image by changing run.py 
-        FACTOR = 3.0
+        FACTOR = 2.0
         generators = self.getBusComponents(bus)['generators']
-        costOffset = self.marginalCostOffset(bus,time)
+        costOffset = self.marginalCostOffset()
         for generator in generators:
             self.coupleComponentWithConstant(
                     generator, 
@@ -1236,6 +1218,45 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
                             costOffset),
                     time=time
             )
+
+
+class fullsplitMarginalAsPenaltyAverageOffset(fullsplitMarginalAsPenalty):
+    """
+    An extension of the fullsplitMarginalAsPenalty strategy by replacing
+    the cost offset equal to the minimal marginal cost with a slightly below
+    average of energy cost
+    """
+    def calcAverageCostPerPowerGenerated(self, time=0):
+        """
+        calculates average cost power unit produced if all generators
+        were switched on at the first time slice
+
+        @param time: int
+            index of time slice for which to calculate average marginal costs
+        @return: float
+            the average marginal cost of all generators weighted by power output
+        """
+        maxCost = 0.0
+        maxPower = 0.0
+        for generator in self.network.generators.index:
+            currentPower = self.getNominalPower(generator, time)
+            maxCost += currentPower * self.network.generators["marginal_cost"].loc[generator]
+            maxPower += currentPower
+        return float(maxCost / maxPower)
+
+    def marginalCostOffset(self, time=0):
+        """
+        returns a float by which all generator marginal costs per power will be offset.
+        Since every generator will be offset, this will not change relative costs between them
+        It changes the range of energy contributions this constraint provides. Adding marginal
+        costs as a cost to the QUBO formulation will penalize all generator configurations. The offset
+        shifts it by 90% of the total average of energy cost such that the added total energy cost
+        is close enough to 0
+        
+        @return: float
+            a float that in is in the range of generator marginal costs
+        """
+        return 0.9 * self.calcAverageCostPerPowerGenerated(time)
 
 
 class fullsplitGlobalCostSquare(fullsplitIsingInterface):
