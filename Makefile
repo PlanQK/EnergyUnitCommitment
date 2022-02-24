@@ -46,9 +46,15 @@ SAMPLECUTSIZE = $(shell seq 200 4 200)
 #PROBLEMFORMULATION = binarysplitNoMarginalCost
 #PROBLEMFORMULATION = fullsplitGlobalCostSquare
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty
-PROBLEMFORMULATION = fullsplitNoMarginalCost
-#PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
+#PROBLEMFORMULATION = fullsplitMarginalAsPenaltyAverageOffset
+#PROBLEMFORMULATION = fullsplitNoMarginalCost
+PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
 #PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
+
+# only relevant for problem formulation using an estimation-of-marginal-costs ansatz
+OFFSETESTIMATIONFACTOR = 1.0
+ESTIMATEDCOSTFACTOR = 1.0
+OFFSETBUILDFACTOR = 1.0
 
 # glpk parameter
 TIMEOUT = 30
@@ -60,6 +66,8 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5in
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
+
+
 
 CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach hightemp, ${CLASSICAL_HIGH_TEMP}, \
@@ -75,8 +83,11 @@ SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach optimizationCycles, ${OPTIMIZATIONCYCLES}, \
 		$(foreach trotterSlices, ${TROTTERSLICES}, \
 		$(foreach problemFormulation, ${PROBLEMFORMULATION}, \
+		$(foreach offsetEstimationFactor, ${OFFSETESTIMATIONFACTOR}, \
+		$(foreach estimatedCostFactor, ${ESTIMATEDCOSTFACTOR}, \
+		$(foreach offsetBuildFactor, ${OFFSETBUILDFACTOR}, \
 		$(foreach number, ${NUMBERS}, \
-		results_sqa_sweep/${PREFIX}_${filename}_${temp}_${transverse}_${optimizationCycles}_${trotterSlices}_${problemFormulation}_${number})))))))
+		results_sqa_sweep/${PREFIX}_${filename}_${temp}_${transverse}_${optimizationCycles}_${trotterSlices}_${problemFormulation}_${offsetEstimationFactor}_${estimatedCostFactor}_${offsetBuildFactor}_${number}))))))))))
 
 QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach anneal_time, ${ANNEAL_TIME}, \
@@ -140,18 +151,21 @@ $(foreach filename, $(SWEEPFILES), \
 # define siquan sweep targets
 
 define sqaParameterSweep
-results_sqa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_sqa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9))_$(strip $(10)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--env temperatureSchedule=[$(strip $(2)),iF,0.0001] \
 	--env transverseFieldSchedule=[$(strip $(3)),0.0] \
 	--env optimizationCycles=$(strip $(4)) \
 	--env trotterSlices=$(strip $(5)) \
 	--env problemFormulation=$(strip $(6)) \
-	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) \
+	--env offsetEstimationFactor=$(strip $(7)) \
+	--env estimatedCostFactor=$(strip $(8)) \
+	--env offsetBuildFactor=$(strip $(9)) \
+	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9))_$(strip $(10)) \
 	--env inputNetwork=$(strip $(1)) \
 	energy:1.0 sqa
 	mkdir -p results_sqa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7)) results_sqa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))_$(strip $(6))_$(strip $(7))_$(strip $(8))_$(strip $(9))_$(strip $(10)) results_sqa_sweep/
 
 endef
 
@@ -161,8 +175,12 @@ $(foreach filename, $(SWEEPFILES), \
 	$(foreach optimizationCycles, ${OPTIMIZATIONCYCLES}, \
 	$(foreach trotterSlices, ${TROTTERSLICES}, \
 	$(foreach problemFormulation, ${PROBLEMFORMULATION}, \
+	$(foreach offsetEstimationFactor, ${OFFSETESTIMATIONFACTOR}, \
+	$(foreach estimatedCostFactor, ${ESTIMATEDCOSTFACTOR}, \
+	$(foreach offsetBuildFactor, ${OFFSETBUILDFACTOR}, \
 	$(foreach number, ${NUMBERS}, \
-	$(eval $(call sqaParameterSweep, ${filename}, ${temp}, ${transverseField}, ${optimizationCycles}, ${trotterSlices}, ${problemFormulation}, ${number})))))))))
+	$(eval $(call sqaParameterSweep, ${filename}, ${temp}, ${transverseField}, ${optimizationCycles}, ${trotterSlices}, \
+			${problemFormulation}, ${offsetEstimationFactor}, ${estimatedCostFactor}, ${offsetBuildFactor}, ${number}))))))))))))
 
 
 # define D-Wave qpu targets
