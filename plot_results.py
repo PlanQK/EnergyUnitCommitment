@@ -360,6 +360,7 @@ class DataExtractionAgent:
             "totalCost",
             "marginalCost",
             "powerImbalance",
+            "kirchhoffCost",
             "optimizationTime",
             "postprocessingTime",
     ]

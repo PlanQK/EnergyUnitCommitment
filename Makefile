@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
-REPETITIONS := 1
+REPETITIONS := 2
 
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
@@ -25,10 +25,10 @@ TIME := $(shell date +"%Y-%m-%d_%H-%M-%S")
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
 TRANSVERSE_HIGH = $(shell seq 8.0 1.0 8)
 OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES = 20
+OPTIMIZATIONCYCLES = 200
 #OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
 TROTTERSLICES = $(shell seq 10 10 100)
-TROTTERSLICES = 20
+TROTTERSLICES = 200
 
 # classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
@@ -52,16 +52,16 @@ PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
 #PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
-OFFSETESTIMATIONFACTOR = 1.0
-ESTIMATEDCOSTFACTOR = 1.0
-OFFSETBUILDFACTOR = 1.0
+OFFSETESTIMATIONFACTOR = 0.95 0.97 1.0 1.03 1.05
+ESTIMATEDCOSTFACTOR = 0.95 0.97 1.0 1.03 1.05
+OFFSETBUILDFACTOR = 0.95 0.97 1.0 1.03 1.05
 
 # glpk parameter
 TIMEOUT = 30
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][0]_[0-4]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][0]_[0-9]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 #SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
