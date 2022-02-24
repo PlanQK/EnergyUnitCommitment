@@ -80,7 +80,6 @@ ganBackends = {
     "qaoa": Backends.QaoaQiskit,
 }
 
-
 def main():
     #assert len(sys.argv) == 3, errorMsg
     assert sys.argv[1] in ganBackends.keys(), errorMsg

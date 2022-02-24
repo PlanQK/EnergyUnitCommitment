@@ -212,7 +212,8 @@ class QaoaQiskit(BackendBase):
         """
         components = {}
 
-        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or "IterationMatrix":
+        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
+                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
             qubit_map = {}
             qubit = 0
             for comp in list(network.generators.index):
@@ -636,7 +637,8 @@ class QaoaQiskit(BackendBase):
         self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
 
         def execute_circ(theta):
-            if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or "IterationMatrix":
+            if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
+                    self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
                 if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
                     qc = self.create_qc1(components=components, theta=theta)
                 elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:

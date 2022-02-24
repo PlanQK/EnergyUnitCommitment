@@ -158,23 +158,22 @@ class PlottingAgent:
         @return: dict
              a dictonary over groupby indices with values being dictionaries over yField labels
         """
+        # TODO
         dataFrame = self.dataExtractionAgent.getData(constraints)[[xField] + yFieldList + splittingFields]
         dataFrame = dataFrame[dataFrame[xField].notna()]
         result = {}
         if splittingFields:
             groupedDataFrame = dataFrame.groupby(splittingFields).agg(list)
             for idx in groupedDataFrame.index:
-                if isinstance(idx,int):
-                    idx_tuple = idx ,
+                # if there is only 1 splitField, the index is not a multiindex
+                if len(splittingFields) == 1:
+                    idx_tuple = [idx]
                 else:
                     idx_tuple = idx
-
-                key = tuple(
-                    [
+                key = tuple([
                         splitField + "=" + str(idx_tuple[counter])
                         for counter, splitField in enumerate(splittingFields)
-                    ]
-                )
+                ])
                 result[key] = {
                         yField : (groupedDataFrame.loc[idx][xField], groupedDataFrame.loc[idx][yField]) 
                         for yField in yFieldList
@@ -361,6 +360,7 @@ class DataExtractionAgent:
             "totalCost",
             "marginalCost",
             "kirchhoffCost",
+            "powerImbalance",
             "optimizationTime",
             "postprocessingTime",
     ]
@@ -450,8 +450,7 @@ class DataExtractionAgent:
 
     def getData(self, constraints: dict = None):
         """
-        getter for accessing result data. The results are filtered by constraints. if constraints are None
-        reuses the constraints of the previous query
+        getter for accessing result data. The results are filtered by constraints. 
         
         @param constraints: dict
             a dictionary with data frame columns indices as key and lists of values. The data frame 
@@ -499,7 +498,6 @@ class DataExtractionAgent:
             fileData = json.load(file)
         # Data Frame containing a single row with columns as the data fields that every solver run
         # contains. Additional solver dependent information is merged on this data frame
-
         generalData = pd.DataFrame({"solver" : solver, 
                                 **{key : [fileData[key]] for key in self.generalFields}
                                 }

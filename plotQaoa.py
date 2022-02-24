@@ -4,6 +4,7 @@ import numpy as np
 import json
 import random
 from statistics import mean
+from scipy.optimize import curve_fit
 
 FILENAME = "QaoaCompare_2022-1-31_13-11-6_987313"
 
@@ -349,7 +350,7 @@ def getCFvalue(filename: str, directory: str) -> float:
 
     return cfValue
 
-def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str):
+def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str, title: str = "Comparision Boxplot"):
     cutoff = {}
     toPlot = {}
     bitstrings = ["0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111",
@@ -391,7 +392,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     nPlots = len(filenames)
     if nPlots == 2:
         boxWidth = 0.6
-        boxDistance = [-0.5, 0.5]
+        boxDistance = [-0.4, 0.4]
     elif nPlots == 3:
         boxWidth = 0.5
         boxDistance = [-0.75, 0, 0.75]
@@ -406,6 +407,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
 
     plt.legend()
 
+    plt.title(title)
     plt.xticks(range(0, len(bitstrings) * nPlots, nPlots), bitstrings, rotation=70)
     plt.xlim(-2, len(bitstrings) * nPlots - 2)
     plt.tight_layout()
@@ -416,6 +418,93 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     #plt.show()
     plt.savefig(f"plots/BP_{savename}.png")
 
+def plotShots_CF(filenamesNnoise: list, filenamesYnoise: list, savename: str, title: str = "Shots vs cost function"):
+    plotXno = []
+    plotXyes = []
+    plotYno = []
+    plotYyes = []
+    for i in range(len(filenamesNnoise)):
+        directory = "results_qaoa_sweep/"
+        dataAllno = openFile(filename=filenamesNnoise[i], directory=directory)
+        dataNo = dataAllno["results"]
+        dataAllyes = openFile(filename=filenamesYnoise[i], directory=directory)
+        dataYes = dataAllyes["results"]
+
+
+        plotXno.append(dataAllno["config"]["QaoaBackend"]["shots"])
+        plotXyes.append(dataAllyes["config"]["QaoaBackend"]["shots"])
+
+        cutoff = []
+        for key in dataNo:
+            cutoff.append(getCFvalue(filename=dataNo[key]["filename"], directory=directory))
+        cutoff.sort()
+        cutoff = cutoff[:50]
+        plotYno.append(sum(cutoff) / len(cutoff))
+
+        cutoff = []
+        for key in dataYes:
+            cutoff.append(getCFvalue(filename=dataYes[key]["filename"], directory=directory))
+        cutoff.sort()
+        cutoff = cutoff[:50]
+        plotYyes.append(sum(cutoff) / len(cutoff))
+
+    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+    f.set_figwidth(15)
+    ax1.plot(plotXno, plotYno)
+    ax2.plot(plotXyes, plotYyes)
+    ax1.set_xlabel('shots')
+    ax1.set_ylabel('cost function')
+    ax2.set_xlabel('shots')
+    ax2.set_ylabel('cost function')
+    ax1.set_title("without noise")
+    ax2.set_title("with noise")
+    plt.suptitle(title)
+    #plt.show()
+    plt.savefig(f"plots/Shots_{savename}.png")
+
+def plotOptTime_CF(filenames: list, savename: str, title: str = "optimization time vs cost function mean"):
+    plotX = []
+    plotY = []
+    cutoff = {}
+    toPlot = {}
+    for i in range(len(filenames)):
+        directory = "results_qaoa_sweep/"
+        dataAll = openFile(filename=filenames[i], directory=directory)
+        data = dataAll["results"]
+
+        costValue = []
+        duration = []
+
+        for key in data:
+            duration.append(data[key]["duration"])
+            costValue.append(getCFvalue(filename=data[key]["filename"], directory=directory))
+
+        costValue.sort()
+        costValue = costValue[:50]
+        plotY.append(sum(costValue) / len(costValue))
+        plotX.append(sum(duration) / len(duration))
+
+        cutoff[i] = {}
+        for key in data:
+            cutoff[i][key] = [getCFvalue(filename=data[key]["filename"], directory=directory), data[key]["duration"]]
+
+        cutoff[i] = dict(sorted(cutoff[i].items(), key=lambda item: item[1]))
+
+        toPlot[i] = []
+        for j in range(int(len(cutoff[i]) * 0.5)):  # only plot best 50%
+            key = list(cutoff[i].keys())[j]
+            toPlot[i].append(cutoff[i][key][1])
+
+    plt.plot(plotX, plotY)
+    #plt.boxplot(toPlot[0])
+    #plt.boxplot(toPlot[1])
+    #plt.boxplot(toPlot[2])
+    plt.xlabel('shots')
+    plt.ylabel('cost function')
+    plt.title(title)
+    plt.show()
+    #plt.savefig(f"plots/Shots_{savename}.png")
+
 def main():
     blueDark = "#003C50"
     blueMedium = "#005C7B"
@@ -424,7 +513,71 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
-    #tests
+    #test v2
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_17-42-55_config_44.yaml",
+                extraPlotInfo="",
+                savename="QPU_4qubit_IterMatrix_COBYLA_g1-1_g2-3_maxiter50_shots20000_rep10")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_17-42-55_config_45.yaml",
+                extraPlotInfo="",
+                savename="QPU_4qubit_IterMatrix_SPSA_g1-1_g2-3_maxiter50_shots20000_rep10")
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_16.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_18.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_20.yaml"]
+    plotOptTime_CF(filenames=filenames, savename="4qubit_optTime_CF")
+
+    return
+    filenamesNnoise = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_08.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_09.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_10.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_11.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_12.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_13.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_14.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_15.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_40.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_42.yaml"]
+    filenamesYnoise = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_30.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_31.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_32.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_33.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_34.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_35.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_36.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_11-06-32_config_37.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_41.yaml",
+                       "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_13-47-31_config_43.yaml"]
+    plotShots_CF(filenamesNnoise=filenamesNnoise, filenamesYnoise=filenamesYnoise, savename="4qubit_shots_CF")
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_08-34-00_config_23.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-18_08-34-00_config_22.yaml"]
+    labels = ["QASM", "AER"]
+    title = "Simulator comparision with noise"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_QASM_AER_yesNoise", title=title)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_01.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_06.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_05.yaml"]
+    labels = ["QASM", "Statevector", "AER - Statevector"]
+    title = "Simulator comparision without noise"
+    colors = [orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_AerState_State_QASM_noNoise", title=title)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_01.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_03.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_02.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-17_17-21-18_config_04.yaml"]
+    labels = ["Matrix w/o noise", "Iteration w/o noise", "Matrix w/ noise", "Iteration w/ noise"]
+    colors = [orangeLight, blueLight, orangeDark, blueDark]
+    title = "Comparision between iteration QC and matrix QC"
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_Iteration_vs_Matrix", title=title)
+
+    return
+    #tests v1
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_10.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_12.yaml"]
@@ -454,13 +607,6 @@ def main():
     colors = [orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_aer_qasm_state_noNoise")
 
-    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_01.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_03.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_02.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_16-13-00_config_04.yaml"]
-    labels = ["Matrix w/o noise", "Iteration w/o noise", "Matrix w/ noise", "Iteration w/ noise"]
-    colors = [orangeLight, blueLight, orangeMedium, blueMedium]
-    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors, savename="4qubit_Iteration_vs_Matrix")
     return
     # initial guess + Hp, Hb vs 2Hp, 2Hb
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-15_15-50-37_config_01.yaml",
