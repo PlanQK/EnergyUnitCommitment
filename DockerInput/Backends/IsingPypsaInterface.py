@@ -1047,10 +1047,21 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
     marginal cost by their difference to the most efficient generator. then we estimate
     a lower bound of the marginal cost at every bus. The marginal cost constraint is then given
     as minimizing the squared distance of incurred marginal cost to the estimated marginal cost
+    This method doesn't pay attention to line transmission changing where marginal costs
+    are incurred
     """
     def __init__(self, network, snapshots):
         super().__init__(network, snapshots)
         # problem constraints: kirchhoff, startup/shutdown, marginal cost
+        envMgr = EnvironmentVariableManager()
+        # factor to scale the offset of marginal cost when estimating
+        # marginal cost at a bus
+        self.offsetEstimationFactor = float(envMgr["offsetEstimationFactor"])
+        # factor to scale estimated cost at a bus after calculation
+        self.estimatedCostFactor = float(envMgr["estimatedCostFactor"])
+        # factor to scale marginal cost of a generator when constructing ising
+        # interactions
+        self.offsetBuildFactor = float(envMgr["offsetBuildFactor"])
         for time in range(len(self.snapshots)):
             for node in self.network.buses.index:
                 self.encodeKirchhoffConstraint(node,time)
@@ -1061,21 +1072,18 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
     def chooseOffset(self, sortedGenerators):
         """
         calculates a float by which to offset all marginal costs. The chosen offset is the
-        marginal cost of the most efficient generator plus a constant
+        minimal marginal cost of a generator in the list
 
         @param sortedGenerators: list
             a list of generators already sorted by their minimal cost in ascending order
         @return: float
              a float by which to offset all marginal costs of network components
         """
-        REL_POS = 0.6 * len(sortedGenerators)
-        CONST_IDX_OFFSET =  0.0
-        idx = int(CONST_IDX_OFFSET + REL_POS )
-        result = self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
-        print(f"OFFSET: {result}")
+        # there are lots of ways to choose an offset. offsetting such that 0 is minimal cost
+        # is decent but for example choosing an offset slighty over that seems to also produce
+        # good results. It is not clear how important the same sign on all marginal costs is
         marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
-        print(f"MEAN: {np.mean(marginalCostList)}")
-        return result
+        return self.offsetEstimationFactor * np.min(marginalCostList) 
 
 
     def estimateMarginalCostAtBus(self, bus, time):
@@ -1084,15 +1092,14 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         only with generators that are at this bus
         
         @param bus: str
-            but at which to estimate marginal costs
+            but solution which to estimate marginal costs
         @param time: int
             index of time slice for which to estimate marginal costs
         @return: float, float
             returns an estimation of the incurred marginal cost if the marginal costs of generators
             are all offset by the second return value
         """
-        LOAD_FACTOR = 1.0
-        remainingLoad = self.getLoad(bus, time) * LOAD_FACTOR
+        remainingLoad = self.getLoad(bus, time) 
         generators = self.getBusComponents(bus)['generators']
         sortedGenerators = sorted(
                 generators,
@@ -1121,29 +1128,25 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         @return: None 
              modifies self.problem. Adds to previously written interaction cofficient 
         """
-        # linear scale of constraint
-        FACTOR = 0.20
-        # linear scale of marginal costs
-        ESTIMATOR_FACTOR = 1.0
         components = self.getBusComponents(bus)
         flattenedComponenents = components['generators'] + \
                 components['positiveLines'] + \
                 components['negativeLines']
 
         estimatedCost, offset = self.estimateMarginalCostAtBus(bus,time)
+        estimatedCost *= self.estimatedCostFactor
+        offset *= self.offsetBuildFactor
     
         def calculateCost(component):
             if component in components['generators']:
-                return self.network.generators["marginal_cost"].loc[component]-offset
-            return 0.0
+                return self.network.generators["marginal_cost"].loc[component] - offset
+            if component in components['positiveLines']:
+                return  0.0
+            if component in components['negativeLines']:
+                return - 0.0
 
-        print(f"CURRENTLY AT BUS: {bus}")
-        print(f"ESTIMATED COST: {estimatedCost}")
         qubits = [ self.data[gen]['indices'][0] for gen in components['generators'] ] 
-        print(f"GENERATORQUBITS: {qubits}")
         power = [ self.data[gen]['weights'][0] for gen in components['generators']] 
-        print(f"GENERATORPOWER_: {power}")
-        print("---------------------------------------")
         
         self.addInteraction(0.25 * estimatedCost ** 2)
         for gen1 in flattenedComponenents:
@@ -1151,16 +1154,12 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
                     gen1,
                     - 2.0 * calculateCost(gen1) * \
                             estimatedCost *  \
-                            self.monetaryCostFactor * \
-                            FACTOR * \
-                            ESTIMATOR_FACTOR 
+                            self.monetaryCostFactor 
                     )
             for gen2 in flattenedComponenents:
                 curFactor = self.monetaryCostFactor * \
                                 calculateCost(gen1) * \
-                                calculateCost(gen2) * \
-                                FACTOR * \
-                                ESTIMATOR_FACTOR ** 2
+                                calculateCost(gen2) 
                 self.coupleComponents(
                         gen1,
                         gen2,
