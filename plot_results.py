@@ -360,6 +360,7 @@ class DataExtractionAgent:
             "timeout",
             "totalCost",
             "marginalCost",
+            "kirchhoffCost",
             "optimizationTime",
             "postprocessingTime",
     ]
