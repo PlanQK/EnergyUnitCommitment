@@ -19,7 +19,7 @@ DEFAULT_ENV_VARIABLES = {
     "optimizationCycles": 1000,
     "temperatureSchedule": "[0.1,iF,0.0001]",
     "transverseFieldSchedule": "[10,.1]",
-    "monetaryCostFactor": 0.1,
+    "monetaryCostFactor": 0.4,
     "kirchhoffFactor": 1.0,
     "slackVarFactor": 60.0,
     "minUpDownFactor": 0.0,
@@ -39,7 +39,10 @@ DEFAULT_ENV_VARIABLES = {
     "timeout": "-1",
     "maxOrder": 0,
     "sampleCutSize": 200,
-    "threshold": 0.5
+    "threshold": 0.5,
+    "offsetEstimationFactor" : 1.0,
+    "estimatedCostFactor" : 1.0,
+    "offsetBuildFactor" : 1.0,
 }
 
 
