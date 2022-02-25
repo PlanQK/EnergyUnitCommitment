@@ -132,14 +132,13 @@ class QaoaQiskit():
             last_rep = self.results_dict["iter_count"]
             last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
             self.metaInfo["results"][i] = {"filename": filename,
-                                           "optimize_Iterations": self.results_dict["iter_count"],
-                                           "simulate": self.results_dict["simulate"],
-                                           "noise": self.results_dict["noise"],
                                            "backend_name": self.results_dict["backend_name"],
-                                           "shots": shots,
-                                           "initial_guess": initial_guess,
+                                           "optimize_Iterations": self.results_dict["iter_count"],
+                                           "optimizeResults": self.results_dict["optimizeResults"],
                                            "duration": duration,
                                            "counts": last_rep_counts}
+
+        self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
 
         return self.metaInfo["results"]
 
@@ -511,13 +510,14 @@ class QaoaQiskit():
             power = 0
             if bus != "qubit_map" and bus != "hamiltonian":
                 power -= components[bus]["load"]
-
+                i = 0
                 for comp in components[bus][f"flattened_{bus}"]:
-                    i = components[bus][f"flattened_{bus}"].index(comp)
+                    #i = components[bus][f"flattened_{bus}"].index(comp)
                     i_bit = components[bus]["qubits"][i]
                     power += (components[bus]["power"][i] * float(bitstring[i_bit]))
+                    i += 1
                 self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
-            power_total += abs(power)
+            power_total += power ** 2
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
         # if power_total != 0:

@@ -1,6 +1,7 @@
 import itertools
 
 import matplotlib.pyplot as plt
+import numpy
 from matplotlib import rcParams
 import numpy as np
 import json
@@ -13,12 +14,96 @@ from scipy.optimize import curve_fit
 
 FILENAME = "QaoaCompare_2022-1-31_13-11-6_987313"
 
+
 def openFile(filename: str, directory: str) -> dict:
     with open(f"{directory}{filename}") as json_file:
         data = json.load(json_file)
 
     return data
 
+
+def intTupleToString(a: tuple):
+    string = ""
+    for i in range(len(a)):
+        string += str(a[i])
+
+    return string
+
+
+def getBitstrings(nBits: int):
+    bitstrings = []
+    tupleBits = list(itertools.product([0,1], repeat=nBits))
+    for i in range(len(tupleBits)):
+        bitstrings.append(intTupleToString(tupleBits[i]))
+
+    return bitstrings
+
+
+def extractPlotData(filename: str) -> tuple:
+    """
+    Extracts data from the supplied file and stores it in dictionaries.
+    Args:
+        filename: (str) The filename of the experiment.
+
+    Returns:
+        shots: (int) The number of shots used in this experiment.
+        bitstrings: (list) A list of all possible bitstrings for the experiment.
+        plotData: (dict) Dictionary with all relevant data to plot for all repetitions.
+        plotDataFull: (dict) Dictionary with all relevant data to plot for each iteration of all repetitions.
+
+    """
+    data = openFile(filename=filename, directory="results_qaoa_sweep/")
+    shots = data["config"]["QaoaBackend"]["shots"]
+    data = data["results"]
+    bitstrings = getBitstrings(nBits=4)
+
+    plotData = {"cf": [],
+                "beta": [],
+                "gamma": [],
+                "duration": []}
+    plotDataFull = {"cf": [],
+                    "beta": [],
+                    "gamma": []}
+    labels = {"cf": "cost function",
+                "beta": "beta",
+                "gamma": "gamma",
+                "duration": "time"}
+    for bitstring in bitstrings:
+        plotDataFull[f"{bitstring}prop"] = []
+        plotDataFull[f"{bitstring}shots"] = []
+        plotData[f"{bitstring}prop"] = []
+        plotData[f"{bitstring}shots"] = []
+        labels[f"{bitstring}prop"] = "probability"
+        labels[f"{bitstring}shots"] = "number of shots"
+
+    for key in data:
+        tempFilename = data[key]["filename"]
+        tempData = openFile(filename=tempFilename, directory="results_qaoa_sweep/")
+        plotData["cf"].append(tempData["optimizeResults"]["fun"])
+        plotData["beta"].append(tempData["optimizeResults"]["x"][0])
+        plotData["gamma"].append(tempData["optimizeResults"]["x"][1])
+        plotData["duration"].append(tempData["duration"])
+        for bitstring in bitstrings:
+            if bitstring in data[key]["counts"]:
+                plotData[f"{bitstring}shots"].append(data[key]["counts"][bitstring])
+                plotData[f"{bitstring}prop"].append(data[key]["counts"][bitstring] / shots)
+            else:
+                plotData[f"{bitstring}shots"].append(0)
+                plotData[f"{bitstring}prop"].append(0)
+
+        for i in range(1, tempData["iter_count"] + 1):
+            plotDataFull["cf"].append(tempData[f"rep{i}"]["return"])
+            plotDataFull["beta"].append(tempData[f"rep{i}"]["theta"][0])
+            plotDataFull["gamma"].append(tempData[f"rep{i}"]["theta"][1])
+            for bitstring in bitstrings:
+                if bitstring in tempData[f"rep{i}"]["counts"]:
+                    plotDataFull[f"{bitstring}shots"].append(tempData[f"rep{i}"]["counts"][bitstring])
+                    plotDataFull[f"{bitstring}prop"].append(tempData[f"rep{i}"]["counts"][bitstring] / shots)
+                else:
+                    plotDataFull[f"{bitstring}shots"].append(0)
+                    plotDataFull[f"{bitstring}prop"].append(0)
+
+    return shots, bitstrings, plotData, plotDataFull, labels
 
 def plotPropVsCost(docker: bool, filename: str, plotname: str):
     if docker:
@@ -139,9 +224,9 @@ def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
     bitstrings.sort()
     #bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
     #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
-    shots = data["1"]["shots"]
+    shots = dataAll["config"]["QaoaBackend"]["shots"]
     backend = dataAll["qaoaBackend"]["backend_name"]
-    initial_guess = data["1"]["initial_guess"]
+    initial_guess = dataAll["config"]["QaoaBackend"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
     for key in data:
@@ -191,9 +276,9 @@ def plotBoxplotBest(docker: bool, filename: str, plotname: str, savename: str):
     bitstrings.sort()
     # bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
     #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
-    shots = data["1"]["shots"]
+    shots = dataAll["config"]["QaoaBackend"]["shots"]
     backend = dataAll["qaoaBackend"]["backend_name"]
-    initial_guess = data["1"]["initial_guess"]
+    initial_guess = dataAll["config"]["QaoaBackend"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
     for i in range(int(len(cutoff)*0.5)):#only plot best 50%
@@ -513,59 +598,41 @@ def plotOptTime_CF(filenames: list, savename: str, title: str = "optimization ti
     plt.show()
     #plt.savefig(f"plots/Shots_{savename}.png")
 
-def intTupleToString(a: tuple):
-    string = ""
-    for i in range(len(a)):
-        string += str(a[i])
 
-    return string
+def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, savename: str, mode: str, x: str, y: str):
+    shots1, bitstrings, plotData1, plotDataFull1, labels = extractPlotData(filename=file1)
+    shots2, bitstrings, plotData2, plotDataFull2, labels = extractPlotData(filename=file2)
 
-def getBitstrings(nBits: int):
-    bitstrings = []
-    tupleBits = list(itertools.product([0,1], repeat=nBits))
-    for i in range(len(tupleBits)):
-        bitstrings.append(intTupleToString(tupleBits[i]))
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
+    fig.set_figwidth(15)
 
-    return bitstrings
+    if mode == "full":
+        plotx1 = plotDataFull1[x]
+        ploty1 = plotDataFull1[y]
+        plotx2 = plotDataFull2[x]
+        ploty2 = plotDataFull2[y]
+    elif mode == "opt":
+        plotx1 = plotData1[x]
+        ploty1 = plotData1[y]
+        plotx2 = plotData2[x]
+        ploty2 = plotData2[y]
 
-def plotCF(filename: str, plotname:str, savename: str):
-    data = openFile(filename=filename, directory="results_qaoa_sweep/")
-    shots = data["config"]["QaoaBackend"]["shots"]
-    data = data["results"]
-    bitstrings = getBitstrings(nBits=4)
+    ax1.scatter(x=plotx1, y=ploty1)
+    ax2.scatter(x=plotx2, y=ploty2)
+    ax1.set_xlabel(labels[x])
+    ax1.set_ylabel(labels[y])
+    ax2.set_xlabel(labels[x])
+    ax2.set_ylabel(labels[y])
+    ax1.set_title(g1title)
+    ax2.set_title(g2title)
+    plt.suptitle(title, y= 1, fontsize="xx-large")
+    #plt.show()
+    plt.savefig(f"plots/Scatter_{savename}.png")
 
-    plotData = {"cf": [],
-                "beta": [],
-                "gamma": [],
-                "duration": []}
-    cfData = []
-    prop0101Data = []
-    shots0101Data = []
-    plotDataFull = {"cf": [],
-                    "beta": [],
-                    "gamma": []}
-    for bitstring in bitstrings:
-        plotDataFull[bitstring] = []
-        plotData[bitstring] = []
 
-    for key in data:
-        tempFilename = data[key]["filename"]
-        tempData = openFile(filename=tempFilename, directory="results_qaoa_sweep/")
-        if all(bitstring in data[key]["counts"] for bitstring in bitstrings):
-            plotData["cf"].append(tempData["optimizeResults"]["fun"])
-            plotData["beta"].append(tempData["optimizeResults"]["x"][0])
-            plotData["gamma"].append(tempData["optimizeResults"]["x"][1])
-            plotData["duration"].append(tempData["duration"])
-            for bitstring in bitstrings:
-                plotData[bitstring].append(data[key]["counts"][bitstring])
+def plotCFtest(filename: str, plotname:str, savename: str):
+    shots, bitstrings, plotData, plotDataFull, labels = extractPlotData(filename=filename)
 
-            for i in range(1, tempData["iter_count"] + 1):
-                if all(bitstring in tempData[f"rep{i}"]["counts"] for bitstring in bitstrings):
-                    plotDataFull["cf"].append(tempData[f"rep{i}"]["return"])
-                    plotDataFull["beta"].append(tempData[f"rep{i}"]["theta"][0])
-                    plotDataFull["gamma"].append(tempData[f"rep{i}"]["theta"][1])
-                    for bitstring in bitstrings:
-                        plotDataFull[bitstring].append(tempData[f"rep{i}"]["counts"][bitstring])
     yDataMedian = median(plotData["cf"])
     yData2 = []
     for i in range(len(plotData["cf"])):
@@ -573,7 +640,8 @@ def plotCF(filename: str, plotname:str, savename: str):
             yData2.append(plotData["cf"][i])
 
     #plt.scatter(x=plotDataFull["cf"], y=plotDataFull["0101"])
-    #plt.show()
+    plt.scatter(x=plotData["cf"], y=plotData["0101prop"])
+    plt.show()
     plt.plot(plotData["duration"])
     plt.xlabel('repetition')
     plt.ylabel('cost function')
@@ -590,10 +658,89 @@ def main():
     orangeDark = "#B45E00"
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
+    labels = ["before bugfix", "after bigfix"]
+    title = "check bugfix"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0)
 
-    plotCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
-           plotname="SPSA100 costfunction distribution",
-           savename="4qubit_SPSA100_20000_yesNoise")
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
+    labels = ["before bugfix", "after bigfix"]
+    title = "check bugfix"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml"]
+    labels = ["before bugfix", "after bigfix"]
+    title = "check bugfix"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0)
+
+    return
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
+                extraPlotInfo="after bugfix",
+                savename="AER_4QubitIsing_2_0_20.nc_after-bugfix")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_11-23-47_config.yaml",
+                extraPlotInfo="before bugfix",
+                savename="AER_4QubitIsing_2_0_20.nc_before-bugfix")
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_11-23-47_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml"]
+    labels = ["before bugfix", "after bigfix"]
+    title = "check bugfix"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix", title=title, cut=0.5)
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-after-bugfix", title=title, cut=1.0)
+
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml",
+                extraPlotInfo="new 4Qubit network",
+                savename="AER_4QubitIsing_2_3_20.nc_IterMatrix_COBYLA_maxiter100_shots20000_rep100")
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
+                extraPlotInfo="",
+                savename="AER_4QubitIsing_2_0_20.nc_IterMatrix_COBYLA_maxiter100_shots20000_rep100")
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                extraPlotInfo="new 4Qubit network",
+                savename="AER_4QubitIsing_2_2_20.nc_IterMatrix_COBYLA_maxiter100_shots20000_rep100")
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                extraPlotInfo="new 4Qubit network",
+                savename="AER_4QubitIsing_2_1_20.nc_IterMatrix_COBYLA_maxiter100_shots20000_rep100")
+
+    return
+    plotScatter(file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                title="cost function vs ideal solution probability of COBYLA and SPSA100 with noise",
+                g1title="COBYLA", g2title="SPSA100",
+                savename="COBYLA-SPSA100_yesNoise_CFvsTIME",
+                mode="opt", x="cf", y="duration")
+
+    plotScatter(file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                title="cost function vs ideal solution probability of COBYLA and SPSA100 with noise",
+                g1title="COBYLA", g2title="SPSA100",
+                savename="COBYLA-SPSA100_yesNoise_CFvsPROP",
+                mode="opt", x="cf", y="0101prop")
+    return
+    plotCFtest(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+               plotname="SPSA100 costfunction distribution",
+               savename="4qubit_SPSA100_20000_yesNoise")
 
 
     return

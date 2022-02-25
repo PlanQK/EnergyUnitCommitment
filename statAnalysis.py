@@ -210,6 +210,44 @@ def equalSamples(alpha: float, file1: str, file2: str, outfile: str, cut: float 
 def main():
     alpha = 0.05
     equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml",
+                 outfile="YesNoise_20000_COBYLA-SPSA200_greater", cut=0.5, alternative="greater")
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 outfile="YesNoise_20000_COBYLA-SPSA100_greater", cut=0.5, alternative="greater")
+
+    return
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml",
+                 outfile="YesNoise_20000_SPSA100-SPSA200_greater", cut=0.5, alternative="greater")
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 outfile="YesNoise_20000_SPSA100-COBYLA_greater", cut=0.5, alternative="greater")
+
+    return
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml",
+                 outfile="YesNoise_20000_SPSA100-SPSA200_two-sided", cut=0.5, alternative="two-sided")
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                 outfile="YesNoise_20000_COBYLA-SPSA100_two-sided", cut=0.5, alternative="two-sided")
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_77.yaml",
+                 outfile="YesNoise_20000_COBYLA-SPSA200_two-sided", cut=0.5, alternative="two-sided")
+
+    return
+    equalSamples(alpha=alpha,
+                 file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_68.yaml",
+                 file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_74.yaml",
+                 outfile="NoNoise_20000_SPSA100-SPSA200_two-sided", alternative="two-sided")
+    equalSamples(alpha=alpha,
                  file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_62.yaml",
                  file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_68.yaml",
                  outfile="NoNoise_20000_COBYLA-SPSA100_two-sided", alternative="two-sided")
