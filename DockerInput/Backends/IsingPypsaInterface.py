@@ -1115,6 +1115,16 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
             remainingLoad -= suppliedPower
         return costEstimation, offset
 
+    def calculateCost(self, componentToBeValued, allComponents, offset, estimatedCost, load, bus):
+        if componentToBeValued in allComponents['generators']:
+            return self.network.generators["marginal_cost"].loc[componentToBeValued] - offset
+        if componentToBeValued in allComponents['positiveLines']:
+            #return - 0.2
+            return 0.5 *   estimatedCost / load
+        if componentToBeValued in allComponents['negativeLines']:
+            #return   0.2
+            return 0.5 * - estimatedCost / load
+
 
     def encodeMarginalCosts(self, bus, time):
         """
@@ -1136,30 +1146,20 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         estimatedCost, offset = self.estimateMarginalCostAtBus(bus,time)
         estimatedCost *= self.estimatedCostFactor
         offset *= self.offsetBuildFactor
-    
-        def calculateCost(component):
-            if component in components['generators']:
-                return self.network.generators["marginal_cost"].loc[component] - offset
-            if component in components['positiveLines']:
-                return  0.0
-            if component in components['negativeLines']:
-                return - 0.0
+        load = self.getLoad(bus, time)
 
-        qubits = [ self.data[gen]['indices'][0] for gen in components['generators'] ] 
-        power = [ self.data[gen]['weights'][0] for gen in components['generators']] 
-        
         self.addInteraction(0.25 * estimatedCost ** 2)
         for gen1 in flattenedComponenents:
             self.coupleComponentWithConstant(
                     gen1,
-                    - 2.0 * calculateCost(gen1) * \
+                    - 2.0 * self.calculateCost(gen1, components, offset, estimatedCost, load, bus) * \
                             estimatedCost *  \
                             self.monetaryCostFactor 
                     )
             for gen2 in flattenedComponenents:
                 curFactor = self.monetaryCostFactor * \
-                                calculateCost(gen1) * \
-                                calculateCost(gen2) 
+                                self.calculateCost(gen1, components, offset, estimatedCost, load, bus) * \
+                                self.calculateCost(gen2, components, offset, estimatedCost, load, bus) 
                 self.coupleComponents(
                         gen1,
                         gen2,
