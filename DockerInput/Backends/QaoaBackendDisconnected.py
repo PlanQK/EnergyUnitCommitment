@@ -11,7 +11,7 @@ from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
-from qiskit.algorithms.optimizers import SPSA
+from qiskit.algorithms.optimizers import SPSA, COBYLA
 from qiskit.circuit import Parameter
 from scipy.optimize import minimize
 from IsingPypsaInterface import IsingPypsaInterface
@@ -216,26 +216,6 @@ class QaoaQiskit():
         """
         components = {}
 
-        print(f"getComponents: generators: \n {network.generators}")
-        print(f"getComponents: lines: \n {network.lines}")
-
-        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
-                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qubit_map = {}
-            qubit = 0
-            for comp in list(network.generators.index):
-                qubit_map[comp] = [qubit]
-                qubit += 1
-            for comp in list(network.lines.index):
-                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
-                qubit += 2
-        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
-            qubit_map = transformedProblem.getQubitMapping()
-            print(f"getComponents: qubit_map: {qubit_map}")
-
-        components["qubit_map"] = qubit_map
-
         for bus in network.buses.index.values:
             components[bus] = {"generators": list(network.generators[network.generators.bus == bus].index),
                                "positiveLines": list(network.lines[network.lines.bus1 == bus].index) +
@@ -251,10 +231,29 @@ class QaoaQiskit():
             components[bus]["qubits"] = []
             components = self.buildPowerAndQubits(components=components, network=network, bus=bus)
 
-        components["hamiltonian"] = []
-        if self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            components["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
-            print(f"getComponents: hamiltonian: {components['hamiltonian']}")
+        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
+                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
+            qubit_map = {}
+            qubit = 0
+            for comp in list(network.generators.index):
+                qubit_map[comp] = [qubit]
+                qubit += 1
+            for comp in list(network.lines.index):
+                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
+                qubit += 2
+            lastKey = list(components["qubit_map"])[-1]
+            nqubits = components["qubit_map"][lastKey][-1] + 1
+            if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
+                hamiltonian = self.calculateHpMatrix(components=components, nqubits=nqubits)
+            else:
+                hamiltonian = []
+        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
+            qubit_map = transformedProblem.getQubitMapping()
+            hamiltonian = transformedProblem.getHamiltonianMatrix()
+
+        components["qubit_map"] = qubit_map
+        components["hamiltonian"] = hamiltonian
 
         self.components = components
 
@@ -695,6 +694,12 @@ class QaoaQiskit():
 
         return execute_circ
 
+    def get_expectation_QaoaQiskit(self, counts: dict, components: dict, filename: str):
+        def execute_circ(theta):
+            return self.compute_expectation(counts=counts, components=components, filename=filename)
+
+        return execute_circ
+
 
 def createTestNetwork4Qubit() -> pypsa.Network:
     testNetwork = pypsa.Network()
@@ -816,10 +821,17 @@ def main():
     [qp.binary_var() for _ in range(4)]
     qp.minimize(quadratic=components["hamiltonian"])
 
-    quantum_instance = QuantumInstance(Aer.get_backend('qasm_simulator'))
-    qaoa_mes = QAOA(quantum_instance=quantum_instance)
-    qaoa = MinimumEigenOptimizer(qaoa_mes)
-    qaoa_result = qaoa.solve(qp)
+    quantum_instance = QuantumInstance(Aer.get_backend('aer_simulator'))
+    cobyla = COBYLA(maxiter=100)
+    qaoaQiskit = QAOA(optimizer=cobyla,reps=10,quantum_instance=quantum_instance)
+    #qaoaQiskit = QAOA(quantum_instance=quantum_instance)
+    qiskitOpt = MinimumEigenOptimizer(qaoaQiskit)
+    qaoa_result = qiskitOpt.solve(qp)
+
+    cobyla = COBYLA(maxiter=100)
+    #qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
+    #qaoa_result = qaoaQiskit.find_minimum()
+    #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
     """
     """
     theta = [Parameter("\u03B2"), Parameter("\u03B3")]

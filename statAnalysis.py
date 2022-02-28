@@ -5,7 +5,7 @@ import numpy as np
 import json
 import pandas as pd
 from scipy import stats
-from numpy import mean, std, median
+from numpy import mean, std, median, linalg
 import matplotlib.pyplot as plt
 
 

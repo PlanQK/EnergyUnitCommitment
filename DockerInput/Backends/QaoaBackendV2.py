@@ -1,4 +1,5 @@
 import json, yaml
+import math
 
 import numpy as np
 import pypsa
@@ -71,14 +72,17 @@ class QaoaQiskit(BackendBase):
             self.resetResultDict()
             self.results_dict["components"] = self.components
 
+            filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
+                             str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
+                             str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
+                             str(self.config["QaoaBackend"]["filenameSplit"][4])
             filename_date = self.config["QaoaBackend"]["filenameSplit"][7]
             filename_time = self.config["QaoaBackend"]["filenameSplit"][8]
-            if len(self.config["QaoaBackend"]["filenameSplit"]) == 10:
-                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
-            elif len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
-                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+            filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+            if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
                 filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
-            filename = f"Qaoa_{filename_date}_{filename_time}_{filename_config}__{i}.json"
+
+            filename = f"Qaoa_{filename_input}_{filename_date}_{filename_time}_{filename_config}__{i}.json"
 
             expectation = self.get_expectation(filename=filename,
                                                components=transformedProblem,
@@ -234,13 +238,32 @@ class QaoaQiskit(BackendBase):
             components[bus]["qubits"] = []
             components = self.buildPowerAndQubits(components=components, network=network, bus=bus)
 
-        components["hamiltonian"] = []
-        if self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            components["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+        if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
+            lastKey = list(components["qubit_map"])[-1]
+            nqubits = components["qubit_map"][lastKey][-1] + 1
+            hamiltonian = self.calculateHpMatrix(components=components, nqubits=nqubits)
+        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+            hamiltonian = transformedProblem.getHamiltonianMatrix()
+        else:
+            hamiltonian = []
+        scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
+
+        components["hamiltonian"] = {}
+        components["hamiltonian"]["scaled"] = scaledHamiltonian
+        components["hamiltonian"]["original"] = hamiltonian
 
         self.components = components
 
         return components
+
+    def scaleHamiltonian(self, hamiltonian: list) -> list:
+        matrixMax = np.max(hamiltonian)
+        matrixMin = np.min(hamiltonian)
+        matrixExtreme = max(abs(matrixMax), abs(matrixMin))
+        factor = matrixExtreme / math.pi
+        scaledHamiltonian = np.array(hamiltonian) / factor
+
+        return scaledHamiltonian.tolist()
 
     def addHpIter(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
         """
@@ -382,8 +405,7 @@ class QaoaQiskit(BackendBase):
         qc.barrier()
 
         if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
-            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"])
+            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         elif self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
             qc = self.addHpIter(qc=qc, gamma=gamma, components=components)
 
@@ -452,7 +474,6 @@ class QaoaQiskit(BackendBase):
         lastKey = list(components["qubit_map"])[-1]
         nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
-        components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
         beta0 = theta[0]
         gamma0 = theta[1]
         beta1 = theta[2]
@@ -463,11 +484,10 @@ class QaoaQiskit(BackendBase):
             qc.h(i)
         qc.barrier()
 
-
-        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         qc = self.addHb(qc=qc, beta=beta0, nqubits=nqubits)
 
-        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         qc = self.addHb(qc=qc, beta=beta1, nqubits=nqubits)
 
         qc.measure_all()
@@ -636,7 +656,7 @@ class QaoaQiskit(BackendBase):
                 elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
                     qc = self.create_qc3(components=components, theta=theta)
             elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"], theta=theta)
+                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
             # qc.draw(output="latex")
             if simulate:

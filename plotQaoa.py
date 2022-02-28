@@ -7,7 +7,7 @@ import numpy as np
 import json
 import random
 
-from numpy import median
+from numpy import median, linalg
 
 from statistics import mean
 from scipy.optimize import curve_fit
@@ -104,6 +104,24 @@ def extractPlotData(filename: str) -> tuple:
                     plotDataFull[f"{bitstring}prop"].append(0)
 
     return shots, bitstrings, plotData, plotDataFull, labels
+
+
+def extractHamiltonian(filename: str) -> list:
+    """
+    Extracts the hamiltonian matrix from the supplied file and returns it.
+    Args:
+        filename: (str) The filename of the experiment.
+
+    Returns:
+        hamiltonian: (list) The hamiltonian matrix used to build the quantum circuit.
+
+    """
+    data = openFile(filename=filename, directory="results_qaoa_sweep/")
+    subdata = openFile(filename=data["results"]["1"]["filename"], directory="results_qaoa_sweep/")
+    hamiltonian = subdata["components"]["hamiltonian"]
+
+    return hamiltonian
+
 
 def plotPropVsCost(docker: bool, filename: str, plotname: str):
     if docker:
@@ -440,14 +458,43 @@ def getCFvalue(filename: str, directory: str) -> float:
 
     return cfValue
 
+def buildLabels(bitstrings: list, added: list) -> list:
+    labels = []
+    for i in range(len(bitstrings)):
+        labels.append(f"{bitstrings[i]}\n{added[i]}")
+
+    return labels
+
 def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str,
-                            title: str = "Comparision Boxplot", cut: float = 0.5):
+                            title: str = "Comparision Boxplot", cut: float = 0.5, kirchLabels: int = None):
+    directory = "results_qaoa_sweep/"
     cutoff = {}
     toPlot = {}
-    bitstrings = ["0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111",
-                  "1000", "1001", "1010", "1011", "1100", "1101", "1110", "1111"]
+    if kirchLabels:
+        dataAll = openFile(filename=filenames[kirchLabels], directory=directory)
+        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
+        bitstrings = getBitstrings(nBits=nBits)
+        labelAdd = []
+        for bitstring in bitstrings:
+            kirchValue = dataAll["kirchhoff"][bitstring]["total"]
+            labelAdd.append(f"k={kirchValue}")
+        xlabels = buildLabels(bitstrings=bitstrings, added=labelAdd)
+    elif kirchLabels == 0:
+        dataAll = openFile(filename=filenames[kirchLabels], directory=directory)
+        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
+        bitstrings = getBitstrings(nBits=nBits)
+        labelAdd = []
+        for bitstring in bitstrings:
+            kirchValue = dataAll["kirchhoff"][bitstring]["total"]
+            labelAdd.append(f"k={kirchValue}")
+        xlabels = buildLabels(bitstrings=bitstrings, added=labelAdd)
+    else:
+        dataAll = openFile(filename=filenames[0], directory=directory)
+        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
+        bitstrings = getBitstrings(nBits=nBits)
+        xlabels = bitstrings
+
     for i in range(len(filenames)):
-        directory = "results_qaoa_sweep/"
         dataAll = openFile(filename=filenames[i], directory=directory)
         data = dataAll["results"]
 
@@ -481,7 +528,10 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     fig = plt.figure(figsize=(13,5))
 
     nPlots = len(filenames)
-    if nPlots == 2:
+    if nPlots == 1:
+        boxWidth = 0.6
+        boxDistance = [0]
+    elif nPlots == 2:
         boxWidth = 0.6
         boxDistance = [-0.4, 0.4]
     elif nPlots == 3:
@@ -499,8 +549,8 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     plt.legend()
 
     plt.title(title)
-    plt.xticks(range(0, len(bitstrings) * nPlots, nPlots), bitstrings, rotation=70)
-    plt.xlim(-2, len(bitstrings) * nPlots - 2)
+    plt.xticks(range(0, len(bitstrings) * nPlots, nPlots), xlabels)
+    plt.xlim(-1, len(bitstrings) * nPlots + 0.5)
     plt.tight_layout()
     plt.xlabel('bitstrings')
     plt.ylabel('probability')
@@ -630,26 +680,15 @@ def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, 
     plt.savefig(f"plots/Scatter_{savename}.png")
 
 
-def plotCFtest(filename: str, plotname:str, savename: str):
-    shots, bitstrings, plotData, plotDataFull, labels = extractPlotData(filename=filename)
+def plotEigenvalues(filename: str, plotname:str, savename: str):
+    hamiltonian = extractHamiltonian(filename=filename)
+    eigenvalues, eigenvectors = linalg.eig(hamiltonian)
 
-    yDataMedian = median(plotData["cf"])
-    yData2 = []
-    for i in range(len(plotData["cf"])):
-        if plotData["cf"][i] <= yDataMedian:
-            yData2.append(plotData["cf"][i])
-
-    #plt.scatter(x=plotDataFull["cf"], y=plotDataFull["0101"])
-    plt.scatter(x=plotData["cf"], y=plotData["0101prop"])
-    plt.show()
-    plt.plot(plotData["duration"])
-    plt.xlabel('repetition')
-    plt.ylabel('cost function')
-
+    plt.hist(eigenvalues)
+    plt.xlabel("eigenvalues")
     plt.title(plotname)
-    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
-    plt.show()
-    #plt.savefig(f"plots/CF_{savename}.png")
+    #plt.show()
+    plt.savefig(f"plots/Hist_{savename}.png")
 
 def main():
     blueDark = "#003C50"
@@ -658,15 +697,129 @@ def main():
     orangeDark = "#B45E00"
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+    labels = ["unscaled", "scaled"]
+    title = "Network 0 evaluation"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+    labels = ["unscaled", "scaled"]
+    title = "Network 1 evaluation"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+    labels = ["unscaled", "scaled"]
+    title = "Network 2 evaluation"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+    labels = ["unscaled", "scaled"]
+    title = "Network 3 evaluation"
+    colors = [blueMedium, orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml"]
+    labels = ["network 0"]
+    title = "Network 0 evaluation"
+    colors = [blueLight]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    plt.clf()
+    plotEigenvalues(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
+                    plotname="Eigenvalues of the hamiltonian matrix of network 0",
+                    savename="4qubit_testNetwork4QubitIsing_2_0_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
+    labels = ["network 1"]
+    title = "Network 1 evaluation"
+    colors = [blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    plt.clf()
+    plotEigenvalues(filename="infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                    plotname="Eigenvalues of the hamiltonian matrix of network 1",
+                    savename="4qubit_testNetwork4QubitIsing_2_1_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
+    labels = ["network 2"]
+    title = "Network 2 evaluation"
+    colors = [orangeLight]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    plt.clf()
+    plotEigenvalues(filename="infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
+                    plotname="Eigenvalues of the hamiltonian matrix of network 2",
+                    savename="4qubit_testNetwork4QubitIsing_2_2_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml"]
+    labels = ["network 3"]
+    title = "Network 3 evaluation"
+    colors = [orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    plt.clf()
+    plotEigenvalues(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml",
+                    plotname="Eigenvalues of the hamiltonian matrix of network 3",
+                    savename="4qubit_testNetwork4QubitIsing_2_3_20")
+
+    return
+
+    plotEigenvalues(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_11-23-47_config.yaml",
+                    plotname="Eigenvalues of the hamiltonian matrix",
+                    savename="4qubit_after-bugfix_testNetwork4QubitIsing_2_0_20")
+
+    return
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml"]
+    labels = ["after bugfix"]
+    title = "check bugfix"
+    colors = [orangeMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_after-bugfix_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_11-23-47_config.yaml"]
+    labels = ["before bugfix"]
+    title = "check bugfix"
+    colors = [blueMedium]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_before-bugfix_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+
     filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
-    labels = ["before bugfix", "after bigfix"]
+    labels = ["before bugfix", "after bugfux"]
     title = "check bugfix"
     colors = [blueMedium, orangeMedium]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=0.5)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=0.5,
+                            kirchLabels=1)
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
+                            kirchLabels=1)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml"]
@@ -674,19 +827,23 @@ def main():
     title = "check bugfix"
     colors = [blueMedium, orangeMedium]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=0.5)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=0.5,
+                            kirchLabels=1)
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
+                            kirchLabels=1)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_12-04-27_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml"]
-    labels = ["before bugfix", "after bigfix"]
+    labels = ["before bugfix", "after bugfix"]
     title = "check bugfix"
     colors = [blueMedium, orangeMedium]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=0.5)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=0.5,
+                            kirchLabels=1)
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0)
+                            savename="4qubit_before-after-bugfix_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=1)
 
     return
 
@@ -698,7 +855,7 @@ def main():
                 savename="AER_4QubitIsing_2_0_20.nc_before-bugfix")
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_11-23-47_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml"]
-    labels = ["before bugfix", "after bigfix"]
+    labels = ["before bugfix", "after bugfix"]
     title = "check bugfix"
     colors = [blueMedium, orangeMedium]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
@@ -737,11 +894,6 @@ def main():
                 g1title="COBYLA", g2title="SPSA100",
                 savename="COBYLA-SPSA100_yesNoise_CFvsPROP",
                 mode="opt", x="cf", y="0101prop")
-    return
-    plotCFtest(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
-               plotname="SPSA100 costfunction distribution",
-               savename="4qubit_SPSA100_20000_yesNoise")
-
 
     return
     #test v2
