@@ -523,6 +523,20 @@ class IsingPypsaInterface:
             contrib[str((bus, t))] = load 
         return contrib
 
+    def calcTotalPowerGeneratedAtBus(self, bus, solution, time=0):
+        totalPower = 0.0
+        generators = self.getBusComponents(bus)['generators']
+        for generator in generators:
+            totalPower += self.getEncodedValueOfComponent(generator, solution, time=time)
+        return totalPower    
+
+    
+    def calcTotalPowerGenerated(self, solution, time=0):
+        totalPower = 0.0
+        for bus in self.network.buses.index:
+            totalPower += self.calcTotalPowerGeneratedAtBus( bus, solution, time=time)
+        return totalPower
+    
 
     def calcPowerImbalance(self, solution):
         """
@@ -1119,11 +1133,9 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         if componentToBeValued in allComponents['generators']:
             return self.network.generators["marginal_cost"].loc[componentToBeValued] - offset
         if componentToBeValued in allComponents['positiveLines']:
-            #return - 0.2
-            return 0.5 *   estimatedCost / load
+            return   0.5 *   estimatedCost / load
         if componentToBeValued in allComponents['negativeLines']:
-            #return   0.2
-            return 0.5 * - estimatedCost / load
+            return  0.5 * - estimatedCost / load
 
 
     def encodeMarginalCosts(self, bus, time):
@@ -1149,20 +1161,20 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         load = self.getLoad(bus, time)
 
         self.addInteraction(0.25 * estimatedCost ** 2)
-        for gen1 in flattenedComponenents:
+        for firstComponent in flattenedComponenents:
             self.coupleComponentWithConstant(
-                    gen1,
+                    firstComponent,
                     - 2.0 * self.calculateCost(gen1, components, offset, estimatedCost, load, bus) * \
                             estimatedCost *  \
                             self.monetaryCostFactor 
                     )
-            for gen2 in flattenedComponenents:
+            for secondComponent in flattenedComponenents:
                 curFactor = self.monetaryCostFactor * \
-                                self.calculateCost(gen1, components, offset, estimatedCost, load, bus) * \
-                                self.calculateCost(gen2, components, offset, estimatedCost, load, bus) 
+                                self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
+                                self.calculateCost(secondComponent, components, offset, estimatedCost, load, bus) 
                 self.coupleComponents(
-                        gen1,
-                        gen2,
+                        firstComponent,
+                        secondComponent,
                         couplingStrength=curFactor
                 )
 
@@ -1171,6 +1183,9 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
 
     def __init__(self, network, snapshots):
         super().__init__(network, snapshots)
+        # factor to scale the offset of marginal cost 
+        envMgr = EnvironmentVariableManager()
+        self.offsetEstimationFactor = float(envMgr["offsetEstimationFactor"])
         # problem constraints: kirchhoff, startup/shutdown, marginal cost
         for time in range(len(self.snapshots)):
             for node in self.network.buses.index:
@@ -1189,7 +1204,7 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
         @return: float
             a float that in is in the range of generator marginal costs
         """
-        return min(self.network.generators["marginal_cost"])
+        return 1.0 * min(self.network.generators["marginal_cost"]) * self.offsetEstimationFactor
 
     def encodeMarginalCosts(self, bus, time):
         """
@@ -1204,15 +1219,12 @@ class fullsplitMarginalAsPenalty(fullsplitIsingInterface):
         @return: None
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        # temporary for scaling without rebuilding image by changing run.py 
-        FACTOR = 2.0
         generators = self.getBusComponents(bus)['generators']
         costOffset = self.marginalCostOffset()
         for generator in generators:
             self.coupleComponentWithConstant(
                     generator, 
                     couplingStrength=self.monetaryCostFactor * \
-                            FACTOR * \
                             (self.network.generators["marginal_cost"].loc[generator] - \
                             costOffset),
                     time=time
@@ -1255,7 +1267,7 @@ class fullsplitMarginalAsPenaltyAverageOffset(fullsplitMarginalAsPenalty):
         @return: float
             a float that in is in the range of generator marginal costs
         """
-        return 0.9 * self.calcAverageCostPerPowerGenerated(time)
+        return 1.0 * self.calcAverageCostPerPowerGenerated(time)
 
 
 class fullsplitGlobalCostSquare(fullsplitIsingInterface):
@@ -1266,6 +1278,16 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
     into the energy and thus minimized
     """
     def __init__(self, network, snapshots):
+        # problem constraints: kirchhoff, startup/shutdown, marginal cost
+        envMgr = EnvironmentVariableManager()
+        # factor to scale the offset of marginal cost when estimating
+        # marginal cost at a bus
+        self.offsetEstimationFactor = float(envMgr["offsetEstimationFactor"])
+        # factor to scale estimated cost at a bus after calculation
+        self.estimatedCostFactor = float(envMgr["estimatedCostFactor"])
+        # factor to scale marginal cost of a generator when constructing ising
+        # interactions
+        self.offsetBuildFactor = float(envMgr["offsetBuildFactor"])
         super().__init__(network, snapshots)
         for time in range(len(self.snapshots)):
             self.encodeMarginalCosts(time)
@@ -1276,20 +1298,19 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
 
     def chooseOffset(self, sortedGenerators):
         """
-        calculates a float by which to offset all marginal costs. It tries to center the resulting
-        marginal cost around the marginal cost of the optimal solution. this means that in a best 
-        case scenario, the optimal solution incurrs a penalty of 0 when using a minimal square 
-        constraint on the offset marginal cost
-        
+        calculates a float by which to offset all marginal costs. The chosen offset is the
+        minimal marginal cost of a generator in the list
+
         @param sortedGenerators: list
             a list of generators already sorted by their minimal cost in ascending order
         @return: float
              a float by which to offset all marginal costs of network components
         """
-        REL_POS = 3.5
-        CONST_IDX_OFFSET = 0.0
-        idx =  int(CONST_IDX_OFFSET + len(sortedGenerators)/ REL_POS)
-        return self.network.generators["marginal_cost"].loc[sortedGenerators[idx]]
+        # there are lots of ways to choose an offset. offsetting such that 0 is minimal cost
+        # is decent but for example choosing an offset slighty over that seems to also produce
+        # good results. It is not clear how important the same sign on all marginal costs is
+        marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
+        return self.offsetEstimationFactor * np.min(marginalCostList) 
 
 
     def estimateGlobalMarginalCost(self, time, expectedAdditonalCost=0.0):
