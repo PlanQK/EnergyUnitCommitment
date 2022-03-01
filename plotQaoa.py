@@ -334,67 +334,71 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str, cut: float = 0.
     plotnameBPB = f"{optimizer} {noise} - maxiter {maxiter}, best 50% \n {extraPlotInfo}"
     plotnameCF = f"{optimizer} CF evolution {noise} - maxiter {maxiter} \n {extraPlotInfo}"
 
-    plotBoxplot(docker=True, filename=filename, plotname=plotnameBP, savename=savename)
-    plotBoxplotBest(docker=True, filename=filename, plotname=plotnameBPB, savename=savename, cut=cut)
+    plotBoxplot(filename=filename, plotname=plotnameBP, savename=savename)
+    plotBoxplotBest(filename=filename, plotname=plotnameBPB, savename=savename, cut=cut)
     if len(dataAll["results"]) > 1:
-        plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
+        plotCFoptimization(filename=filename, plotname=plotnameCF, savename=savename)
 
 
-def getCFvalue(filename: str, directory: str) -> float:
-    subdata = openFile(filename=filename, directory=directory)
-    cfValue = subdata["optimizeResults"]["fun"]
+def buildKirchLabels(filename: str, directory: str = "results_qaoa_sweep/", kirchLabels: int = None) -> list:
+    """
+    Builds labels consisting of the bitstring and the kirchhoff costs for this bitstring, spanning over two lines.
+    Args:
+        filename: (str) filename of dateset to be used for the kirchhoff cost extraction.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+        kirchLabels: (int) if None, no kirchhoff costs will be added to the labels. Otherwise the kirchhoff costs will
+                           be extracted from the given file and added to the labels.
 
-    return cfValue
+    Returns:
+        labels: (list) A list with the labels consisting of the bitstrings and (possibly) the kirchhoff costs.
+    """
+    dataAll = openFile(filename=filename, directory=directory)
+    nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
+    bitstrings = getBitstrings(nBits=nBits)
 
-
-def buildLabels(bitstrings: list, added: list) -> list:
     labels = []
-    for i in range(len(bitstrings)):
-        labels.append(f"{bitstrings[i]}\n{added[i]}")
+    if kirchLabels == None:
+        labels = bitstrings
+    else:
+        for bitstring in bitstrings:
+            kirchValue = dataAll["kirchhoff"][bitstring]["total"]
+            labels.append(f"{bitstring}\nk={kirchValue}")
 
     return labels
 
 
 def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str,
-                            title: str = "Comparision Boxplot", cut: float = 0.5, kirchLabels: int = None):
-    directory = "results_qaoa_sweep/"
+                            directory: str = "results_qaoa_sweep/", title: str = "Comparision Boxplot",
+                            cut: float = 0.5, kirchLabels: int = None):
+    """
+    Creates boxplots of the probability of all possible bitstrings for the best cut of repetitions of multiple datasets
+    next to each other.
+    Args:
+        filenames: (list) filenames of datesets to be plotted.
+        labels: (list) labels for datasets to be plotted.
+        colors: (list) colors to be used for datasets.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+        title: (str) title of the plot.
+        cut: (float) the percentage of best repetitions to be plotted: Default: 0.5
+        kirchLabels: (int) indicates which element of the list filenames is to be used to extract the kirchhoff costs.
+                           If None, no kirchhoff costs will be added to the bitstring labels.
+
+    Returns:
+        Saves the generated plot, with the name "BPcomp_{savename}_cut{cut}.png" to the subfolder 'plots'
+    """
     cutoff = {}
     toPlot = {}
     if kirchLabels:
-        dataAll = openFile(filename=filenames[kirchLabels], directory=directory)
-        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
-        bitstrings = getBitstrings(nBits=nBits)
-        labelAdd = []
-        for bitstring in bitstrings:
-            kirchValue = dataAll["kirchhoff"][bitstring]["total"]
-            labelAdd.append(f"k={kirchValue}")
-        xlabels = buildLabels(bitstrings=bitstrings, added=labelAdd)
-    elif kirchLabels == 0:
-        dataAll = openFile(filename=filenames[kirchLabels], directory=directory)
-        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
-        bitstrings = getBitstrings(nBits=nBits)
-        labelAdd = []
-        for bitstring in bitstrings:
-            kirchValue = dataAll["kirchhoff"][bitstring]["total"]
-            labelAdd.append(f"k={kirchValue}")
-        xlabels = buildLabels(bitstrings=bitstrings, added=labelAdd)
+        xlabels = buildKirchLabels(filename=filenames[kirchLabels], directory=directory, kirchLabels=kirchLabels)
     else:
-        dataAll = openFile(filename=filenames[0], directory=directory)
-        nBits = len(list(dataAll["results"]["1"]["counts"].keys())[0])
-        bitstrings = getBitstrings(nBits=nBits)
-        xlabels = bitstrings
-
+        xlabels = buildKirchLabels(filename=filenames[0], directory=directory, kirchLabels=kirchLabels)
     for i in range(len(filenames)):
-        dataAll = openFile(filename=filenames[i], directory=directory)
-        data = dataAll["results"]
+        bitstrings, plotData, plotDataFull, labelsExtract, metaData = extractPlotData(filename=filenames[i],
+                                                                                      directory=directory)
 
-        shots = dataAll["config"]["QaoaBackend"]["shots"]
-
-        cutoff[i] = {}
-
-        for key in data:
-            cutoff[i][key] = getCFvalue(filename=data[key]["filename"], directory=directory)
-
+        cutoffDictKeys = list(range(1, metaData["repetitions"] + 1))
+        cutoff[i] = dict(zip(cutoffDictKeys, plotData["cf"]))
         cutoff[i] = dict(sorted(cutoff[i].items(), key=lambda item: item[1]))
 
         toPlot[i] = [[] for j in range(len(bitstrings))]
@@ -402,11 +406,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
             bitstring_index = bitstrings.index(bitstring)
             for j in range(int(len(cutoff[i]) * cut)):  # only plot best cut
                 key = list(cutoff[i].keys())[j]
-                if bitstring in data[key]["counts"]:
-                    appendData = data[key]["counts"][bitstring]
-                else:
-                    appendData = 0
-                toPlot[i][bitstring_index].append(appendData / shots)
+                toPlot[i][bitstring_index].append(plotData[f"{bitstring}prop"][key-1])
 
     def set_box_color(bp, color):
         plt.setp(bp['boxes'], color=color)
@@ -432,7 +432,8 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         boxDistance = [-0.9, -0.3, 0.3, 0.9]
 
     for i in range(nPlots):
-        bp = plt.boxplot(toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i], sym='', widths=boxWidth)
+        bp = plt.boxplot(x=toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i], sym='',
+                         widths=boxWidth)
         set_box_color(bp, colors[i])
         plt.plot([], c=colors[i], label=labels[i])
 
@@ -440,17 +441,18 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
 
     plt.title(title)
     plt.xticks(range(0, len(bitstrings) * nPlots, nPlots), xlabels)
-    plt.xlim(-1, len(bitstrings) * nPlots + 0.5)
+    plt.xlim(-1.5, len(bitstrings) * nPlots + 0.5)
     plt.tight_layout()
     plt.xlabel('bitstrings')
     plt.ylabel('probability')
     fig.set_figheight(7)
     fig.set_figwidth(15)
-    #plt.show()
-    plt.savefig(f"plots/BP_{savename}_cut{cut}.png")
+    plt.show()
+    plt.savefig(f"plots/BPcomp_{savename}_cut{cut}.png")
 
 
-def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, savename: str, mode: str, x: str, y: str):
+def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, savename: str, mode: str, x: str,
+                y: str, directory: str = "results_qaoa_sweep/"):
     """
     Creates two scatter plots of the same features for two different datasets.
     Args:
@@ -464,6 +466,7 @@ def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, 
                     data from each optimiziation iteration
         x: (str) feature to be plotted on x-axis.
         y: (str) feature to be plotted on y-axis.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
         Features to choose from for the x- and y-axis:
             - "cf" (cost function);
             - "beta{i}", where i is the number of beta, e.g. beta1, beta2, ...;
@@ -475,8 +478,8 @@ def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, 
     Returns:
         Saves the generated plot, with the name "Scatter_{plotname}.png" to the subfolder 'plots'
     """
-    bitstrings, plotData1, plotDataFull1, labels, metaData1 = extractPlotData(filename=file1)
-    bitstrings, plotData2, plotDataFull2, labels, metaData2 = extractPlotData(filename=file2)
+    bitstrings, plotData1, plotDataFull1, labels, metaData1 = extractPlotData(filename=file1, directory=directory)
+    bitstrings, plotData2, plotDataFull2, labels, metaData2 = extractPlotData(filename=file2, directory=directory)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
     fig.set_figwidth(15)
@@ -523,8 +526,22 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
-                       plotname="test", savename="test")
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
+    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
+    title = "Network 0 evaluation"
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=None)
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_16-31-10_config.yaml",
+                extraPlotInfo="SPSA blocking = True",
+                savename="4qubit_SPSA-blocking-True_testNetwork4QubitIsing_2_0_20")
+
+    return
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",

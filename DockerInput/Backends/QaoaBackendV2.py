@@ -93,7 +93,7 @@ class QaoaQiskit(BackendBase):
                                                simulate=simulate,
                                                noise=noise)
             if self.config["QaoaBackend"]["classical_optimizer"] == "SPSA":
-                optimizer = SPSA(maxiter=max_iter)
+                optimizer = SPSA(maxiter=max_iter, blocking=False)
             elif self.config["QaoaBackend"]["classical_optimizer"] == "COBYLA":
                 optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
             else:
