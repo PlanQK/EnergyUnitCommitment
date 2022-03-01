@@ -116,10 +116,6 @@ class QaoaQiskit(BackendBase):
                 with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
                     json.dump(self.results_dict, write_file, indent=2, default=str)
 
-            # filename2 = f"Kirchhoff_{i}_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-            # with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename2, "w") as write_file:
-            #    json.dump(qaoa.kirchhoff, write_file, indent=2)
-
             last_rep = self.results_dict["iter_count"]
             last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
             self.metaInfo["results"][i] = {"filename": filename,
@@ -144,7 +140,7 @@ class QaoaQiskit(BackendBase):
 
     def get_power(self, comp: str, network: pypsa.Network, type: str) -> float:
         """
-        Extracts the power value of the given component and adjusts its sign according to function this component
+        Extracts the power value of the given component and adjusts its sign according to the function this component
         fulfills for the given bus.
 
         Args:
@@ -257,6 +253,15 @@ class QaoaQiskit(BackendBase):
         return components
 
     def scaleHamiltonian(self, hamiltonian: list) -> list:
+        """
+        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi
+
+        Args:
+            hamiltonian: (list) The input hamiltonian to be scaled.
+
+        Returns:
+            (list) the scaled hamiltonian.
+        """
         matrixMax = np.max(hamiltonian)
         matrixMin = np.min(hamiltonian)
         matrixExtreme = max(abs(matrixMax), abs(matrixMin))

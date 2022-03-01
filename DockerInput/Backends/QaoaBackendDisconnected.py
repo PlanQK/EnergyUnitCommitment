@@ -1,4 +1,5 @@
 import json, yaml
+import math
 
 import numpy as np
 import pypsa
@@ -216,6 +217,22 @@ class QaoaQiskit():
         """
         components = {}
 
+        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
+                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
+            qubit_map = {}
+            qubit = 0
+            for comp in list(network.generators.index):
+                qubit_map[comp] = [qubit]
+                qubit += 1
+            for comp in list(network.lines.index):
+                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
+                qubit += 2
+        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
+            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
+            qubit_map = transformedProblem.getQubitMapping()
+
+        components["qubit_map"] = qubit_map
+
         for bus in network.buses.index.values:
             components[bus] = {"generators": list(network.generators[network.generators.bus == bus].index),
                                "positiveLines": list(network.lines[network.lines.bus1 == bus].index) +
@@ -231,33 +248,44 @@ class QaoaQiskit():
             components[bus]["qubits"] = []
             components = self.buildPowerAndQubits(components=components, network=network, bus=bus)
 
-        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
-                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qubit_map = {}
-            qubit = 0
-            for comp in list(network.generators.index):
-                qubit_map[comp] = [qubit]
-                qubit += 1
-            for comp in list(network.lines.index):
-                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
-                qubit += 2
+        if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
             lastKey = list(components["qubit_map"])[-1]
             nqubits = components["qubit_map"][lastKey][-1] + 1
-            if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-                hamiltonian = self.calculateHpMatrix(components=components, nqubits=nqubits)
-            else:
-                hamiltonian = []
+            hamiltonian = self.calculateHpMatrix(components=components, nqubits=nqubits)
         elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
-            qubit_map = transformedProblem.getQubitMapping()
             hamiltonian = transformedProblem.getHamiltonianMatrix()
+        else:
+            hamiltonian = []
+        scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
 
-        components["qubit_map"] = qubit_map
-        components["hamiltonian"] = hamiltonian
+        components["hamiltonian"] = {}
+        components["hamiltonian"]["scaled"] = scaledHamiltonian
+        components["hamiltonian"]["original"] = hamiltonian
 
         self.components = components
 
         return components
+
+    def scaleHamiltonian(self, hamiltonian: list) -> list:
+        """
+        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi
+
+        Args:
+            hamiltonian: (list) The input hamiltonian to be scaled.
+
+        Returns:
+            (list) the scaled hamiltonian.
+        """
+        if hamiltonian:
+            matrixMax = np.max(hamiltonian)
+            matrixMin = np.min(hamiltonian)
+            matrixExtreme = max(abs(matrixMax), abs(matrixMin))
+            factor = matrixExtreme / math.pi
+            scaledHamiltonian = np.array(hamiltonian) / factor
+
+            return scaledHamiltonian.tolist()
+        else:
+            return hamiltonian
 
     def addHpIter(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
         """
@@ -399,8 +427,7 @@ class QaoaQiskit():
         qc.barrier()
 
         if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
-            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"])
+            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         elif self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
             qc = self.addHpIter(qc=qc, gamma=gamma, components=components)
 
@@ -469,7 +496,6 @@ class QaoaQiskit():
         lastKey = list(components["qubit_map"])[-1]
         nqubits = components["qubit_map"][lastKey][-1] + 1
         qc = QuantumCircuit(nqubits)
-        components["hamiltonian"] = self.calculateHpMatrix(components=components, nqubits=nqubits)
         beta0 = theta[0]
         gamma0 = theta[1]
         beta1 = theta[2]
@@ -480,10 +506,10 @@ class QaoaQiskit():
             qc.h(i)
         qc.barrier()
 
-        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         qc = self.addHb(qc=qc, beta=beta0, nqubits=nqubits)
 
-        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
         qc = self.addHb(qc=qc, beta=beta1, nqubits=nqubits)
 
         qc.measure_all()
@@ -651,21 +677,15 @@ class QaoaQiskit():
 
         def execute_circ(theta):
             if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
-                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
+                    self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
                 if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
                     qc = self.create_qc1(components=components, theta=theta)
                 elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
                     qc = self.create_qc3(components=components, theta=theta)
             elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"], theta=theta)
+                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=theta)
             self.results_dict["qc"] = qc.draw(output="latex_source")
-            traspiledQC = qiskit.compiler.transpile(circuits=qc, backend=backend)
-            traspiledQCopt = qiskit.compiler.transpile(circuits=qc, backend=backend, optimization_level=2)
-            traspiledQCdrawn = traspiledQC.draw(output="latex_source")
-            traspiledQCoptDrawn = traspiledQCopt.draw(output="latex_source")
-            #traspiledQCdrawn = traspiledQC.draw(output="mpl").show()
-            #traspiledQCoptDrawn = traspiledQCopt.draw(output="mpl").show()
-            #qc.draw(output="latex")
+            # qc.draw(output="latex")
             if simulate:
                 # Run on chosen simulator
                 results = execute(experiments=qc,
@@ -815,11 +835,10 @@ def main():
     # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
     # https://blog.xa0.de/post/Solving-QUBOs-with-qiskit-QAOA-example/
     # https://qiskit.org/documentation/optimization/stubs/qiskit_optimization.QuadraticProgram.html
-    components["hamiltonian"] = qaoa.calculateHpMatrix(components=components, nqubits=4)
     qp = QuadraticProgram()
-    #[qp.binary_var() for _ in range(components["hamiltonian"].shape[0])]
+    #[qp.binary_var() for _ in range(components["hamiltonian"]["scaled"].shape[0])]
     [qp.binary_var() for _ in range(4)]
-    qp.minimize(quadratic=components["hamiltonian"])
+    qp.minimize(quadratic=components["hamiltonian"]["scaled"])
 
     quantum_instance = QuantumInstance(Aer.get_backend('aer_simulator'))
     cobyla = COBYLA(maxiter=100)
@@ -833,23 +852,28 @@ def main():
     #qaoa_result = qaoaQiskit.find_minimum()
     #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
     """
-    """
+
     theta = [Parameter("\u03B2"), Parameter("\u03B3")]
+    config["QaoaBackend"]["qcGeneration"] = "IterationMatrix"
+    componentsIterM = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIterM = qaoa.create_qc1(components=componentsIterM, theta=theta)
+    qcIterDrawnM = qcIterM.draw(output="latex_source")
     config["QaoaBackend"]["qcGeneration"] = "Iteration"
     componentsIter = qaoa.transformProblemForOptimizer(network=netImport)
     qcIter = qaoa.create_qc1(components=componentsIter, theta=theta)
     qcIterDrawn = qcIter.draw(output="latex_source")
     config["QaoaBackend"]["qcGeneration"] = "Ising"
     componentsIsing = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"], theta=theta)
+    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"]["scaled"], theta=theta)
     qcIsingDrawn = qcIsing.draw(output="latex_source")
     
     qcCompare = {"Iteration": qcIterDrawn,
+                 "IterationMatrix": qcIterDrawnM,
                  "Ising": qcIsingDrawn}
 
     with open("qcCompare.json", "w") as write_file:
         json.dump(qcCompare, write_file, indent=2, default=str)
-    """
+
 
     qaoa.optimize(transformedProblem=components)
 
