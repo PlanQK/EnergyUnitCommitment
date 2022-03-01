@@ -123,7 +123,7 @@ class PlottingAgent:
     class for creating plots. on initialization reads and prepares data files. Plots based on that 
     data can then be created and written by calling makeFigure
     """
-    def __init__(self, globDict, constraints={}, fileformat = "png"):
+    def __init__(self, fileformat = "png"):
         """
         constructor for a plotting agent. On initialization, constructs a DataExtractionAgent to handle
         data management
@@ -131,9 +131,27 @@ class PlottingAgent:
         @param globDict: dict
             a dictionary containg lists of glob expressions for the solver whose data will be plotted
         """
-        self.dataExtractionAgent = DataExtractionAgent(globDict, constraints=constraints, suffix="sweep")
         self.savepath = "plots"
         self.fileformat = fileformat
+
+
+    @classmethod
+    def read_csv(cls, csv_file: str, fileformat = "png"):
+        agent = PlottingAgent(fileformat)
+        agent.dataExtractionAgent = DataExtractionAgent.read_csv(csv_file)
+        return agent
+    
+    @classmethod
+    def extract_from_json(cls, globDict, constraints={}, fileformat = "png"):
+        agent = PlottingAgent(fileformat)
+        agent.dataExtractionAgent = DataExtractionAgent.extract_from_json(
+                globDict=globDict, constraints=constraints, 
+        ) 
+        return agent
+        
+    def to_csv(self, filename:str):
+        self.dataExtractionAgent.df.to_csv(filename)
+    
 
     def getDataPoints(self,
                     xField, 
@@ -158,12 +176,10 @@ class PlottingAgent:
         @return: dict
              a dictonary over groupby indices with values being dictionaries over yField labels
         """
-        # TODO
         dataFrame = self.dataExtractionAgent.getData(constraints)[[xField] + yFieldList + splittingFields]
-        dataFrame = dataFrame[dataFrame[xField].notna()]
         result = {}
         if splittingFields:
-            groupedDataFrame = dataFrame.groupby(splittingFields).agg(list)
+            groupedDataFrame = dataFrame.groupby(splittingFields, dropna=False).agg(list)
             for idx in groupedDataFrame.index:
                 # if there is only 1 splitField, the index is not a multiindex
                 if len(splittingFields) == 1:
@@ -184,22 +200,8 @@ class PlottingAgent:
                 }
         return result
     
-    def filterPointsByNa(self,xValues, yValue):
-        """
-        a method to filter two lists by all indices in which in at least one of them occurs a NaN value
-        
-        @param xValues: list
-            a list of values representing a coordinate on the x-axiy
-        @param yValues: list
-            a list of values representing a coordinate on the y-axis
-        @return: (list,list)
-            a filtered pair of xValues and yValues
-        """
-        filteredXValues = [x for idx, x in enumerate(xValues) if pd.notna(x) and pd.notna(yValues[idx])]
-        filteredYValues = [y for idx, y in enumerate(yValues) if pd.notna(y) and pd.notna(yValues[idx])]
-        return filteredXValues, filteredYValues 
 
-    def aggregateData(self, xValues, yValues, aggregationMethods):
+    def aggregateData(self, xValues, yValues, aggregationMethods, ):
         """
         aggregation nethod for a list of yValues grouped by their corresponding xValue
         
@@ -215,9 +217,10 @@ class PlottingAgent:
         if len(xValues) != len(yValues):
             raise ValueError("data lists are of unequal length")
         df = pd.DataFrame({"xField" : xValues, "yField" : yValues})
-        df = df[df["yField"].notna() & df["yField"].notna()]
-        grouped = df.groupby("xField").agg(aggregationMethods)
-        return grouped["yField"]
+        yValues_df = df[df["yField"].notna()]
+        naValues_df = df[df["xField"].isna()]
+        return yValues_df.groupby("xField").agg(aggregationMethods)["yField"] , \
+                np.mean(naValues_df["yField"])
 
     def makeFigure(self,
             plotname: str,
@@ -261,16 +264,21 @@ class PlottingAgent:
                         aggregateMethod = 'mean'
                     if errorMethod is None:
                         errorMethod = deviationOfTheMean
-                    yValues = self.aggregateData(
-                            yFieldValues[0],
-                            yFieldValues[1],
-                            [aggregateMethod, errorMethod]
+                    yValues, naValues = self.aggregateData(
+                                xCoordinateList,
+                                yCoordinateList,
+                                [aggregateMethod, errorMethod],
                     )
                     ax.errorbar(yValues.index,
                             yValues.iloc[:,0],
                             label=label,
                             yerr=yValues.iloc[:,1],
                             **kwargs)
+
+                    ax.axhline(naValues)
+
+#                    print(yFieldValues[1][yFieldValues[0].isna()])
+#                    ax.hline()
 
                 if plottype == "scatterplot":
                     if 's' not in kwargs:
@@ -366,7 +374,7 @@ class DataExtractionAgent:
     ]
 
 
-    def __init__(self, globDict: dict, constraints={}, suffix: str = "sweep"):
+    def __init__(self, prefix: str = "results", suffix: str = "sweep"):
         """
         constructor for a data extraction. data files specified in globDict are read, filtered by
         constraints and then saved into a pandas data frame. stored data can be queried by a getter
@@ -381,17 +389,27 @@ class DataExtractionAgent:
             suffix or results folder in which to apply glob. 
         """
         self.pathDictionary = {
-            solver : "_".join(["results",solver,"sweep"]) for solver in self.solverKeys.keys()
+            solver : "_".join([prefix, solver, suffix]) for solver in self.solverKeys.keys()
         }
-        self.globDict = globDict
-        # last used constraints dictionary used in getting data
-        self.constraints = {}
-        self.df = pd.DataFrame()
-        for solver, globList in globDict.items():
-            self.df = self.df.append(self.extractData(solver, globList,))
-        self.df = self.filterByConstraint(constraints)
-        self.df = self.df.apply(pd.to_numeric, errors='ignore')
 
+    @classmethod
+    def read_csv(cls, filename:str):
+        agent = DataExtractionAgent()
+        agent.df = pd.read_csv(filename)
+        agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        print(agent.df.columns)
+        return agent
+
+    @classmethod
+    def extract_from_json(cls, globDict: dict, constraints: dict = {}):
+        agent = DataExtractionAgent()
+        agent.df = pd.DataFrame()
+        for solver, globList in globDict.items():
+            agent.df = agent.df.append(agent.extractData(solver, globList,))
+        agent.df = agent.filterByConstraint(constraints)
+        agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        return agent
+    
 
     def expandSolverDict(self, dictKey, dictValue):
         """
