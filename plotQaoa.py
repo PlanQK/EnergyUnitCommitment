@@ -12,17 +12,32 @@ from numpy import median, linalg
 from statistics import mean
 from scipy.optimize import curve_fit
 
-FILENAME = "QaoaCompare_2022-1-31_13-11-6_987313"
-
 
 def openFile(filename: str, directory: str) -> dict:
+    """
+    Opens the given json file and returns its content as a dictionary.
+    Args:
+        filename: (str) The name of the file to be opened.
+        directory: (str) The folder in which the file is located.
+
+    Returns:
+        data (dict) The content of the file with the given filename from the given directory.
+    """
     with open(f"{directory}{filename}") as json_file:
         data = json.load(json_file)
 
     return data
 
 
-def intTupleToString(a: tuple):
+def intTupleToString(a: tuple) -> str:
+    """
+    Changes a tuple into a string.
+    Args:
+        a: (tuple) The tuple to be changed
+
+    Returns:
+        string: (str) The string representation of the tuple data.
+    """
     string = ""
     for i in range(len(a)):
         string += str(a[i])
@@ -30,7 +45,15 @@ def intTupleToString(a: tuple):
     return string
 
 
-def getBitstrings(nBits: int):
+def getBitstrings(nBits: int) -> list:
+    """
+    Returns a list with all possible bitstrings for the given number of bits.
+    Args:
+        nBits: (int) Number of bits.
+
+    Returns:
+        bitstrings: (list) A list with all possible bitstrings for the given number of bits.
+    """
     bitstrings = []
     tupleBits = list(itertools.product([0,1], repeat=nBits))
     for i in range(len(tupleBits)):
@@ -39,21 +62,28 @@ def getBitstrings(nBits: int):
     return bitstrings
 
 
-def extractPlotData(filename: str) -> tuple:
+def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tuple:
     """
     Extracts data from the supplied file and stores it in dictionaries.
     Args:
         filename: (str) The filename of the experiment.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
 
     Returns:
-        shots: (int) The number of shots used in this experiment.
         bitstrings: (list) A list of all possible bitstrings for the experiment.
         plotData: (dict) Dictionary with all relevant data to plot for all repetitions.
         plotDataFull: (dict) Dictionary with all relevant data to plot for each iteration of all repetitions.
+        labels: (dict) A dictionary with the labels for each plotData option.
+        metaData: (dict) A dictionary with the metaData for the dataset.
 
     """
-    data = openFile(filename=filename, directory="results_qaoa_sweep/")
-    shots = data["config"]["QaoaBackend"]["shots"]
+    data = openFile(filename=filename, directory=directory)
+    metaData = {"shots": data["config"]["QaoaBackend"]["shots"],
+                "backend": data["qaoaBackend"]["backend_name"],
+                "max_iter": data["config"]["QaoaBackend"]["max_iter"],
+                "repetitions": data["config"]["QaoaBackend"]["repetitions"],
+                "optimizer": data["config"]["QaoaBackend"]["classical_optimizer"],
+                "initial_guess": data["config"]["QaoaBackend"]["initial_guess"]}
     data = data["results"]
     bitstrings = getBitstrings(nBits=4)
 
@@ -86,7 +116,7 @@ def extractPlotData(filename: str) -> tuple:
         for bitstring in bitstrings:
             if bitstring in data[key]["counts"]:
                 plotData[f"{bitstring}shots"].append(data[key]["counts"][bitstring])
-                plotData[f"{bitstring}prop"].append(data[key]["counts"][bitstring] / shots)
+                plotData[f"{bitstring}prop"].append(data[key]["counts"][bitstring] / metaData["shots"])
             else:
                 plotData[f"{bitstring}shots"].append(0)
                 plotData[f"{bitstring}prop"].append(0)
@@ -98,12 +128,12 @@ def extractPlotData(filename: str) -> tuple:
             for bitstring in bitstrings:
                 if bitstring in tempData[f"rep{i}"]["counts"]:
                     plotDataFull[f"{bitstring}shots"].append(tempData[f"rep{i}"]["counts"][bitstring])
-                    plotDataFull[f"{bitstring}prop"].append(tempData[f"rep{i}"]["counts"][bitstring] / shots)
+                    plotDataFull[f"{bitstring}prop"].append(tempData[f"rep{i}"]["counts"][bitstring] / metaData["shots"])
                 else:
                     plotDataFull[f"{bitstring}shots"].append(0)
                     plotDataFull[f"{bitstring}prop"].append(0)
 
-    return shots, bitstrings, plotData, plotDataFull, labels
+    return bitstrings, plotData, plotDataFull, labels, metaData
 
 
 def extractHamiltonian(filename: str) -> list:
@@ -123,138 +153,25 @@ def extractHamiltonian(filename: str) -> list:
     return hamiltonian
 
 
-def plotPropVsCost(docker: bool, filename: str, plotname: str):
-    if docker:
-        data = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = data["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotBoxplot(filename: str, plotname: str, savename: str, directory: str = "results_qaoa_sweep/"):
+    """
+    Creates a boxplot of the probability of all possible bitstrings.
+    Args:
+        filename: (str) filename of dateset to be plotted.
+        plotname: (str) title of the plot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
 
-    bitstrings = list(data["1"]["counts"].keys())
-    bitstrings.sort()
-    shots = data["1"]["shots"]
-    subfile = data["1"]["filename"]
-    if docker:
-        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
-    else:
-        subdata = openFile(filename=subfile, directory="results_qaoa/")
-    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
-    initial_guess = data["1"]["initial_guess"]
-    kirchhoffFileName = "kirchhoff" + data["1"]["filename"][4:]
-    kirchhoffData = openFile(filename=kirchhoffFileName, directory="results_qaoa/")
-    bitstring_costs = kirchhoffData["rep1"]
-    toPlot = [[] for i in range(100)]
-    #bitstring_costs = {"0000": 3, "0001": 4, "0010": 5, "0011": 8, "0100": 3, "0101": 0, "0110": 3, "0111": 4,
-    #                   "1000": 2, "1001": 3, "1010": 4, "1011": 7, "1100": 4, "1101": 1, "1110": 2, "1111": 3}
+    Returns:
+        Saves the generated plot, with the name "BP_{plotname}.png" to the subfolder 'plots'
+    """
+    bitstrings, plotData, plotDataFull, labels, metaData = extractPlotData(filename=filename, directory=directory)
 
-    for key in data:
-        for bitstring in bitstrings:
-            bitstring_index = int(bitstring_costs[bitstring]["total"])
-            if bitstring in data[key]["counts"]:
-                appendData = data[key]["counts"][bitstring]
-            else:
-                appendData = 0
-            toPlot[bitstring_index].append(appendData / shots)
-    yData = []
-    xData = []
-    for i in range(len(toPlot)):
-        if toPlot[i]:  # if toPlot[i] is an empty list it returns False
-            yData.append(mean(toPlot[i]))
-            #yData.append(sum(toPlot[i]) / len(data))
-            xData.append(i)
-
-    fig, ax = plt.subplots()
-    fig.set_figheight(7)
-    ax.plot(xData, yData, "x-")
-
-    ax.set_xlabel('cost function')
-    ax.set_ylabel('probability')
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
-              fontdict={'fontsize': 8})
-    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
-    plt.suptitle(plotname)
-
-    #plt.show()
-    plt.savefig(f"plots/{filename}_PropVsCF1.png")
-
-
-def plotPropVsCost4qubit(docker: bool, filename: str, plotname: str):
-    if docker:
-        data = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = data["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
-
-    bitstrings = list(data["1"]["counts"].keys())
-    bitstrings.sort()
-    shots = data["1"]["shots"]
-    subfile = data["1"]["filename"]
-    if docker:
-        subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
-    else:
-        subdata = openFile(filename=subfile, directory="results_qaoa/")
-    backend = subdata[f"rep{subdata['iter_count']}"]["backend"]["backend_name"]
-    initial_guess = data["1"]["initial_guess"]
-    toPlot = [[] for i in range(9)]
-    bitstring_costs = {"0000": 3, "0001": 4, "0010": 5, "0011": 8, "0100": 3, "0101": 0, "0110": 3, "0111": 4,
-                       "1000": 2, "1001": 3, "1010": 4, "1011": 7, "1100": 4, "1101": 1, "1110": 2, "1111": 3}
-
-    for key in data:
-        for bitstring in bitstrings:
-            bitstring_index = bitstring_costs[bitstring]
-            if bitstring in data[key]["counts"]:
-                appendData = data[key]["counts"][bitstring]
-            else:
-                appendData = 0
-            toPlot[bitstring_index].append(appendData / shots)
-    yData = []
-    xData = []
-    for i in range(len(toPlot)):
-        if toPlot[i]:
-            #yData.append(mean(toPlot[i]))
-            yData.append(sum(toPlot[i]) / len(data))
-            xData.append(i)
-
-    fig, ax = plt.subplots()
-    fig.set_figheight(7)
-    ax.plot(xData, yData, "x-")
-
-    ax.set_xlabel('cost function')
-    ax.set_ylabel('probability')
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
-              fontdict={'fontsize': 8})
-    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
-    plt.suptitle(plotname)
-
-    #plt.show()
-    plt.savefig(f"plots/{filename}_PropVsCF2.png")
-
-
-def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
-    if docker:
-        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = dataAll["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
-
-
-    bitstrings = list(data["1"]["counts"].keys())
-    bitstrings.sort()
-    #bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
-    #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
-    shots = dataAll["config"]["QaoaBackend"]["shots"]
-    backend = dataAll["qaoaBackend"]["backend_name"]
-    initial_guess = dataAll["config"]["QaoaBackend"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
-    for key in data:
-        for bitstring in bitstrings:
-            bitstring_index = bitstrings.index(bitstring)
-            if bitstring in data[key]["counts"]:
-                appendData = data[key]["counts"][bitstring]
-            else:
-                appendData = 0
-            toPlot[bitstring_index].append(appendData/shots)
+    for bitstring in bitstrings:
+        bitstring_index = bitstrings.index(bitstring)
+        toPlot[bitstring_index] = plotData[f"{bitstring}prop"]
 
     fig, ax = plt.subplots()
     fig.set_figheight(7)
@@ -263,7 +180,8 @@ def plotBoxplot(docker: bool, filename: str, plotname: str, savename: str):
 
     ax.set_xlabel('bitstrings')
     ax.set_ylabel('probability')
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}", fontdict = {'fontsize' : 8})
+    plt.title(f"backend = {metaData['backend']}, shots = {metaData['shots']}, rep = {metaData['repetitions']} \n "
+              f"initial guess = {metaData['initial_guess']}", fontdict = {'fontsize' : 8})
     plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
     plt.xticks(range(1, len(bitstrings)+1), bitstrings, rotation=70)
@@ -415,42 +333,6 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
     if len(dataAll["results"]) > 1:
         plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
 
-def plotHistCF(docker: bool, filename: str, plotname:str, savename: str):
-    if docker:
-        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = dataAll["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
-
-    shots = data["1"]["shots"]
-    backend = dataAll["qaoaBackend"]["backend_name"]
-    initial_guess = data["1"]["initial_guess"]
-
-    toPlot = []
-    x = []
-    for key in data:
-        if docker:
-            tempData = openFile(filename=data[key]["filename"], directory="results_qaoa_sweep/")
-        else:
-            tempData = openFile(filename=data[key]["filename"], directory="results_qaoa/")
-        toPlot.append(float(tempData["optimizeResults"]["fun"]))
-        x.append(int(key))
-        bins = int(key)
-
-    fig, ax = plt.subplots()
-    fig.set_figheight(7)
-
-    #n, bins, patches = plt.hist(x=x, weights=toPlot, histtype='step')
-    plt.bar(x=x, height=toPlot)
-    ax.set_xlabel('repetition')
-    ax.set_ylabel('cost function')
-    plt.xticks(x)
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
-              fontdict={'fontsize': 8})
-    plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
-    plt.suptitle(plotname)
-    # plt.show()
-    plt.savefig(f"plots/HCF_{savename}.png")
 
 def getCFvalue(filename: str, directory: str) -> float:
     subdata = openFile(filename=filename, directory=directory)
@@ -458,12 +340,14 @@ def getCFvalue(filename: str, directory: str) -> float:
 
     return cfValue
 
+
 def buildLabels(bitstrings: list, added: list) -> list:
     labels = []
     for i in range(len(bitstrings)):
         labels.append(f"{bitstrings[i]}\n{added[i]}")
 
     return labels
+
 
 def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savename: str,
                             title: str = "Comparision Boxplot", cut: float = 0.5, kirchLabels: int = None):
@@ -559,99 +443,34 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     #plt.show()
     plt.savefig(f"plots/BP_{savename}_cut{cut}.png")
 
-def plotShots_CF(filenamesNnoise: list, filenamesYnoise: list, savename: str, title: str = "Shots vs cost function"):
-    plotXno = []
-    plotXyes = []
-    plotYno = []
-    plotYyes = []
-    for i in range(len(filenamesNnoise)):
-        directory = "results_qaoa_sweep/"
-        dataAllno = openFile(filename=filenamesNnoise[i], directory=directory)
-        dataNo = dataAllno["results"]
-        dataAllyes = openFile(filename=filenamesYnoise[i], directory=directory)
-        dataYes = dataAllyes["results"]
-
-
-        plotXno.append(dataAllno["config"]["QaoaBackend"]["shots"])
-        plotXyes.append(dataAllyes["config"]["QaoaBackend"]["shots"])
-
-        cutoff = []
-        for key in dataNo:
-            cutoff.append(getCFvalue(filename=dataNo[key]["filename"], directory=directory))
-            #cutoff.append(dataNo[key]["counts"]["0101"] / dataNo[key]["shots"])
-        cutoff.sort()
-        #cutoff = cutoff[:50]
-        plotYno.append(sum(cutoff) / len(cutoff))
-
-        cutoff = []
-        for key in dataYes:
-            cutoff.append(getCFvalue(filename=dataYes[key]["filename"], directory=directory))
-            #cutoff.append(dataYes[key]["counts"]["0101"] / dataYes[key]["shots"])
-        cutoff.sort()
-        #cutoff = cutoff[:50]
-        plotYyes.append(sum(cutoff) / len(cutoff))
-
-    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-    f.set_figwidth(15)
-    ax1.plot(plotXno, plotYno)
-    ax2.plot(plotXyes, plotYyes)
-    ax1.set_xlabel('shots')
-    ax1.set_ylabel('cost function')
-    ax2.set_xlabel('shots')
-    ax2.set_ylabel('cost function')
-    ax1.set_title("without noise")
-    ax2.set_title("with noise")
-    plt.suptitle(title)
-    #plt.show()
-    plt.savefig(f"plots/Shots_{savename}.png")
-
-def plotOptTime_CF(filenames: list, savename: str, title: str = "optimization time vs cost function mean"):
-    plotX = []
-    plotY = []
-    cutoff = {}
-    toPlot = {}
-    for i in range(len(filenames)):
-        directory = "results_qaoa_sweep/"
-        dataAll = openFile(filename=filenames[i], directory=directory)
-        data = dataAll["results"]
-
-        costValue = []
-        duration = []
-
-        for key in data:
-            duration.append(data[key]["duration"])
-            costValue.append(getCFvalue(filename=data[key]["filename"], directory=directory))
-
-        costValue.sort()
-        costValue = costValue[:50]
-        plotY.append(sum(costValue) / len(costValue))
-        plotX.append(sum(duration) / len(duration))
-
-        cutoff[i] = {}
-        for key in data:
-            cutoff[i][key] = [getCFvalue(filename=data[key]["filename"], directory=directory), data[key]["duration"]]
-
-        cutoff[i] = dict(sorted(cutoff[i].items(), key=lambda item: item[1]))
-
-        toPlot[i] = []
-        for j in range(int(len(cutoff[i]) * 0.5)):  # only plot best 50%
-            key = list(cutoff[i].keys())[j]
-            toPlot[i].append(cutoff[i][key][1])
-
-    plt.plot(plotX, plotY)
-    #plt.boxplot(toPlot[0])
-    #plt.boxplot(toPlot[1])
-    #plt.boxplot(toPlot[2])
-    plt.xlabel('shots')
-    plt.ylabel('cost function')
-    plt.title(title)
-    plt.show()
-    #plt.savefig(f"plots/Shots_{savename}.png")
-
 
 def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, savename: str, mode: str, x: str, y: str):
-    shots1, bitstrings, plotData1, plotDataFull1, labels = extractPlotData(filename=file1)
-    shots2, bitstrings, plotData2, plotDataFull2, labels = extractPlotData(filename=file2)
+    """
+    Creates two scatter plots of the same features for two different datasets.
+    Args:
+        file1: (str) filename of dateset 1.
+        file2: (str) filename of dateset 2.
+        title: (str) title of the plot.
+        g1title: (str) title of the dataset 1 subplot.
+        g2title: (str) title of the dataset 2 subplot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        mode: (str) the mode for the data retrival. Choose from "opt", use only the optimized data or "full", use the
+                    data from each optimiziation iteration
+        x: (str) feature to be plotted on x-axis.
+        y: (str) feature to be plotted on y-axis.
+        Features to choose from for the x- and y-axis:
+            - "cf" (cost function);
+            - "beta";
+            - "gamma";
+            - "{bitstring}prop" (probability of the chosen bistring);
+            - "{bitstring}shots" (number of shots of the chosen bitstring);
+            - "duration" (only available if mode is set to "opt").
+
+    Returns:
+        Saves the generated plot, with the name "Scatter_{plotname}.png" to the subfolder 'plots'
+    """
+    bitstrings, plotData1, plotDataFull1, labels, metaData1 = extractPlotData(filename=file1)
+    bitstrings, plotData2, plotDataFull2, labels, metaData2 = extractPlotData(filename=file2)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True)
     fig.set_figwidth(15)
@@ -698,8 +517,15 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
+    plotScatter(file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
+                file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
+                title="cost function vs ideal solution probability of COBYLA and SPSA100 with noise",
+                g1title="COBYLA", g2title="SPSA100",
+                savename="COBYLA-SPSA100_yesNoise_CFvsTIME",
+                mode="opt", x="cf", y="duration")
+
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
     labels = ["unscaled", "scaled"]
     title = "Network 0 evaluation"
     colors = [blueMedium, orangeMedium]
@@ -708,7 +534,7 @@ def main():
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
     labels = ["unscaled", "scaled"]
     title = "Network 1 evaluation"
     colors = [blueMedium, orangeMedium]
@@ -717,7 +543,7 @@ def main():
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
     labels = ["unscaled", "scaled"]
     title = "Network 2 evaluation"
     colors = [blueMedium, orangeMedium]
@@ -726,7 +552,7 @@ def main():
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-28_14-57-49_config.yaml"]
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
     labels = ["unscaled", "scaled"]
     title = "Network 3 evaluation"
     colors = [blueMedium, orangeMedium]

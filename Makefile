@@ -253,7 +253,7 @@ results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $
 	energy:1.0 qaoa $(strip $(5))
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) results_qaoa_sweep/
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_$(strip $(4))_$(strip $(5))* results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_$(strip $(1))_$(strip $(4))_$(strip $(5))* results_qaoa_sweep/
 
 endef
 
