@@ -180,7 +180,7 @@ class DwaveTabuSampler(BackendBase):
             load = network.loads_t['p_set'].loc[snapshot].sum()
             print(f"Total output at {snapshot}: {power}")
             print(f"Total load at {snapshot}: {load}")
-
+        print(f"Marginal Cost: {transformedProblem[0].calcMarginalCost( solutionState)}")
         # network = transformedProblem.addSQASolutionToNetwork(
         #      network, solutionState
         # )
