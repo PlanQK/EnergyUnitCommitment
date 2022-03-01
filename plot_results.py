@@ -137,12 +137,32 @@ class PlottingAgent:
 
     @classmethod
     def read_csv(cls, csv_file: str, fileformat = "png"):
+        """
+        constructor method to set up the data to be plotted by reading a csv file
+        
+        Args:
+            csv_file: (str) name and location of the file
+            fileformat: (str) fileformat of the plots that an instance makes
+        Returns:
+            (PlottingAgent) a PlottingAgent initialized with the data in the csv file
+        """
         agent = PlottingAgent(fileformat)
         agent.dataExtractionAgent = DataExtractionAgent.read_csv(csv_file)
         return agent
     
     @classmethod
     def extract_from_json(cls, globDict, constraints={}, fileformat = "png"):
+        """
+        constructor method to set up the data to be plotted by reading the json files
+        of the runs that are to be plotted
+        
+        Args:
+            globDict: (dict) a dictionary with solver names as keys and a list of glob expressions as value
+            constraints: (dict) a dictionary with data fields name as keys and admissable values in a list
+            fileformat: (str) fileformat of the plots that an instance makes
+        Returns:
+            (PlottingAgent) a PlottingAgent initialized with the data of the run files
+        """
         agent = PlottingAgent(fileformat)
         agent.dataExtractionAgent = DataExtractionAgent.extract_from_json(
                 globDict=globDict, constraints=constraints, 
@@ -150,6 +170,14 @@ class PlottingAgent:
         return agent
         
     def to_csv(self, filename:str):
+        """
+        wrapper for writing the data into a csv file
+        
+        Args:
+            filename: (str) location where to save as csv
+        Returns:
+            (None) creates a csv file on disk
+        """
         self.dataExtractionAgent.df.to_csv(filename)
     
 
