@@ -4,17 +4,19 @@ import math
 import numpy as np
 import pypsa
 import os.path
-from .BackendBase import BackendBase
-from .IsingPypsaInterface import IsingPypsaInterface
+from .BackendBase import BackendBase                                # import for Docker run
+from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
+#from BackendBase import BackendBase                                # import for local/debug run
+#from IsingPypsaInterface import IsingPypsaInterface                # import for local/debug run
+#from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
-from qiskit.algorithms.optimizers import SPSA, COBYLA, CRS
+from qiskit.algorithms.optimizers import SPSA, COBYLA
 from qiskit.circuit import Parameter
-from scipy.optimize import minimize
 
 
 class QaoaQiskit(BackendBase):
@@ -113,7 +115,7 @@ class QaoaQiskit(BackendBase):
                 with open(f"Problemset/{filename}", "w") as write_file:
                     json.dump(self.results_dict, write_file, indent=2, default=str)
             else:
-                with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+                with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
                     json.dump(self.results_dict, write_file, indent=2, default=str)
 
             last_rep = self.results_dict["iter_count"]
@@ -384,7 +386,7 @@ class QaoaQiskit(BackendBase):
 
         return qc
 
-    def create_qc1(self, components: dict, theta: list) -> QuantumCircuit:
+    def create_qc1(self, components: dict, theta: list, hamiltonianType: str = "scaled") -> QuantumCircuit:
         """
         Creates a quantum circuit based on the components given and the cost function:
 
@@ -392,6 +394,8 @@ class QaoaQiskit(BackendBase):
             components: (dict) All components to be modeled as a Quantum Circuit.
             theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
                           gamma = theta[1].
+            hamiltonianType: (str) The type of the hamiltonian matrix to be used. Options can be "scaled" or "original".
+                                   Default: "scaled"
 
         Returns:
             (QuantumCircuit) The created quantum circuit.
@@ -410,7 +414,7 @@ class QaoaQiskit(BackendBase):
         qc.barrier()
 
         if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
+            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
         elif self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
             qc = self.addHpIter(qc=qc, gamma=gamma, components=components)
 
@@ -463,7 +467,7 @@ class QaoaQiskit(BackendBase):
 
         return qc
 
-    def create_qc3(self, components: dict, theta: list) -> QuantumCircuit:
+    def create_qc3(self, components: dict, theta: list, hamiltonianType: str = "scaled") -> QuantumCircuit:
         # 2 betas & 2 gammas
         """
         Creates a quantum circuit based on the components given and the cost function:
@@ -471,7 +475,9 @@ class QaoaQiskit(BackendBase):
         Args:
             components: (dict) All components to be modeled as a Quantum Circuit.
             theta: (list) The optimizable values of the quantum circuit. Four arguments needed: [beta0, gamma0, beta1,
-            gamma1].
+                          gamma1].
+            hamiltonianType: (str) The type of the hamiltonian matrix to be used. Options can be "scaled" or "original".
+                                   Default: "scaled"
 
         Returns:
             (QuantumCircuit) The created quantum circuit.
@@ -489,10 +495,10 @@ class QaoaQiskit(BackendBase):
             qc.h(i)
         qc.barrier()
 
-        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
         qc = self.addHb(qc=qc, beta=beta0, nqubits=nqubits)
 
-        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"]["scaled"])
+        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
         qc = self.addHb(qc=qc, beta=beta1, nqubits=nqubits)
 
         qc.measure_all()
@@ -561,7 +567,7 @@ class QaoaQiskit(BackendBase):
             with open(f"Problemset/{filename}", "w") as write_file:
                 json.dump(self.results_dict, write_file, indent=2, default=str)
         else:
-            with open(os.path.dirname(__file__) + "/../../results_qaoa/" + filename, "w") as write_file:
+            with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
                 json.dump(self.results_dict, write_file, indent=2, default=str)
 
         return avg / sum_count
@@ -654,16 +660,20 @@ class QaoaQiskit(BackendBase):
         self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
 
         def execute_circ(theta):
+            thetaDraw = [Parameter("\u03B2"), Parameter("\u03B3")]
             if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
                     self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
                 if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
                     qc = self.create_qc1(components=components, theta=theta)
+                    qcDraw = self.create_qc1(components=components, theta=thetaDraw)
                 elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
                     qc = self.create_qc3(components=components, theta=theta)
+                    thetaDraw.extend([Parameter("\u03B2"), Parameter("\u03B3")])
+                    qcDraw = self.create_qc3(components=components, theta=thetaDraw)
             elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
                 qc = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=theta)
-            self.results_dict["qc"] = qc.draw(output="latex_source")
-            # qc.draw(output="latex")
+                qcDraw = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=thetaDraw)
+            self.results_dict["qc"] = qcDraw.draw(output="latex_source")
             if simulate:
                 # Run on chosen simulator
                 results = execute(experiments=qc,
@@ -682,7 +692,6 @@ class QaoaQiskit(BackendBase):
             counts = results.get_counts()
             self.results_dict["iter_count"] += 1
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
-            # self.results_dict[f"rep{self.results_dict['iter_count']}"]["backend"] = backend.configuration().to_dict()
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["theta"] = list(theta)
             self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
 
@@ -693,63 +702,106 @@ class QaoaQiskit(BackendBase):
         return execute_circ
 
 
-def createTestNetwork4Qubit() -> pypsa.Network:
-    testNetwork = pypsa.Network()
-    # add node
-    testNetwork.add("Bus", "bus1")
-    testNetwork.add("Bus", "bus2")
-    # add generators
-    testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=1, p_nom_extendable=False, marginal_cost=5)
-    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=3, p_nom_extendable=False, marginal_cost=5)
-    # line
-    # p0= [-1,-2]
-    # p1= [1, 2]
-    # testNetwork.add("Line","line1",bus0="bus1", bus1="bus2",x=0.0001, s_nom=2, p0=p0, p1=p1)
-    testNetwork.add("Line", "line1", bus0="bus1", bus1="bus2", x=0.0001, s_nom=2)
-    testNetwork.add("Line", "line2", bus0="bus2", bus1="bus1", x=0.0001, s_nom=2)
-    # add load
-    testNetwork.add("Load", "load1", bus="bus1", p_set=2)
-    testNetwork.add("Load", "load2", bus="bus2", p_set=1)
-
-    return testNetwork
-
-
-def createTestNetwork5Qubit() -> pypsa.Network:
-    testNetwork = pypsa.Network()
-    # add node
-    testNetwork.add("Bus", "bus1")
-    testNetwork.add("Bus", "bus2")
-    # add generators
-    testNetwork.add("Generator", "Gen1", bus="bus1", p_nom=2, p_nom_extendable=False, marginal_cost=5)
-    testNetwork.add("Generator", "Gen2", bus="bus2", p_nom=4, p_nom_extendable=False, marginal_cost=5)
-    testNetwork.add("Generator", "Gen3", bus="bus2", p_nom=2, p_nom_extendable=False, marginal_cost=5)
-    # line
-    # p0= [-1,-2]
-    # p1= [1, 2]
-    # testNetwork.add("Line","line1",bus0="bus1", bus1="bus2",x=0.0001, s_nom=2, p0=p0, p1=p1)
-    testNetwork.add("Line", "line1", bus0="bus1", bus1="bus2", x=0.0001, s_nom=2)
-    testNetwork.add("Line", "line2", bus0="bus2", bus1="bus1", x=0.0001, s_nom=2)
-    # add load
-    testNetwork.add("Load", "load1", bus="bus1", p_set=2)
-    testNetwork.add("Load", "load2", bus="bus2", p_set=2)
-
-    return testNetwork
-
-
 def main():
-    testNetwork = createTestNetwork4Qubit()
+    inputNet = "testNetwork4QubitIsing_2_0_20.nc"
+    configFile = "config.yaml"
+    outPREFIX = "infoNoCost"
+    now = datetime.today()
+    outDateTime = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+    outInfo = f"{outPREFIX}_{inputNet}_1_1_{outDateTime}_{configFile}"
+    DEFAULT_ENV_VARIABLES = {
+        "inputNetwork": inputNet,
+        "inputInfo": "",
+        "outputNetwork": "",
+        "outputInfo": outInfo,
+        "outputInfoTime": outDateTime,
+        "optimizationCycles": 1000,
+        "temperatureSchedule": "[0.1,iF,0.0001]",
+        "transverseFieldSchedule": "[10,.1]",
+        "monetaryCostFactor": 0.1,
+        "kirchhoffFactor": 1.0,
+        "slackVarFactor": 70.0,
+        "minUpDownFactor": 0.0,
+        "trotterSlices": 32,
+        "problemFormulation": "binarysplitNoMarginalCost",
+        "dwaveAPIToken": "",
+        "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
+        "annealing_time": 500,
+        "programming_thermalization": 0,
+        "readout_thermalization": 0,
+        "num_reads": 1,
+        "chain_strength": 250,
+        "strategy": "LowestEnergy",
+        "lineRepresentation": 0,
+        "postprocess": "flow",
+        "timeout": "-1",
+        "maxOrder": 0,
+        "sampleCutSize": 200,
+        "threshold": 0.5,
+        "seed": 2
+    }
 
-    with open(os.path.dirname(__file__) + "/../config.yaml") as file:
+    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
+    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet)
+
+    with open(os.path.dirname(__file__) + "/../Configs/" + configFile) as file:
         config = yaml.safe_load(file)
 
-    qaoa = QaoaQiskit(config=config, docker=False)
+    filenameSplit = str(envMgr['outputInfo']).split("_")
+    config["QaoaBackend"]["filenameSplit"] = filenameSplit
+    config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
-    components = qaoa.transformProblemForOptimizer(network=testNetwork)
+    qaoa = QaoaQiskit(config=config, docker=False)
+    components = qaoa.transformProblemForOptimizer(network=netImport)
+
+    """
+    # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
+    # https://blog.xa0.de/post/Solving-QUBOs-with-qiskit-QAOA-example/
+    # https://qiskit.org/documentation/optimization/stubs/qiskit_optimization.QuadraticProgram.html
+    qp = QuadraticProgram()
+    #[qp.binary_var() for _ in range(components["hamiltonian"]["scaled"].shape[0])]
+    [qp.binary_var() for _ in range(4)]
+    qp.minimize(quadratic=components["hamiltonian"]["scaled"])
+
+    quantum_instance = QuantumInstance(Aer.get_backend('aer_simulator'))
+    cobyla = COBYLA(maxiter=100)
+    qaoaQiskit = QAOA(optimizer=cobyla,reps=10,quantum_instance=quantum_instance)
+    #qaoaQiskit = QAOA(quantum_instance=quantum_instance)
+    qiskitOpt = MinimumEigenOptimizer(qaoaQiskit)
+    qaoa_result = qiskitOpt.solve(qp)
+
+    cobyla = COBYLA(maxiter=100)
+    #qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
+    #qaoa_result = qaoaQiskit.find_minimum()
+    #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
+    """
+    """
+    theta = [Parameter("\u03B2"), Parameter("\u03B3")]
+    config["QaoaBackend"]["qcGeneration"] = "IterationMatrix"
+    componentsIterM = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIterM = qaoa.create_qc1(components=componentsIterM, theta=theta)
+    qcIterDrawnM = qcIterM.draw(output="latex_source")
+    config["QaoaBackend"]["qcGeneration"] = "Iteration"
+    componentsIter = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIter = qaoa.create_qc1(components=componentsIter, theta=theta)
+    qcIterDrawn = qcIter.draw(output="latex_source")
+    config["QaoaBackend"]["qcGeneration"] = "Ising"
+    componentsIsing = qaoa.transformProblemForOptimizer(network=netImport)
+    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"]["scaled"], theta=theta)
+    qcIsingDrawn = qcIsing.draw(output="latex_source")
+
+    qcCompare = {"Iteration": qcIterDrawn,
+                 "IterationMatrix": qcIterDrawnM,
+                 "Ising": qcIsingDrawn}
+
+    with open("qcCompare.json", "w") as write_file:
+        json.dump(qcCompare, write_file, indent=2, default=str)
+    """
+
     qaoa.optimize(transformedProblem=components)
 
-    now = datetime.today()
-    filename = f"QaoaCompare_{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}_{now.microsecond}.json"
-    with open(os.path.dirname(__file__) + "/../../results_qaoa/qaoaCompare/" + filename, "w") as write_file:
+    filename = str(envMgr['outputInfo'])
+    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
         json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
 
 

@@ -86,18 +86,22 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
                 "initial_guess": data["config"]["QaoaBackend"]["initial_guess"]}
     data = data["results"]
     bitstrings = getBitstrings(nBits=4)
+    hpReps = int(len(metaData["initial_guess"]) / 2)
 
     plotData = {"cf": [],
-                "beta": [],
-                "gamma": [],
-                "duration": []}
+                "duration": [],
+                "filename": []}
     plotDataFull = {"cf": [],
-                    "beta": [],
-                    "gamma": []}
+                    "filename": []}
     labels = {"cf": "cost function",
-                "beta": "beta",
-                "gamma": "gamma",
-                "duration": "time"}
+              "duration": "time"}
+    for i in range(1, hpReps + 1):
+        plotData[f"beta{i}"] = []
+        plotData[f"gamma{i}"] = []
+        plotDataFull[f"beta{i}"] = []
+        plotDataFull[f"gamma{i}"] = []
+        labels[f"beta{i}"] = f"beta{i}"
+        labels[f"gamma{i}"] = f"gamma{i}"
     for bitstring in bitstrings:
         plotDataFull[f"{bitstring}prop"] = []
         plotDataFull[f"{bitstring}shots"] = []
@@ -110,9 +114,11 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
         tempFilename = data[key]["filename"]
         tempData = openFile(filename=tempFilename, directory="results_qaoa_sweep/")
         plotData["cf"].append(tempData["optimizeResults"]["fun"])
-        plotData["beta"].append(tempData["optimizeResults"]["x"][0])
-        plotData["gamma"].append(tempData["optimizeResults"]["x"][1])
+        for i in range(1, hpReps + 1):
+            plotData[f"beta{i}"].append(tempData["optimizeResults"]["x"][2*(i-1)])
+            plotData[f"gamma{i}"].append(tempData["optimizeResults"]["x"][2*(i-1)+1])
         plotData["duration"].append(tempData["duration"])
+        plotData["filename"].append(tempFilename)
         for bitstring in bitstrings:
             if bitstring in data[key]["counts"]:
                 plotData[f"{bitstring}shots"].append(data[key]["counts"][bitstring])
@@ -123,8 +129,10 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
 
         for i in range(1, tempData["iter_count"] + 1):
             plotDataFull["cf"].append(tempData[f"rep{i}"]["return"])
-            plotDataFull["beta"].append(tempData[f"rep{i}"]["theta"][0])
-            plotDataFull["gamma"].append(tempData[f"rep{i}"]["theta"][1])
+            for j in range(1, hpReps + 1):
+                plotDataFull[f"beta{j}"].append(tempData[f"rep{i}"]["theta"][2 * (j - 1)])
+                plotDataFull[f"gamma{j}"].append(tempData[f"rep{i}"]["theta"][2 * (j - 1) + 1])
+            plotDataFull["filename"].append(tempFilename)
             for bitstring in bitstrings:
                 if bitstring in tempData[f"rep{i}"]["counts"]:
                     plotDataFull[f"{bitstring}shots"].append(tempData[f"rep{i}"]["counts"][bitstring])
@@ -191,41 +199,33 @@ def plotBoxplot(filename: str, plotname: str, savename: str, directory: str = "r
     plt.savefig(f"plots/BP_{savename}.png")
 
 
-def plotBoxplotBest(docker: bool, filename: str, plotname: str, savename: str):
-    if docker:
-        dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = dataAll["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotBoxplotBest(filename: str, plotname: str, savename: str, cut: float = 0.5,
+                    directory: str = "results_qaoa_sweep/"):
+    """
+    Creates a boxplot of the probability of all possible bitstrings for the best cut of repetitions.
+    Args:
+        filename: (str) filename of dateset to be plotted.
+        plotname: (str) title of the plot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        cut: (float) the percentage of best repetitions to be plotted: Default: 0.5
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
 
-    cutoff = {}
-    for key in data:
-        if docker:
-            subdata = openFile(filename=data[key]["filename"], directory="results_qaoa_sweep/")
-        else:
-            subdata = openFile(filename=data[key]["filename"], directory="results_qaoa/")
-        cutoff[key] = subdata["optimizeResults"]["fun"]
+    Returns:
+        Saves the generated plot, with the name "BBP_{plotname}.png" to the subfolder 'plots'
+    """
+    bitstrings, plotData, plotDataFull, labels, metaData = extractPlotData(filename=filename, directory=directory)
 
+    cutoffDictKeys = list(range(1, metaData["repetitions"] + 1))
+    cutoff = dict(zip(cutoffDictKeys, plotData["cf"]))
     cutoff = dict(sorted(cutoff.items(), key=lambda item: item[1]))
 
-    bitstrings = list(data["1"]["counts"].keys())
-    bitstrings.sort()
-    # bitstrings = ["0000", "1000", "0100", "1100", "0010", "1010", "0110", "1110",
-    #              "0001", "1001", "0101", "1101", "0011", "1011", "0111", "1111"]
-    shots = dataAll["config"]["QaoaBackend"]["shots"]
-    backend = dataAll["qaoaBackend"]["backend_name"]
-    initial_guess = dataAll["config"]["QaoaBackend"]["initial_guess"]
     toPlot = [[] for i in range(len(bitstrings))]
 
-    for i in range(int(len(cutoff)*0.5)):#only plot best 50%
+    for i in range(int(len(cutoff)*cut)):#only plot the specified cut
         key = list(cutoff.keys())[i]
         for bitstring in bitstrings:
             bitstring_index = bitstrings.index(bitstring)
-            if bitstring in data[key]["counts"]:
-                appendData = data[key]["counts"][bitstring]
-            else:
-                appendData = 0
-            toPlot[bitstring_index].append(appendData / shots)
+            toPlot[bitstring_index].append(plotData[f"{bitstring}prop"][key-1])
 
     fig, ax = plt.subplots()
     fig.set_figheight(7)
@@ -234,75 +234,62 @@ def plotBoxplotBest(docker: bool, filename: str, plotname: str, savename: str):
 
     ax.set_xlabel('bitstrings')
     ax.set_ylabel('probability')
-    plt.title(f"backend = {backend}, shots = {shots}, rep = {len(data)} \n initial guess = {initial_guess}",
-              fontdict={'fontsize': 8})
+    plt.title(f"backend = {metaData['backend']}, shots = {metaData['shots']}, rep = {metaData['repetitions']} \n "
+              f"initial guess = {metaData['initial_guess']}", fontdict={'fontsize': 8})
     plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
     plt.xticks(range(1, len(bitstrings) + 1), bitstrings, rotation=70)
     plt.setp(bp['whiskers'], color='k', linestyle='-')
     plt.setp(bp['fliers'], markersize=2.0)
-    # plt.show()
-    plt.savefig(f"plots/BPB_{savename}.png")
+    #plt.show()
+    plt.savefig(f"plots/BBP_{savename}.png")
 
 
-def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str):
-    if docker:
-        data = openFile(filename=filename, directory="results_qaoa_sweep/")
-        data = data["results"]
-    else:
-        data = openFile(filename=filename, directory="results_qaoa/qaoaCompare/")
+def plotCFoptimization(filename: str, plotname: str, savename: str, directory: str = "results_qaoa_sweep/"):
+    """
+    Creates two plot showing the evolution of the cost function, and all betas and gammas of two random repetitions.
+    Args:
+        filename: (str) filename of dateset to be plotted.
+        plotname: (str) title of the plot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        Saves the generated plot, with the name "CF_{plotname}.png" to the subfolder 'plots'
+    """
+    bitstrings, plotData, plotDataFull, labels, metaData = extractPlotData(filename=filename, directory=directory)
+
     fig, axs = plt.subplots(2, sharex=True, sharey=True)
     fig.set_figheight(7)
 
-    random_list = list(range(1, len(data)+1))
+    random_list = list(range(1, metaData["repetitions"]))
     random.shuffle(random_list)
 
     for i in range(len(axs)):
-        rep = random_list[i]
-        subfile = data[str(rep)]["filename"]
-        if docker:
-            subdata = openFile(filename=subfile, directory="results_qaoa_sweep/")
-        else:
-            subdata = openFile(filename=subfile, directory="results_qaoa/")
+        rep = int(random_list[i])
+        indexBegin = plotDataFull["filename"].index(plotData["filename"][rep])
+        plotDataFull["filename"].reverse()
+        indexEnd = plotDataFull["filename"].index(plotData["filename"][rep])
+        plotDataFull["filename"].reverse()
+        indexEnd = len(plotDataFull["filename"]) - indexEnd
+        hpReps = int(len(metaData["initial_guess"]) / 2)
 
-        l_theta = len(subdata["rep1"]["theta"])
-
-        yData = [[] for j in range(l_theta+1)]
-        xData = []
+        xData = list(range(0, indexEnd - indexBegin))
         leg = []
-        for j in range(subdata["iter_count"]):
-            if (l_theta % 2) != 0:
-                yData[0].append(subdata[f"rep{j + 1}"]["theta"][0])
-                for k in range(1, l_theta):
-                    yData[k].append(subdata[f"rep{j + 1}"]["theta"][k])
-            elif (l_theta % 2) == 0:
-                for k in range(int(l_theta/2)):
-                    yData[2*k].append(subdata[f"rep{j + 1}"]["theta"][2*k])
-                    yData[2*k+1].append(subdata[f"rep{j + 1}"]["theta"][2*k+1])
-            yData[l_theta].append(subdata[f"rep{j + 1}"]["return"])
-            xData.append(j + 1)
 
-        if (l_theta % 2) != 0:
-            axs[i].plot(xData, yData[0], "b-", label="beta")
-            leg.append("beta")
-            for k in range(1, l_theta):
-                axs[i].plot(xData, yData[k], color=((k / l_theta), 0, 0, 1),
-                            label=f"gamma{k}")
-                leg.append(f"gamma{k}")
-        elif (l_theta % 2) == 0:
-            for k in range(int(l_theta / 2)):
-                axs[i].plot(xData, yData[2*k],  color=(0, 0, (1 - (k / l_theta)), 1),
-                            label=f"beta{k}")
-                leg.append(f"beta{k}")
-                axs[i].plot(xData, yData[2*k+1], color=((1 - (k / l_theta)), 0, 0, 1),
-                            label=f"gamma{k}")
-                leg.append(f"gamma{k}")
-        axs[i].plot(xData, yData[l_theta], "g-", label="cost function")
-        leg.append("cost function")
+        for j in range(1, hpReps + 1):
+            axs[i].plot(xData, plotDataFull[f"beta{j}"][indexBegin:indexEnd], color=(0, 0, (1 - ((j - 1) / hpReps)), 1),
+                        label=labels[f"beta{j}"])
+            leg.append(labels[f"beta{j}"])
+            axs[i].plot(xData, plotDataFull[f"gamma{j}"][indexBegin:indexEnd], color=((1 - ((j - 1) / hpReps)), 0, 0, 1),
+                        label=labels[f"gamma{j}"])
+            leg.append(labels[f"gamma{j}"])
+        axs[i].plot(xData, plotDataFull["cf"][indexBegin:indexEnd], "g-", label=labels["cf"])
+        leg.append(labels["cf"])
         axs[i].set_xlabel('iteration')
         axs[i].set_ylabel('value')
         axs[i].label_outer()
-        axs[i].text(0.53, 0.02, f"data: {subfile}", transform=axs[i].transAxes, fontdict={'fontsize': 8})
+        axs[i].text(0.22, 0.02, f"data: {plotData['filename'][rep]}", transform=axs[i].transAxes, fontdict={'fontsize': 6})
         axs[i].set_title(f"rep {rep}", fontdict={'fontsize': 8})
 
     fig.suptitle(plotname)
@@ -312,8 +299,27 @@ def plotCFoptimization(docker: bool, filename: str, plotname:str, savename: str)
     plt.savefig(f"plots/CF_{savename}.png")
 
 
-def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
-    dataAll = openFile(filename=filename, directory="results_qaoa_sweep/")
+def plotBPandCF(filename: str, extraPlotInfo:str, savename: str, cut: float = 0.5,
+                directory: str = "results_qaoa_sweep/"):
+    """
+    Generated three plots.
+        1. A boxplot of the probability of all possible bitstrings;
+        2. A boxplot of the probability of all possible bitstrings for the best cut of repetitions;
+        3. A plot showing the evolution of the cost function, and all betas and gammas of two random repetitions.
+    Args:
+        filename: (str) filename of dateset to be plotted.
+        extraPlotInfo: (str) extra information used to generate the title of the plot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        cut: (float) the percentage of best repetitions to be plotted: Default: 0.5
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        Saves the generated plot to the subfolder 'plots' with the following names:
+            1. BP_{plotname}.png
+            2. BBP_{plotname}.png
+            3. CF_{plotname}.png
+    """
+    dataAll = openFile(filename=filename, directory=directory)
 
     if dataAll["config"]["QaoaBackend"]["simulate"]:
         if dataAll["config"]["QaoaBackend"]["noise"]:
@@ -329,7 +335,7 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str):
     plotnameCF = f"{optimizer} CF evolution {noise} - maxiter {maxiter} \n {extraPlotInfo}"
 
     plotBoxplot(docker=True, filename=filename, plotname=plotnameBP, savename=savename)
-    plotBoxplotBest(docker=True, filename=filename, plotname=plotnameBPB, savename=savename)
+    plotBoxplotBest(docker=True, filename=filename, plotname=plotnameBPB, savename=savename, cut=cut)
     if len(dataAll["results"]) > 1:
         plotCFoptimization(docker=True, filename=filename, plotname=plotnameCF, savename=savename)
 
@@ -460,8 +466,8 @@ def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, 
         y: (str) feature to be plotted on y-axis.
         Features to choose from for the x- and y-axis:
             - "cf" (cost function);
-            - "beta";
-            - "gamma";
+            - "beta{i}", where i is the number of beta, e.g. beta1, beta2, ...;
+            - "gamma{i}", where i is the number of gamma, e.g. beta1, beta2, ...;
             - "{bitstring}prop" (probability of the chosen bistring);
             - "{bitstring}shots" (number of shots of the chosen bitstring);
             - "duration" (only available if mode is set to "opt").
@@ -517,45 +523,49 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
-    plotScatter(file1="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_65.yaml",
-                file2="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-22_17-57-05_config_71.yaml",
-                title="cost function vs ideal solution probability of COBYLA and SPSA100 with noise",
-                g1title="COBYLA", g2title="SPSA100",
-                savename="COBYLA-SPSA100_yesNoise_CFvsTIME",
-                mode="opt", x="cf", y="duration")
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                       plotname="test", savename="test")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
-    labels = ["unscaled", "scaled"]
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
+    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
     title = "Network 0 evaluation"
-    colors = [blueMedium, orangeMedium]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
-    labels = ["unscaled", "scaled"]
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
+    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
     title = "Network 1 evaluation"
-    colors = [blueMedium, orangeMedium]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-02-25_10-14-41_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
-    labels = ["unscaled", "scaled"]
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
+    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
     title = "Network 2 evaluation"
-    colors = [blueMedium, orangeMedium]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-02-25_11-06-22_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_07-19-44_config.yaml"]
-    labels = ["unscaled", "scaled"]
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
+    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
     title = "Network 3 evaluation"
-    colors = [blueMedium, orangeMedium]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
                             kirchLabels=0)
