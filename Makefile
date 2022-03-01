@@ -325,6 +325,9 @@ docker.tmp: Dockerfile DockerInput/run.py DockerInput/requirements.txt
 plots: venv/bin/activate
 	mkdir -p plots && source venv/bin/activate && python plot_results.py
 
+plt: venv/bin/activate
+	mkdir -p plots && source venv/bin/activate && python makePlots.py
+
 venv/bin/activate:
 	python3 -m venv venv && pip install -r requirements.txt && pip install 
 
