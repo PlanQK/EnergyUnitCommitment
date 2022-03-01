@@ -103,6 +103,7 @@ class ClassicalBackend(BackendBase):
         print(f"Total Kirchhoff cost: {self.metaInfo['kirchhoffCost']}")
         print(f"Total power imbalance: {self.metaInfo['powerImbalance']}")
         print(f"Marginal Cost at each bus: {transformedProblem.individualMarginalCost(solution['state'])}")
+        print(f"Total Power generated: {transformedProblem.calcTotalPowerGenerated(solution['state'])}")
         print(f"Total marginal cost: {self.metaInfo['marginalCost']}")
         print(
             f"Total cost (with constant terms): {self.metaInfo['totalCost']}\n" 
