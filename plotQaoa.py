@@ -1,4 +1,5 @@
 import itertools
+import operator
 
 import matplotlib.pyplot as plt
 import numpy
@@ -18,7 +19,7 @@ def openFile(filename: str, directory: str) -> dict:
     Opens the given json file and returns its content as a dictionary.
     Args:
         filename: (str) The name of the file to be opened.
-        directory: (str) The folder in which the file is located.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
 
     Returns:
         data (dict) The content of the file with the given filename from the given directory.
@@ -96,11 +97,17 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
     labels = {"cf": "cost function",
               "duration": "time"}
     for i in range(1, hpReps + 1):
+        plotData[f"init_beta{i}"] = []
         plotData[f"beta{i}"] = []
+        plotData[f"init_gamma{i}"] = []
         plotData[f"gamma{i}"] = []
+        plotDataFull[f"init_beta{i}"] = []
         plotDataFull[f"beta{i}"] = []
+        plotDataFull[f"init_gamma{i}"] = []
         plotDataFull[f"gamma{i}"] = []
+        labels[f"init_beta{i}"] = f"initial beta{i}"
         labels[f"beta{i}"] = f"beta{i}"
+        labels[f"init_gamma{i}"] = f"initial gamma{i}"
         labels[f"gamma{i}"] = f"gamma{i}"
     for bitstring in bitstrings:
         plotDataFull[f"{bitstring}prop"] = []
@@ -115,6 +122,8 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
         tempData = openFile(filename=tempFilename, directory="results_qaoa_sweep/")
         plotData["cf"].append(tempData["optimizeResults"]["fun"])
         for i in range(1, hpReps + 1):
+            plotData[f"init_beta{i}"].append(tempData["initial_guess"][2 * (i - 1)])
+            plotData[f"init_gamma{i}"].append(tempData["initial_guess"][2 * (i - 1) + 1])
             plotData[f"beta{i}"].append(tempData["optimizeResults"]["x"][2*(i-1)])
             plotData[f"gamma{i}"].append(tempData["optimizeResults"]["x"][2*(i-1)+1])
         plotData["duration"].append(tempData["duration"])
@@ -130,6 +139,8 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
         for i in range(1, tempData["iter_count"] + 1):
             plotDataFull["cf"].append(tempData[f"rep{i}"]["return"])
             for j in range(1, hpReps + 1):
+                plotDataFull[f"init_beta{j}"].append(tempData["initial_guess"][2 * (j - 1)])
+                plotDataFull[f"init_gamma{j}"].append(tempData["initial_guess"][2 * (j - 1) + 1])
                 plotDataFull[f"beta{j}"].append(tempData[f"rep{i}"]["theta"][2 * (j - 1)])
                 plotDataFull[f"gamma{j}"].append(tempData[f"rep{i}"]["theta"][2 * (j - 1) + 1])
             plotDataFull["filename"].append(tempFilename)
@@ -447,7 +458,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
     plt.ylabel('probability')
     fig.set_figheight(7)
     fig.set_figwidth(15)
-    plt.show()
+    #plt.show()
     plt.savefig(f"plots/BPcomp_{savename}_cut{cut}.png")
 
 
@@ -469,8 +480,10 @@ def plotScatter(file1: str, file2: str, title: str, g1title: str, g2title: str, 
         directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
         Features to choose from for the x- and y-axis:
             - "cf" (cost function);
+            - "init_beta{i}", where i is the number of beta, e.g. beta1, beta2, ...;
             - "beta{i}", where i is the number of beta, e.g. beta1, beta2, ...;
-            - "gamma{i}", where i is the number of gamma, e.g. beta1, beta2, ...;
+            - "init_gamma{i}", where i is the number of gamma, e.g. gamma1, gamma2, ...;
+            - "gamma{i}", where i is the number of gamma, e.g. gamma1, gamma2, ...;
             - "{bitstring}prop" (probability of the chosen bistring);
             - "{bitstring}shots" (number of shots of the chosen bitstring);
             - "duration" (only available if mode is set to "opt").
@@ -518,6 +531,22 @@ def plotEigenvalues(filename: str, plotname:str, savename: str):
     #plt.show()
     plt.savefig(f"plots/Hist_{savename}.png")
 
+
+def meanOfInitGuess(filename: str):
+    bitstrings, plotData, plotDataFull, labels, metaData = extractPlotData(filename=filename)
+    betaMean = mean(plotData["init_beta1"])
+    betaMedian = median(plotData["init_beta1"])
+    gammaMean = mean(plotData["init_gamma1"])
+    gammaMedian = median(plotData["init_gamma1"])
+    minCFindex, minCF = min(enumerate(plotData["cf"]), key=operator.itemgetter(1))
+
+
+    print(filename)
+    print(f"minCF = {minCF}, at index {minCFindex} with beta = {plotData['beta1'][minCFindex]} and gamma = {plotData['gamma1'][minCFindex]}")
+    print(f"Beta: mean = {betaMean}, median = {betaMedian}")
+    print(f"Gamma: mean = {gammaMean}, median = {gammaMedian}")
+
+
 def main():
     blueDark = "#003C50"
     blueMedium = "#005C7B"
@@ -526,17 +555,192 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
-    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-02-25_10-50-04_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_11-57-09_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_10-14-01_config.yaml"]
-    labels = ["IterMatrix - unscaled", "IterMatrix - scaled", "IterMatrix - 2Hp", "Ising - scaled"]
-    title = "Network 0 evaluation"
-    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
-    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_scaled-unscaled_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
-                            kirchLabels=None)
+    meanOfInitGuess(filename="infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_11-51-19_config.yaml")
 
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_13-34-27_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+    title = "Network 0 evaluation"
+    colors = [blueLight, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_13-52-15_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+    title = "Network 1 evaluation"
+    colors = [blueLight, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_15-40-13_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+    title = "Network 2 evaluation"
+    colors = [blueLight, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_15-58-23_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+    title = "Network 3 evaluation"
+    colors = [blueLight, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_11-45-08_config.yaml",
+                extraPlotInfo="number initial_guess after random initial_guess",
+                savename="4qubit_COBYLA-numberINITafterRandomINIT_testNetwork4QubitIsing_2_0_20")
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_11-42-30_config.yaml",
+                extraPlotInfo="random initial_guess",
+                savename="4qubit_COBYLA-randomINIT_testNetwork4QubitIsing_2_0_20")
+
+    return
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-32-15_config.yaml",
+                       plotname="COBYLA init = 5,5",
+                       savename="4qubit_COBYLA-init5-5_testNetwork4QubitIsing_2_0_20")
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-32-15_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml"]
+    labels = ["COBYLA init = 1,1", "COBYLA init = 5,5", "COBYLA init = 10,10"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-init-test2_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
+                       plotname="COBYLA init = 1,1",
+                       savename="4qubit_COBYLA-init1-1_testNetwork4QubitIsing_2_0_20")
+    return
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-16-36_config.yaml",
+                       plotname="COBYLA tol = 0.01",
+                       savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_3_20")
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-18-44_config.yaml",
+                       plotname="COBYLA tol = None",
+                       savename="4qubit_COBYLA-tol-None_testNetwork4QubitIsing_2_3_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-12-21_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-16-36_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-18-44_config.yaml"]
+    labels = ["COBYLA tol = 0.0001", "COBYLA tol = 0.01", "COBYLA tol = None"]
+    title = "Network 3 - classical optimizer feature try out"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-tolTests_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-14-49_config.yaml",
+                       plotname="COBYLA init = 10,10",
+                       savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_3_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-12-21_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-14-49_config.yaml"]
+    labels = ["COBYLA init = 1,1", "COBYLA init = 10,10"]
+    title = "Network 3 - classical optimizer feature try out"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-int10-10_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-12-21_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-10-29_config.yaml"]
+    labels = ["COBYLA optimize", "COBYLA minimize"]
+    title = "Network 3 - classical optimizer feature try out"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-optVSmin_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
+                       plotname="COBYLA minimize",
+                       savename="4qubit_COBYLA-minimize_testNetwork4QubitIsing_2_0_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml"]
+    labels = ["COBYLA optimize", "COBYLA minimize"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-optVSmin_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+    plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-54-11_config.yaml",
+                extraPlotInfo="COBYLA constraints test",
+                savename="4qubit_COBYLA-constraints_testNetwork4QubitIsing_2_0_20")
+    return
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-21-06_config.yaml",
+                       plotname="COBYLA init = 10,10; rhobeg = 5",
+                       savename="4qubit_COBYLA-init10-10_rhobeg5_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-18-58_config.yaml",
+                       plotname="COBYLA init = 1,1; rhobeg = 5",
+                       savename="4qubit_COBYLA-init1-1_rhobeg5_testNetwork4QubitIsing_2_0_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-18-58_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-21-06_config.yaml"]
+    labels = ["COBYLA init = 1,1", "COBYLA init = 1,1; rhobeg = 5", "COBYLA init = 10,10; rhobeg = 5"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, blueMedium, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-rhobeg-test_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml",
+                       plotname="COBYLA init = 10,10",
+                       savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_0_20")
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml"]
+    labels = ["COBYLA init = 1,1", "COBYLA init = 10,10"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-init-test_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-04-26_config.yaml"]
+    labels = ["COBYLA tol = 0.0001", "COBYLA tol = 0.01"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, blueDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_COBYLA-tol-test_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                       plotname="COBYLA tol = 0.0001",
+                       savename="4qubit_COBYLA-tol0.0001_testNetwork4QubitIsing_2_0_20")
+
+    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-04-26_config.yaml",
+                       plotname="COBYLA tol = 0.01",
+                       savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_0_20")
+    return
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_16-48-59_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_16-31-10_config.yaml"]
+    labels = ["COBYLA", "SPSA blocking = False", "SPSA blocking = True"]
+    title = "classical optimizer feature try out"
+    colors = [blueLight, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_SPSA-new-features_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+    return
     plotBPandCF(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_16-31-10_config.yaml",
                 extraPlotInfo="SPSA blocking = True",
                 savename="4qubit_SPSA-blocking-True_testNetwork4QubitIsing_2_0_20")

@@ -6,18 +6,41 @@ APItoken: # your token here
     dWave_API_token: ""
 
 QaoaBackend:
-    shots: 4096 # max 20,000
-    simulate: True # if True: use simulator; if False: use real IBMQ QPU (IBMQ API token required)
-    noise: False # if True: use simulator with noise model (IBMQ API token required); if False: use simulator without noise model
-    simulator: "aer_simulator" # qasm_simulator, aer_simulator, statevector_simulator, aer_simulator_statevector
-    initial_guess: [ 1.0, 1.0, 1.0, 1.0 ] # [ 1.0, 1.0, 1.0 ] -> [beta, gamma1, gamma2]; [ 1.0, 1.0, 1.0, 1.0 ] -> [beta0, gamma0, beta1, gamma1]; [ 1.0, 1.0 ] -> [beta, gamma]
-    max_iter: 100 # maximum iterations of classical optimizer
-    repetitions: 1 # number of experiment repetitons
-    classical_optimizer: "COBYLA" # SPSA, COBYLA
-    qcGeneration: "IterationMatrix" # Ising, Iteration, IterationMatrix
+    shots: 20000
+        # (int) the number of shots
+        # max 20,000
+    simulate: True
+        # (boolean) use a simulator or a QPU
+        # if True: use simulator;
+        # if False: use real IBMQ QPU (IBMQ API token required)
+    noise: True
+        # (boolean) simulate with or without noise (only used, when simulate is True)
+        # if True: use simulator with noise model (IBMQ API token required);
+        # if False: use simulator without noise model
+    simulator: "aer_simulator"
+        # (string) the qiskit simulator to be used (only used, when simulate is True)
+        # choose between "qasm_simulator", "aer_simulator", "statevector_simulator" and "aer_simulator_statevector"
+    initial_guess: [ 2.93275, 1.58887 ]
+        # (list of float or "rand") the initial guess for the classical optimizer
+        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
+        # use "rand" if a random initial guess should be used for this parameter. For beta between 0 and 2Pi and for
+        # gamma between 0 and Pi
+    max_iter: 100
+        # (int) maximum number iterations of the classical optimizer
+    repetitions: 100
+        # (int) number of experiment repetitions
+    classical_optimizer: "COBYLA"
+        # (string) the classical optimizer to be used
+        # choose between "SPSA" and "COBYLA"
+    qcGeneration: "IterationMatrix"
+        # (string) the method for the generation of the quantum circuit
+        # choose between "Ising", "Iteration" and "IterationMatrix"
 
 IsingInterface:
     problemFormulation: "binarysplitNoMarginalCost"
+        # (string) the method used to generate the Ising problem
+        # choose between "binarysplitNoMarginalCost", "fullsplitGlobalCostSquare", "fullsplitMarginalAsPenalty",
+        # "fullsplitNoMarginalCost", "fullsplitLocalMarginalEstimationDistance" and "fullsplitDirectInefficiencyPenalty"
 
 SQABackend:
     shots: 10

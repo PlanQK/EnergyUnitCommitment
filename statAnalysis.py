@@ -10,6 +10,15 @@ import matplotlib.pyplot as plt
 
 
 def openFile(filename: str, directory: str = "results_qaoa_sweep/") -> dict:
+    """
+    Opens the given json file and returns its content as a dictionary.
+    Args:
+        filename: (str) The name of the file to be opened.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        data (dict) The content of the file with the given filename from the given directory.
+    """
     with open(f"{directory}{filename}") as json_file:
         data = json.load(json_file)
 
@@ -17,6 +26,15 @@ def openFile(filename: str, directory: str = "results_qaoa_sweep/") -> dict:
 
 
 def extractSortedCF(filename: str, directory: str = "results_qaoa_sweep/") -> dict:
+    """
+    Extracts the cost function values from the given file and returns them in a sorted dictionary.
+    Args:
+        filename: (str) The name of the file to be opened.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        cfValues (dict) The sorted cost function values.
+    """
     cfValues = {}
     data = openFile(filename=filename, directory=directory)
     data = data["results"]
@@ -30,19 +48,15 @@ def extractSortedCF(filename: str, directory: str = "results_qaoa_sweep/") -> di
     return cfValues
 
 
-def extractCFvalue(filename: str, directory: str = "results_qaoa_sweep/") -> list:
-    cfValues = []
-    data = openFile(filename=filename, directory=directory)
-    data = data["results"]
-    for key in data:
-        filenameTemp = data[key]["filename"]
-        dataTemp = openFile(filename=filenameTemp, directory=directory)
-        cfValues.append(dataTemp["optimizeResults"]["fun"])
-
-    return cfValues
-
-
 def intTupleToString(a: tuple):
+    """
+    Changes a tuple into a string.
+    Args:
+        a: (tuple) The tuple to be changed
+
+    Returns:
+        string: (str) The string representation of the tuple data.
+    """
     string = ""
     for i in range(len(a)):
         string += str(a[i])
@@ -51,6 +65,14 @@ def intTupleToString(a: tuple):
 
 
 def getBitstrings(nBits: int):
+    """
+    Returns a list with all possible bitstrings for the given number of bits.
+    Args:
+        nBits: (int) Number of bits.
+
+    Returns:
+        bitstrings: (list) A list with all possible bitstrings for the given number of bits.
+    """
     bitstrings = []
     tupleBits = list(itertools.product([0,1], repeat=nBits))
     for i in range(len(tupleBits)):
@@ -60,6 +82,15 @@ def getBitstrings(nBits: int):
 
 
 def extractP(filename: str, directory: str = "results_qaoa_sweep/") -> dict:
+    """
+    Extracts the probability values for all bitstrings from the given file and returns them in a dictionary.
+    Args:
+        filename: (str) The name of the file to be opened.
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        pValues (dict) The probability values.
+    """
     pValues = {}
     data = openFile(filename=filename, directory=directory)
     data = data["results"]
@@ -76,6 +107,17 @@ def extractP(filename: str, directory: str = "results_qaoa_sweep/") -> dict:
 
 
 def extractSortedP(filename: str, cut: float, directory: str = "results_qaoa_sweep/") -> dict:
+    """
+        Extracts the probability values for all bitstrings from the given file and returns the best {cut} in a sorted
+        dictionary.
+        Args:
+            filename: (str) The name of the file to be opened.
+            cut: (float) the percentage of best repetitions to be plotted: Default: 0.5
+            directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+        Returns:
+            pValues (dict) The probability values.
+        """
     pValues = extractP(filename=filename, directory=directory)
     cfValues = extractSortedCF(filename=filename, directory=directory)
     cfValues = dict(sorted(cfValues.items(), key=lambda item: item[1]))
@@ -91,6 +133,16 @@ def extractSortedP(filename: str, cut: float, directory: str = "results_qaoa_swe
     return pValues
 
 def compareBitStringToRest(bitstring: str, pValues: dict) -> dict:
+    """
+    Determines if the probabilities of the given bitstring and all other bitstrings within pValues are equal using a
+    one-sided Mann Whitney U Test. The results are stored in a dictionary and returned.
+    Args:
+        bitstring: (str) the bitstring to which all other bitstrings should be compared
+        pValues: (dict) dictionary of the p-values of all bitstrings
+
+    Returns:
+        results (dict) dictionary containing the results of the Mann Whitney U Tests.
+    """
     pValues = pValues
     pValueKeys = list(pValues.keys())
     pValueKeys.remove(bitstring)
@@ -108,6 +160,17 @@ def compareBitStringToRest(bitstring: str, pValues: dict) -> dict:
 
 
 def distributionWithinSample(alpha: float, pValues: dict) -> dict:
+    """
+    Determines if the distribution within a sample is clear enough to determine an ideal bitstring. The bitstring with
+    the highest median probability is determined and then compared to the probabilities of all other bitsttrings using
+    a one-sided Mann Whitney U Test. The results are stored in a dictionary and returned.
+    Args:
+        alpha: (float) confidence of test.
+        pValues: (dict) dictionary of the p-values of all bitstrings
+
+    Returns:
+        results (dict) dictionary containing all statistical data to determine if an ideal bitstring can be found.
+    """
     bestKey = list(pValues.keys())[0]
     bestMedian = median(pValues[bestKey])
 
@@ -146,17 +209,18 @@ def equalSamples(alpha: float, file1: str, file2: str, outfile: str, cut: float 
     Bitstring. Checks as well if best bitstring can be found with certainty performing one-sided Mann Whitney U Tests
     between the best bitstring sample data and the sample data for each other non-ideal bitstring.
     Args:
-        alpha: confidence of test
-        file1: filename of results data 1
-        file2: filename of results data 2
-        outfile: filename of the output file, to be saved to the Folder "statistics"
-        alternative: alternative to be used for Mann Whitney U Test.
+        alpha: (float) confidence of test
+        file1: (str) filename of results data 1
+        file2: (str) filename of results data 2
+        outfile: (str) filename of the output file, to be saved to the Folder "statistics"
+        alternative: (str) alternative to be used for Mann Whitney U Test.
                      "two-sided" -> H1: distributions are not equal;
                      "less" -> H1: distribution of file 1 is stochastically less than distribution of file 2
                      "greater" -> H1: distribution of file 1 is stochastically greater than distribution of file 2
 
     Returns:
-
+        Saves the generated statistics, with the names "{timeStamp}__{outfile}_all.json" and
+        "{timeStamp}__{outfile}_cut.json" in the subfolder 'statistics'
     """
     pValues1all = extractSortedP(filename=file1, cut=1.0)
     distSample1all = distributionWithinSample(alpha=alpha, pValues=pValues1all)

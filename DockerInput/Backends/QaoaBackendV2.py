@@ -1,9 +1,13 @@
+import copy
 import json, yaml
 import math
 
 import numpy as np
 import pypsa
 import os.path
+
+from numpy import random
+
 from .BackendBase import BackendBase                                # import for Docker run
 from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
 #from BackendBase import BackendBase                                # import for local/debug run
@@ -61,18 +65,33 @@ class QaoaQiskit(BackendBase):
         simulator = self.config["QaoaBackend"]["simulator"]
         simulate = self.config["QaoaBackend"]["simulate"]
         noise = self.config["QaoaBackend"]["noise"]
-        initial_guess = np.array(self.config["QaoaBackend"]["initial_guess"])
+        initial_guess_original = self.config["QaoaBackend"]["initial_guess"]
+        num_vars = len(initial_guess_original)
         max_iter = self.config["QaoaBackend"]["max_iter"]
         repetitions = self.config["QaoaBackend"]["repetitions"]
 
-        num_vars = len(initial_guess)
+
 
         for i in range(1, repetitions + 1):
             time_start = datetime.timestamp(datetime.now())
             print(f"----------------------------- Iteration {i} ----------------------------------------")
 
+            initial_guess = []
+            for j in range(num_vars):
+                # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
+                if initial_guess_original[j] == "rand":
+                    if j % 2 == 0:
+                        initial_guess.append(random.rand() * 2 * math.pi)
+                    else:
+                        initial_guess.append(random.rand() * math.pi)
+                else:
+                    initial_guess.append(self.config["QaoaBackend"]["initial_guess"][j])
+            initial_guess = np.array(initial_guess)
+
             self.resetResultDict()
+            self.results_dict["initial_guess"] = initial_guess.tolist()
             self.results_dict["components"] = self.components
+
 
             filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
                              str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
@@ -92,6 +111,7 @@ class QaoaQiskit(BackendBase):
                                                shots=shots,
                                                simulate=simulate,
                                                noise=noise)
+
             if self.config["QaoaBackend"]["classical_optimizer"] == "SPSA":
                 optimizer = SPSA(maxiter=max_iter, blocking=False)
             elif self.config["QaoaBackend"]["classical_optimizer"] == "COBYLA":
@@ -104,7 +124,10 @@ class QaoaQiskit(BackendBase):
             self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
             self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
 
-            self.results_dict["initial_guess"] = initial_guess
+            #res = optimizer.minimize(fun=expectation, x0=initial_guess)
+            #self.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
+            #self.results_dict["optimizeResults"]["fun"] = float(res.fun)  # objective function value
+            #self.results_dict["optimizeResults"]["nfev"] = int(res.nfev)  # number of objective function calls
 
             time_end = datetime.timestamp(datetime.now())
             duration = time_end - time_start
@@ -122,6 +145,7 @@ class QaoaQiskit(BackendBase):
             last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
             self.metaInfo["results"][i] = {"filename": filename,
                                            "backend_name": self.results_dict["backend_name"],
+                                           "initial_guess": self.results_dict["initial_guess"],
                                            "optimize_Iterations": self.results_dict["iter_count"],
                                            "optimizeResults": self.results_dict["optimizeResults"],
                                            "duration": duration,
