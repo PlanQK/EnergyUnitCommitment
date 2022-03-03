@@ -248,7 +248,7 @@ class PlottingAgent:
         yValues_df = df[df["yField"].notna()]
         naValues_df = df[df["xField"].isna()]
         return yValues_df.groupby("xField").agg(aggregationMethods)["yField"] , \
-                np.mean(naValues_df["yField"])
+                naValues_df["yField"]
 
     def makeFigure(self,
             plotname: str,
@@ -292,6 +292,9 @@ class PlottingAgent:
                         aggregateMethod = 'mean'
                     if errorMethod is None:
                         errorMethod = deviationOfTheMean
+
+
+
                     yValues, naValues = self.aggregateData(
                                 xCoordinateList,
                                 yCoordinateList,
@@ -303,7 +306,7 @@ class PlottingAgent:
                             yerr=yValues.iloc[:,1],
                             **kwargs)
 
-                    ax.axhline(naValues)
+                    ax.axhline(np.mean(naValues))
 
 #                    print(yFieldValues[1][yFieldValues[0].isna()])
 #                    ax.hline()
@@ -425,7 +428,6 @@ class DataExtractionAgent:
         agent = DataExtractionAgent()
         agent.df = pd.read_csv(filename)
         agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
-        print(agent.df.columns)
         return agent
 
     @classmethod
@@ -460,17 +462,6 @@ class DataExtractionAgent:
                         **value 
                     }
                     for key, value in dictValue.items()
-            ]
-        if dictKey == "sqaBackend":
-            eigenValues = sorted(dictValue["eigenValues"])
-            del dictValue["eigenValues"]
-            result = [
-                    {
-                        "order_ev": idx,
-                        "eigenValue": eigenValue,
-                        **dictValue
-                    }
-                    for idx, eigenValue in enumerate(eigenValues) 
             ]
         return result
 
