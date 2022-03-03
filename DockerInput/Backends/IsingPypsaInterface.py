@@ -1164,7 +1164,7 @@ class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
         for firstComponent in flattenedComponenents:
             self.coupleComponentWithConstant(
                     firstComponent,
-                    - 2.0 * self.calculateCost(gen1, components, offset, estimatedCost, load, bus) * \
+                    - 2.0 * self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
                             estimatedCost *  \
                             self.monetaryCostFactor 
                     )
