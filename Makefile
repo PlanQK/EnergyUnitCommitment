@@ -14,8 +14,8 @@ PREFIX := infoNocost
 
 
 # config file
-CONFIGFILES = "config.yaml"
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[5-7][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+#CONFIGFILES = "config.yaml"
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[8][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -56,7 +56,7 @@ TIMEOUT = 30
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1][5]_1[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_[2-3]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
@@ -252,7 +252,7 @@ results_qaoa_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $
 	--env timeout=$(strip $(2)) \
 	energy:1.0 qaoa $(strip $(5))
 	mkdir -p results_qaoa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5)) results_qaoa_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4))_$(strip $(5))* results_qaoa_sweep/
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/Qaoa_$(strip $(1))_$(strip $(4))_$(strip $(5))* results_qaoa_sweep/
 
 endef

@@ -65,95 +65,139 @@ class QaoaQiskit(BackendBase):
         simulator = self.config["QaoaBackend"]["simulator"]
         simulate = self.config["QaoaBackend"]["simulate"]
         noise = self.config["QaoaBackend"]["noise"]
-        initial_guess_original = self.config["QaoaBackend"]["initial_guess"]
+        initial_guess_original = copy.deepcopy(self.config["QaoaBackend"]["initial_guess"])
         num_vars = len(initial_guess_original)
         max_iter = self.config["QaoaBackend"]["max_iter"]
         repetitions = self.config["QaoaBackend"]["repetitions"]
+        repetitions_start = 1
 
+        if "rand" in initial_guess_original:
+            randRep = 2
+        else:
+            randRep = 1
 
+        for rand in range(randRep):
+            for i in range(1, repetitions + 1):
+                time_start = datetime.timestamp(datetime.now())
+                print(f"----------------------- Iteration {rand * repetitions + i} ----------------------------------")
 
-        for i in range(1, repetitions + 1):
-            time_start = datetime.timestamp(datetime.now())
-            print(f"----------------------------- Iteration {i} ----------------------------------------")
-
-            initial_guess = []
-            for j in range(num_vars):
-                # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
-                if initial_guess_original[j] == "rand":
-                    if j % 2 == 0:
-                        initial_guess.append(random.rand() * 2 * math.pi)
+                initial_guess = []
+                for j in range(num_vars):
+                    # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
+                    if initial_guess_original[j] == "rand":
+                        if j % 2 == 0:
+                            initial_guess.append(random.rand() * 2 * math.pi)
+                        else:
+                            initial_guess.append(random.rand() * math.pi)
                     else:
-                        initial_guess.append(random.rand() * math.pi)
+                        initial_guess.append(initial_guess_original[j])
+                initial_guess = np.array(initial_guess)
+
+                self.resetResultDict()
+                self.results_dict["initial_guess"] = initial_guess.tolist()
+                self.results_dict["components"] = self.components
+
+
+                filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
+                                 str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
+                                 str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
+                                 str(self.config["QaoaBackend"]["filenameSplit"][4])
+                filename_date = self.config["QaoaBackend"]["filenameSplit"][7]
+                filename_time = self.config["QaoaBackend"]["filenameSplit"][8]
+                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+                if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
+                    filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
+
+                filename = f"Qaoa_{filename_input}_{filename_date}_{filename_time}_{filename_config}__" \
+                           f"{rand * repetitions + i}.json"
+
+                expectation = self.get_expectation(filename=filename,
+                                                   components=transformedProblem,
+                                                   simulator=simulator,
+                                                   shots=shots,
+                                                   simulate=simulate,
+                                                   noise=noise)
+
+                if self.config["QaoaBackend"]["classical_optimizer"] == "SPSA":
+                    optimizer = SPSA(maxiter=max_iter, blocking=False)
+                elif self.config["QaoaBackend"]["classical_optimizer"] == "COBYLA":
+                    optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
                 else:
-                    initial_guess.append(self.config["QaoaBackend"]["initial_guess"][j])
-            initial_guess = np.array(initial_guess)
+                    optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
 
-            self.resetResultDict()
-            self.results_dict["initial_guess"] = initial_guess.tolist()
-            self.results_dict["components"] = self.components
+                res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
+                self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
+                self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
+                self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
 
+                #res = optimizer.minimize(fun=expectation, x0=initial_guess)
+                #self.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
+                #self.results_dict["optimizeResults"]["fun"] = float(res.fun)  # objective function value
+                #self.results_dict["optimizeResults"]["nfev"] = int(res.nfev)  # number of objective function calls
 
-            filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
-                             str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
-                             str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
-                             str(self.config["QaoaBackend"]["filenameSplit"][4])
-            filename_date = self.config["QaoaBackend"]["filenameSplit"][7]
-            filename_time = self.config["QaoaBackend"]["filenameSplit"][8]
-            filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
-            if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
-                filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
+                time_end = datetime.timestamp(datetime.now())
+                duration = time_end - time_start
+                self.results_dict["duration"] = duration
 
-            filename = f"Qaoa_{filename_input}_{filename_date}_{filename_time}_{filename_config}__{i}.json"
+                # safe final results
+                if self.docker:
+                    with open(f"Problemset/{filename}", "w") as write_file:
+                        json.dump(self.results_dict, write_file, indent=2, default=str)
+                else:
+                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
+                        json.dump(self.results_dict, write_file, indent=2, default=str)
 
-            expectation = self.get_expectation(filename=filename,
-                                               components=transformedProblem,
-                                               simulator=simulator,
-                                               shots=shots,
-                                               simulate=simulate,
-                                               noise=noise)
+                last_rep = self.results_dict["iter_count"]
+                last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
+                self.metaInfo["results"][i] = {"filename": filename,
+                                               "backend_name": self.results_dict["backend_name"],
+                                               "initial_guess": self.results_dict["initial_guess"],
+                                               "optimize_Iterations": self.results_dict["iter_count"],
+                                               "optimizeResults": self.results_dict["optimizeResults"],
+                                               "duration": duration,
+                                               "counts": last_rep_counts}
 
-            if self.config["QaoaBackend"]["classical_optimizer"] == "SPSA":
-                optimizer = SPSA(maxiter=max_iter, blocking=False)
-            elif self.config["QaoaBackend"]["classical_optimizer"] == "COBYLA":
-                optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
-            else:
-                optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
+            if "rand" in initial_guess_original:
+                randFileName = ""
+                for namePart in self.config["QaoaBackend"]["filenameSplit"]:
+                    randFileName += namePart + "_"
+                randFileName += "rand"
 
-            res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-            self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-            self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-            self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+                if self.docker:
+                    with open(f"Problemset/{randFileName}", "w") as write_file:
+                        json.dump(self.metaInfo, write_file, indent=2, default=str)
+                else:
+                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName, "w") as write_file:
+                        json.dump(self.metaInfo, write_file, indent=2, default=str)
 
-            #res = optimizer.minimize(fun=expectation, x0=initial_guess)
-            #self.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
-            #self.results_dict["optimizeResults"]["fun"] = float(res.fun)  # objective function value
-            #self.results_dict["optimizeResults"]["nfev"] = int(res.nfev)  # number of objective function calls
+                #repetitions_start += repetitions
+                #repetitions += repetitions
+                minCFvars  = self.getMinCFvars()
+                for j in range(num_vars):
+                    if initial_guess_original[j] == "rand":
+                        initial_guess_original[j] = minCFvars[j]
+                self.metaInfo["results"] = {}
 
-            time_end = datetime.timestamp(datetime.now())
-            duration = time_end - time_start
-            self.results_dict["duration"] = duration
-
-            # safe final results
-            if self.docker:
-                with open(f"Problemset/{filename}", "w") as write_file:
-                    json.dump(self.results_dict, write_file, indent=2, default=str)
-            else:
-                with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-                    json.dump(self.results_dict, write_file, indent=2, default=str)
-
-            last_rep = self.results_dict["iter_count"]
-            last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
-            self.metaInfo["results"][i] = {"filename": filename,
-                                           "backend_name": self.results_dict["backend_name"],
-                                           "initial_guess": self.results_dict["initial_guess"],
-                                           "optimize_Iterations": self.results_dict["iter_count"],
-                                           "optimizeResults": self.results_dict["optimizeResults"],
-                                           "duration": duration,
-                                           "counts": last_rep_counts}
 
         self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
 
         return self.metaInfo["results"]
+
+    def getMinCFvars(self):
+        """
+        Searches through metaInfo["results"] and finds the minimum cost function value along with the associated betas
+        and gammas, which will be returned as a list.
+        Returns:
+            minX (list) a list with the betas and gammas associated with the minimal cost function value.
+        """
+        minCF = self.metaInfo["results"][1]["optimizeResults"]["fun"]
+        minX = []
+        for i in range(1, len(self.metaInfo["results"]) + 1):
+            if self.metaInfo["results"][i]["optimizeResults"]["fun"] <= minCF:
+                minCF = self.metaInfo["results"][i]["optimizeResults"]["fun"]
+                minX = self.metaInfo["results"][i]["optimizeResults"]["x"]
+
+        return minX
 
     def getMetaInfo(self):
         return self.metaInfo
@@ -684,7 +728,7 @@ class QaoaQiskit(BackendBase):
         self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
 
         def execute_circ(theta):
-            thetaDraw = [Parameter("\u03B2"), Parameter("\u03B3")]
+            thetaDraw = [Parameter("\u03B2\u2081"), Parameter("\u03B3\u2081")]
             if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
                     self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
                 if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
@@ -692,7 +736,7 @@ class QaoaQiskit(BackendBase):
                     qcDraw = self.create_qc1(components=components, theta=thetaDraw)
                 elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
                     qc = self.create_qc3(components=components, theta=theta)
-                    thetaDraw.extend([Parameter("\u03B2"), Parameter("\u03B3")])
+                    thetaDraw.extend([Parameter("\u03B2\u2082"), Parameter("\u03B3\u2082")])
                     qcDraw = self.create_qc3(components=components, theta=thetaDraw)
             elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
                 qc = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=theta)

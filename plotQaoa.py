@@ -555,44 +555,93 @@ def main():
     orangeMedium = "#F07D00"
     orangeLight = "#FFB15D"
 
-    meanOfInitGuess(filename="infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_11-51-19_config.yaml")
+    #meanOfInitGuess(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_11-51-19_config.yaml")
 
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 0 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-03_16-43-45_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-03_16-43-45_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-03_16-43-45_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-03_22-26-51_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 1 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-03_22-26-51_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-03_22-26-51_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-03_16-43-45_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 2 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 3 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_13-34-27_config.yaml"]
-    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_13-34-27_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_16-16-15_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random", "initial guess min cf from random"]
     title = "Network 0 evaluation"
-    colors = [blueLight, orangeLight, orangeDark]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_init-rand_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
                             kirchLabels=0)
-    return
+
     filenames = ["infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_13-52-15_config.yaml"]
-    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_13-52-15_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_1_20.nc_30_1_2022-03-02_16-32-33_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random", "initial guess min cf from random"]
     title = "Network 1 evaluation"
-    colors = [blueLight, orangeLight, orangeDark]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_init-rand_testNetwork4QubitIsing_2_1_20", title=title, cut=1.0,
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_15-40-13_config.yaml"]
-    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_15-40-13_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_2_20.nc_30_1_2022-03-02_16-50-16_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random", "initial guess min cf from random"]
     title = "Network 2 evaluation"
-    colors = [blueLight, orangeLight, orangeDark]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_init-rand_testNetwork4QubitIsing_2_2_20", title=title, cut=1.0,
                             kirchLabels=0)
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-01_07-19-44_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_11-51-19_config.yaml",
-                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_15-58-23_config.yaml"]
-    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random"]
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_15-58-23_config.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_17-21-13_config.yaml"]
+    labels = ["initial guess [1, 1]", "initial guess random", "initial guess mean from random", "initial guess min cf from random"]
     title = "Network 3 evaluation"
-    colors = [blueLight, orangeLight, orangeDark]
+    colors = [blueLight, orangeLight, orangeMedium, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
                             savename="4qubit_init-rand_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
                             kirchLabels=0)
