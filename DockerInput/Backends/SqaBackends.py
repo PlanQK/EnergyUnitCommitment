@@ -108,7 +108,6 @@ class ClassicalBackend(BackendBase):
         print(
             f"Total cost (with constant terms): {self.metaInfo['totalCost']}\n" 
         )
-        print(f"Eigenvalues: {self.metaInfo['sqaBackend']['eigenValues']}\n")
         return
     
     def writeResultsToMetaInfo(self, result, transformedProblem):
