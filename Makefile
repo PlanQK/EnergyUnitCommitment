@@ -44,29 +44,31 @@ SAMPLECUTSIZE = $(shell seq 200 4 200)
 
 # Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
 #PROBLEMFORMULATION = binarysplitNoMarginalCost
-#PROBLEMFORMULATION = fullsplitGlobalCostSquare
+PROBLEMFORMULATION = fullsplitGlobalCostSquare
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty
 #PROBLEMFORMULATION = fullsplitMarginalAsPenaltyAverageOffset
 #PROBLEMFORMULATION = fullsplitNoMarginalCost
 #PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
 #PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
 
-PROBLEMFORMULATION = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance
+#PROBLEMFORMULATION = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
 
-#MONETARYCOSTFACTOR = 0.215
-MONETARYCOSTFACTOR = 0.2 0.3 0.4 0.5
+MONETARYCOSTFACTOR = 0.1
+#MONETARYCOSTFACTOR = 0.2 0.3 0.4
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
 #OFFSETESTIMATIONFACTOR = 0.95 0.97 1.0 1.03 1.05
 #ESTIMATEDCOSTFACTOR = 0.95 0.97 1.0 1.03 1.05
 #OFFSETBUILDFACTOR = 0.95 0.97 1.0 1.03 1.05
 # 10.0
-#OFFSETESTIMATIONFACTOR = 1.21
+#OFFSETESTIMATIONFACTOR = 1.22
 # 10.1
-#OFFSETESTIMATIONFACTOR = 1.33
-# 60.0
-#OFFSETESTIMATIONFACTOR = 1.322
-OFFSETESTIMATIONFACTOR = 1.0 1.1 1.2 1.3
+#OFFSETESTIMATIONFACTOR = 1.349
+# 60.0 by 0.16
+#OFFSETESTIMATIONFACTOR = 1.3203
+OFFSETESTIMATIONFACTOR = 1.3
+#OFFSETESTIMATIONFACTOR = 1.0 1.1 1.2 1.3 1.4
+
 ESTIMATEDCOSTFACTOR = 1.0
 OFFSETBUILDFACTOR = 1.0
 
