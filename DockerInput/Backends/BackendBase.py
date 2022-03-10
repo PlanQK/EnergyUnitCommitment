@@ -87,7 +87,7 @@ class BackendBase(abc.ABC):
                                "eigenValues": "",
                                },
             "pypsaBackend": {"solver_name": "",
-                             "slack_gen_penalty": ""
+                             "terminationCondition" : "",
                              },
             "sqaBackend": {"individualCost": "",
                            "seed": "int",

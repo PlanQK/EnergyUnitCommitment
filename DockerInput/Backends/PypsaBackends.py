@@ -45,84 +45,40 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
-
-        # add slack generators which have to be used last. penalty has to be
-        # significantly higher than using a regular generator
-        maximum_loads_t = self.network.loads_t['p_set'].max()
-        for load in maximum_loads_t.index:
-            bus = self.network.loads.loc[load]['bus']
-            self.network.add("Generator",f"pos_slack_{bus}",bus=bus,
-                    committable=False,
-                    p_min_pu=0.0,
-                    p_max_pu= maximum_loads_t[load],
-                    marginal_cost=self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
-                    min_down_time=0,
-                    start_up_cost=0,
-                    p_nom=1)
-            self.network.add("Generator",f"neg_slack_{bus}",bus=bus,
-                    committable=False,
-                    p_min_pu= - maximum_loads_t[load],
-                    p_max_pu=0.0,
-                    marginal_cost= - self.metaInfo["pypsaBackend"]["slack_gen_penalty"],
-                    min_down_time=0,
-                    start_up_cost=0,
-                    p_nom=1)
-
         self.model = pypsa.opf.network_lopf_build_model(self.network,
                 self.network.snapshots,
                 formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
                 solver_name=self.metaInfo["pypsaBackend"]["solver_name"])
         self.opt.options["tmlim"] = self.metaInfo["timeout"]
-
         return self.model
 
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print("Writing from pyoyo model to network is not implemented")
-        
-#        print(self.metaInfo["solution"]["genStates"] )
-#        print(self.metaInfo["solution"]["lineValues"] )
 
-        for snapshot in network.snapshots:
-            exceeded_demand = 0
-            missing_demand = 0
+        if self.metaInfo["pypsaBackend"]["terminationCondition"] == "infeasible":
+            print("no feasible solution, stop writing to network")
+
+        elif self.metaInfo["pypsaBackend"]["terminationCondition"] != "infeasible":
+            
+            print(self.metaInfo["solution"]["genStates"] )
+            print(self.metaInfo["solution"]["lineValues"] )
+
             totalCost = 0
-            for bus in network.buses.index:
-                cur_neg_slack = self.model.generator_p.get_values()[(f"neg_slack_{bus}",snapshot)]
-                exceeded_demand += cur_neg_slack
-                totalCost += cur_neg_slack ** 2
-                if cur_neg_slack:
-                    print(f"EXCEEDED LOAD AT {bus}: {cur_neg_slack}")
+            costPerSnapshot = {snapshot : 0.0 for snapshot in self.network.snapshots}
 
-                cur_pos_slack = self.model.generator_p.get_values()[(f"pos_slack_{bus}",snapshot)]
-                missing_demand += cur_pos_slack 
-                totalCost += cur_pos_slack ** 2
-                if cur_pos_slack:
-                    print(f"MISSING LOAD AT {bus}: {cur_pos_slack}")
-
-                if not (cur_neg_slack + cur_pos_slack):
-                    print(f"OPTIMAL LOAD AT {bus}")
-
-            marginalCost = 0.0
-            for generator in network.generators.index:
-                marginalCost += self.model.generator_p.get_values()[(generator,snapshot)] * \
-                        network.generators["marginal_cost"].loc[generator]
-            self.metaInfo["marginalCost"] = marginalCost
-            self.metaInfo["powerImbalance"] = cur_neg_slack + cur_pos_slack
-            self.metaInfo["kirchhoffCost"] = totalCost
-
-            print(f"MARGINAL COST AT {snapshot}:: {marginalCost}")
-
-
-            dev_from_optimum_gen = exceeded_demand + missing_demand
-            if dev_from_optimum_gen == 0:
-                print(f"POWER GENERATION MATCHES TOTAL LOAD IN {snapshot}")
-            else:
-                print(f"TOTAL POWER/LOAD IMBALANCE {dev_from_optimum_gen}")
+            for key, val in  self.model.generator_p.get_values().items():
+                incurredCost = self.network.generators["marginal_cost"].loc[key[0]] * val
+                totalCost += incurredCost
+                costPerSnapshot[key[1]] += incurredCost
             self.metaInfo["totalCost"] = totalCost
-            print(f"TOTAL COST: {totalCost}")
+            self.metaInfo["marginalCost"] = totalCost
+            self.metaInfo["powerImbalance"] = 0.0
+            self.metaInfo["kirchhoffCost"] = 0.0
+            print(f"Total marginal cost: {self.metaInfo['marginalCost']}")
         return
+
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
@@ -131,7 +87,9 @@ class PypsaBackend(BackendBase):
 
         solverstring = str(sol["Solver"])
         solvingTime = solverstring.splitlines()[-1].split()[1]
+        terminationCondition = solverstring.splitlines()[-7].split()[2]
         self.metaInfo["optimizationTime"] = solvingTime
+        self.metaInfo["pypsaBackend"]["terminationCondition"] = terminationCondition
 
         sol.write()
 
@@ -140,17 +98,16 @@ class PypsaBackend(BackendBase):
             if self.model.generator_status.get_values()[key] == 1.0:
                 committed_gen.append(key[0])
         self.metaInfo["status"] = committed_gen
-
         return self.model
+
 
     def getMetaInfo(self):
         return self.metaInfo
 
     
-    def __init__(self, config: dict, solver_name = "glpk", slack_gen_penalty = 100.0):
+    def __init__(self, config: dict, solver_name = "glpk", ):
         super().__init__(config=config)
         self.metaInfo["pypsaBackend"]["solver_name"] = solver_name
-        self.metaInfo["pypsaBackend"]["slack_gen_penalty"] = slack_gen_penalty
 
         if self.metaInfo["timeout"] < 0:
             self.metaInfo["timeout"] = 1000
