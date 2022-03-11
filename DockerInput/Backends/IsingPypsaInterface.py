@@ -344,6 +344,12 @@ class IsingPypsaInterface:
             )
         return result
 
+    def getTotalLoad(self, time):
+        load = 0.0
+        for bus in self.network.buses.index:
+            load += self.getLoad(bus,time)
+        return load
+
 
     def getRepresentingQubits(self, component, time=0):
         """
@@ -1296,6 +1302,24 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
                 self.encodeStartupShutdownCost(node,time)
 
 
+        gen = self.network.generators.index
+        demand = self.getTotalLoad(0)
+        scale = 0.0
+        print(demand)
+
+        # constant load contribution to cost function so that a configuration that fulfills the
+        # kirchhoff contraint has energy 0
+        self.addInteraction((scale * demand) ** 2)
+        for component1 in gen:
+            factor = 1.0
+            # reward/penalty term for matching/adding load
+            self.coupleComponentWithConstant(component1, - 2.0 * scale * factor * demand)
+            for component2 in gen:
+                curFactor = factor * scale
+                # attraction/repulsion term for different/same sign of power at components
+                self.coupleComponents(component1, component2, couplingStrength=curFactor)
+
+
     def chooseOffset(self, sortedGenerators):
         """
         calculates a float by which to offset all marginal costs. The chosen offset is the
@@ -1359,9 +1383,6 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         @return: None 
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        FACTOR = 0.100
-        ESTIMATORFAC = 1.0
-
         estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
         generators = self.network.generators.index
 
@@ -1369,32 +1390,17 @@ class fullsplitGlobalCostSquare(fullsplitIsingInterface):
         for bus in self.network.buses.index:
             load += self.getLoad(bus,time)
 
-        print(f"CURRENTLY AT BUS: {bus}")
-        print(f"ESTIMATED COST: {estimatedCost}")
-        qubits = [ self.data[gen]['indices'][0] for gen in generators ] 
-        print(f"GENERATORQUBITS: {qubits}")
-        power = [ self.data[gen]['weights'][0] for gen in generators] 
-        print(f"GENERATORPOWER_: {power}")
-        print("---------------------------------------")
-        print(f"ESTIMATED COST: {estimatedCost}")
-        
+        print(f"Offset: {offset}")
+        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
+        print(f"Load: {load}")
+        print(f"Current total estimation at {time}: {offset * self.getTotalLoad(time)}")
         for gen1 in generators:
-            # reward/penalty term for matching/adding load
             marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
-            self.coupleComponentWithConstant(
-                    gen1,
-                    - 2.0 * marginalCostGen1* \
-                            self.monetaryCostFactor * \
-                            ESTIMATORFAC * \
-                            FACTOR
-                    )
             for gen2 in generators:
                 marginalCostGen2 = self.network.generators["marginal_cost"].loc[gen2] - offset
                 curFactor = self.monetaryCostFactor * \
                                 marginalCostGen1 * \
-                                marginalCostGen2 * \
-                                FACTOR * \
-                                ESTIMATORFAC ** 2
+                                marginalCostGen2 
                 self.coupleComponents(
                         gen1,
                         gen2,
