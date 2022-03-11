@@ -96,8 +96,8 @@ class ClassicalBackend(BackendBase):
             (None) Only side effect is printing information
         """
         print(f"\n--- Solution ---")
-        print(f"Qubits with spin -1: {solution['state']}")
-        print(f"Power on transmission lines: {transformedProblem.getLineValues(solution['state'])}")
+#        print(f"Qubits with spin -1: {solution['state']}")
+#        print(f"Power on transmission lines: {transformedProblem.getLineValues(solution['state'])}")
         print(f"\n--- Meta parameters of the solution ---")
         print(f"Cost at each bus: {transformedProblem.individualCostContribution(solution['state'])}")
         print(f"Total Kirchhoff cost: {self.metaInfo['kirchhoffCost']}")
