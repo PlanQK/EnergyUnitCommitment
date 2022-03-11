@@ -28,7 +28,7 @@ OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
 OPTIMIZATIONCYCLES = 1000
 #OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
 TROTTERSLICES = $(shell seq 10 10 100)
-TROTTERSLICES = 500
+TROTTERSLICES = 2000
 
 # classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
@@ -53,7 +53,7 @@ PROBLEMFORMULATION = fullsplitGlobalCostSquare
 
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
 
-MONETARYCOSTFACTOR = 0.1
+MONETARYCOSTFACTOR = 0.02 0.015 0.025
 #MONETARYCOSTFACTOR = 0.2 0.3 0.4
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
@@ -61,12 +61,14 @@ MONETARYCOSTFACTOR = 0.1
 #ESTIMATEDCOSTFACTOR = 0.95 0.97 1.0 1.03 1.05
 #OFFSETBUILDFACTOR = 0.95 0.97 1.0 1.03 1.05
 # 10.0
-#OFFSETESTIMATIONFACTOR = 1.22
+#OFFSETESTIMATIONFACTOR = 1.32
+OFFSETESTIMATIONFACTOR = 1.3805 1.3800 1.3802
+#OFFSETESTIMATIONFACTOR = 1.210
 # 10.1
 #OFFSETESTIMATIONFACTOR = 1.349
 # 60.0 by 0.16
 #OFFSETESTIMATIONFACTOR = 1.3203
-OFFSETESTIMATIONFACTOR = 1.3
+#OFFSETESTIMATIONFACTOR = 1.4268
 #OFFSETESTIMATIONFACTOR = 1.0 1.1 1.2 1.3 1.4
 
 ESTIMATEDCOSTFACTOR = 1.0
@@ -77,7 +79,7 @@ TIMEOUT = 60
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_1[0-4]_[0-9]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 #SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
