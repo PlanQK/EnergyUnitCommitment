@@ -14,8 +14,8 @@ PREFIX := infoNocostFixed
 
 
 # config file
-#CONFIGFILES = "config.yaml"
-CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[8][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+CONFIGFILES = "config.yaml"
+#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[8][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -77,8 +77,8 @@ TIMEOUT = 60
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_1[0-4]_[0-9]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_1[0-4]_[0-9]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations
