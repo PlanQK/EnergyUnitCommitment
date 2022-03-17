@@ -24,14 +24,14 @@ from qiskit.circuit import Parameter
 
 
 class QaoaQiskit(BackendBase):
-    def __init__(self, config: dict, docker: bool = True):
+    def __init__(self, config: dict,):
         super().__init__(config=config)
         self.metaInfo["results"] = {}
         self.resetResultDict()
 
         self.kirchhoff = {}
         self.components = {}
-        self.docker = docker
+        self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
         if config["QaoaBackend"]["noise"] or (not config["QaoaBackend"]["simulate"]):
             IBMQ.save_account(config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
@@ -820,7 +820,7 @@ def main():
     config["QaoaBackend"]["filenameSplit"] = filenameSplit
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
-    qaoa = QaoaQiskit(config=config, docker=False)
+    qaoa = QaoaQiskit(config=config)
     components = qaoa.transformProblemForOptimizer(network=netImport)
 
     """
