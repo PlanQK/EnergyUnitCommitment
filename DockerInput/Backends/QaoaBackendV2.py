@@ -19,7 +19,7 @@ from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
-from qiskit.algorithms.optimizers import SPSA, COBYLA
+from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
 from qiskit.circuit import Parameter
 
 
@@ -71,118 +71,113 @@ class QaoaQiskit(BackendBase):
         repetitions = self.config["QaoaBackend"]["repetitions"]
         repetitions_start = 1
 
+
+        for curRepetition in range(1, repetitions + 1):
+            time_start = datetime.timestamp(datetime.now())
+            print(f"----------------------- Iteration {curRepetition} ----------------------------------")
+
+            initial_guess = [
+                    (0.5 - random.rand()) * 2 * math.pi 
+                    if currentGuess == "rand" 
+                    else currentGuess
+                    for  currentGuess in initial_guess_original
+            ]
+            initial_guess = np.array(initial_guess)
+
+            self.resetResultDict()
+            self.results_dict["initial_guess"] = initial_guess.tolist()
+            self.results_dict["components"] = self.components
+
+            filename = self.generateFilename(curRepetition)
+
+            expectation = self.get_expectation(filename=filename,
+                                               components=transformedProblem,
+                                               simulator=simulator,
+                                               shots=shots,
+                                               simulate=simulate,
+                                               noise=noise)
+
+            optimizer = self.getClassicalOptimizer(max_iter)
+
+
+            res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
+            self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
+            self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
+            self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+
+            time_end = datetime.timestamp(datetime.now())
+            duration = time_end - time_start
+            self.results_dict["duration"] = duration
+
+            # safe final results
+            if self.docker:
+                with open(f"Problemset/{filename}", "w") as write_file:
+                    json.dump(self.results_dict, write_file, indent=2, default=str)
+            else:
+                with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
+                    json.dump(self.results_dict, write_file, indent=2, default=str)
+
+            last_rep = self.results_dict["iter_count"]
+            last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
+            self.metaInfo["results"][curRepetition] = {"filename": filename,
+                                           "backend_name": self.results_dict["backend_name"],
+                                           "initial_guess": self.results_dict["initial_guess"],
+                                           "optimize_Iterations": self.results_dict["iter_count"],
+                                           "optimizeResults": self.results_dict["optimizeResults"],
+                                           "duration": duration,
+                                           "counts": last_rep_counts}
+
         if "rand" in initial_guess_original:
-            randRep = 2
-        else:
-            randRep = 1
+            # dumping data
+            randFileName = "_".join(self.config["QaoaBackend"]["filenameSplit"]) + "rand"
+            if self.docker:
+                saveLocation = f"Problemset/{randFileName}"
+            else:
+                saveLocation = os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName
+            with open(saveLocation, "w") as write_file:
+                json.dump(self.metaInfo, write_file, indent=2, default=str)
 
-        for rand in range(randRep):
-            for i in range(1, repetitions + 1):
-                time_start = datetime.timestamp(datetime.now())
-                print(f"----------------------- Iteration {rand * repetitions + i} ----------------------------------")
-
-                initial_guess = []
-
-                for j in range(num_vars):
-                    # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
-                    if initial_guess_original[j] == "rand":
-                        if j % 2 == 0:
-                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
-                        else:
-                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
-                    else:
-                        initial_guess.append(initial_guess_original[j])
-                initial_guess = np.array(initial_guess)
-
-                self.resetResultDict()
-                self.results_dict["initial_guess"] = initial_guess.tolist()
-                self.results_dict["components"] = self.components
-
-
-                filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
-                                 str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
-                                 str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
-                                 str(self.config["QaoaBackend"]["filenameSplit"][4])
-                filename_date = self.config["QaoaBackend"]["filenameSplit"][7]
-                filename_time = self.config["QaoaBackend"]["filenameSplit"][8]
-                filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
-                if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
-                    filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
-
-                filename = f"Qaoa_{filename_input}_{filename_date}_{filename_time}_{filename_config}__" \
-                           f"{rand * repetitions + i}.json"
-
-                expectation = self.get_expectation(filename=filename,
-                                                   components=transformedProblem,
-                                                   simulator=simulator,
-                                                   shots=shots,
-                                                   simulate=simulate,
-                                                   noise=noise)
-
-                if self.config["QaoaBackend"]["classical_optimizer"] == "SPSA":
-                    optimizer = SPSA(maxiter=max_iter, blocking=False)
-                elif self.config["QaoaBackend"]["classical_optimizer"] == "COBYLA":
-                    optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
-                else:
-                    optimizer = COBYLA(maxiter=max_iter, tol=0.0001)
-
-                res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-                self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-                self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-                self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
-
-                #res = optimizer.minimize(fun=expectation, x0=initial_guess)
-                #self.results_dict["optimizeResults"]["x"] = list(res.x)  # solution [beta, gamma]
-                #self.results_dict["optimizeResults"]["fun"] = float(res.fun)  # objective function value
-                #self.results_dict["optimizeResults"]["nfev"] = int(res.nfev)  # number of objective function calls
-
-                time_end = datetime.timestamp(datetime.now())
-                duration = time_end - time_start
-                self.results_dict["duration"] = duration
-
-                # safe final results
-                if self.docker:
-                    with open(f"Problemset/{filename}", "w") as write_file:
-                        json.dump(self.results_dict, write_file, indent=2, default=str)
-                else:
-                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-                        json.dump(self.results_dict, write_file, indent=2, default=str)
-
-                last_rep = self.results_dict["iter_count"]
-                last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
-                self.metaInfo["results"][i] = {"filename": filename,
-                                               "backend_name": self.results_dict["backend_name"],
-                                               "initial_guess": self.results_dict["initial_guess"],
-                                               "optimize_Iterations": self.results_dict["iter_count"],
-                                               "optimizeResults": self.results_dict["optimizeResults"],
-                                               "duration": duration,
-                                               "counts": last_rep_counts}
-
-            if "rand" in initial_guess_original:
-                randFileName = ""
-                for namePart in self.config["QaoaBackend"]["filenameSplit"]:
-                    randFileName += namePart + "_"
-                randFileName += "rand"
-
-                if self.docker:
-                    with open(f"Problemset/{randFileName}", "w") as write_file:
-                        json.dump(self.metaInfo, write_file, indent=2, default=str)
-                else:
-                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName, "w") as write_file:
-                        json.dump(self.metaInfo, write_file, indent=2, default=str)
-
-                #repetitions_start += repetitions
-                #repetitions += repetitions
-                minCFvars  = self.getMinCFvars()
-                for j in range(num_vars):
-                    if initial_guess_original[j] == "rand":
-                        initial_guess_original[j] = minCFvars[j]
-                self.metaInfo["results"] = {}
+            minCFvars  = self.getMinCFvars()
+            for j in range(num_vars):
+                if initial_guess_original[j] == "rand":
+                    initial_guess_original[j] = minCFvars[j]
+            self.metaInfo["results"] = {}
 
 
         self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
 
         return self.metaInfo["results"]
+
+
+    def generateFilename(self, currentRepetitionNumber):
+
+        filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
+                         str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
+                         str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
+                         str(self.config["QaoaBackend"]["filenameSplit"][4])
+        filename_date = str(self.config["QaoaBackend"]["filenameSplit"][7])
+        filename_time = str(self.config["QaoaBackend"]["filenameSplit"][8])
+        filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
+        if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
+            filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
+
+        filename = "_".join([
+                "Qaoa", filename_input, filename_date, filename_time, \
+                filename_config, "", str(currentRepetitionNumber)
+        ]) 
+        return filename + ".json"
+    
+
+    def getClassicalOptimizer(self, max_iter):
+        configString = self.config["QaoaBackend"]["classical_optimizer"]
+        if configString == "SPSA":
+            return SPSA(maxiter=max_iter, blocking=False)
+        elif configString == "COBYLA":
+            return COBYLA(maxiter=max_iter, tol=0.0001)
+        elif configString == "ADAM":
+            return ADAM(maxiter=max_iter, tol=0.0001)
+        raise ValueError("Optimizername in config file doesn't match any known optimizers")
+
 
     def getMinCFvars(self):
         """
