@@ -557,6 +557,176 @@ def main():
 
     #meanOfInitGuess(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_11-51-19_config.yaml")
 
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+
+
+    filenames = [
+#    "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_14-17-31_config.yaml",
+            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_14-46-59_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_15-00-02_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_15-25-23_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_15-38-27_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_16-00-02_config.yaml", #inverted
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_16-26-53_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_17-46-37_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_16-42-21_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_18-05-23_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_18-18-44_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_19-10-36_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_20-07-27_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_20-17-39_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_20-30-01_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_20-41-50_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_20-52-09_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_10-02-33_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_10-25-01_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_10-37-45_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_10-46-19_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_10-58-49_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_11-08-17_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_11-18-44_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_15-06-16_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_15-13-15_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_15-36-26_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_16-45-31_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_16-54-32_config.yaml",
+            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_17-06-09_config.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_18-17-20_configGreedy.yaml",
+#            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_18-21-07_configGreedy2.yaml",
+            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_18-25-54_configGreedy3.yaml",
+            "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_18-36-10_configSingleton.yaml",
+    ]
+
+    meanOfInitGuess(filename=filenames[3])
+    plotBitstringBoxCompare(filenames=filenames, colors=colors,
+                labels=["randomHalf",
+                        "AdamLinearDoubleParam",
+                        "AdamReasonableIteration",
+                        "AdamSingleton"
+                        ],
+                savename="CompareGuessFactors", cut=1.0,
+                kirchLabels=0)
+
+    plotBPandCF(filenames[0],
+            extraPlotInfo="fixedInitGuess",
+            savename="FixedGUess" + filenames[0])
+#    plotBPandCF(filenames[0],
+#            extraPlotInfo="randomHalfGuess",
+#            savename="randomHalfGuess" + filenames[0])
+#    plotBPandCF(filenames[2],
+#            extraPlotInfo="randomTenthGuess",
+#            savename="randomTenthGuess" + filenames[2])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="randomhundredGuessEqualRand",
+#            savename="randomhundredGuessEqualRand" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="GuessIsLastBestResult",
+#            savename="GuessIsLastBestResult" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="scaledCost",
+#            savename="scaledCost" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="scaledCost",
+#            savename="scaledCost" + filenames[3])
+#    plotBPandCF(filenames[2],
+#            extraPlotInfo="SPSA",
+#            savename="SPSA" + filenames[2])
+#    plotBPandCF(filenames[2],
+#            extraPlotInfo="COBRandomSign",
+#            savename="COBRandomSign" + filenames[2])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="COBFixedSign",
+#            savename="COBFixedSign" + filenames[3])
+#    plotBPandCF(filenames[1],
+#            extraPlotInfo="LinScaledCost",
+#            savename="LinScaledCost" + filenames[1])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="RootOfLinearKirchhoff",
+#            savename="RootOfLinearKirchhoff" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="InverseHammingCost",
+#            savename="InverseHammingCost" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="HammingCost",
+#            savename="HammingCost" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="IsingHamming",
+#            savename="IsingHamming" + filenames[3])
+#    plotBPandCF(filenames[0],
+#            extraPlotInfo="DoubleDiagonalIsingHamming",
+#            savename="DoubleDiagonalIsingHamming" + filenames[2])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="HalfDiagonalIsingHamming",
+#            savename="HalfDiagonalIsingHamming" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="HalfDiagonalIsingRootLoss",
+#            savename="HalfDiagonalIsingRootLoss" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamSquaredKirch",
+#            savename="AdamSquaredKirch" + filenames[3])
+#    plotBPandCF(filenames[1],
+#            extraPlotInfo="AdamSquaredKirchNoDiagonal",
+#            savename="AdamSquaredKirchNoDiagonal" + filenames[1])
+#    plotBPandCF(filenames[2],
+#            extraPlotInfo="AdamSquaredKirchNegativeDiagonal",
+#            savename="AdamSquaredKirchNegativeDiagonal" + filenames[2])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamSquaredKirchNegative4thDiagonal",
+#            savename="AdamSquaredKirchNegativet4thDiagonal" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamLinearNoDiagonal",
+#            savename="AdamLinearNoDiagonal"+ filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamRootNoDiagonalPreviousBestGuess",
+#            savename="AdamRootNoDiagonalPreviousBestGuess"+ filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamSquaredNoDemandTermIsingFixedGuess",
+#            savename="AdamSquaredNoDemandTermIsingFixedGuess"+ filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamSquaredNegativeDiagonalDoubleParam",
+#            savename="AdamSquaredNegativeDiagonalDoubleParam" + filenames[3])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamLineardNegativeDiagonalDoubleParam",
+#            savename="AdamLineardNegativeDiagonalDoubleParam" + filenames[3])
+    plotBPandCF(filenames[1],
+            extraPlotInfo="AdamLinearDoubleParam",
+            savename="AdamLinearDoubleParam" + filenames[1])
+#    plotBPandCF(filenames[2],
+#            extraPlotInfo="AdamLinearGreedy",
+#            savename="AdamLinearGreedy" + filenames[2])
+    plotBPandCF(filenames[2],
+            extraPlotInfo="AdamReasonableIteration",
+            savename="AdamReasonableIteration " + filenames[2])
+    plotBPandCF(filenames[3],
+            extraPlotInfo="AdamSingleton",
+            savename="AdamSingleton" + filenames[3])
+    
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_20-49-50_configSingletonNegativeSign.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSingletonNegativeStart",
+            savename="AdamSingletonNegativeStart" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_20-55-28_configSingletonNegativeSign.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSingletonPosBetaNegGamma",
+            savename="AdamSingletonPosBetaNegGamme" + SomeFile)
+ 
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-16_09-05-38_config.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSmallInitGuess2Param",
+            savename="AdamSmallInitGuess2Param" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-16_09-12-59_config.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSmallRepMoreShots",
+            savename="AdamSmallResMoreShots" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-16_09-27-24_config.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSmallRepOptimalGuess",
+            savename="AdamSmallResOptimalGuess" + SomeFile)
+    return
+
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_80.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_81.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_82.yaml",

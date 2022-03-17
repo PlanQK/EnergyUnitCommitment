@@ -82,13 +82,14 @@ class QaoaQiskit(BackendBase):
                 print(f"----------------------- Iteration {rand * repetitions + i} ----------------------------------")
 
                 initial_guess = []
+
                 for j in range(num_vars):
                     # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
                     if initial_guess_original[j] == "rand":
                         if j % 2 == 0:
-                            initial_guess.append(random.rand() * 2 * math.pi)
+                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
                         else:
-                            initial_guess.append(random.rand() * math.pi)
+                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
                     else:
                         initial_guess.append(initial_guess_original[j])
                 initial_guess = np.array(initial_guess)
@@ -599,7 +600,7 @@ class QaoaQiskit(BackendBase):
                     power += (components[bus]["power"][i] * float(bitstring[i_bit]))
                     i += 1
                 self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
-            power_total += power ** 2
+            power_total += abs(power)
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
         return power_total
