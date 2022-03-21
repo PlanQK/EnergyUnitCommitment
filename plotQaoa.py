@@ -86,7 +86,8 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
                 "optimizer": data["config"]["QaoaBackend"]["classical_optimizer"],
                 "initial_guess": data["config"]["QaoaBackend"]["initial_guess"]}
     data = data["results"]
-    bitstrings = getBitstrings(nBits=4)
+    bitstringLength = len(list(data["1"]["counts"].keys())[0])
+    bitstrings = getBitstrings(nBits=bitstringLength)
     hpReps = int(len(metaData["initial_guess"]) / 2)
 
     plotData = {"cf": [],
@@ -240,7 +241,7 @@ def plotBoxplotBest(filename: str, plotname: str, savename: str, cut: float = 0.
 
     fig, ax = plt.subplots()
     fig.set_figheight(7)
-    pos = np.arange(len(toPlot)) + 1
+    pos = np.arange(2*len(toPlot),step=2) + 1
     bp = ax.boxplot(toPlot, sym='k+', positions=pos, bootstrap=5000)
 
     ax.set_xlabel('bitstrings')
@@ -249,7 +250,7 @@ def plotBoxplotBest(filename: str, plotname: str, savename: str, cut: float = 0.
               f"initial guess = {metaData['initial_guess']}", fontdict={'fontsize': 8})
     plt.figtext(0.0, 0.01, f"data: {filename}", fontdict={'fontsize': 8})
     plt.suptitle(plotname)
-    plt.xticks(range(1, len(bitstrings) + 1), bitstrings, rotation=70)
+    plt.xticks(range(1, 2*len(bitstrings) + 1,2), bitstrings, rotation=70)
     plt.setp(bp['whiskers'], color='k', linestyle='-')
     plt.setp(bp['fliers'], markersize=2.0)
     #plt.show()
@@ -277,6 +278,9 @@ def plotCFoptimization(filename: str, plotname: str, savename: str, directory: s
     random.shuffle(random_list)
 
     for i in range(len(axs)):
+        if i >= len(random_list):
+            print("Index Error, skip iteration")
+            continue
         rep = int(random_list[i])
         indexBegin = plotDataFull["filename"].index(plotData["filename"][rep])
         plotDataFull["filename"].reverse()
@@ -598,18 +602,18 @@ def main():
     ]
 
     meanOfInitGuess(filename=filenames[3])
-    plotBitstringBoxCompare(filenames=filenames, colors=colors,
-                labels=["randomHalf",
-                        "AdamLinearDoubleParam",
-                        "AdamReasonableIteration",
-                        "AdamSingleton"
-                        ],
-                savename="CompareGuessFactors", cut=1.0,
-                kirchLabels=0)
+#    plotBitstringBoxCompare(filenames=filenames, colors=colors,
+#                labels=["randomHalf",
+#                        "AdamLinearDoubleParam",
+#                        "AdamReasonableIteration",
+#                        "AdamSingleton"
+#                        ],
+#                savename="CompareGuessFactors", cut=1.0,
+#                kirchLabels=0)
 
-    plotBPandCF(filenames[0],
-            extraPlotInfo="fixedInitGuess",
-            savename="FixedGUess" + filenames[0])
+#    plotBPandCF(filenames[0],
+#            extraPlotInfo="fixedInitGuess",
+#            savename="FixedGUess" + filenames[0])
 #    plotBPandCF(filenames[0],
 #            extraPlotInfo="randomHalfGuess",
 #            savename="randomHalfGuess" + filenames[0])
@@ -688,19 +692,106 @@ def main():
 #    plotBPandCF(filenames[3],
 #            extraPlotInfo="AdamLineardNegativeDiagonalDoubleParam",
 #            savename="AdamLineardNegativeDiagonalDoubleParam" + filenames[3])
-    plotBPandCF(filenames[1],
-            extraPlotInfo="AdamLinearDoubleParam",
-            savename="AdamLinearDoubleParam" + filenames[1])
+#    plotBPandCF(filenames[1],
+#            extraPlotInfo="AdamLinearDoubleParam",
+#            savename="AdamLinearDoubleParam" + filenames[1])
+##    plotBPandCF(filenames[2],
+##            extraPlotInfo="AdamLinearGreedy",
+##            savename="AdamLinearGreedy" + filenames[2])
 #    plotBPandCF(filenames[2],
-#            extraPlotInfo="AdamLinearGreedy",
-#            savename="AdamLinearGreedy" + filenames[2])
-    plotBPandCF(filenames[2],
-            extraPlotInfo="AdamReasonableIteration",
-            savename="AdamReasonableIteration " + filenames[2])
-    plotBPandCF(filenames[3],
-            extraPlotInfo="AdamSingleton",
-            savename="AdamSingleton" + filenames[3])
+#            extraPlotInfo="AdamReasonableIteration",
+#            savename="AdamReasonableIteration " + filenames[2])
+#    plotBPandCF(filenames[3],
+#            extraPlotInfo="AdamSingleton",
+#            savename="AdamSingleton" + filenames[3])
     
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_18-15-47_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="COBYLAOptimalGuess",
+            savename="COBYLAOptimalGuess" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-21_09-41-28_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="COBYLAFullsplit4Param",
+            savename="COBYLAFullsplit4Param" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-21_10-08-08_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="COBYLAFullsplit4ParamEfficientKirchhoff",
+            savename="COBYLAFullsplit4ParamEfficientKirchhoff" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-21_10-48-46_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="COBYLAFullsplit4ParamBiggerSweep",
+            savename="COBYLAFullsplit4ParamBiggerSweep" + SomeFile)
+
+    return
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_17-42-36_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaBinarySplitIsingTest",
+            savename="CobylaBinarySplitIsingTest" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-21-53_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit4paramHighShotQuadraticLoss",
+            savename="CobylaFullSplit4paramHighShotQuadraticLoss" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-33-48_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit8paramHighShotQuadraticLoss",
+            savename="CobylaFullSplit8paramHighShotQuadraticLoss" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-38-00_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamDullsplit8ParamHighShotQuadraticLoss",
+            savename="AdamDullsplit8ParamHighShotQuadraticLoss" + SomeFile)
+
+    return
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_09-42-06_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit2param",
+            savename="CobylaFullSplit2param" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_09-59-04_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit4param",
+            savename="CobylaFullSplit4param" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-07-31_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit4paramBinaryCost",
+            savename="CobylaFullSplit4paramBinaryCost" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-09-22_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit4paramQuadraticCost",
+            savename="CobylaFullSplit4paramQuadraticCost" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-18_10-12-00_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaFullSplit4paramScaledLinearQuadraticCost",
+            savename="CobylaFullSplit4paramScaledLinearQuadraticCost" + SomeFile)
+
+    return
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-20-07_configIter1.yamlrand"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess8Param",
+            savename="CobylaGuess8Param" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-28-10_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess4x3-3with8Param",
+            savename="CobylaGuess4x3-3with8Param" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-30-03_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess4x3-3with8ParamLongIterate",
+            savename="CobylaGuess4x3-3with8ParamLongIterate" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-32-52_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess4x3-3with8ParamLongIterateMoreRep",
+            savename="CobylaGuess4x3-3with8ParamLongIterateMoreRep" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-38-50_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess0Initwith8ParamLongIterateMoreRep",
+            savename="CobylaGuess0Init8ParamLongIterateMoreRep" + SomeFile)
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_18-42-23_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="CobylaGuess0Initwith4ParamLongIterateMoreRep",
+            savename="CobylaGuess0Initwith4ParamLongIterateMoreRep" + SomeFile)
+
+
     SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-15_20-49-50_configSingletonNegativeSign.yaml"
     plotBPandCF(SomeFile,
             extraPlotInfo="AdamSingletonNegativeStart",
@@ -725,6 +816,21 @@ def main():
     plotBPandCF(SomeFile,
             extraPlotInfo="AdamSmallRepOptimalGuess",
             savename="AdamSmallResOptimalGuess" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_16-46-14_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamSmallRepOptimalGuessAndThird",
+            savename="AdamSmallResOptimalGuessAndThird" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_17-04-41_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamOptimalGuessAndThird",
+            savename="AdamOptimalGuessAndThird" + SomeFile)
+
+    SomeFile = "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-17_17-46-14_configIter1.yaml"
+    plotBPandCF(SomeFile,
+            extraPlotInfo="AdamOptimalGuess8Param",
+            savename="AdamOptimalGuess8Param" + SomeFile)
     return
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_80.yaml",
