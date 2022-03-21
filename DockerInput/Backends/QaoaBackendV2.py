@@ -74,6 +74,7 @@ class QaoaQiskit(BackendBase):
         repetitions = self.config["QaoaBackend"]["repetitions"]
         repetitions_start = 1
 
+        repetitionResults = []
 
         for curRepetition in range(1, repetitions + 1):
             time_start = datetime.timestamp(datetime.now())
@@ -113,6 +114,7 @@ class QaoaQiskit(BackendBase):
             self.results_dict["duration"] = duration
 
             print(f"Score at repetition {curRepetition}: {res[1]} with solution {res[0]}")
+            repetitionResults.append({"score": res[1] , "theta": list(res[0])})
             # safe final results
             if self.docker:
                 with open(f"Problemset/{filename}", "w") as write_file:
@@ -145,11 +147,20 @@ class QaoaQiskit(BackendBase):
             for j in range(num_vars):
                 if initial_guess_original[j] == "rand":
                     initial_guess_original[j] = minCFvars[j]
-            self.metaInfo["results"] = {}
+#            self.metaInfo["results"] = {}
 
 
         self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
+        bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
+        bestRepetition = repetitionResults[bestRepetitionIndex]
+        bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
+        mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
 
+        print(f"----------------------- Summary -------------------------------------")
+        print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
+        print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff_satisfied2(mostLikelyBitstring)}")
+#        for bitstring in bestResult['counts'].keys():
+#            print(f" Bitstring:: {bitstring}  Cost: {self.kirchhoff_satisfied2(bitstring)}")
         return self.metaInfo["results"]
 
 
@@ -630,7 +641,7 @@ class QaoaQiskit(BackendBase):
         avg = 0
         sum_count = 0
         for bitstring, count in counts.items():
-            obj = self.kirchhoff_satisfied2(bitstring=bitstring, components=components)
+            obj = self.kirchhoff_satisfied2(bitstring=bitstring,)
             avg += obj * count
             sum_count += count
             self.results_dict[f"rep{self.results_dict['iter_count']}"][bitstring] = {"count": count,
@@ -884,6 +895,11 @@ def main():
     
 
 class QaoaQiskitIsing(QaoaQiskit):
+
+    def __init__(self, config: dict,):
+        super().__init__(config=config)
+        self._kirchhoffcostDict = {}
+
     def kirchhoff_satisfied2(self, bitstring: str) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given solution.
@@ -896,12 +912,16 @@ class QaoaQiskitIsing(QaoaQiskit):
             (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
                     satisfied for the given network.
         """
-        kirchhoffCost = 0.0
-        for bus in self.network.buses.index:
-            bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
-            for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
-                kirchhoffCost += abs(val)
-        return kirchhoffCost
+        try:
+            return self._kirchhoffcostDict[bitstring]
+        except KeyError:
+            kirchhoffCost = 0.0
+            for bus in self.network.buses.index:
+                bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
+                for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
+                    kirchhoffCost += abs(val) ** 2
+            self._kirchhoffcostDict[bitstring] = kirchhoffCost
+            return kirchhoffCost
 
 
 if __name__ == "__main__":
