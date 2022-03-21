@@ -31,6 +31,7 @@ class QaoaQiskit(BackendBase):
 
         self.kirchhoff = {}
         self.components = {}
+
         self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
         if config["QaoaBackend"]["noise"] or (not config["QaoaBackend"]["simulate"]):
             IBMQ.save_account(config["APItoken"]["IBMQ_API_token"], overwrite=True)
@@ -51,6 +52,8 @@ class QaoaQiskit(BackendBase):
 
     def transformProblemForOptimizer(self, network):
         print("transforming problem...")
+        self.network = network
+        self.isingInterface = IsingPypsaInterface.buildCostFunction(network=network)
         return self.getComponents(network=network)
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
@@ -109,6 +112,7 @@ class QaoaQiskit(BackendBase):
             duration = time_end - time_start
             self.results_dict["duration"] = duration
 
+            print(f"Score at repetition {curRepetition}: {res[1]} with solution {res[0]}")
             # safe final results
             if self.docker:
                 with open(f"Problemset/{filename}", "w") as write_file:
@@ -253,6 +257,7 @@ class QaoaQiskit(BackendBase):
 
         return components
 
+
     def getComponents(self, network: pypsa.Network) -> dict:
         """
         Separates and organizes all components of a network to be optimized using QAOA.
@@ -280,7 +285,7 @@ class QaoaQiskit(BackendBase):
                 qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
                 qubit += 2
         elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            transformedProblem = IsingPypsaInterface.buildCostFunction(network=network)
+            transformedProblem = self.isingInterface
             qubit_map = transformedProblem.getQubitMapping()
 
         components["qubit_map"] = qubit_map
@@ -506,26 +511,33 @@ class QaoaQiskit(BackendBase):
         beta = theta[0]
         gamma = theta[1]
 
+        # beta parameters are at even indices and gamma at odd indices
+        betaValues = theta[::2]
+        gammaValues = theta[1::2]
+
+
         # add Hadamard gate to each qubit
         for i in range(nqubits):
             qc.h(i)
         qc.barrier()
         qc.barrier()
 
-        # add problem Hamiltonian
-        for i in range(len(hamiltonian)):
-            for j in range(i, len(hamiltonian[i])):
-                if hamiltonian[i][j] != 0.0:
-                    if i == j:
-                        qc.rz(-hamiltonian[i][j] * gamma, i)  # negative because it´s the inverse of original QC
-                    else:
-                        qc.rzz(-hamiltonian[i][j] * gamma, i, j)  # negative because it´s the inverse of original QC
-        qc.barrier()
-        qc.barrier()
 
-        # add mixing Hamiltonian to each qubit
-        for i in range(nqubits):
-            qc.rx(beta, i)
+        for layer, _ in enumerate(betaValues):
+            # add problem Hamiltonian
+            for i in range(len(hamiltonian)):
+                for j in range(i, len(hamiltonian[i])):
+                    if hamiltonian[i][j] != 0.0:
+                        if i == j:
+                            qc.rz(-hamiltonian[i][j] * gammaValues[layer], i)  # negative because it´s the inverse of original QC
+                        else:
+                            qc.rzz(-hamiltonian[i][j] * gammaValues[layer], i, j)  # negative because it´s the inverse of original QC
+            qc.barrier()
+            qc.barrier()
+
+            # add mixing Hamiltonian to each qubit
+            for i in range(nqubits):
+                qc.rx(betaValues[layer], i)
 
         qc.measure_all()
 
@@ -595,7 +607,9 @@ class QaoaQiskit(BackendBase):
                     power += (components[bus]["power"][i] * float(bitstring[i_bit]))
                     i += 1
                 self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
-            power_total += abs(power)
+#            power_total += abs(power)
+#            power_total += power ** 2
+            power_total += (abs(power) + power ** 2)
         self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
 
         return power_total
@@ -867,6 +881,27 @@ def main():
     filename = str(envMgr['outputInfo'])
     with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
         json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
+    
+
+class QaoaQiskitIsing(QaoaQiskit):
+    def kirchhoff_satisfied2(self, bitstring: str) -> float:
+        """
+        Checks if the kirchhoff constraints are satisfied for the given solution.
+
+        Args:
+            bitstring: (str) The possible solution to the network.
+            components: (dict) All components to be modeled as a Quantum Circuit.
+
+        Returns:
+            (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
+                    satisfied for the given network.
+        """
+        kirchhoffCost = 0.0
+        for bus in self.network.buses.index:
+            bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
+            for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
+                kirchhoffCost += abs(val)
+        return kirchhoffCost
 
 
 if __name__ == "__main__":
