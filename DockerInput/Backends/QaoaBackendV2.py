@@ -155,12 +155,17 @@ class QaoaQiskit(BackendBase):
         bestRepetition = repetitionResults[bestRepetitionIndex]
         bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
         mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
+        bestString = min(bestResult['counts'],key=self.kirchhoff_satisfied2)
+        print(f"BEST STRING: {bestString}")
+        for idx, repetition in self.metaInfo["results"].items():
+            if max(repetition['counts'], key=repetition['counts'].get) == bestString:
+                print(f"Solution has highest count at repetition {idx+1}")
+                print(repetition['counts'])
+
 
         print(f"----------------------- Summary -------------------------------------")
         print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
         print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff_satisfied2(mostLikelyBitstring)}")
-#        for bitstring in bestResult['counts'].keys():
-#            print(f" Bitstring:: {bitstring}  Cost: {self.kirchhoff_satisfied2(bitstring)}")
         return self.metaInfo["results"]
 
 
@@ -519,19 +524,15 @@ class QaoaQiskit(BackendBase):
         nqubits = len(hamiltonian)
         qc = QuantumCircuit(nqubits)
 
-        beta = theta[0]
-        gamma = theta[1]
-
         # beta parameters are at even indices and gamma at odd indices
         betaValues = theta[::2]
         gammaValues = theta[1::2]
-
 
         # add Hadamard gate to each qubit
         for i in range(nqubits):
             qc.h(i)
         qc.barrier()
-        qc.barrier()
+#        qc.barrier()
 
 
         for layer, _ in enumerate(betaValues):
@@ -544,7 +545,7 @@ class QaoaQiskit(BackendBase):
                         else:
                             qc.rzz(-hamiltonian[i][j] * gammaValues[layer], i, j)  # negative because it´s the inverse of original QC
             qc.barrier()
-            qc.barrier()
+#            qc.barrier()
 
             # add mixing Hamiltonian to each qubit
             for i in range(nqubits):
@@ -648,7 +649,6 @@ class QaoaQiskit(BackendBase):
                                                                                      "obj": obj,
                                                                                      "avg": avg,
                                                                                      "sum_count": sum_count}
-
         self.results_dict[f"rep{self.results_dict['iter_count']}"]["return"] = avg / sum_count
 
         # safe results to make sure nothing is lost, even if the code or backend crashes
@@ -749,7 +749,8 @@ class QaoaQiskit(BackendBase):
         self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
 
         def execute_circ(theta):
-            thetaDraw = [Parameter("\u03B2\u2081"), Parameter("\u03B3\u2081")]
+#            thetaDraw = [Parameter("\u03B2\u2081"), Parameter("\u03B3\u2081")]
+            thetaDraw = [Parameter("b"), Parameter("g")]
             if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
                     self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
                 if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
@@ -920,6 +921,7 @@ class QaoaQiskitIsing(QaoaQiskit):
                 bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
                 for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
                     kirchhoffCost += abs(val) ** 2
+            # TODO seperate into different cost functions
             self._kirchhoffcostDict[bitstring] = kirchhoffCost
             return kirchhoffCost
 
