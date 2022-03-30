@@ -428,7 +428,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         plt.setp(bp['whiskers'], color=color)
         plt.setp(bp['caps'], color=color)
         plt.setp(bp['medians'], color=color)
-        plt.setp(bp['fliers'], color=color, markersize=2.0)
+        plt.setp(bp['fliers'], markersize=5.0, marker="+", markeredgecolor=color)
 
     fig = plt.figure(figsize=(13,5))
 
@@ -447,7 +447,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         boxDistance = [-0.9, -0.3, 0.3, 0.9]
 
     for i in range(nPlots):
-        bp = plt.boxplot(x=toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i], sym='',
+        bp = plt.boxplot(x=toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i],
                          widths=boxWidth)
         set_box_color(bp, colors[i])
         plt.plot([], c=colors[i], label=labels[i])
@@ -563,6 +563,18 @@ def main():
 
     colors = [blueLight, blueDark, orangeLight, orangeDark]
 
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 3 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
 
     filenames = [
 #    "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_14-17-31_config.yaml",
