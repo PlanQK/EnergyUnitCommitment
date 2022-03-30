@@ -245,11 +245,11 @@ class IsingPypsaInterface:
                         ].index),
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index),
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index),
                 }
         return result
