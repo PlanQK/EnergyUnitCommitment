@@ -77,8 +77,8 @@ ganBackends = {
     "dwave-hybrid": Backends.DwaveCloudHybrid,
     "dwave-qpu": Backends.DwaveCloudDirectQPU,
     "dwave-read-qpu": Backends.DwaveReadQPU,
-#    "qaoa": Backends.QaoaQiskit,
-    "qaoa": Backends.QaoaQiskitIsing,
+    "qaoa": Backends.QaoaQiskit,
+#    "qaoa": Backends.QaoaQiskitIsing,
 }
 
 def main():

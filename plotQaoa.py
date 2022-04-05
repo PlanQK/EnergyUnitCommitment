@@ -430,7 +430,7 @@ def buildKirchLabels(filename: str, directory: str = "results_qaoa_sweep/", kirc
     else:
         for bitstring in bitstrings:
             kirchValue = dataAll["kirchhoff"][bitstring]["total"]
-            labels.append(f"{bitstring}\nk={kirchValue}")
+            labels.append(f"{bitstring}\nc={kirchValue}")
 
     return labels
 
@@ -615,6 +615,19 @@ def main():
     #meanOfInitGuess(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_11-51-19_config.yaml")
 
     colors = [blueLight, blueDark, orangeLight, orangeDark]
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_15-27-33_config_90.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_91.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_92.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
 
     plotCFoptimizationSingle(
         filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
