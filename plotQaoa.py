@@ -616,15 +616,64 @@ def main():
 
     colors = [blueLight, blueDark, orangeLight, orangeDark]
 
-    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_15-27-33_config_90.yaml",
-                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_91.yaml",
-                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_92.yaml",
-                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-04_17-07-10_config_93.yaml"]
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml",
+        repetition="10", plotname="Parameterentwicklung für zwei Layer\nmit sehr guten Initialwerten", savename="2Layer_OptInit")
+
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yamlrand",
+        repetition="24", plotname="Parameterentwicklung für zwei Layer\nmit guten Initialwerten", savename="2Layer_RandomInit")
+
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml",
+        repetition="1", plotname="Parameterentwicklung für zwei Layer\nmit schlechten Initialwerten",
+        savename="2Layer_BadInit")
+
+    return
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_90.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_92.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml"]
     labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
     title = "Einfluss des Initialwertes und der Anzahl der Layer"
     colors = [blueLight, blueDark, orangeLight, orangeDark]
     plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
-                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_IsingInterfaceRandom", title=title,
+                            cut=1.0,
+                            kirchLabels=None)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-06_07-55-35_config_94.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml"]
+    labels = ["2 Layers Qaoa", "2 Layers Ising"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffClasses_2Layers_testNetwork4QubitIsing_2_0_20", title=title,
+                            cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_90.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_92.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_IsingInterface", title=title,
+                            cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_90.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_91.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_92.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_QaoaInterface", title=title, cut=1.0,
                             kirchLabels=0)
 
     return

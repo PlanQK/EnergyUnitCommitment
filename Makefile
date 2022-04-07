@@ -15,7 +15,7 @@ PREFIX := infoNocostFixed
 
 # config file
 #CONFIGFILES = "config.yaml"
-CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[9][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})

@@ -90,9 +90,9 @@ class QaoaQiskit(BackendBase):
                     # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
                     if initial_guess_original[j] == "rand":
                         if j % 2 == 0:
-                            initial_guess.append(0.5 - random.rand() * 2 * math.pi)
+                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
                         else:
-                            initial_guess.append(0.5 - random.rand() * math.pi)
+                            initial_guess.append((0.5 - random.rand()) * math.pi)
                     else:
                         initial_guess.append(initial_guess_original[j])
                 initial_guess = np.array(initial_guess)
@@ -160,21 +160,21 @@ class QaoaQiskit(BackendBase):
 
 
         self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
-        bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
-        bestRepetition = repetitionResults[bestRepetitionIndex]
-        bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
-        mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
-        bestString = min(bestResult['counts'],key=lambda x: self.kirchhoff[f"rep{bestRepetitionIndex+1}"][x]["total"])
-        print(f"BEST STRING: {bestString}")
-        for idx, repetition in self.metaInfo["results"].items():
-            if max(repetition['counts'], key=repetition['counts'].get) == bestString:
-                print(f"Solution has highest count at repetition {idx+1}")
-                print(repetition['counts'])
+        #bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
+        #bestRepetition = repetitionResults[bestRepetitionIndex]
+        #bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
+        #mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
+        #bestString = min(bestResult['counts'],key=lambda x: self.kirchhoff[f"rep{bestRepetitionIndex+1}"][x]["total"])
+        #print(f"BEST STRING: {bestString}")
+        #for idx, repetition in self.metaInfo["results"].items():
+        #    if max(repetition['counts'], key=repetition['counts'].get) == bestString:
+        #        print(f"Solution has highest count at repetition {idx+1}")
+        #        print(repetition['counts'])
 
 
-        print(f"----------------------- Summary -------------------------------------")
-        print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
-        print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff[f'rep{bestRepetitionIndex+1}'][mostLikelyBitstring]['total']}")
+        #print(f"----------------------- Summary -------------------------------------")
+        #print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
+        #print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff[f'rep{bestRepetitionIndex+1}'][mostLikelyBitstring]['total']}")
         return self.metaInfo["results"]
 
 
@@ -910,7 +910,7 @@ class QaoaQiskitIsing(QaoaQiskit):
         super().__init__(config=config)
         self._kirchhoffcostDict = {}
 
-    def kirchhoff_satisfied2(self, bitstring: str) -> float:
+    def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given solution.
 
@@ -923,8 +923,10 @@ class QaoaQiskitIsing(QaoaQiskit):
                     satisfied for the given network.
         """
         try:
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = self._kirchhoffcostDict[bitstring]
             return self._kirchhoffcostDict[bitstring]
         except KeyError:
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring] = {}
             kirchhoffCost = 0.0
             for bus in self.network.buses.index:
                 bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
@@ -932,6 +934,7 @@ class QaoaQiskitIsing(QaoaQiskit):
                     kirchhoffCost += abs(val) ** 2
             # TODO seperate into different cost functions
             self._kirchhoffcostDict[bitstring] = kirchhoffCost
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = kirchhoffCost
             return kirchhoffCost
 
 
