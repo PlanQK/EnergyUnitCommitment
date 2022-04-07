@@ -57,6 +57,8 @@ class DwaveTabuSampler(BackendBase):
         totalCost = transformedProblem[0].calcCost(solutionState)
         self.metaInfo["marginalCost"] = transformedProblem[0].calcMarginalCost(solutionState)
         self.metaInfo["totalCost"] = totalCost
+        self.metaInfo["kirchhoffCost"] = transformedProblem[0].calcKirchhoffCost(solutionState)
+        print(f"Kirchhoff: {self.metaInfo['kirchhoffCost']}")
 
         resultDict = {
             'solutionState': solutionState,
@@ -221,6 +223,7 @@ class DwaveCloudHybrid(DwaveCloud):
         # TODO write more info on solution to metaInfo
 
     def optimize(self, transformedProblem):
+        print(self.sampler.properties)
         print("optimize")
         sampleset = self.sampler.sample(transformedProblem[1])
         print("Waiting for server response...")
