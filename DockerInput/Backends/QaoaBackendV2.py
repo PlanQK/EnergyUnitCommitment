@@ -8,11 +8,11 @@ import os.path
 
 from numpy import random
 
-from .BackendBase import BackendBase                                # import for Docker run
-from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
-#from BackendBase import BackendBase                                # import for local/debug run
-#from IsingPypsaInterface import IsingPypsaInterface                # import for local/debug run
-#from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
+#from .BackendBase import BackendBase                                # import for Docker run
+#from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
+from BackendBase import BackendBase                                # import for local/debug run
+from IsingPypsaInterface import IsingPypsaInterface                # import for local/debug run
+from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
@@ -205,7 +205,7 @@ class QaoaQiskit(BackendBase):
             return COBYLA(maxiter=max_iter, tol=0.0001)
         elif configString == "ADAM":
             return ADAM(maxiter=max_iter, tol=0.0001)
-        raise ValueError("Optimizername in config file doesn't match any known optimizers")
+        raise ValueError("Optimizer name in config file doesn't match any known optimizers")
 
 
     def getMinCFvars(self):
@@ -850,7 +850,7 @@ def main():
     config["QaoaBackend"]["filenameSplit"] = filenameSplit
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
-    qaoa = QaoaQiskit(config=config)
+    qaoa = QaoaQiskitIsing(config=config)
     components = qaoa.transformProblemForOptimizer(network=netImport)
 
     """
