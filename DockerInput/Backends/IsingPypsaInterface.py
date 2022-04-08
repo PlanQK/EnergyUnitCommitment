@@ -1687,3 +1687,154 @@ class customsplitMarginalAsPenalty(customsplitIsingInterface):
             )
 
 
+
+def fullsplit(capacity):
+    pass
+
+def binarysplit(capacity):
+    pass
+
+def customsplit(capacity):
+    pass
+
+
+
+class IsingBackbone:
+    """
+    This class implements the conversion of a unit commitment problem given by a pypsa network
+    to an ising spin glass problem. It encodes the various network components into qubits and provides
+    methods to interact with that data structure. It delegates modeling of various constraints to other
+    instances of IsingSubprolem, which are stored as attributes. IsingSubproblem provide a method which
+    adds the ising representation of the subproblem it models to the stored ising problem in this class
+    """
+#   wrapper for old calling convention
+#    @classmethod
+#    def buildCostFunction(
+#        cls,
+#        network,
+#    ):
+
+    linesplitDict = {
+            "fullsplit" : fullsplit,
+            "binarysplit" : binarysplit,
+            "customsplit" : customsplit,
+    } 
+
+    def __init__(self, network, linesplitFunction, configuration):
+        if isinstance(linesplitFunction, str):
+            linesplitFunction = IsingBackbone.linesplitDict[linesplitFunction]
+        self._splitCapacity = linesplitFunction
+
+        # Reusing IsingPypsaInterface, refactor this
+        # set up qubits
+        # network to be solved
+        self.network = network
+        self.snapshots = snapshots
+
+        # hyper parameters of problem formulation
+        envMgr = EnvironmentVariableManager()
+        self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
+        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
+        self.minUpDownFactor = float(envMgr["minUpDownFactor"])
+
+        # contains ising coefficients
+        self.problem = {}
+
+        # contains encoding data
+        self.data = {}
+        
+        # qubits currently in use/next qubit to use to represent a network component
+        self.allocatedQubits = 0
+        # End IsingPypsaInterface init
+
+        #read configuration dict and apply subproblems
+        self._subproblems = {}
+        for subproblem, subproblemConfiguratioa in configuration.items():
+            name, subproblemInstance = subproblem.build(subproblemConfiguration)
+            self._subproblems[name] = subproblemInstance
+            subproblemInstance.encodeSubproblem(self)
+            
+
+    # obtain config file using an adapter
+    @classmethod
+    def buildIsingProblem(cls, network, linesplitFunction, config: dict):
+        pass
+    
+    def addInteraction(self, *args):
+        pass
+
+    def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0, additionalTime=None):
+        pass
+
+    def encodeGenerator(self, generator, time):
+        pass
+
+    def encodeLine(self, line, time):
+        pass
+
+    def storeLines(self):
+        pass
+
+    def storeGenerators(self):
+        pass
+
+    def siquanFormat(self):
+        pass
+
+    def getNominalPower(self,generator, time=0,):
+        pass
+
+    def getInteraction(self,*args):
+        pass
+
+    # usw
+
+class AbstractIsingSubproblem:
+    """
+    An interface for classes that model the ising formulation of subproblem of an unit commitment problem
+    """
+    def encodeSubproblem(self, isingBackbone: IsingBackbone, scaleFactor: float):
+        """
+        This encodes the problem an instance of a subclass is describing into the isingBackbone instance
+        After this call, the corresponding QUBO is stored in the isingBackbone
+        """
+        pass
+
+    @classmethod
+    def buildSubproblem(cls, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
+        """
+        returns the name of the subproblem and an instance of the class set up according to the configuration.
+        This is done by choosing the corresponding subclass of the configuration.
+        After initialization, the instance can encode this subproblem into an isingBackbone by calling
+        the encodeSubproblem method
+        """
+        pass
+
+    def calculateCost(self, solution, *args):
+        """
+        For a given solution calculates how much cost is incurred regarding the subproblem this instance
+        represents by not solving it exactly
+        """
+        pass
+    
+    
+
+class KirchhoffSubproblem(AbstractIsingSubproblem):
+    pass
+    
+
+class Adapter:
+    """
+    This class is an adapter to obtain the configuration dictionary dependent on the input format
+    """
+    def getConfig(self,*args) -> dict:
+        pass
+
+class JsonAdapter(Adapter):
+    pass
+
+class YamlAdapter(Adapter):
+    pass
+
+class EnvAdapter(Adapter):
+    pass
