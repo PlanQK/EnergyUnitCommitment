@@ -14,8 +14,8 @@ PREFIX := infoNocostFixed
 
 
 # config file
-CONFIGFILES = "config.yaml"
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[8][0-9].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+#CONFIGFILES = "config.yaml"
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 # general parameters
 NUMBERS = $(shell seq 1 ${REPETITIONS})
@@ -43,8 +43,8 @@ CHAINSTRENGTH = 60
 SAMPLECUTSIZE = $(shell seq 200 4 200)
 
 # Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
-#PROBLEMFORMULATION = binarysplitNoMarginalCost
-PROBLEMFORMULATION = fullsplitGlobalCostSquare
+PROBLEMFORMULATION = binarysplitNoMarginalCost
+#PROBLEMFORMULATION = fullsplitGlobalCostSquare
 #PROBLEMFORMULATION = fullsplitMarginalAsPenalty
 #PROBLEMFORMULATION = fullsplitMarginalAsPenaltyAverageOffset
 #PROBLEMFORMULATION = fullsplitNoMarginalCost
@@ -79,8 +79,8 @@ TIMEOUT = 60
 
 
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 # result files of computations

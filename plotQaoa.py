@@ -9,6 +9,7 @@ import json
 import random
 
 from numpy import median, linalg
+from qiskit.circuit import Parameter
 
 from statistics import mean
 from scipy.optimize import curve_fit
@@ -95,7 +96,7 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
                 "filename": []}
     plotDataFull = {"cf": [],
                     "filename": []}
-    labels = {"cf": "cost function",
+    labels = {"cf": "cf",
               "duration": "time"}
     for i in range(1, hpReps + 1):
         plotData[f"init_beta{i}"] = []
@@ -106,10 +107,10 @@ def extractPlotData(filename: str, directory: str = "results_qaoa_sweep/") -> tu
         plotDataFull[f"beta{i}"] = []
         plotDataFull[f"init_gamma{i}"] = []
         plotDataFull[f"gamma{i}"] = []
-        labels[f"init_beta{i}"] = f"initial beta{i}"
-        labels[f"beta{i}"] = f"beta{i}"
-        labels[f"init_gamma{i}"] = f"initial gamma{i}"
-        labels[f"gamma{i}"] = f"gamma{i}"
+        labels[f"init_beta{i}"] = f"initial {chr(946)}{chr(8320 + i)}"
+        labels[f"beta{i}"] = f"{chr(946)}{chr(8320 + i)}"
+        labels[f"init_gamma{i}"] = f"initial {chr(947)}{chr(8320 + i)}"
+        labels[f"gamma{i}"] = f"{chr(947)}{chr(8320 + i)}"
     for bitstring in bitstrings:
         plotDataFull[f"{bitstring}prop"] = []
         plotDataFull[f"{bitstring}shots"] = []
@@ -257,7 +258,7 @@ def plotBoxplotBest(filename: str, plotname: str, savename: str, cut: float = 0.
     plt.savefig(f"plots/BBP_{savename}.png")
 
 
-def plotCFoptimization(filename: str, plotname: str, savename: str, directory: str = "results_qaoa_sweep/"):
+def plotCFoptimizationDouble(filename: str, plotname: str, savename: str, directory: str = "results_qaoa_sweep/"):
     """
     Creates two plot showing the evolution of the cost function, and all betas and gammas of two random repetitions.
     Args:
@@ -314,6 +315,58 @@ def plotCFoptimization(filename: str, plotname: str, savename: str, directory: s
     plt.savefig(f"plots/CF_{savename}.png")
 
 
+def plotCFoptimizationSingle(filename: str, repetition: str, plotname: str, savename: str, directory: str = "results_qaoa_sweep/"):
+    """
+    Creates two plot showing the evolution of the cost function, and all betas and gammas of a chosen repetition.
+    Args:
+        filename: (str) filename of dateset to be plotted.
+        plotname: (str) title of the plot.
+        savename: (str) the name to be used to add to "Scatter_" as the filename of the png
+        directory: (str) The folder in which the file is located. Default: "results_qaoa_sweep/"
+
+    Returns:
+        Saves the generated plot, with the name "CFSingle_{plotname}.png" to the subfolder 'plots'
+    """
+    bitstrings, plotData, plotDataFull, labels, metaData = extractPlotData(filename=filename, directory=directory)
+
+    minCF = min(plotData["cf"])
+    index_minCF = plotData["cf"].index(minCF)
+
+    fig, ax = plt.subplots()
+    fig.set_figheight(7)
+
+    rep = int(repetition) - 1
+    indexBegin = plotDataFull["filename"].index(plotData["filename"][rep])
+    plotDataFull["filename"].reverse()
+    indexEnd = plotDataFull["filename"].index(plotData["filename"][rep])
+    plotDataFull["filename"].reverse()
+    indexEnd = len(plotDataFull["filename"]) - indexEnd
+    hpReps = int(len(metaData["initial_guess"]) / 2)
+
+    xData = list(range(0, indexEnd - indexBegin))
+    leg = []
+
+    for j in range(1, hpReps + 1):
+        ax.plot(xData, plotDataFull[f"beta{j}"][indexBegin:indexEnd], color=(0, 0, (1 - ((j - 1) / hpReps)), 1),
+                label=labels[f"beta{j}"])
+        leg.append(labels[f"beta{j}"])
+        ax.plot(xData, plotDataFull[f"gamma{j}"][indexBegin:indexEnd], color=((1 - ((j - 1) / hpReps)), 0, 0, 1),
+                label=labels[f"gamma{j}"])
+        leg.append(labels[f"gamma{j}"])
+    ax.plot(xData, plotDataFull["cf"][indexBegin:indexEnd], "g-", label=labels["cf"])
+    leg.append(labels["cf"])
+    ax.set_xlabel('iteration')
+    ax.set_ylabel('value')
+    ax.label_outer()
+    #ax.set_title(f"rep {repetition}", fontdict={'fontsize': 8})
+
+    fig.suptitle(plotname)
+    fig.legend(leg, loc="upper right")
+    plt.figtext(0.0, 0.01, f"data: {plotData['filename'][rep]}", fontdict={'fontsize': 8})
+    #plt.show()
+    plt.savefig(f"plots/CFSingle_{savename}.png")
+
+
 def plotBPandCF(filename: str, extraPlotInfo:str, savename: str, cut: float = 0.5,
                 directory: str = "results_qaoa_sweep/"):
     """
@@ -352,7 +405,7 @@ def plotBPandCF(filename: str, extraPlotInfo:str, savename: str, cut: float = 0.
     plotBoxplot(filename=filename, plotname=plotnameBP, savename=savename)
     plotBoxplotBest(filename=filename, plotname=plotnameBPB, savename=savename, cut=cut)
     if len(dataAll["results"]) > 1:
-        plotCFoptimization(filename=filename, plotname=plotnameCF, savename=savename)
+        plotCFoptimizationDouble(filename=filename, plotname=plotnameCF, savename=savename)
 
 
 def buildKirchLabels(filename: str, directory: str = "results_qaoa_sweep/", kirchLabels: int = None) -> list:
@@ -377,7 +430,7 @@ def buildKirchLabels(filename: str, directory: str = "results_qaoa_sweep/", kirc
     else:
         for bitstring in bitstrings:
             kirchValue = dataAll["kirchhoff"][bitstring]["total"]
-            labels.append(f"{bitstring}\nk={kirchValue}")
+            labels.append(f"{bitstring}\nc={kirchValue}")
 
     return labels
 
@@ -428,7 +481,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         plt.setp(bp['whiskers'], color=color)
         plt.setp(bp['caps'], color=color)
         plt.setp(bp['medians'], color=color)
-        plt.setp(bp['fliers'], color=color, markersize=2.0)
+        plt.setp(bp['fliers'], markersize=5.0, marker="+", markeredgecolor=color)
 
     fig = plt.figure(figsize=(13,5))
 
@@ -447,7 +500,7 @@ def plotBitstringBoxCompare(filenames: list, labels: list, colors: list, savenam
         boxDistance = [-0.9, -0.3, 0.3, 0.9]
 
     for i in range(nPlots):
-        bp = plt.boxplot(x=toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i], sym='',
+        bp = plt.boxplot(x=toPlot[i], positions=np.array(range(len(toPlot[i]))) * nPlots + boxDistance[i],
                          widths=boxWidth)
         set_box_color(bp, colors[i])
         plt.plot([], c=colors[i], label=labels[i])
@@ -563,6 +616,89 @@ def main():
 
     colors = [blueLight, blueDark, orangeLight, orangeDark]
 
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml",
+        repetition="10", plotname="Parameterentwicklung für zwei Layer\nmit sehr guten Initialwerten", savename="2Layer_OptInit")
+
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yamlrand",
+        repetition="24", plotname="Parameterentwicklung für zwei Layer\nmit guten Initialwerten", savename="2Layer_RandomInit")
+
+    plotCFoptimizationSingle(
+        filename="infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml",
+        repetition="1", plotname="Parameterentwicklung für zwei Layer\nmit schlechten Initialwerten",
+        savename="2Layer_BadInit")
+
+    return
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_90.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_92.yamlrand",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_IsingInterfaceRandom", title=title,
+                            cut=1.0,
+                            kirchLabels=None)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-06_07-55-35_config_94.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml"]
+    labels = ["2 Layers Qaoa", "2 Layers Ising"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffClasses_2Layers_testNetwork4QubitIsing_2_0_20", title=title,
+                            cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_90.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_91.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_92.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_22-12-45_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_IsingInterface", title=title,
+                            cut=1.0,
+                            kirchLabels=0)
+
+    filenames = ["infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_90.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_91.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_92.yaml",
+                 "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-04-05_18-14-03_config_93.yaml"]
+    labels = ["1 Layer", "2 Layers", "4 Layers", "1 Layer mit schlechten Ausgangswerten"]
+    title = "Einfluss des Initialwertes und der Anzahl der Layer"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_diffLayers_testNetwork4QubitIsing_2_0_20_QaoaInterface", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
+
+    plotCFoptimizationSingle(
+        filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
+        repetition="49", plotname="test1", savename="test_1")
+
+    plotCFoptimizationSingle(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml_rand",
+                             repetition="20", plotname="test1", savename="test_1")
+
+    return
+
+    filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_80.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_81.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-03_22-26-51_config_82.yaml",
+                 "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-03_16-43-45_config_83.yaml"]
+    labels = ["single Hp + min cf rand", "single Hp + 1;1", "double Hp + min cf rand", "double Hp + 1;1"]
+    title = "Network 3 evaluation - with noise"
+    colors = [blueLight, blueDark, orangeLight, orangeDark]
+    plotBitstringBoxCompare(filenames=filenames, labels=labels, colors=colors,
+                            savename="4qubit_init-rand_2Hp_NOISE_testNetwork4QubitIsing_2_3_20", title=title, cut=1.0,
+                            kirchLabels=0)
+
+    return
 
     filenames = [
 #    "infoNocostFixed_testNetwork4QubitIsing_2_0_20.nc_60_1_2022-03-14_14-17-31_config.yaml",
@@ -931,9 +1067,9 @@ def main():
                 savename="4qubit_COBYLA-randomINIT_testNetwork4QubitIsing_2_0_20")
 
     return
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-32-15_config.yaml",
-                       plotname="COBYLA init = 5,5",
-                       savename="4qubit_COBYLA-init5-5_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-32-15_config.yaml",
+                             plotname="COBYLA init = 5,5",
+                             savename="4qubit_COBYLA-init5-5_testNetwork4QubitIsing_2_0_20")
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-32-15_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml"]
@@ -945,16 +1081,16 @@ def main():
                             kirchLabels=0)
 
     return
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
-                       plotname="COBYLA init = 1,1",
-                       savename="4qubit_COBYLA-init1-1_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
+                             plotname="COBYLA init = 1,1",
+                             savename="4qubit_COBYLA-init1-1_testNetwork4QubitIsing_2_0_20")
     return
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-16-36_config.yaml",
-                       plotname="COBYLA tol = 0.01",
-                       savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_3_20")
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-18-44_config.yaml",
-                       plotname="COBYLA tol = None",
-                       savename="4qubit_COBYLA-tol-None_testNetwork4QubitIsing_2_3_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-16-36_config.yaml",
+                             plotname="COBYLA tol = 0.01",
+                             savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_3_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-18-44_config.yaml",
+                             plotname="COBYLA tol = None",
+                             savename="4qubit_COBYLA-tol-None_testNetwork4QubitIsing_2_3_20")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-12-21_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-16-36_config.yaml",
@@ -967,9 +1103,9 @@ def main():
                             kirchLabels=0)
 
     return
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-14-49_config.yaml",
-                       plotname="COBYLA init = 10,10",
-                       savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_3_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-14-49_config.yaml",
+                             plotname="COBYLA init = 10,10",
+                             savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_3_20")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-12-21_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_3_20.nc_30_1_2022-03-02_08-14-49_config.yaml"]
@@ -991,9 +1127,9 @@ def main():
                             kirchLabels=0)
     return
 
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
-                       plotname="COBYLA minimize",
-                       savename="4qubit_COBYLA-minimize_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml",
+                             plotname="COBYLA minimize",
+                             savename="4qubit_COBYLA-minimize_testNetwork4QubitIsing_2_0_20")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_08-02-58_config.yaml"]
@@ -1008,12 +1144,12 @@ def main():
                 extraPlotInfo="COBYLA constraints test",
                 savename="4qubit_COBYLA-constraints_testNetwork4QubitIsing_2_0_20")
     return
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-21-06_config.yaml",
-                       plotname="COBYLA init = 10,10; rhobeg = 5",
-                       savename="4qubit_COBYLA-init10-10_rhobeg5_testNetwork4QubitIsing_2_0_20")
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-18-58_config.yaml",
-                       plotname="COBYLA init = 1,1; rhobeg = 5",
-                       savename="4qubit_COBYLA-init1-1_rhobeg5_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-21-06_config.yaml",
+                             plotname="COBYLA init = 10,10; rhobeg = 5",
+                             savename="4qubit_COBYLA-init10-10_rhobeg5_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-18-58_config.yaml",
+                             plotname="COBYLA init = 1,1; rhobeg = 5",
+                             savename="4qubit_COBYLA-init1-1_rhobeg5_testNetwork4QubitIsing_2_0_20")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-18-58_config.yaml",
@@ -1026,9 +1162,9 @@ def main():
                             kirchLabels=0)
     return
 
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml",
-                       plotname="COBYLA init = 10,10",
-                       savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml",
+                             plotname="COBYLA init = 10,10",
+                             savename="4qubit_COBYLA-init10-10_testNetwork4QubitIsing_2_0_20")
 
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-10-21_config.yaml"]
@@ -1048,13 +1184,13 @@ def main():
                             savename="4qubit_COBYLA-tol-test_testNetwork4QubitIsing_2_0_20", title=title, cut=1.0,
                             kirchLabels=0)
 
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
-                       plotname="COBYLA tol = 0.0001",
-                       savename="4qubit_COBYLA-tol0.0001_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
+                             plotname="COBYLA tol = 0.0001",
+                             savename="4qubit_COBYLA-tol0.0001_testNetwork4QubitIsing_2_0_20")
 
-    plotCFoptimization(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-04-26_config.yaml",
-                       plotname="COBYLA tol = 0.01",
-                       savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_0_20")
+    plotCFoptimizationDouble(filename="infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-02_07-04-26_config.yaml",
+                             plotname="COBYLA tol = 0.01",
+                             savename="4qubit_COBYLA-tol0.01_testNetwork4QubitIsing_2_0_20")
     return
     filenames = ["infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_17-07-37_config.yaml",
                  "infoNocost_testNetwork4QubitIsing_2_0_20.nc_30_1_2022-03-01_16-48-59_config.yaml",
@@ -1836,15 +1972,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-49-00",
                 plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3, kirch^2",
                 savename="aer_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-42",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, statevector",
-                       savename="state_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-51",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, qasm",
-                       savename="qasm_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-49-00",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, aer",
-                       savename="aer_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-42",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, statevector",
+                             savename="state_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-48-51",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, qasm",
+                             savename="qasm_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_14-49-00",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, kirch^2, aer",
+                             savename="aer_4qubit_g1-1_g2-3_kirch^2_noNoise_maxiter50_shots4096_rep10")
 
     # 4bit gInverse kirch^2
     # without noise
@@ -1857,15 +1993,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-12",
                 plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1, kirch^2",
                 savename="aer_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-31",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, statevector",
-                       savename="state_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-22",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, qasm",
-                       savename="qasm_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-12",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, aer",
-                       savename="aer_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-31",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, statevector",
+                             savename="state_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-22",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, qasm",
+                             savename="qasm_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_14-26-12",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, kirch^2, aer",
+                             savename="aer_4qubit_g1-3_g2-1_kirch^2_noNoise_maxiter50_shots4096_rep10")
 
     # 4bit gInverse
     # without noise
@@ -1878,15 +2014,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-20",
                 plotname="SPSA without noise - maxiter 50 \n g1=3, g2=1",
                 savename="aer_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-35-57",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, statevector",
-                       savename="state_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-07",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, qasm",
-                       savename="qasm_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-20",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, aer",
-                       savename="aer_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-35-57",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, statevector",
+                             savename="state_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-07",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, qasm",
+                             savename="qasm_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-gInverse_2_0_20.nc_30_1_2022-02-09_13-36-20",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=1, aer",
+                             savename="aer_4qubit_g1-3_g2-1_noNoise_maxiter50_shots4096_rep10")
 
     # 4bit g3 & g12
     # without noise
@@ -1899,15 +2035,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-51",
                 plotname="SPSA without noise - maxiter 50 \n g1=3, g2=12",
                 savename="aer_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-20-35",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, statevector",
-                       savename="state_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-21",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, qasm",
-                       savename="qasm_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-51",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, aer",
-                       savename="aer_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-20-35",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, statevector",
+                             savename="state_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-21",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, qasm",
+                             savename="qasm_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit-g3g12_2_0_20.nc_30_1_2022-02-09_13-10-51",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=3, g2=12, aer",
+                             savename="aer_4qubit_g1-3_g2-12_noNoise_maxiter50_shots4096_rep10")
 
     # 5bit
     # without noise
@@ -1920,15 +2056,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-37",
                 plotname="SPSA without noise - maxiter 50 \n g1=2, g2=4, g3=2",
                 savename="aer_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_11-33-18",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, statevector",
-                       savename="state_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-53",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, qasm",
-                       savename="qasm_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-37",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, aer",
-                       savename="aer_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_11-33-18",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, statevector",
+                             savename="state_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-53",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, qasm",
+                             savename="qasm_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork5Qubit_2_0_20.nc_30_1_2022-02-09_12-03-37",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=2, g2=4, g3=2, aer",
+                             savename="aer_5qubit_g1-2_g2-4_g3-2_noNoise_maxiter50_shots4096_rep10")
 
     # 4bit
     # without noise
@@ -1941,15 +2077,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-57",
                 plotname="SPSA without noise - maxiter 50 \n g1=1, g2=3",
                 savename="aer_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_09-59-35",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, statevector",
-                       savename="state_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-10",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, qasm",
-                       savename="qasm_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-57",
-                       plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, aer",
-                       savename="aer_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_09-59-35",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, statevector",
+                             savename="state_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-10",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, qasm",
+                             savename="qasm_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-16-57",
+                             plotname="SPSA evolution without noise - maxiter 50 \n g1=1, g2=3, aer",
+                             savename="aer_4qubit_g1-1_g2-3_noNoise_maxiter50_shots4096_rep10")
 
     # 4bit
     # with noise
@@ -1962,15 +2098,15 @@ def main():
     plotBoxplot(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-34",
                 plotname="SPSA with noise - maxiter 50 \n g1=1, g2=3",
                 savename="aer_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-44-43",
-                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, statevector",
-                       savename="state_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-41",
-                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, qasm",
-                       savename="qasm_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
-    plotCFoptimization(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-34",
-                       plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, aer",
-                       savename="aer_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-44-43",
+                             plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, statevector",
+                             savename="state_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-41",
+                             plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, qasm",
+                             savename="qasm_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
+    plotCFoptimizationDouble(docker=True, filename="info_testNetwork4Qubit_2_0_20.nc_30_1_2022-02-09_10-32-34",
+                             plotname="SPSA evolution with noise - maxiter 50 \n g1=1, g2=3, aer",
+                             savename="aer_4qubit_g1-1_g2-3_yesNoise_maxiter50_shots4096_rep10")
     return
 
     #plotBoxplot(filename="QaoaCompare_2022-2-4_15-22-53_606565",
@@ -2029,8 +2165,8 @@ def main():
 
     plotBoxplot(filename="QaoaCompare_2022-2-2_9-57-52_224944",
                 plotname="simulator with noise using SPSA - maxiter 100")
-    plotCFoptimization(filename="QaoaCompare_2022-2-2_9-57-52_224944",
-                       plotname="SPSA evolution with noise - maxiter 100")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-2_9-57-52_224944",
+                             plotname="SPSA evolution with noise - maxiter 100")
 
     return
 
@@ -2038,10 +2174,10 @@ def main():
                 plotname="simulator no noise using SPSA - maxiter 25")
     plotBoxplot(filename="QaoaCompare_2022-2-1_18-16-50_858006",
                 plotname="simulator with noise using SPSA - maxiter 25")
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_18-16-50_858006",
-                       plotname="SPSA evolution with noise - maxiter 25")
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-39-28_26095",
-                       plotname="SPSA evolution without noise - maxiter 25")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_18-16-50_858006",
+                             plotname="SPSA evolution with noise - maxiter 25")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_17-39-28_26095",
+                             plotname="SPSA evolution without noise - maxiter 25")
 
     return
 
@@ -2049,24 +2185,24 @@ def main():
                 plotname="simulator no noise using SPSA - maxiter 10")
     plotBoxplot(filename="QaoaCompare_2022-2-1_17-3-6_698242",
                 plotname="simulator with noise using SPSA - maxiter 10")
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-3-6_698242",
-                       plotname="SPSA evolution with noise - maxiter 10")
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_17-14-20_973918",
-                       plotname="SPSA evolution without noise - maxiter 10")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_17-3-6_698242",
+                             plotname="SPSA evolution with noise - maxiter 10")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_17-14-20_973918",
+                             plotname="SPSA evolution without noise - maxiter 10")
 
 
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_15-22-52_137642",
-                       plotname="SPSA evolution with noise - maxiter 50")
-    plotCFoptimization(filename="QaoaCompare_2022-2-1_15-52-0_342208",
-                       plotname="SPSA evolution without noise - maxiter 50")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_15-22-52_137642",
+                             plotname="SPSA evolution with noise - maxiter 50")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-2-1_15-52-0_342208",
+                             plotname="SPSA evolution without noise - maxiter 50")
     plotBoxplot(filename="QaoaCompare_2022-2-1_15-52-0_342208",
                 plotname="simulator no noise using SPSA - maxiter 50")
     plotBoxplot(filename="QaoaCompare_2022-2-1_15-22-52_137642",
                 plotname="simulator with noise using SPSA - maxiter 50")
 
     return
-    plotCFoptimization(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="optimization evolution with noise")
-    plotCFoptimization(filename="QaoaCompare_2022-1-31_12-35-19_479895", plotname="optimization evolution without noise")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="optimization evolution with noise")
+    plotCFoptimizationDouble(filename="QaoaCompare_2022-1-31_12-35-19_479895", plotname="optimization evolution without noise")
 
     plotBoxplot(filename="QaoaCompare_2022-1-31_13-11-6_987313", plotname="aer_simulator with noise")
 

@@ -72,100 +72,109 @@ class QaoaQiskit(BackendBase):
         num_vars = len(initial_guess_original)
         max_iter = self.config["QaoaBackend"]["max_iter"]
         repetitions = self.config["QaoaBackend"]["repetitions"]
-        repetitions_start = 1
-
         repetitionResults = []
 
-        for curRepetition in range(1, repetitions + 1):
-            time_start = datetime.timestamp(datetime.now())
-            print(f"----------------------- Iteration {curRepetition} ----------------------------------")
-
-            initial_guess = [
-                    (0.5 - random.rand()) * 2 * math.pi 
-                    if currentGuess == "rand" 
-                    else currentGuess
-                    for  currentGuess in initial_guess_original
-            ]
-            initial_guess = np.array(initial_guess)
-
-            self.resetResultDict()
-            self.results_dict["initial_guess"] = initial_guess.tolist()
-            self.results_dict["components"] = self.components
-
-            filename = self.generateFilename(curRepetition)
-
-            expectation = self.get_expectation(filename=filename,
-                                               components=transformedProblem,
-                                               simulator=simulator,
-                                               shots=shots,
-                                               simulate=simulate,
-                                               noise=noise)
-
-            optimizer = self.getClassicalOptimizer(max_iter)
-
-
-            res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-            self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-            self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-            self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
-
-            time_end = datetime.timestamp(datetime.now())
-            duration = time_end - time_start
-            self.results_dict["duration"] = duration
-
-            print(f"Score at repetition {curRepetition}: {res[1]} with solution {res[0]}")
-            repetitionResults.append({"score": res[1] , "theta": list(res[0])})
-            # safe final results
-            if self.docker:
-                with open(f"Problemset/{filename}", "w") as write_file:
-                    json.dump(self.results_dict, write_file, indent=2, default=str)
-            else:
-                with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-                    json.dump(self.results_dict, write_file, indent=2, default=str)
-
-            last_rep = self.results_dict["iter_count"]
-            last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
-            self.metaInfo["results"][curRepetition] = {"filename": filename,
-                                           "backend_name": self.results_dict["backend_name"],
-                                           "initial_guess": self.results_dict["initial_guess"],
-                                           "optimize_Iterations": self.results_dict["iter_count"],
-                                           "optimizeResults": self.results_dict["optimizeResults"],
-                                           "duration": duration,
-                                           "counts": last_rep_counts}
-
         if "rand" in initial_guess_original:
-            # dumping data
-            randFileName = "_".join(self.config["QaoaBackend"]["filenameSplit"]) + "rand"
-            if self.docker:
-                saveLocation = f"Problemset/{randFileName}"
-            else:
-                saveLocation = os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName
-            with open(saveLocation, "w") as write_file:
-                json.dump(self.metaInfo, write_file, indent=2, default=str)
+            randRep = 2
+        else:
+            randRep = 1
 
-            minCFvars  = self.getMinCFvars()
-            for j in range(num_vars):
-                if initial_guess_original[j] == "rand":
-                    initial_guess_original[j] = minCFvars[j]
-#            self.metaInfo["results"] = {}
+        for rand in range(randRep):
+            for curRepetition in range(1, repetitions + 1):
+                time_start = datetime.timestamp(datetime.now())
+                totalRepetition = rand * repetitions + curRepetition
+                print(f"----------------------- Iteration {totalRepetition} ----------------------------------")
+
+                initial_guess = []
+                for j in range(num_vars):
+                    # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
+                    if initial_guess_original[j] == "rand":
+                        if j % 2 == 0:
+                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
+                        else:
+                            initial_guess.append((0.5 - random.rand()) * math.pi)
+                    else:
+                        initial_guess.append(initial_guess_original[j])
+                initial_guess = np.array(initial_guess)
+
+                self.resetResultDict()
+                self.results_dict["initial_guess"] = initial_guess.tolist()
+                self.results_dict["components"] = self.components
+
+                filename = self.generateFilename(totalRepetition)
+
+                expectation = self.get_expectation(filename=filename,
+                                                   components=transformedProblem,
+                                                   simulator=simulator,
+                                                   shots=shots,
+                                                   simulate=simulate,
+                                                   noise=noise)
+
+                optimizer = self.getClassicalOptimizer(max_iter)
+
+
+                res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
+                self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
+                self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
+                self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+
+                time_end = datetime.timestamp(datetime.now())
+                duration = time_end - time_start
+                self.results_dict["duration"] = duration
+
+                print(f"Score at repetition {curRepetition}: {res[1]} with solution {res[0]}")
+                repetitionResults.append({"score": res[1] , "theta": list(res[0])})
+                # safe final results
+                if self.docker:
+                    with open(f"Problemset/{filename}", "w") as write_file:
+                        json.dump(self.results_dict, write_file, indent=2, default=str)
+                else:
+                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
+                        json.dump(self.results_dict, write_file, indent=2, default=str)
+
+                last_rep = self.results_dict["iter_count"]
+                last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
+                self.metaInfo["results"][curRepetition] = {"filename": filename,
+                                               "backend_name": self.results_dict["backend_name"],
+                                               "initial_guess": self.results_dict["initial_guess"],
+                                               "optimize_Iterations": self.results_dict["iter_count"],
+                                               "optimizeResults": self.results_dict["optimizeResults"],
+                                               "duration": duration,
+                                               "counts": last_rep_counts}
+
+            if "rand" in initial_guess_original:
+                # dumping data
+                randFileName = "_".join(self.config["QaoaBackend"]["filenameSplit"]) + "rand"
+                if self.docker:
+                    saveLocation = f"Problemset/{randFileName}"
+                else:
+                    saveLocation = os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName
+                with open(saveLocation, "w") as write_file:
+                    json.dump(self.metaInfo, write_file, indent=2, default=str)
+
+                minCFvars  = self.getMinCFvars()
+                for j in range(num_vars):
+                    if initial_guess_original[j] == "rand":
+                        initial_guess_original[j] = minCFvars[j]
+                self.metaInfo["results"] = {}
 
 
         self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
-        bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
-        bestRepetition = repetitionResults[bestRepetitionIndex]
-        bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
-        mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
-        bestString = min(bestResult['counts'],key=self.kirchhoff_satisfied2)
-        print(f"BEST STRING: {bestString}")
-        for idx, repetition in self.metaInfo["results"].items():
-            if max(repetition['counts'], key=repetition['counts'].get) == bestString:
-                print(f"Solution has highest count at repetition {idx+1}")
-                print(repetition['counts'])
+        #bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
+        #bestRepetition = repetitionResults[bestRepetitionIndex]
+        #bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
+        #mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
+        #bestString = min(bestResult['counts'],key=lambda x: self.kirchhoff[f"rep{bestRepetitionIndex+1}"][x]["total"])
+        #print(f"BEST STRING: {bestString}")
+        #for idx, repetition in self.metaInfo["results"].items():
+        #    if max(repetition['counts'], key=repetition['counts'].get) == bestString:
+        #        print(f"Solution has highest count at repetition {idx+1}")
+        #        print(repetition['counts'])
 
 
-        print(f"----------------------- Summary -------------------------------------")
-        print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
-        print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff_satisfied2(mostLikelyBitstring)}")
+        #print(f"----------------------- Summary -------------------------------------")
+        #print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
+        #print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff[f'rep{bestRepetitionIndex+1}'][mostLikelyBitstring]['total']}")
         return self.metaInfo["results"]
 
 
@@ -196,7 +205,7 @@ class QaoaQiskit(BackendBase):
             return COBYLA(maxiter=max_iter, tol=0.0001)
         elif configString == "ADAM":
             return ADAM(maxiter=max_iter, tol=0.0001)
-        raise ValueError("Optimizername in config file doesn't match any known optimizers")
+        raise ValueError("Optimizer name in config file doesn't match any known optimizers")
 
 
     def getMinCFvars(self):
@@ -642,7 +651,7 @@ class QaoaQiskit(BackendBase):
         avg = 0
         sum_count = 0
         for bitstring, count in counts.items():
-            obj = self.kirchhoff_satisfied2(bitstring=bitstring,)
+            obj = self.kirchhoff_satisfied2(bitstring=bitstring, components=components)
             avg += obj * count
             sum_count += count
             self.results_dict[f"rep{self.results_dict['iter_count']}"][bitstring] = {"count": count,
@@ -841,7 +850,7 @@ def main():
     config["QaoaBackend"]["filenameSplit"] = filenameSplit
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
-    qaoa = QaoaQiskit(config=config)
+    qaoa = QaoaQiskitIsing(config=config)
     components = qaoa.transformProblemForOptimizer(network=netImport)
 
     """
@@ -901,7 +910,7 @@ class QaoaQiskitIsing(QaoaQiskit):
         super().__init__(config=config)
         self._kirchhoffcostDict = {}
 
-    def kirchhoff_satisfied2(self, bitstring: str) -> float:
+    def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given solution.
 
@@ -914,8 +923,10 @@ class QaoaQiskitIsing(QaoaQiskit):
                     satisfied for the given network.
         """
         try:
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = self._kirchhoffcostDict[bitstring]
             return self._kirchhoffcostDict[bitstring]
         except KeyError:
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring] = {}
             kirchhoffCost = 0.0
             for bus in self.network.buses.index:
                 bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
@@ -923,6 +934,7 @@ class QaoaQiskitIsing(QaoaQiskit):
                     kirchhoffCost += abs(val) ** 2
             # TODO seperate into different cost functions
             self._kirchhoffcostDict[bitstring] = kirchhoffCost
+            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = kirchhoffCost
             return kirchhoffCost
 
 
