@@ -173,148 +173,6 @@ class IsingPypsaInterface:
         return network
 
 
-    def calcPowerImbalanceAtBus(self, bus, result, silent=True):
-        """
-        returns the absolute value of the power imbalance/mismatch at a bus
-        
-        Args:
-            bus: (str) label of the bus at which to calculate power imbalance
-            result: (list) list of all qubits which have spin -1 in the solution 
-
-        Returns:
-            (dict) dictionary with keys of the type (str, int) over all  time
-                        slices and the string alwyays being the chosen bus
-        """
-        contrib = {}
-        for t in range(len(self.snapshots)):
-            load = - self.getLoad(bus,t)
-            components = self.getBusComponents(bus)
-            for gen in components['generators']:
-                load += self.getEncodedValueOfComponent(gen, result, time=t)
-            for lineId in components['positiveLines']:
-                load += self.getEncodedValueOfComponent(lineId, result, time=t)
-            for lineId in components['negativeLines']:
-                load -= self.getEncodedValueOfComponent(lineId, result, time=t)
-            if load and not silent:
-                print(f"Imbalance at {bus}::{load}")
-            contrib[str((bus, t))] = load 
-        return contrib
-
-    def calcTotalPowerGeneratedAtBus(self, bus, solution, time=0):
-        totalPower = 0.0
-        generators = self.getBusComponents(bus)['generators']
-        for generator in generators:
-            totalPower += self.getEncodedValueOfComponent(generator, solution, time=time)
-        return totalPower    
-
-    
-    def calcTotalPowerGenerated(self, solution, time=0):
-        totalPower = 0.0
-        for bus in self.network.buses.index:
-            totalPower += self.calcTotalPowerGeneratedAtBus( bus, solution, time=time)
-        return totalPower
-    
-
-    def calcPowerImbalance(self, solution):
-        """
-        returns the sum of all absolutes values of power imbalances at each bus.
-        This is practically like kirchhoff cost except with linear penalty
-        
-        Args:
-            solution: (list) list of all qubits which have spin -1 in the solution
-        Returns:
-            (float) the sum of all absolute values of every ower imbalance at every bus
-        """
-        powerImbalance = 0.0
-        for bus in self.network.buses.index:
-            for _, imbalance in self.calcPowerImbalanceAtBus(bus, solution).items():
-                powerImbalance += abs(imbalance)
-        return powerImbalance
-
-
-    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
-        """
-        returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
-        every time slice 'time' as {(bus,time) : value} 
-
-        @param result: list
-           
-        @return: dict
-            dictionary with keys of the type (str,int) over all  time slices and the string 
-            alwyays being the chosen bus
-        """
-        return {
-                key : (imbalance * self.kirchhoffFactor) ** 2
-                for key, imbalance in self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
-                }
-
-
-    def calcKirchhoffCost(self, solution):
-        """
-        calculate the total unscaled kirchhoffcost incurred by a solution
-        
-        Args:
-            solution: (list) list of all qubits which have spin -1 in the solution
-            
-        Returns:
-            (float) total kirchhoff cost incurred without kirchhoffFactor scaling
-        """
-        kirchhoffCost = 0.0
-        for bus in self.network.buses.index:
-            for _, val in self.calcPowerImbalanceAtBus(bus, solution).items():
-                kirchhoffCost += val ** 2
-        return kirchhoffCost
-
-
-    def individualCostContribution(self, result, silent=True):
-        """
-        returns a dictionary which contains the kirchhoff cost incurred at every bus at
-        every time slice scaled by the KirchhoffFactor
-
-        @param result: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the form (str,int) over all busses and time slices
-        """
-        contrib = {}
-        for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
-        return contrib
-
-
-    def individualKirchhoffCost(self, solution, silent=True):
-        """
-        returns a dictionary which contains the kirchhoff cost incurred at every bus at 
-        every time slice without being scaled by the kirchhofffactor
-        
-        Args:
-            solution: (list) list of all qubits which have spin -1 in the solution
-        Returns:
-            dictionary with keys of the form (str,int) over all busses and time slices
-        """
-        return {
-                key : imbalance ** 2
-                for key, imbalance in self.individualPowerImbalance(bus, result, silent=silent).items()
-                }
-
-
-    def individualPowerImbalance(self, solution, silent=True):
-        """
-        returns a dictionary which contains the power imbalance at each bus at every time slice
-        with respect to their type (too much or to little power) via it's sign
-        
-        Args:
-            solution: (list) list of all qubits which have spin -1 in the solution
-            silent: (bool) true if the steps when building the result should not print anything
-        Returns:
-            (dict) dictionary with keys of the form (str, int) over all busses and time slices
-        """
-        contrib = {}
-        for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcPowerImbalanceAtBus(bus, solution, silent=silent)}
-        return contrib
-
-
     def individualMarginalCost(self, result):
         """
         returns a dictionary which contains the marginal cost incurred at every bus 'bus' at
@@ -395,42 +253,6 @@ class IsingPypsaInterface:
     # ------------------------------------------------------------
     # encodings of problem constraints
 
-    def encodeKirchhoffConstraint(self, bus, time=0):
-        """
-        Adds the kirchhoff constraint at a bus to the problem formulation. The kirchhoff constraint
-        is that the sum of all power generating elements (generators, lines ) is equal to the sum of 
-        all load generating elements (bus specific load, lines). Deviation from equality is penalized
-        quadratically 
-
-        @param bus: str
-            label of the bus at which to enforce the kirchhoff constraint
-        @param time: int
-            index of time slice at which to enforce the kirchhoff contraint
-        @return: None
-            modifies self.problem. Adds to previously written interaction cofficient
-        """
-        components = self.getBusComponents(bus)
-        flattenedComponenents = components['generators'] + \
-                components['positiveLines'] + \
-                components['negativeLines']
-        demand = self.getLoad(bus, time=time)
-
-        # constant load contribution to cost function so that a configuration that fulfills the
-        # kirchhoff contraint has energy 0
-        self.addInteraction(demand ** 2)
-        for component1 in flattenedComponenents:
-            factor = 1.0
-            if component1 in components['negativeLines']:
-                factor *= -1.0
-            # reward/penalty term for matching/adding load
-            self.coupleComponentWithConstant(component1, - 2.0 * factor * demand)
-            for component2 in flattenedComponenents:
-                if component2 in components['negativeLines']:
-                    curFactor = -factor
-                else:
-                    curFactor = factor
-                # attraction/repulsion term for different/same sign of power at components
-                self.coupleComponents(component1, component2, couplingStrength=curFactor)
 
 
     def encodeStartupShutdownCost(self, bus, time=0):
@@ -1261,34 +1083,36 @@ class IsingBackbone:
 
     def __init__(self, network, linesplitFunction, configuration):
         if isinstance(linesplitFunction, str):
+            self._linesplitName = linesplitFunction
             linesplitFunction = IsingBackbone.linesplitDict[linesplitFunction]
-        self._splitCapacity = linesplitFunction
+        else:
+            print("Warning: Can't assign name to used function for splitting lines into qubits")
+            self._linesplitName = ""
+            
+        self.splitCapacity = linesplitFunction
 
-        # Reusing IsingPypsaInterface, refactor this
-        # set up qubits
         # network to be solved
         self.network = network
         self.snapshots = snapshots
 
-        # hyper parameters of problem formulation
-        envMgr = EnvironmentVariableManager()
-        self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
-        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
-        self.minUpDownFactor = float(envMgr["minUpDownFactor"])
-
         # contains ising coefficients
         self.problem = {}
+        # a secondary dictionary to track new interactions. Can be reset and read to obtain
+        # formulations for subproblems
+        self.cachedProblem = {}
 
         # contains encoding data
         self.data = {}
         
         # qubits currently in use/next qubit to use to represent a network component
         self.allocatedQubits = 0
-        # End IsingPypsaInterface init
+
+        self.storeGenerators()
+        self.storeLines()
 
         #read configuration dict and apply subproblems
         self._subproblems = {}
-        for subproblem, subproblemConfiguratioa in configuration.items():
+        for subproblem, subproblemConfiguration in configuration.items():
             name, subproblemInstance = subproblem.build(subproblemConfiguration)
             self._subproblems[name] = subproblemInstance
             subproblemInstance.encodeSubproblem(self)
@@ -1297,8 +1121,16 @@ class IsingBackbone:
     # obtain config file using an adapter
     @classmethod
     def buildIsingProblem(cls, network, linesplitFunction, config: dict):
+        linesplitFunction = config.pop("problemFormulation")
         return IsingBackbone(network, linesplitFunction, config)
     
+    def flushCachedProblem(self,):
+        """
+        resets the cached changes of interactions
+        """
+        self.cachedProblem = {}
+    
+
     # functions to couple components. The couplings are interpreted as multiplications of QUBO
     # polynomials. The final interactions are coefficients for an ising spin glass problem
 
@@ -1338,6 +1170,7 @@ class IsingBackbone:
             if key[0] == key[1]:
                 key = tuple([])
         self.problem[key] = self.problem.get(key,0) - interactionStrength
+        self.cachedProblem[key] = self.cachedProblem.get(key,0) - interactionStrength
 
 
     def coupleComponentWithConstant(self, component, couplingStrength=1, time=0):
@@ -1507,8 +1340,8 @@ class IsingBackbone:
     def encodeLine(self, line, time):
         """
         Allocate qubits to encode a line at a single time slice. The specific encoding
-        of the line is determined by the method "splitCapacity". Other encodings can be
-        obtained by overwriting "splitCapacity" in a child class.
+        of the line is determined by the method "splitCapacity". This function is set
+        during initialisation
 
         @param line: str
             label of the network line to be encoded in qubits
@@ -1793,6 +1626,204 @@ class AbstractIsingSubproblem:
     
 
 class KirchhoffSubproblem(AbstractIsingSubproblem):
-    pass
+
+    def __init__(self,*args):
+        self.problem = {}
+
+    def encodeSubproblem(self, isingBackbone: IsingBackbone, scaleFactor: float):
+        isingBackbone.flushCachedProblem()
+        for time in range(len(isingBackbone.snapshots)):
+            for node in isingBackbone.network.buses.index:
+                self.encodeKirchhoffConstraint(isingBackbone, scaleFactor, node, time)
+        self.problem = isingBackbone.cachedProblem
+
+    def encodeKirchhoffConstraint(self, isingBackbone, scaleFactor, bus, time=0):
+        """
+        Adds the kirchhoff constraint at a bus to the problem formulation. The kirchhoff constraint
+        is that the sum of all power generating elements (generators, lines ) is equal to the sum of 
+        all load generating elements (bus specific load, lines). Deviation from equality is penalized
+        quadratically 
+
+        @param bus: str
+            label of the bus at which to enforce the kirchhoff constraint
+        @param time: int
+            index of time slice at which to enforce the kirchhoff contraint
+        @return: None
+            modifies self.problem. Adds to previously written interaction cofficient
+        """
+        components = isingBackbone.getBusComponents(bus)
+        flattenedComponenents = components['generators'] + \
+                components['positiveLines'] + \
+                components['negativeLines']
+        demand = isingBackbone.getLoad(bus, time=time)
+
+        # constant load contribution to cost function so that a configuration that fulfills the
+        # kirchhoff contraint has energy 0
+        isingBackbone.addInteraction(demand ** 2)
+        for component1 in flattenedComponenents:
+            factor = 1.0
+            if component1 in components['negativeLines']:
+                factor *= -1.0
+            # reward/penalty term for matching/adding load
+            isingBackbone.coupleComponentWithConstant(component1, - 2.0 * factor * demand)
+            for component2 in flattenedComponenents:
+                if component2 in components['negativeLines']:
+                    curFactor = -factor
+                else:
+                    curFactor = factor
+                # attraction/repulsion term for different/same sign of power at components
+               isingBackbone.coupleComponents(component1, component2, couplingStrength=curFactor)
     
+    @classmethod
+    def buildSubproblem(cls, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
+        """
+        returns the name of the subproblem and an instance of the class set up according to the configuration.
+        This is done by choosing the corresponding subclass of the configuration.
+        After initialization, the instance can encode this subproblem into an isingBackbone by calling
+        the encodeSubproblem method
+        """
+        return "kirchhoff", KirchhoffSubproblem(configuration)
+        
+
+    def calcPowerImbalanceAtBus(self, bus, result, silent=True):
+        """
+        returns the absolute value of the power imbalance/mismatch at a bus
+        
+        Args:
+            bus: (str) label of the bus at which to calculate power imbalance
+            result: (list) list of all qubits which have spin -1 in the solution 
+
+        Returns:
+            (dict) dictionary with keys of the type (str, int) over all  time
+                        slices and the string alwyays being the chosen bus
+        """
+        contrib = {}
+        for t in range(len(self.snapshots)):
+            load = - self.getLoad(bus,t)
+            components = self.getBusComponents(bus)
+            for gen in components['generators']:
+                load += self.getEncodedValueOfComponent(gen, result, time=t)
+            for lineId in components['positiveLines']:
+                load += self.getEncodedValueOfComponent(lineId, result, time=t)
+            for lineId in components['negativeLines']:
+                load -= self.getEncodedValueOfComponent(lineId, result, time=t)
+            if load and not silent:
+                print(f"Imbalance at {bus}::{load}")
+            contrib[str((bus, t))] = load 
+        return contrib
+
+    def calcTotalPowerGeneratedAtBus(self, bus, solution, time=0):
+        totalPower = 0.0
+        generators = self.getBusComponents(bus)['generators']
+        for generator in generators:
+            totalPower += self.getEncodedValueOfComponent(generator, solution, time=time)
+        return totalPower    
+
+    
+    def calcTotalPowerGenerated(self, solution, time=0):
+        totalPower = 0.0
+        for bus in self.network.buses.index:
+            totalPower += self.calcTotalPowerGeneratedAtBus( bus, solution, time=time)
+        return totalPower
+    
+
+    def calcPowerImbalance(self, solution):
+        """
+        returns the sum of all absolutes values of power imbalances at each bus.
+        This is practically like kirchhoff cost except with linear penalty
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+        Returns:
+            (float) the sum of all absolute values of every ower imbalance at every bus
+        """
+        powerImbalance = 0.0
+        for bus in self.network.buses.index:
+            for _, imbalance in self.calcPowerImbalanceAtBus(bus, solution).items():
+                powerImbalance += abs(imbalance)
+        return powerImbalance
+
+
+    def calcKirchhoffCostAtBus(self, bus, result, silent=True):
+        """
+        returns a dictionary which contains the kirchhoff cost at the specified bus 'bus' for
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           
+        @return: dict
+            dictionary with keys of the type (str,int) over all  time slices and the string 
+            alwyays being the chosen bus
+        """
+        return {
+                key : (imbalance * self.kirchhoffFactor) ** 2
+                for key, imbalance in self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
+                }
+
+
+    def calcKirchhoffCost(self, solution):
+        """
+        calculate the total unscaled kirchhoffcost incurred by a solution
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+            
+        Returns:
+            (float) total kirchhoff cost incurred without kirchhoffFactor scaling
+        """
+        kirchhoffCost = 0.0
+        for bus in self.network.buses.index:
+            for _, val in self.calcPowerImbalanceAtBus(bus, solution).items():
+                kirchhoffCost += val ** 2
+        return kirchhoffCost
+
+
+    def individualCostContribution(self, result, silent=True):
+        """
+        returns a dictionary which contains the kirchhoff cost incurred at every bus at
+        every time slice scaled by the KirchhoffFactor
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the form (str,int) over all busses and time slices
+        """
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result, silent=silent)}
+        return contrib
+
+
+    def individualKirchhoffCost(self, solution, silent=True):
+        """
+        returns a dictionary which contains the kirchhoff cost incurred at every bus at 
+        every time slice without being scaled by the kirchhofffactor
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+        Returns:
+            dictionary with keys of the form (str,int) over all busses and time slices
+        """
+        return {
+                key : imbalance ** 2
+                for key, imbalance in self.individualPowerImbalance(bus, result, silent=silent).items()
+                }
+
+
+    def individualPowerImbalance(self, solution, silent=True):
+        """
+        returns a dictionary which contains the power imbalance at each bus at every time slice
+        with respect to their type (too much or to little power) via it's sign
+        
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+            silent: (bool) true if the steps when building the result should not print anything
+        Returns:
+            (dict) dictionary with keys of the form (str, int) over all busses and time slices
+        """
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcPowerImbalanceAtBus(bus, solution, silent=silent)}
+        return contrib
+
 
