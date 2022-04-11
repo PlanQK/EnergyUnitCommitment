@@ -5,6 +5,11 @@ APItoken: # your token here
     IBMQ_API_token: ""
     dWave_API_token: ""
 
+Backend: "qaoa"
+    # (string) the backend algorithm to be used
+    # choose between "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
+    # "pypsa-glpk", "pypsa-fico", "qaoa"
+
 QaoaBackend:
     shots: 20000
         # (int) the number of shots
