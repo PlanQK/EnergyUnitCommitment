@@ -8,11 +8,11 @@ import os.path
 
 from numpy import random
 
-#from .BackendBase import BackendBase                                # import for Docker run
-#from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
-from BackendBase import BackendBase                                # import for local/debug run
-from IsingPypsaInterface import IsingPypsaInterface                # import for local/debug run
-from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
+from .BackendBase import BackendBase                                # import for Docker run
+from .IsingPypsaInterface import IsingPypsaInterface                # import for Docker run
+#from BackendBase import BackendBase                                # import for local/debug run
+#from IsingPypsaInterface import IsingPypsaInterface                # import for local/debug run
+#from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
