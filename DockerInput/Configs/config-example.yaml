@@ -31,25 +31,65 @@ QaoaBackend:
         # (int) number of experiment repetitions
     classical_optimizer: "COBYLA"
         # (string) the classical optimizer to be used
-        # choose between "SPSA" and "COBYLA"
+        # choose between "SPSA", "COBYLA" and "ADAM"
     qcGeneration: "IterationMatrix"
         # (string) the method for the generation of the quantum circuit
         # choose between "Ising", "Iteration" and "IterationMatrix"
 
 IsingInterface:
+    kirchhoffFactor: 1.0
+        # (float)
+    monetaryCostFactor: 1.0
+        # (float)
+    minUpDownFactor: 1.0
+        # (float)
+    offsetEstimationFactor: 1.0
+        # (float)
+    estimatedCostFactor: 1.0
+        # (float)
+    offsetBuildFactor: 1.0
+        # (float)
     problemFormulation: "binarysplitNoMarginalCost"
         # (string) the method used to generate the Ising problem
         # choose between "binarysplitNoMarginalCost", "fullsplitGlobalCostSquare", "fullsplitMarginalAsPenalty",
         # "fullsplitNoMarginalCost", "fullsplitLocalMarginalEstimationDistance" and "fullsplitDirectInefficiencyPenalty"
 
 SQABackend:
-    shots: 10
+    seed: 10
+        # (int)
+    transverseFieldSchedule: ""
+        # (string)
+    temperatureSchedule: ""
+        # (string)
+    trotterSlices: 10
+        # (int)
+    optimizationCycles: 2
+        # (int)
 
 DWaveBackend:
-    annealTime: 5
+    annealing_time: 1
+        # (int)
+    num_reads1: 1
+        # (int)
+    chain_strength1: 1
+        # (int)
+    programming_thermalization: 1
+        # (int)
+    readout_thermalization: 1
+        # (int)
+    sampleCutSize: 1
+        # (int)
+    threshold: 1.0
+        # (float)
+    strategy: "LowestEnergy"
+        # (string)
+        # choose between "LowestEnergy", "MajorityVote", "PercentageVote" and "ClosestSample"
+    postprocess: "flow"
+        # (string)
     
 PypsaBackend:
-    something: True
+    solver_name: "glpk"
+        # (string)
 
 
     
