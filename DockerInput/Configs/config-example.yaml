@@ -71,7 +71,7 @@ DWaveBackend:
         # (int)
     num_reads1: 1
         # (int)
-    chain_strength1: 1
+    chain_strength: 1
         # (int)
     programming_thermalization: 1
         # (int)
