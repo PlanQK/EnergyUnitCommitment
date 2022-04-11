@@ -7,7 +7,9 @@ import json, yaml
 import random
 import pypsa
 import Backends
+from Backends.Adapter import JsonAdapter, YamlAdapter, EnvAdapter
 from EnvironmentVariableManager import EnvironmentVariableManager
+
 
 FOLDER = "Problemset"
 
@@ -105,7 +107,10 @@ def main():
 
     OptimizerClass = ganBackends[sys.argv[1]]
 
-    optimizer = OptimizerClass(config=config)
+    # TODO choose correct adapter
+    adapter = EnvAdapter()
+
+    optimizer = OptimizerClass(adapter=adapter,config=config)
     try:
         optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
     except TypeError:

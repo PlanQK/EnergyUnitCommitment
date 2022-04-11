@@ -1050,10 +1050,10 @@ class customsplitMarginalAsPenalty(customsplitIsingInterface):
 
 
 def fullsplit(capacity):
-    pass
+    return [1]*capacity + [-1]*capacity
 
 def binarysplit(capacity):
-    pass
+    return [capacity,-capacity]
 
 def customsplit(capacity):
     pass
@@ -1093,7 +1093,7 @@ class IsingBackbone:
 
         # network to be solved
         self.network = network
-        self.snapshots = snapshots
+        self.snapshots = network.snapshots
 
         # contains ising coefficients
         self.problem = {}
@@ -1120,7 +1120,7 @@ class IsingBackbone:
 
     # obtain config file using an adapter
     @classmethod
-    def buildIsingProblem(cls, network, linesplitFunction, config: dict):
+    def buildIsingProblem(cls, network, config: dict):
         linesplitFunction = config.pop("problemFormulation")
         return IsingBackbone(network, linesplitFunction, config)
     
@@ -1672,7 +1672,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 else:
                     curFactor = factor
                 # attraction/repulsion term for different/same sign of power at components
-               isingBackbone.coupleComponents(component1, component2, couplingStrength=curFactor)
+                isingBackbone.coupleComponents(component1, component2, couplingStrength=curFactor)
     
     @classmethod
     def buildSubproblem(cls, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
@@ -1825,5 +1825,4 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calcPowerImbalanceAtBus(bus, solution, silent=silent)}
         return contrib
-
 

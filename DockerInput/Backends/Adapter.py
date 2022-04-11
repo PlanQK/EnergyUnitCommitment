@@ -35,4 +35,5 @@ class YamlAdapter(Adapter):
 
 
 class EnvAdapter(Adapter):
-    pass
+    def setConfig(self):
+        pass

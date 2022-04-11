@@ -2,14 +2,14 @@ import numpy as np
 import random
 from ast import literal_eval
 import siquan
-from .IsingPypsaInterface import IsingPypsaInterface
+from .IsingPypsaInterface import IsingPypsaInterface, IsingBackbone
 from .BackendBase import BackendBase
 import time
 
 
 class ClassicalBackend(BackendBase):
-    def __init__(self, config: dict):
-        super().__init__(config=config)
+    def __init__(self, adapter, config: dict, ):
+        super().__init__(adapter=adapter, config=config,)
         self.solver = siquan.DTSQA()
 
     def validateInput(self, path, network):
@@ -25,6 +25,9 @@ class ClassicalBackend(BackendBase):
     @staticmethod
     def transformProblemForOptimizer(network):
         print("transforming problem...")
+        return IsingBackbone.buildIsingProblem( network, config={
+                "problemFormulation":"fullsplit",
+                })
         return IsingPypsaInterface.buildCostFunction(
             network,
         )

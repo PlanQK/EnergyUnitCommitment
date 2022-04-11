@@ -1,7 +1,7 @@
 import abc
 
 from EnvironmentVariableManager import EnvironmentVariableManager
-import Adapter
+from .Adapter import Adapter
 
 
 class BackendBase(abc.ABC):
