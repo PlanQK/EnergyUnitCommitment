@@ -1,10 +1,13 @@
 import abc
 
 from EnvironmentVariableManager import EnvironmentVariableManager
+import Adapter
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, config: dict):
+    def __init__(self, adapter: Adapter, config: dict):
+        self.adapter = adapter
+
         self.envMgr = EnvironmentVariableManager()
         self.config = config
         self.metaInfo = {}
@@ -37,6 +40,9 @@ class BackendBase(abc.ABC):
     @abc.abstractmethod
     def handleOptimizationStop(self, path, network):
         pass
+
+    def getConfig(self) -> dict:
+        return self.adapter.config
 
     def buildMetaInfo(self):
 
