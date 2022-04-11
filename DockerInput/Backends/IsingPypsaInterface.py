@@ -1823,18 +1823,3 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
     pass
     
 
-class Adapter:
-    """
-    This class is an adapter to obtain the configuration dictionary dependent on the input format
-    """
-    def getConfig(self,*args) -> dict:
-        pass
-
-class JsonAdapter(Adapter):
-    pass
-
-class YamlAdapter(Adapter):
-    pass
-
-class EnvAdapter(Adapter):
-    pass
