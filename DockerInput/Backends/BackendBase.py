@@ -5,13 +5,14 @@ from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, config: dict = None, config_path: str = None):
-        if config:
-            self.adapter = DictAdapter(config=config)
-        elif config_path[0:-5] == "yaml":
-            self.adapter = YamlAdapter(path=config_path)
-        elif config_path[0:-5] == "json":
-            self.adapter = JsonAdapter(path=config_path)
+    def __init__(self, *args, config: dict):
+        if isinstance(args[0], dict):
+            self.adapter = DictAdapter(config=args[0])
+        elif isinstance(args[0], str):
+            if args[0][-4:] == "yaml":
+                self.adapter = YamlAdapter(path=args[0])
+            elif args[0][-4:] == "json":
+                self.adapter = JsonAdapter(path=args[0])
         else:
             self.adapter = StandardAdapter()
 
