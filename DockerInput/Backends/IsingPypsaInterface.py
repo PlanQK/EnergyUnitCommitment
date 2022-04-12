@@ -503,6 +503,8 @@ class IsingBackbone:
                 list of labels of lines that end in this bus
          - end in this bus
         """
+        if bus not in self.network.buses.index:
+            raise ValueError("the bus " + bus + "doesn't exist")
         result = {
                 "generators":
                         list(self.network.generators[
@@ -806,7 +808,8 @@ class IsingBackbone:
         return self._subproblems["kirchhoff"].individualCostContribution(result,silent=silent)
 
     def calcTotalPowerGenerated(self, solution, time=0):
-        self._subproblems["kirchhoff"].calcTotalPowerGenerated(solution, time=time)
+        return self._subproblems["kirchhoff"].calcTotalPowerGenerated(solution, time=time)
+
 
 
 class AbstractIsingSubproblem:
@@ -891,7 +894,8 @@ class MarginalAsPenalty(MarginalCostSubproblem):
 
     def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
         for time in range(len(self.network.snapshots)):
-            self.encodeMarginalCosts(time)
+            for bus in self.network.buses.index:
+                self.encodeMarginalCosts(bus, time)
 
     def marginalCostOffset(self, ):
         """
@@ -945,7 +949,8 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
 
     def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
         for time in range(len(self.network.snapshots)):
-            self.encodeMarginalCosts(time)
+            for bus in self.network.buses.index:
+                self.encodeMarginalCosts(bus, time)
 
     def chooseOffset(self, sortedGenerators):
         """
@@ -1024,19 +1029,19 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         offset *= self.offsetBuildFactor
         load = self.backbone.getLoad(bus, time)
 
-        self.addInteraction(0.25 * estimatedCost ** 2)
+        self.backbone.addInteraction(0.25 * estimatedCost ** 2)
         for firstComponent in flattenedComponenents:
             self.backbone.coupleComponentWithConstant(
                     firstComponent,
                     - 2.0 * self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
                             estimatedCost *  \
-                            self.monetaryCostFactor 
+                            self.scaleFactor
                     )
             for secondComponent in flattenedComponenents:
-                curFactor = self.monetaryCostFactor * \
+                curFactor = self.scaleFactor * \
                                 self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
                                 self.calculateCost(secondComponent, components, offset, estimatedCost, load, bus) 
-                self.coupleComponents(
+                self.backbone.coupleComponents(
                         firstComponent,
                         secondComponent,
                         couplingStrength=curFactor
@@ -1127,6 +1132,9 @@ class GlobalCostSquare(MarginalCostSubproblem):
         for bus in self.network.buses.index:
             load += self.backbone.getLoad(bus, time)
 
+        
+        print("")
+        print("--- Estimation Parameters ---")
         print(f"Offset: {offset}")
         print(f"Minimal estimated Cost (with offset): {estimatedCost}")
         print(f"Load: {load}")
@@ -1144,12 +1152,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
                         couplingStrength=curFactor
                 )
 
-
-class MarginalAsPenalty(MarginalCostSubproblem):
-    pass
-
-class LocalMarginalEstimation(MarginalCostSubproblem):
-    pass
 
 class KirchhoffSubproblem(AbstractIsingSubproblem):
 
