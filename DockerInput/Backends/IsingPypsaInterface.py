@@ -131,77 +131,11 @@ class IsingPypsaInterface:
 #                    additionalTime = time -1
 #            )
 
+class fullsplitIsingInterface:
+    pass
 
-class fullsplitDirectInefficiencyPenalty(fullsplitIsingInterface):
-    def __init__(self, network, snapshots):
-        super().__init__(network, snapshots)
-        # problem formulation specific parameters
-        # problem constraints: kirchhoff, startup/shutdown, marginal cost
-        for time in range(len(self.snapshots)):
-            for node in self.network.buses.index:
-                self.encodeKirchhoffConstraint(node,time)
-                self.encodeMarginalCosts(node,time)
-                self.encodeStartupShutdownCost(node,time)
-
-    def calcEffiencyLoss(self, cheapGen, expensiveGen,time=0):
-        """
-        calculates an approximation of the loss of using a generator with higher operational 
-        costs compared to using the generator with a lower cost 
-
-        @param cheapGen: str
-            generator label with lower marginal cost per MW produced
-        @param expensiveGen: str
-            generator label that has hower marginal cost per MW produced
-        @return: float:
-            a value that can be used as a coupling strength for penalizing using the expensive generator
-        """
-        cheapCost = self.network.generators["marginal_cost"].loc[cheapGen] 
-        expensiveCost = self.network.generators["marginal_cost"].loc[expensiveGen] 
-        result = max(0,(expensiveCost - cheapCost )) * self.monetaryCostFactor 
-        return result
-
-
-    def encodeMarginalCosts(self, bus, time):
-        """
-        encodes marginal costs for running generators at a single bus by penalizing expensive
-        generators and adding rewards to that generator if cheaper generators are also on
-        Doesn't even come close to an optimum
-
-        @param bus: str
-            label of the bus at which to add marginal costs
-        @param time: int
-            index of time slice for which to add marginal costs
-        @return: None
-            modifies self.problem. Adds to previously written interaction cofficient
-        """
-        FACTOR = 1.0
-        generators = self.getBusComponents(bus)['generators']
-        sortedGenerators = sorted(
-                generators,
-                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
-        )
-        numGenerators = len(generators)
-        for idx, cheapGen in enumerate(sortedGenerators):
-            for _, expensiveGen in enumerate(sortedGenerators, start=idx + 1):
-                couplingStrength = self.calcEffiencyLoss(cheapGen, expensiveGen)
-                self.coupleComponentWithConstant(
-                    expensiveGen,
-                    couplingStrength =   1.0 / (len(generators) - idx) * \
-                            self.getNominalPower(cheapGen, time) * \
-                            couplingStrength * \
-                            FACTOR,
-                    time=time
-                ) 
-                self.coupleComponents(
-                    cheapGen,
-                    expensiveGen,
-                    couplingStrength=  - 1.0 / (len(generators)- idx) * \
-                            couplingStrength * \
-                            FACTOR,
-                    time=time
-                )
-        return
-
+class customsplitIsingInterface:
+    pass
 
 class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
     """
@@ -833,15 +767,16 @@ class IsingBackbone:
 
         #read configuration dict and apply subproblems
         subclassTable = {
-            "kirchhoff" : KirchhoffSubproblem
+            "kirchhoff" : KirchhoffSubproblem,
+            "marginalCost" : MarginalCostSubproblem
         }
 
         self._subproblems = {}
         for subproblem, subproblemConfiguration in configuration.items():
-            name, subproblemInstance = subclassTable[subproblem].buildSubproblem(
+            subproblemInstance = subclassTable[subproblem].buildSubproblem(
                     self, subproblemConfiguration
             )
-            self._subproblems[name] = subproblemInstance
+            self._subproblems[subproblem] = subproblemInstance
             subproblemInstance.encodeSubproblem(self)
             
 
@@ -1431,7 +1366,7 @@ class AbstractIsingSubproblem:
         pass
 
     @classmethod
-    def buildSubproblem(cls, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
+    def buildSubproblem(cls, backbone, configuration) -> 'AbstractIsingSubproblem':
         """
         returns the name of the subproblem and an instance of the class set up according to the configuration.
         This is done by choosing the corresponding subclass of the configuration.
@@ -1465,8 +1400,28 @@ class AbstractIsingSubproblem:
             totalCost += factor * weight
         return totalCost
 
+class MarginalCostSubproblem(AbstractIsingSubproblem):
 
+    @classmethod
+    def buildSubproblem(cls, backbone, configuration) -> 'AbstractIsingSubproblem':
+        subclassTable = {
+            "GlobalCostSquare" : GlobalCostSquare,
+            "MarginalAsPenalty" : MarginalAsPenalty,
+            "LocalMarginalEstimation" : LocalMarginalEstimation,
+        }
+        return subclassTable[configuration.pop("formulation")](backbone, configuration)
 
+    def __init__(self, backbone, config):
+        super().__init__(backbone, config)
+
+class GlobalCostSquare(MarginalCostSubproblem):
+    pass
+
+class MarginalAsPenalty(MarginalCostSubproblem):
+    pass
+
+class LocalMarginalEstimation(MarginalCostSubproblem):
+    pass
 
 class KirchhoffSubproblem(AbstractIsingSubproblem):
 
@@ -1525,7 +1480,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         After initialization, the instance can encode this subproblem into an isingBackbone by calling
         the encodeSubproblem method
         """
-        return "kirchhoff", KirchhoffSubproblem(backbone, configuration)
+        return KirchhoffSubproblem(backbone, configuration)
         
 
     def calcPowerImbalanceAtBus(self, bus, result, silent=True):
