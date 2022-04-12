@@ -1,12 +1,19 @@
 import abc
 
 from EnvironmentVariableManager import EnvironmentVariableManager
-import Adapter
+from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, adapter: Adapter, config: dict):
-        self.adapter = adapter
+    def __init__(self, config: dict = None, config_path: str = None):
+        if config:
+            self.adapter = DictAdapter(config=config)
+        elif config_path[0:-5] == "yaml":
+            self.adapter = YamlAdapter(path=config_path)
+        elif config_path[0:-5] == "json":
+            self.adapter = JsonAdapter(path=config_path)
+        else:
+            self.adapter = StandardAdapter()
 
         self.envMgr = EnvironmentVariableManager()
         self.config = config
