@@ -132,139 +132,6 @@ class IsingPypsaInterface:
 #                    additionalTime = time -1
 #            )
 
-class fullsplitIsingInterface:
-    pass
-
-class customsplitIsingInterface:
-    pass
-
-class fullsplitLocalMarginalEstimationDistance(fullsplitIsingInterface):
-    """
-    class for building an ising spin glass problem for optimizing marginal costs
-    while respecting the kirchoff constraint. We represent it by substituting generator
-    marginal cost by their difference to the most efficient generator. then we estimate
-    a lower bound of the marginal cost at every bus. The marginal cost constraint is then given
-    as minimizing the squared distance of incurred marginal cost to the estimated marginal cost
-    This method doesn't pay attention to line transmission changing where marginal costs
-    are incurred
-    """
-    def __init__(self, network, snapshots):
-        super().__init__(network, snapshots)
-        # problem constraints: kirchhoff, startup/shutdown, marginal cost
-        envMgr = EnvironmentVariableManager()
-        # factor to scale the offset of marginal cost when estimating
-        # marginal cost at a bus
-        self.offsetEstimationFactor = float(envMgr["offsetEstimationFactor"])
-        # factor to scale estimated cost at a bus after calculation
-        self.estimatedCostFactor = float(envMgr["estimatedCostFactor"])
-        # factor to scale marginal cost of a generator when constructing ising
-        # interactions
-        self.offsetBuildFactor = float(envMgr["offsetBuildFactor"])
-        for time in range(len(self.snapshots)):
-            for node in self.network.buses.index:
-                self.encodeKirchhoffConstraint(node,time)
-                self.encodeMarginalCosts(node,time)
-                self.encodeStartupShutdownCost(node,time)
-
-
-    def chooseOffset(self, sortedGenerators):
-        """
-        calculates a float by which to offset all marginal costs. The chosen offset is the
-        minimal marginal cost of a generator in the list
-
-        @param sortedGenerators: list
-            a list of generators already sorted by their minimal cost in ascending order
-        @return: float
-             a float by which to offset all marginal costs of network components
-        """
-        # there are lots of ways to choose an offset. offsetting such that 0 is minimal cost
-        # is decent but for example choosing an offset slighty over that seems to also produce
-        # good results. It is not clear how important the same sign on all marginal costs is
-        marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
-        return self.offsetEstimationFactor * np.min(marginalCostList) 
-
-
-    def estimateMarginalCostAtBus(self, bus, time):
-        """
-        estimates a lower bound for marginal costs incurred by matching the load at the bus
-        only with generators that are at this bus
-        
-        @param bus: str
-            but solution which to estimate marginal costs
-        @param time: int
-            index of time slice for which to estimate marginal costs
-        @return: float, float
-            returns an estimation of the incurred marginal cost if the marginal costs of generators
-            are all offset by the second return value
-        """
-        remainingLoad = self.getLoad(bus, time) 
-        generators = self.getBusComponents(bus)['generators']
-        sortedGenerators = sorted(
-                generators,
-                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
-        )
-        offset = self.chooseOffset(sortedGenerators)
-        costEstimation = 0.0
-        for generator in sortedGenerators:
-            if remainingLoad <= 0:
-                break
-            suppliedPower = min(remainingLoad, self.data[generator]['weights'][0])
-            costEstimation += suppliedPower * (self.network.generators["marginal_cost"].loc[generator] - offset)
-            remainingLoad -= suppliedPower
-        return costEstimation, offset
-
-    def calculateCost(self, componentToBeValued, allComponents, offset, estimatedCost, load, bus):
-        if componentToBeValued in allComponents['generators']:
-            return self.network.generators["marginal_cost"].loc[componentToBeValued] - offset
-        if componentToBeValued in allComponents['positiveLines']:
-            return   0.5 *   estimatedCost / load
-        if componentToBeValued in allComponents['negativeLines']:
-            return  0.5 * - estimatedCost / load
-
-
-    def encodeMarginalCosts(self, bus, time):
-        """
-        encodes marginal costs at a bus by first estimating a lower bound of unavoidable marginal costs
-        Then deviation in the marginal cost from that estimation are penalized quadratically
-        
-        @param bus: str
-            but at which to estimate marginal costs
-        @param time: int
-            index of time slice for which to estimate marginal costs
-        @return: None 
-             modifies self.problem. Adds to previously written interaction cofficient 
-        """
-        components = self.getBusComponents(bus)
-        flattenedComponenents = components['generators'] + \
-                components['positiveLines'] + \
-                components['negativeLines']
-
-        estimatedCost, offset = self.estimateMarginalCostAtBus(bus,time)
-        estimatedCost *= self.estimatedCostFactor
-        offset *= self.offsetBuildFactor
-        load = self.getLoad(bus, time)
-
-        self.addInteraction(0.25 * estimatedCost ** 2)
-        for firstComponent in flattenedComponenents:
-            self.coupleComponentWithConstant(
-                    firstComponent,
-                    - 2.0 * self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
-                            estimatedCost *  \
-                            self.monetaryCostFactor 
-                    )
-            for secondComponent in flattenedComponenents:
-                curFactor = self.monetaryCostFactor * \
-                                self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
-                                self.calculateCost(secondComponent, components, offset, estimatedCost, load, bus) 
-                self.coupleComponents(
-                        firstComponent,
-                        secondComponent,
-                        couplingStrength=curFactor
-                )
-
-
-## TODO REFACTOR THIS CODE DUPLICAPLICATION
-
 
 def fullsplit(capacity):
     return [1]*capacity + [-1]*capacity
@@ -1063,6 +930,117 @@ class MarginalAsPenalty(MarginalCostSubproblem):
                     time=time
             )
 
+
+
+
+class LocalMarginalEstimation(MarginalCostSubproblem):
+    def __init__(self, backbone, config):
+        super().__init__(backbone, config)
+        self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
+        # factor to scale estimated cost at a bus after calculation
+        self.estimatedCostFactor = float(config["estimatedCostFactor"])
+        # factor to scale marginal cost of a generator when constructing ising
+        # interactions
+        self.offsetBuildFactor = float(config["offsetBuildFactor"])
+
+    def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
+        for time in range(len(self.network.snapshots)):
+            self.encodeMarginalCosts(time)
+
+    def chooseOffset(self, sortedGenerators):
+        """
+        calculates a float by which to offset all marginal costs. The chosen offset is the
+        minimal marginal cost of a generator in the list
+
+        @param sortedGenerators: list
+            a list of generators already sorted by their minimal cost in ascending order
+        @return: float
+             a float by which to offset all marginal costs of network components
+        """
+        # there are lots of ways to choose an offset. offsetting such that 0 is minimal cost
+        # is decent but for example choosing an offset slighty over that seems to also produce
+        # good results. It is not clear how important the same sign on all marginal costs is
+        marginalCostList = [self.network.generators["marginal_cost"].loc[gen] for gen in sortedGenerators]
+        return self.offsetEstimationFactor * np.min(marginalCostList) 
+
+
+    def estimateMarginalCostAtBus(self, bus, time):
+        """
+        estimates a lower bound for marginal costs incurred by matching the load at the bus
+        only with generators that are at this bus
+        
+        @param bus: str
+            but solution which to estimate marginal costs
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @return: float, float
+            returns an estimation of the incurred marginal cost if the marginal costs of generators
+            are all offset by the second return value
+        """
+        remainingLoad = self.backbone.getLoad(bus, time) 
+        generators = self.backbone.getBusComponents(bus)['generators']
+        sortedGenerators = sorted(
+                generators,
+                key= lambda gen : self.network.generators["marginal_cost"].loc[gen]
+        )
+        offset = self.chooseOffset(sortedGenerators)
+        costEstimation = 0.0
+        for generator in sortedGenerators:
+            if remainingLoad <= 0:
+                break
+            suppliedPower = min(remainingLoad, self.backbone.data[generator]['weights'][0])
+            costEstimation += suppliedPower * (self.network.generators["marginal_cost"].loc[generator] - offset)
+            remainingLoad -= suppliedPower
+        return costEstimation, offset
+
+    def calculateCost(self, componentToBeValued, allComponents, offset, estimatedCost, load, bus):
+        if componentToBeValued in allComponents['generators']:
+            return self.network.generators["marginal_cost"].loc[componentToBeValued] - offset
+        if componentToBeValued in allComponents['positiveLines']:
+            return   0.5 *   estimatedCost / load
+        if componentToBeValued in allComponents['negativeLines']:
+            return  0.5 * - estimatedCost / load
+
+
+    def encodeMarginalCosts(self, bus, time):
+        """
+        encodes marginal costs at a bus by first estimating a lower bound of unavoidable marginal costs
+        Then deviation in the marginal cost from that estimation are penalized quadratically
+        
+        @param bus: str
+            but at which to estimate marginal costs
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @return: None 
+             modifies self.problem. Adds to previously written interaction cofficient 
+        """
+        components = self.backbone.getBusComponents(bus)
+        flattenedComponenents = components['generators'] + \
+                components['positiveLines'] + \
+                components['negativeLines']
+
+        estimatedCost, offset = self.estimateMarginalCostAtBus(bus,time)
+        estimatedCost *= self.estimatedCostFactor
+        offset *= self.offsetBuildFactor
+        load = self.backbone.getLoad(bus, time)
+
+        self.addInteraction(0.25 * estimatedCost ** 2)
+        for firstComponent in flattenedComponenents:
+            self.backbone.coupleComponentWithConstant(
+                    firstComponent,
+                    - 2.0 * self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
+                            estimatedCost *  \
+                            self.monetaryCostFactor 
+                    )
+            for secondComponent in flattenedComponenents:
+                curFactor = self.monetaryCostFactor * \
+                                self.calculateCost(firstComponent, components, offset, estimatedCost, load, bus) * \
+                                self.calculateCost(secondComponent, components, offset, estimatedCost, load, bus) 
+                self.coupleComponents(
+                        firstComponent,
+                        secondComponent,
+                        couplingStrength=curFactor
+                )
 
 
 class GlobalCostSquare(MarginalCostSubproblem):

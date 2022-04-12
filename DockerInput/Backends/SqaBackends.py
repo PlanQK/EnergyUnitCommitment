@@ -32,7 +32,7 @@ class ClassicalBackend(BackendBase):
                         "kirchhoff": {"scaleFactor" : 1.0},
                         "marginalCost": {
                                 "scaleFactor" : 0.005,
-                                "formulation" : "MarginalAsPenalty",
+                                "formulation" : "LocalMarginalEstimation",
                                 "offsetEstimationFactor": 1.1,
                                 "estimatedCostFactor": 1.0,
                                 "offsetBuildFactor": 1.0,
