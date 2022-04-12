@@ -3,9 +3,6 @@ import numpy as np
 from EnvironmentVariableManager import EnvironmentVariableManager
 import typing
 
-class IsingPypsaInterface:
-    pass
-
 #    FactoryDictionary = {
 #            "fullsplit" : fullsplitNoMarginalCost,
 #            "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,

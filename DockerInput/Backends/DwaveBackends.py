@@ -6,7 +6,7 @@ import tabu
 import greedy
 
 from .BackendBase import BackendBase
-from .IsingPypsaInterface import IsingPypsaInterface
+from .IsingPypsaInterface import IsingBackbone
 
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler, FixedEmbeddingComposite, EmbeddingComposite, DWaveCliqueSampler
