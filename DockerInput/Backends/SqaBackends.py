@@ -31,9 +31,9 @@ class ClassicalBackend(BackendBase):
                         "problemFormulation":"fullsplit",
                         "kirchhoff": {"scaleFactor" : 1.0},
                         "marginalCost": {
-                                "scaleFactor" : 0.01,
-                                "formulation" : "GlobalCostSquare",
-                                "offsetEstimationFactor": 1.0,
+                                "scaleFactor" : 0.005,
+                                "formulation" : "MarginalAsPenalty",
+                                "offsetEstimationFactor": 1.1,
                                 "estimatedCostFactor": 1.0,
                                 "offsetBuildFactor": 1.0,
                                 }
