@@ -173,81 +173,6 @@ class IsingPypsaInterface:
         return network
 
 
-    def individualMarginalCost(self, result):
-        """
-        returns a dictionary which contains the marginal cost incurred at every bus 'bus' at
-        every time slice 'time' as {(bus,time) : value} 
-
-        @param result: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the type (str,int) over all busses and time slices
-        """
-        contrib = {}
-        for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcMarginalCostAtBus(bus, result)}
-        return contrib
-
-
-    def calcMarginalCostAtBus(self, bus, result):
-        """
-        returns a dictionary which contains the marginal cost the specified bus 'bus' at
-        every time slice 'time' as {(bus,time) : value} 
-
-        @param result: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the type (str,int) over all  time slices and the string 
-            alwyays being the chosen bus
-        """
-        contrib = {}
-        for time in range(len(self.snapshots)):
-            marginalCost = 0.0
-            components = self.getBusComponents(bus)
-            for generator in components['generators']:
-                if self.getGeneratorStatus(generator, result, time):
-                    marginalCost += self.network.generators["marginal_cost"].loc[generator] * \
-                                    self.data[generator]['weights'][0]
-            contrib[str((bus, time))] = marginalCost
-        return contrib
-
-
-    def calcMarginalCost(self, solution):
-        """
-        calculate the total marginal cost incurred by a solution
-
-        @param result: list
-            list of all qubits which have spin -1 in the solution
-        @return: float
-            total marginal cost incurred without monetaryFactor scaling
-        """
-        marginalCost = 0.0
-        for key, val in self.individualMarginalCost(solution).items():
-            marginalCost += val 
-        return marginalCost
-
-
-    def calcCost(self, result, ):
-        """
-        calculates the energy of a spin state including the constant energy contribution
-        
-        @param result: list
-            list of all qubits which have spin -1 in the solution 
-        @return: float
-            the energy of the spin glass state in result
-        """
-        result = set(result)
-        totalCost = 0.0
-        for spins, weight in self.problem.items():
-            if len(spins) == 1:
-                factor = 1
-            else:
-                factor = -1
-            for spin in spins:
-                if spin in result:
-                    factor *= -1
-            totalCost += factor * weight
-        return totalCost
 
     # ------------------------------------------------------------
     # ------------------------------------------------------------
@@ -1111,9 +1036,15 @@ class IsingBackbone:
         self.storeLines()
 
         #read configuration dict and apply subproblems
+        subclassTable = {
+            "kirchhoff" : KirchhoffSubproblem
+        }
+
         self._subproblems = {}
         for subproblem, subproblemConfiguration in configuration.items():
-            name, subproblemInstance = subproblem.build(subproblemConfiguration)
+            name, subproblemInstance = subclassTable[subproblem].buildSubproblem(
+                    self, subproblemConfiguration
+            )
             self._subproblems[name] = subproblemInstance
             subproblemInstance.encodeSubproblem(self)
             
@@ -1594,12 +1525,109 @@ class IsingBackbone:
         return value
 
 
+    def calcCost(self, result, isingInteractions=None):
+        """
+        calculates the energy of a spin state including the constant energy contribution
+        
+        @param result: list
+            list of all qubits which have spin -1 in the solution 
+        @return: float
+            the energy of the spin glass state in result
+        """
+        result = set(result)
+        if isingInteractions is None:
+            isingInteractions = self.problem
+        totalCost = 0.0
+        for spins, weight in isingInteractions.items():
+            if len(spins) == 1:
+                factor = 1
+            else:
+                factor = -1
+            for spin in spins:
+                if spin in result:
+                    factor *= -1
+            totalCost += factor * weight
+        return totalCost
+
+
+    def individualMarginalCost(self, result):
+        """
+        returns a dictionary which contains the marginal cost incurred at every bus 'bus' at
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the type (str,int) over all busses and time slices
+        """
+        contrib = {}
+        for bus in self.network.buses.index:
+            contrib = {**contrib, **self.calcMarginalCostAtBus(bus, result)}
+        return contrib
+
+
+    def calcMarginalCostAtBus(self, bus, result):
+        """
+        returns a dictionary which contains the marginal cost the specified bus 'bus' at
+        every time slice 'time' as {(bus,time) : value} 
+
+        @param result: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            dictionary with keys of the type (str,int) over all  time slices and the string 
+            alwyays being the chosen bus
+        """
+        contrib = {}
+        for time in range(len(self.snapshots)):
+            marginalCost = 0.0
+            components = self.getBusComponents(bus)
+            for generator in components['generators']:
+                if self.getGeneratorStatus(generator, result, time):
+                    marginalCost += self.network.generators["marginal_cost"].loc[generator] * \
+                                    self.data[generator]['weights'][0]
+            contrib[str((bus, time))] = marginalCost
+        return contrib
+
+
+    def calcMarginalCost(self, solution):
+        """
+        calculate the total marginal cost incurred by a solution
+
+        @param result: list
+            list of all qubits which have spin -1 in the solution
+        @return: float
+            total marginal cost incurred without monetaryFactor scaling
+        """
+        marginalCost = 0.0
+        for key, val in self.individualMarginalCost(solution).items():
+            marginalCost += val 
+        return marginalCost
+
+    def calcKirchhoffCost(self, solution):
+        return self._subproblems["kirchhoff"].calcCost(solution)
+
+    def calcPowerImbalance(self, solution):
+        return self._subproblems["kirchhoff"].calcPowerImbalance(solution)
+    
+    def individualCostContribution(self, result, silent=True):
+        return self._subproblems["kirchhoff"].individualCostContribution(result,silent=silent)
+
+    def calcTotalPowerGenerated(self, solution, time=0):
+        self._subproblems["kirchhoff"].calcTotalPowerGenerated(solution, time=time)
+
 
 class AbstractIsingSubproblem:
     """
     An interface for classes that model the ising formulation of subproblem of an unit commitment problem
     """
-    def encodeSubproblem(self, isingBackbone: IsingBackbone, scaleFactor: float):
+
+    def __init__(self, backbone, config):
+        self.problem = {}
+        self.scaleFactor = config["scaleFactor"]
+        self.backbone = backbone
+        self.network = backbone.network
+
+    def encodeSubproblem(self, isingBackbone: IsingBackbone, ):
         """
         This encodes the problem an instance of a subclass is describing into the isingBackbone instance
         After this call, the corresponding QUBO is stored in the isingBackbone
@@ -1616,28 +1644,47 @@ class AbstractIsingSubproblem:
         """
         pass
 
-    def calculateCost(self, solution, *args):
+
+    def calcCost(self, result, isingInteractions=None):
         """
-        For a given solution calculates how much cost is incurred regarding the subproblem this instance
-        represents by not solving it exactly
+        calculates the energy of a spin state including the constant energy contribution
+        
+        @param result: list
+            list of all qubits which have spin -1 in the solution 
+        @return: float
+            the energy of the spin glass state in result
         """
-        pass
-    
-    
+        result = set(result)
+        if isingInteractions is None:
+            isingInteractions = self.problem
+        totalCost = 0.0
+        for spins, weight in isingInteractions.items():
+            if len(spins) == 1:
+                factor = 1
+            else:
+                factor = -1
+            for spin in spins:
+                if spin in result:
+                    factor *= -1
+            totalCost += factor * weight
+        return totalCost
+
+
+
 
 class KirchhoffSubproblem(AbstractIsingSubproblem):
 
-    def __init__(self,*args):
-        self.problem = {}
+    def __init__(self, backbone, config):
+        super().__init__(backbone, config)
 
-    def encodeSubproblem(self, isingBackbone: IsingBackbone, scaleFactor: float):
+    def encodeSubproblem(self, isingBackbone: IsingBackbone, ):
         isingBackbone.flushCachedProblem()
         for time in range(len(isingBackbone.snapshots)):
             for node in isingBackbone.network.buses.index:
-                self.encodeKirchhoffConstraint(isingBackbone, scaleFactor, node, time)
+                self.encodeKirchhoffConstraint(isingBackbone, node, time)
         self.problem = isingBackbone.cachedProblem
 
-    def encodeKirchhoffConstraint(self, isingBackbone, scaleFactor, bus, time=0):
+    def encodeKirchhoffConstraint(self, isingBackbone, bus, time=0):
         """
         Adds the kirchhoff constraint at a bus to the problem formulation. The kirchhoff constraint
         is that the sum of all power generating elements (generators, lines ) is equal to the sum of 
@@ -1659,9 +1706,9 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
         # constant load contribution to cost function so that a configuration that fulfills the
         # kirchhoff contraint has energy 0
-        isingBackbone.addInteraction(demand ** 2)
+        isingBackbone.addInteraction(self.scaleFactor * demand ** 2)
         for component1 in flattenedComponenents:
-            factor = 1.0
+            factor = self.scaleFactor
             if component1 in components['negativeLines']:
                 factor *= -1.0
             # reward/penalty term for matching/adding load
@@ -1675,14 +1722,14 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 isingBackbone.coupleComponents(component1, component2, couplingStrength=curFactor)
     
     @classmethod
-    def buildSubproblem(cls, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
+    def buildSubproblem(cls, backbone, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
         """
         returns the name of the subproblem and an instance of the class set up according to the configuration.
         This is done by choosing the corresponding subclass of the configuration.
         After initialization, the instance can encode this subproblem into an isingBackbone by calling
         the encodeSubproblem method
         """
-        return "kirchhoff", KirchhoffSubproblem(configuration)
+        return "kirchhoff", KirchhoffSubproblem(backbone, configuration)
         
 
     def calcPowerImbalanceAtBus(self, bus, result, silent=True):
@@ -1698,15 +1745,16 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                         slices and the string alwyays being the chosen bus
         """
         contrib = {}
-        for t in range(len(self.snapshots)):
-            load = - self.getLoad(bus,t)
-            components = self.getBusComponents(bus)
+        # TODO option to take only some snapshots
+        for t in range(len(self.network.snapshots)):
+            load = - self.backbone.getLoad(bus,t)
+            components = self.backbone.getBusComponents(bus)
             for gen in components['generators']:
-                load += self.getEncodedValueOfComponent(gen, result, time=t)
+                load += self.backbone.getEncodedValueOfComponent(gen, result, time=t)
             for lineId in components['positiveLines']:
-                load += self.getEncodedValueOfComponent(lineId, result, time=t)
+                load += self.backbone.getEncodedValueOfComponent(lineId, result, time=t)
             for lineId in components['negativeLines']:
-                load -= self.getEncodedValueOfComponent(lineId, result, time=t)
+                load -= self.backbone.getEncodedValueOfComponent(lineId, result, time=t)
             if load and not silent:
                 print(f"Imbalance at {bus}::{load}")
             contrib[str((bus, t))] = load 
@@ -1714,16 +1762,16 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
     def calcTotalPowerGeneratedAtBus(self, bus, solution, time=0):
         totalPower = 0.0
-        generators = self.getBusComponents(bus)['generators']
+        generators = self.backbone.getBusComponents(bus)['generators']
         for generator in generators:
-            totalPower += self.getEncodedValueOfComponent(generator, solution, time=time)
+            totalPower += self.backbone.getEncodedValueOfComponent(generator, solution, time=time)
         return totalPower    
 
     
     def calcTotalPowerGenerated(self, solution, time=0):
         totalPower = 0.0
         for bus in self.network.buses.index:
-            totalPower += self.calcTotalPowerGeneratedAtBus( bus, solution, time=time)
+            totalPower += self.calcTotalPowerGeneratedAtBus(bus, solution, time=time)
         return totalPower
     
 
@@ -1756,7 +1804,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             alwyays being the chosen bus
         """
         return {
-                key : (imbalance * self.kirchhoffFactor) ** 2
+                key : (imbalance * self.scaleFactor) ** 2
                 for key, imbalance in self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
                 }
 

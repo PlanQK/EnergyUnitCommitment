@@ -27,6 +27,7 @@ class ClassicalBackend(BackendBase):
         print("transforming problem...")
         return IsingBackbone.buildIsingProblem( network, config={
                 "problemFormulation":"fullsplit",
+                "kirchhoff" : {"scaleFactor" : 1.0}
                 })
         return IsingPypsaInterface.buildCostFunction(
             network,
