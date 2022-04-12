@@ -2,7 +2,7 @@ import numpy as np
 import random
 from ast import literal_eval
 import siquan
-from .IsingPypsaInterface import IsingPypsaInterface, IsingBackbone
+from .IsingPypsaInterface import IsingBackbone
 from .BackendBase import BackendBase
 import time
 

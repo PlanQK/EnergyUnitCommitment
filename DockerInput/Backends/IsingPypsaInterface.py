@@ -3,236 +3,133 @@ import numpy as np
 from EnvironmentVariableManager import EnvironmentVariableManager
 import typing
 
-
 class IsingPypsaInterface:
-    """
-    class to generate and store an Ising spin glass problem.
+    pass
 
-    @attribute network: pypsa.Network
-        the network for which to build in ising spin glass problem for
-    @attribute snapshots: list
-        list of snapshots to be considered in problem
-    @attribute allocatedQubits: int
-        number of currently used qubits
-    @attribute problem: dict
-        dictionary that stores ising spin glass interactions
-    @attribute data: dict
-        a dictionary that stores all encoding with qubits related data 
-        for the network components. 
-        @key: int
-            weight of the qubit
-        @key: str
-            data as dictionary corresponding to the component label
-    @attribute kirchhoffFactor: float
-        weight of kirchhoff constraint
-    @attribute monetaryCostFactor: float
-        weight of any monetary cost incurred by a solution
-    @attribute minUpDownFactor: float
-        weight of minimal up/down-time constraint
-    """
-
-    def __init__(self, network, snapshots):
-        """
-        Constructor for an IsingPypsaInterface. It reads all relevant parameters
-        for a problem formulation from the environment and instantiates all attributes
-        that other class method write in and read from. It does not fill any of those
-        attributes with data specific to a chosen problem formulation like component
-        - qubit representations or problem contraint interactions
-
-        @param network: pypsa.Network
-            The pypsa.Network for which to build an Ising spin glass problem
-        @param snapshots: list
-            integer indices of snapshots to consider in Ising spin glass problem
-        @return: IsingPypsaInterface
-            An empty IsingPypsaInterface object
-        """
-
-        # network to be solved
-        self.network = network
-        self.snapshots = snapshots
-
-        # hyper parameters of problem formulation
-        envMgr = EnvironmentVariableManager()
-        self.kirchhoffFactor = float(envMgr["kirchhoffFactor"])
-        self.monetaryCostFactor = float(envMgr["monetaryCostFactor"])
-        self.minUpDownFactor = float(envMgr["minUpDownFactor"])
-
-        # contains ising coefficients
-        self.problem = {}
-
-        # contains encoding data
-        self.data = {}
-        
-        # qubits currently in use/next qubit to use to represent a network component
-        self.allocatedQubits = 0
-
-
-    @classmethod
-    def buildCostFunction(
-        cls,
-        network,
-    ):
-        """
-        factory method to instantiate a child class of IsingPypsaInterface. Additional
-        parameters to determine the appropiate child class are read from the environment.
-
-        @param network: pypsa.Network
-            A pypsa network for which to formulate the unit commitment problem as an
-            ising spin glass problem
-        @return: IsingPypsaInterface
-            instance of IsingPypsaInterface child class with complete problem formulation
-        """
-        envMgr = EnvironmentVariableManager()
-        problemFormulation = envMgr["problemFormulation"]
-        FactoryDictionary = {
-                "fullsplit" : fullsplitNoMarginalCost,
-                "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,
-                "fullsplitMarginalAsPenalty" : fullsplitMarginalAsPenalty,
-                "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
-                "fullsplitLocalMarginalEstimationDistance" : fullsplitLocalMarginalEstimationDistance,
-                "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
-                "binarysplitIsingInterface" : binarysplitIsingInterface,
-                "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
-                "fullsplitMarginalAsPenaltyAverageOffset" : fullsplitMarginalAsPenaltyAverageOffset,
-                "customsplitNoMarginalCost" : customsplitNoMarginalCost,
-                "customsplitGlobalCostSquare":  customsplitGlobalCostSquare,
-                "customsplitMarginalAsPenalty": customsplitMarginalAsPenalty,
-        }
-        return FactoryDictionary[problemFormulation](network, network.snapshots)
-
-
-
-    # @abstractmethod
-    def splitCapacity(self, capacity):
-        """
-        Method to split a line which has maximum capacity "capacity". A line split is a 
-        list of lines with varying capacity which can either be on or off. The status of 
-        a line is binary, so it can either carry no power or power equal to it's capacity
-        The direction of flow for each line is also fixed. It is not enforced that a
-        chosen split can only represent flow lower than capacity or all flows that are
-        admissable. 
-
-        @param capacity: int
-            the capacity of the line that is to be split up
-        @return: list
-            a list of integers. Each integer is the capacity of a line of the splitting
-            direciont of flow is encoded as the sign
-        """
-        raise NotImplementedError("No implementation for splitting up a line into multilple components")
+#    FactoryDictionary = {
+#            "fullsplit" : fullsplitNoMarginalCost,
+#            "fullsplitGlobalCostSquare" : fullsplitGlobalCostSquare,
+#            "fullsplitMarginalAsPenalty" : fullsplitMarginalAsPenalty,
+#            "fullsplitNoMarginalCost" : fullsplitNoMarginalCost,
+#            "fullsplitLocalMarginalEstimationDistance" : fullsplitLocalMarginalEstimationDistance,
+#            "fullsplitDirectInefficiencyPenalty" : fullsplitDirectInefficiencyPenalty,
+#            "binarysplitIsingInterface" : binarysplitIsingInterface,
+#            "binarysplitNoMarginalCost" : binarysplitNoMarginalCost,
+#            "fullsplitMarginalAsPenaltyAverageOffset" : fullsplitMarginalAsPenaltyAverageOffset,
+#            "customsplitNoMarginalCost" : customsplitNoMarginalCost,
+#            "customsplitGlobalCostSquare":  customsplitGlobalCostSquare,
+#            "customsplitMarginalAsPenalty": customsplitMarginalAsPenalty,
+#    }
 
     # ------------------------------------------------------------------------
     # helper functions to obtain represented values
 
-
-    # TODO
-    # @staticmethod
-    def addSQASolutionToNetwork(self, network, solutionState):
-        """
-        writes the solution encoded in an ising spin glass problem into the 
-        pypsa network
-        
-        @param network: pypsa.Network
-            the pypsa network in which to write the results
-        @param solutionState: list
-            list of all qubits which have spin -1 in the solution 
-        @return: None
-            modifies network changing generator status and power flows
-        """
-        for gen in problemDict._startIndex:
-            vec = np.zeros(len(problemDict.snapshots))
-            network.generators_t.status[gen] = np.concatenate(
-                [
-                    vec,
-                    np.ones(
-                        len(network.snapshots) - len(problemDict.snapshots)
-                    ),
-                ]
-            )
-        vec = np.zeros(len(problemDict.snapshots))
-        gen, time = problemDict.fromVecIndex(0)
-        for index in solutionState:
-            try:
-                new_gen, new_time = problemDict.fromVecIndex(index)
-            except:
-                continue
-            if gen != new_gen:
-                network.generators_t.status[gen] = np.concatenate(
-                    [
-                        vec,
-                        np.ones(
-                            len(network.snapshots) - len(problemDict.snapshots)
-                        ),
-                    ]
-                )
-                vec = np.zeros(len(problemDict.snapshots))
-                gen = new_gen
-                vec[new_time] = 1
-        network.generators_t.status[gen] = np.concatenate(
-            [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
-        )
-        return network
-
-
+#
+## TODO
+## @staticmethod
+#def addSQASolutionToNetwork(self, network, solutionState):
+#    """
+#    writes the solution encoded in an ising spin glass problem into the 
+#    pypsa network
+#    
+#    @param network: pypsa.Network
+#        the pypsa network in which to write the results
+#    @param solutionState: list
+#        list of all qubits which have spin -1 in the solution 
+#    @return: None
+#        modifies network changing generator status and power flows
+#    """
+#    for gen in problemDict._startIndex:
+#        vec = np.zeros(len(problemDict.snapshots))
+#        network.generators_t.status[gen] = np.concatenate(
+#            [
+#                vec,
+#                np.ones(
+#                    len(network.snapshots) - len(problemDict.snapshots)
+#                ),
+#            ]
+#        )
+#    vec = np.zeros(len(problemDict.snapshots))
+#    gen, time = problemDict.fromVecIndex(0)
+#    for index in solutionState:
+#        try:
+#            new_gen, new_time = problemDict.fromVecIndex(index)
+#        except:
+#            continue
+#        if gen != new_gen:
+#            network.generators_t.status[gen] = np.concatenate(
+#                [
+#                    vec,
+#                    np.ones(
+#                        len(network.snapshots) - len(problemDict.snapshots)
+#                    ),
+#                ]
+#            )
+#            vec = np.zeros(len(problemDict.snapshots))
+#            gen = new_gen
+#            vec[new_time] = 1
+#    network.generators_t.status[gen] = np.concatenate(
+#        [vec, np.ones(len(network.snapshots) - len(problemDict.snapshots))]
+#    )
+#    return network
 
     # ------------------------------------------------------------
     # ------------------------------------------------------------
     # encodings of problem constraints
 
-
-
-    def encodeStartupShutdownCost(self, bus, time=0):
-        """
-        Adds the startup and shutdown costs for every generator attached to the bus. Those
-        costs are monetary costs incurred whenever a generator changes its status from one
-        time slice to the next. The first time slice doesn't incurr costs because the status
-        of the generators before is unknown
-        
-        @param bus: str
-            label of the bus at which to add startup and shutdown cost
-        @param time: int
-            index of time slice which contains the generator status after a status change
-        @return: None
-            modifies self.problem. Adds to previously written interaction cofficient 
-        """
-        # no previous information on first time step or when out of bounds
-        if time == 0 or time >= len(self.snapshots):
-            return
-
-        generators = self.getBusComponents(bus)['generators']
-
-        for generator in generators:
-            startup_cost = self.network.generators["start_up_cost"].loc[generator]
-            shutdown_cost = self.network.generators["shut_down_cost"].loc[generator]
-
-            # start up costs
-            # summands of (1-g_{time-1})  * g_{time})
-            self.coupleComponentWithConstant(
-                    generator,
-                    couplingStrength=self.monetaryCostFactor * startup_cost,
-                    time=time
-            )
-            self.coupleComponents(
-                    generator,
-                    generator,
-                    couplingStrength= -self.monetaryCostFactor * startup_cost,
-                    time = time,
-                    additionalTime = time -1
-            )
-
-            # shutdown costs
-            # summands of g_{time-1} * (1-g_{time})
-            self.coupleComponentWithConstant(
-                    generator,
-                    couplingStrength=self.monetaryCostFactor * shutdown_cost,
-                    time=time-1
-            )
-            self.coupleComponents(
-                    generator,
-                    generator,
-                    couplingStrength= -self.monetaryCostFactor * shutdown_cost,
-                    time = time,
-                    additionalTime = time -1
-            )
+#    def encodeStartupShutdownCost(self, bus, time=0):
+#        """
+#        Adds the startup and shutdown costs for every generator attached to the bus. Those
+#        costs are monetary costs incurred whenever a generator changes its status from one
+#        time slice to the next. The first time slice doesn't incurr costs because the status
+#        of the generators before is unknown
+#        
+#        @param bus: str
+#            label of the bus at which to add startup and shutdown cost
+#        @param time: int
+#            index of time slice which contains the generator status after a status change
+#        @return: None
+#            modifies self.problem. Adds to previously written interaction cofficient 
+#        """
+#        # no previous information on first time step or when out of bounds
+#        if time == 0 or time >= len(self.snapshots):
+#            return
+#
+#        generators = self.getBusComponents(bus)['generators']
+#
+#        for generator in generators:
+#            startup_cost = self.network.generators["start_up_cost"].loc[generator]
+#            shutdown_cost = self.network.generators["shut_down_cost"].loc[generator]
+#
+#            # start up costs
+#            # summands of (1-g_{time-1})  * g_{time})
+#            self.coupleComponentWithConstant(
+#                    generator,
+#                    couplingStrength=self.monetaryCostFactor * startup_cost,
+#                    time=time
+#            )
+#            self.coupleComponents(
+#                    generator,
+#                    generator,
+#                    couplingStrength= -self.monetaryCostFactor * startup_cost,
+#                    time = time,
+#                    additionalTime = time -1
+#            )
+#
+#            # shutdown costs
+#            # summands of g_{time-1} * (1-g_{time})
+#            self.coupleComponentWithConstant(
+#                    generator,
+#                    couplingStrength=self.monetaryCostFactor * shutdown_cost,
+#                    time=time-1
+#            )
+#            self.coupleComponents(
+#                    generator,
+#                    generator,
+#                    couplingStrength= -self.monetaryCostFactor * shutdown_cost,
+#                    time = time,
+#                    additionalTime = time -1
+#            )
 
 
 class fullsplitIsingInterface(IsingPypsaInterface):
