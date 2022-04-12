@@ -5,7 +5,7 @@ from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, *args, config: dict):
+    def __init__(self, *args):
         if isinstance(args[0], dict):
             self.adapter = DictAdapter(config=args[0])
         elif isinstance(args[0], str):
@@ -16,10 +16,7 @@ class BackendBase(abc.ABC):
         else:
             self.adapter = StandardAdapter()
 
-        self.envMgr = EnvironmentVariableManager()
-        self.config = config
-        self.metaInfo = {}
-        self.buildMetaInfo()
+        self.setupResultsDict()
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):
@@ -51,6 +48,27 @@ class BackendBase(abc.ABC):
 
     def getConfig(self) -> dict:
         return self.adapter.config
+
+    def getResults(self) -> dict:
+        return self.results
+
+    def setupResultsDict(self):
+        self.results = {"config": {"Backend": self.adapter.config["Backend"],
+                                   "IsingInterface": self.adapter.config["IsingInterface"]},
+                        "components": {},
+                        "network": {},
+                        "results": {}}
+
+        if self.adapter.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
+            self.results["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
+        elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
+            self.results["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
+        elif self.adapter.config["Backend"] in ["sqa"]:
+            self.results["config"]["SQABackend"] = self.adapter.config["SQABackend"]
+        elif self.adapter.config["Backend"] in ["qaoa"]:
+            self.results["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
+        elif self.adapter.config["Backend"] in ["classical"]:
+            self.results["config"]["QaoaBackend"] = {}
 
     def buildMetaInfo(self):
 

@@ -10,6 +10,24 @@ Backend: "qaoa"
     # choose between "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
     # "pypsa-glpk", "pypsa-fico", "qaoa"
 
+IsingInterface:
+    kirchhoffFactor: 1.0
+        # (float)
+    monetaryCostFactor: 1.0
+        # (float)
+    minUpDownFactor: 1.0
+        # (float)
+    offsetEstimationFactor: 1.0
+        # (float)
+    estimatedCostFactor: 1.0
+        # (float)
+    offsetBuildFactor: 1.0
+        # (float)
+    problemFormulation: "binarysplitNoMarginalCost"
+        # (string) the method used to generate the Ising problem
+        # choose between "binarysplitNoMarginalCost", "fullsplitGlobalCostSquare", "fullsplitMarginalAsPenalty",
+        # "fullsplitNoMarginalCost", "fullsplitLocalMarginalEstimationDistance" and "fullsplitDirectInefficiencyPenalty"
+
 QaoaBackend:
     shots: 20000
         # (int) the number of shots
@@ -41,24 +59,6 @@ QaoaBackend:
         # (string) the method for the generation of the quantum circuit
         # choose between "Ising", "Iteration" and "IterationMatrix"
 
-IsingInterface:
-    kirchhoffFactor: 1.0
-        # (float)
-    monetaryCostFactor: 1.0
-        # (float)
-    minUpDownFactor: 1.0
-        # (float)
-    offsetEstimationFactor: 1.0
-        # (float)
-    estimatedCostFactor: 1.0
-        # (float)
-    offsetBuildFactor: 1.0
-        # (float)
-    problemFormulation: "binarysplitNoMarginalCost"
-        # (string) the method used to generate the Ising problem
-        # choose between "binarysplitNoMarginalCost", "fullsplitGlobalCostSquare", "fullsplitMarginalAsPenalty",
-        # "fullsplitNoMarginalCost", "fullsplitLocalMarginalEstimationDistance" and "fullsplitDirectInefficiencyPenalty"
-
 SQABackend:
     seed: 10
         # (int)
@@ -74,7 +74,7 @@ SQABackend:
 DWaveBackend:
     annealing_time: 1
         # (int)
-    num_reads1: 1
+    num_reads: 1
         # (int)
     chain_strength: 1
         # (int)
@@ -91,10 +91,14 @@ DWaveBackend:
         # choose between "LowestEnergy", "MajorityVote", "PercentageVote" and "ClosestSample"
     postprocess: "flow"
         # (string)
+    timeout: 100
+        # (int)
     
 PypsaBackend:
     solver_name: "glpk"
         # (string)
+    timeout: 100
+    # (int)
 
 
     
