@@ -16,7 +16,7 @@ class BackendBase(abc.ABC):
         else:
             self.adapter = StandardAdapter()
 
-        self.setupResultsDict()
+        self.setupOutputDict()
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):
@@ -50,23 +50,23 @@ class BackendBase(abc.ABC):
         return self.adapter.config
 
     def getResults(self) -> dict:
-        return self.results
+        return self.output
 
-    def setupResultsDict(self):
-        self.results = {"config": {"Backend": self.adapter.config["Backend"],
+    def setupOutputDict(self):
+        self.output = {"config": {"Backend": self.adapter.config["Backend"],
                                    "IsingInterface": self.adapter.config["IsingInterface"]},
                         "components": {},
                         "network": {},
                         "results": {}}
 
         if self.adapter.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
-            self.results["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
+            self.output["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
         elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
-            self.results["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
+            self.output["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
         elif self.adapter.config["Backend"] in ["sqa", "classical"]:
-            self.results["config"]["SQABackend"] = self.adapter.config["SQABackend"]
+            self.output["config"]["SQABackend"] = self.adapter.config["SQABackend"]
         elif self.adapter.config["Backend"] in ["qaoa"]:
-            self.results["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
+            self.output["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
 
     def buildMetaInfo(self):
 
