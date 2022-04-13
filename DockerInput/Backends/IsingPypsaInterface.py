@@ -250,20 +250,6 @@ class IsingBackbone:
     def numVariables(self, ):
         return self.allocatedQubits
 
-    def writeToHighestLevel(self, component):
-        """
-        After storing all qubits that represent a logical component of the network
-        (generators, lines) this writes the weight of all used qubits i into the
-        data dictionary at the highest level for access as self.data[i]
-
-        @param component: str
-            the label of a network component
-        @return: None
-            modifies the dictionary self.data 
-        """
-        for idx in range(len(self.data[component]['indices'])):
-            self.data[self.data[component]['indices'][idx]] = self.data[component]['weights'][idx]
-
     # create qubits for generators and lines
     def storeGenerators(self):
         """
@@ -274,10 +260,14 @@ class IsingBackbone:
         @return: None
             modifies self.data and self.allocatedQubits
         """
+        timesteps = len(self.snapshots)
         for generator in self.network.generators.index:
-            for time in range(len(self.network.snapshots)):
-                self.encodeGenerator(generator, time)
-            self.writeToHighestLevel(generator)
+            self.createQubitEntriesForComponent(
+                    generator,
+                    timesteps,
+                    weights=[self.getNominalPower(generator, time) for time in range(len(self.snapshots))],
+                    encodingLength=1,
+            )
         return
 
     def storeLines(self):
@@ -288,60 +278,47 @@ class IsingBackbone:
         @return: None
             modifies self.data and self.allocatedQubits
         """
+        timesteps = len(self.snapshots)
         for line in self.network.lines.index:
-            for time in range(len(self.network.snapshots)):
-            # overwrite this in child classes
-                self.encodeLine(line,time)
-            self.writeToHighestLevel(line)
+            singleTimestepSplit = self.splitCapacity(int(self.network.lines.loc[line].s_nom))
+            self.createQubitEntriesForComponent(
+                    line,
+                    weights=singleTimestepSplit * timesteps,
+                    encodingLength=len(singleTimestepSplit),
+            )
 
-    def encodeGenerator(self, generator, time):
+    def createQubitEntriesForComponent(self, componentName, numQubits=None, weights=None, encodingLength=None):
         """
-        Allocate qubits to encode a generator at a single time splice. THe specific encoding
-        for this method is that a generator's is assumed to be binary and either supplying
-        full power or no power.
+        a function to create qubits in the data dictionary that represent some network component
+        The qubits can be accessed using the componentName
         
         Args:
-            bus: (str) label of the generator to be encoded in qubits
-            time: (int) index of time slice for which to encode the generator
+            componentName: (str) the string used to couple the component with qubits
+            numQubits: (int) number of qubits necessary to encode the component
+            weights: (int) weight for each qubit which to use whenever it gets coupled with other qubits
+            encodingLength: (int) number of qubits used for encoding during one time step
         Returns:
-            (None) modifies self.allocatedQubits and self.data
+            (None) modifies the self.data and self.allocatedQubits attributes
         """
-        # no generator is supposed to be committable in our problems
-        if self.network.generators.committable[generator]:
-            return
-        weights = [self.getNominalPower(generator, time)]
-        indices = range(self.allocatedQubits, self.allocatedQubits + len(weights))
-        self.allocatedQubits += len(indices)
-        self.data[generator] = {
+        if isinstance(componentName, int):
+            raise ValueError("Component names mustn't be of type int")
+        if weights is None:
+            raise ValueError("Assigned Qubits don't have any weight")
+        if numQubits is None:
+            numQubits = len(weights)
+        if numQubits != len(weights):
+            raise ValueError("Assigned Qubits don't match number of weights")
+
+        indices = range(self.allocatedQubits, self.allocatedQubits + numQubits)
+        self.allocatedQubits += numQubits
+        self.data[componentName] = {
                 'indices' : indices,
                 'weights' : weights,
-                'encodingLength' : len(weights),
+                'encodingLength' : encodingLength,
         }
-        return
-
-    def encodeLine(self, line, time):
-        """
-        Allocate qubits to encode a line at a single time slice. The specific encoding
-        of the line is determined by the method "splitCapacity". This function is set
-        during initialisation
-
-        @param line: str
-            label of the network line to be encoded in qubits
-        @param time: int
-            index of time slice at which to encode the line
-        @return: None
-            modifies self.allocatedQubits and self.data
-        """
-        capacity = int(self.network.lines.loc[line].s_nom)
-        weights = self.splitCapacity(capacity)
-        indices = list(range(self.allocatedQubits, self.allocatedQubits + len(weights),1))
-        self.allocatedQubits += len(indices)
-        self.data[line] = {
-                'weights' : weights,
-                'indices' : indices,
-                'encodingLength' : len(weights),
-        }
-        return
+        for idx, qubit in enumerate(indices):
+            self.data[qubit] = weights[idx]
+        
 
     # TODO make functions to allow subproblems to get qubits allocated for their subproblem 
     # and accept data on their encoding weigths. Also requires getter for accessing those qubits
@@ -721,6 +698,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem):
     def buildSubproblem(cls, backbone, configuration) -> 'AbstractIsingSubproblem':
         subclassTable = {
             "GlobalCostSquare" : GlobalCostSquare,
+            "GlobalCostSquareWithSlack" : GlobalCostSquareWithSlack,
             "MarginalAsPenalty" : MarginalAsPenalty,
             "LocalMarginalEstimation" : LocalMarginalEstimation,
         }
@@ -1183,6 +1161,65 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calcPowerImbalanceAtBus(bus, solution, silent=silent)}
         return contrib
+
+class GlobalCostSquareWithSlack(GlobalCostSquare):
+    def __init__(self, backbone, config):
+        super().__init__(backbone, config)
+        self.backbone.createQubitEntriesForComponent(
+                "slackMarginalCost",
+                weights=[-2**i for i in range(4)],
+                encodingLength=6
+        )
+        print(f"SUM:{sum([-2**i for i in range(4)])}")
+
+    def encodeMarginalCosts(self, time):
+        """
+        The marginal costs of using generators
+        are considered one single global constraint. The square of marginal costs is encoded
+        into the energy and thus minimized
+
+        @param time: int
+            index of time slice for which to estimate marginal costs
+        @param expectedAdditonalCost: float
+            float by which lower estimate off marginal cost is offset
+        @return: None 
+            modifies self.problem. Adds to previously written interaction cofficient 
+        """
+        estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
+        generators = self.network.generators.index
+        generators = list(generators) + ["slackMarginalCost"]
+
+
+        load = 0.0
+        for bus in self.network.buses.index:
+            load += self.backbone.getLoad(bus, time)
+        
+        print("")
+        print("--- Estimation Parameters ---")
+        print(f"Offset: {offset}")
+        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
+        print(f"Load: {load}")
+        print(f"Current total estimation at {time}: {offset * self.backbone.getTotalLoad(time)}")
+        for gen1 in generators:
+            if gen1 == "slackMarginalCost":
+                marginalCostGen1 = 1.
+            else:
+                marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
+            for gen2 in generators:
+                if gen2 == "slackMarginalCost":
+                    marginalCostGen2 = 1.
+                else:
+                    marginalCostGen2 = self.network.generators["marginal_cost"].loc[gen2] - offset
+                curFactor = self.scaleFactor * \
+                                marginalCostGen1 * \
+                                marginalCostGen2 
+                self.backbone.coupleComponents(
+                        gen1,
+                        gen2,
+                        couplingStrength=curFactor
+                )
+
+    
 
 class StartupShutdown(AbstractIsingSubproblem):
     pass
