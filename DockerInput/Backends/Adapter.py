@@ -1,5 +1,6 @@
 import json
 import yaml
+import pypsa
 
 
 class Adapter:
@@ -28,6 +29,9 @@ class Adapter:
             return AdapterFormats[data[-4:]](data)
         raise ValueError("input can't be read")
 
+    def getNetwork(self):
+        return pypsa.Network(f"Problemset/{self.config['inputNetwork']}")
+
 
 class DictAdapter(Adapter):
     def setConfig(self, config: dict):
@@ -42,7 +46,7 @@ class JsonAdapter(Adapter):
 
 class YamlAdapter(Adapter):
     def setConfig(self, path: str):
-        with open(path) as file:
+        with open("Configs/" + path) as file:
             self.config = yaml.safe_load(file)
 
 
