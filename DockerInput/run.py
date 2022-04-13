@@ -107,10 +107,7 @@ def main():
 
     OptimizerClass = ganBackends[sys.argv[1]]
 
-    # TODO choose correct adapter
-    adapter = EnvAdapter()
-
-    optimizer = OptimizerClass(adapter=adapter,config=config)
+    optimizer = OptimizerClass(config)
     try:
         optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
     except TypeError:

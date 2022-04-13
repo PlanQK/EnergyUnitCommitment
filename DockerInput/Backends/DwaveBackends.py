@@ -26,8 +26,8 @@ from pandas import value_counts
 
 
 class DwaveTabuSampler(BackendBase):
-    def __init__(self, config: dict):
-        super().__init__(config=config)
+    def __init__(self, *args):
+        super().__init__(args)
         self.time = 0.0
         #self.solver = tabu.Tabusampler()
 
@@ -45,7 +45,7 @@ class DwaveTabuSampler(BackendBase):
         """
 
         if hasattr(self, 'network'):
-            bestSample = self.choose_sample(solution, self.network, strategy=self.metaInfo["dwaveBackend"]["strategy"])
+            bestSample = self.choose_sample(solution, self.network, strategy=self.adapter.config["DWaveBackend"]["strategy"])
         else:
             bestSample = self.choose_sample(solution, network)
 
@@ -55,10 +55,10 @@ class DwaveTabuSampler(BackendBase):
         lineValues = transformedProblem[0].getLineValues(solutionState)
         indCostCon = transformedProblem[0].individualCostContribution(solutionState)
         totalCost = transformedProblem[0].calcCost(solutionState)
-        self.metaInfo["marginalCost"] = transformedProblem[0].calcMarginalCost(solutionState)
-        self.metaInfo["totalCost"] = totalCost
-        self.metaInfo["kirchhoffCost"] = transformedProblem[0].calcKirchhoffCost(solutionState)
-        print(f"Kirchhoff: {self.metaInfo['kirchhoffCost']}")
+        self.output["results"]["marginalCost"] = transformedProblem[0].calcMarginalCost(solutionState)
+        self.output["results"]["totalCost"] = totalCost
+        self.output["results"]["kirchhoffCost"] = transformedProblem[0].calcKirchhoffCost(solutionState)
+        print(f"Kirchhoff: {self.output['results']['kirchhoffCost']}")
 
         resultDict = {
             'solutionState': solutionState,
@@ -71,9 +71,7 @@ class DwaveTabuSampler(BackendBase):
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
 
-        cost = IsingPypsaInterface.buildCostFunction(
-            network,
-        )
+        cost = self.isingInterface
 
         # store the directional qubits first, then the line's binary representations
         linear = {
@@ -112,11 +110,11 @@ class DwaveTabuSampler(BackendBase):
 
     def choose_sample(self, solution, network, strategy="LowestEnergy", snapshot=None):
 
-        if hasattr(self.metaInfo, "sample_df"):
-            df = self.metaInfo["sample_df"]
+        if hasattr(self.output["results"], "sample_df"):
+            df = self.output["results"]["sample_df"]
         else:
             df = solution.to_pandas_dataframe()
-            self.metaInfo["sample_df"] = df.to_dict('split')
+            self.output["results"]["sample_df"] = df.to_dict('split')
 
         if snapshot is None:
             snapshot = network.snapshots[0]
@@ -135,7 +133,7 @@ class DwaveTabuSampler(BackendBase):
                 lambda col: float(col.loc[-1]) / float(len(df))
             )
             return sample.apply(
-                lambda x: -1 if x >= self.metaInfo["dwaveBackend"]["threshold"] else 1
+                lambda x: -1 if x >= self.adapter.config["DWaveBackend"]["threshold"] else 1
             )
 
         # requires postprocessing because in order to match total power output
@@ -191,8 +189,8 @@ class DwaveTabuSampler(BackendBase):
     def optimize(self, transformedProblem):
         print("starting optimization...")
         result = self.solver.sample(transformedProblem[1])
-        self.metaInfo["serial"] = result.to_serializable()
-        self.metaInfo["dwaveBackend"]["energy"] = result.first.energy
+        self.output["results"]["serial"] = result.to_serializable()
+        self.output["results"]["energy"] = result.first.energy
         print("done")
         return result
 
@@ -201,8 +199,8 @@ class DwaveTabuSampler(BackendBase):
 
 
 class DwaveSteepestDescent(DwaveTabuSampler):
-    def __init__(self, config: dict):
-        super().__init__(config=config)
+    def __init__(self, *args):
+        super().__init__(args)
         self.solver = greedy.SteepestDescentSolver()
 
 
@@ -211,16 +209,17 @@ class DwaveCloud(DwaveTabuSampler):
 
 
 class DwaveCloudHybrid(DwaveCloud):
-    def __init__(self, config: dict):
-        super().__init__(config=config)
-        self.token = self.envMgr["dwaveAPIToken"]
+    def __init__(self, *args):
+        super().__init__(args)
+        #self.token = self.envMgr["dwaveAPIToken"]
+        self.token = self.adapter.config["APItoken"]["dWave_API_token"]
         self.solver = "hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
                                          token=self.token)
-        self.metaInfo["dwaveBackend"]["solver_id"] = self.solver
+        self.output["results"]["solver_id"] = self.solver
         self.time = 0.0
 
-        # TODO write more info on solution to metaInfo
+        # TODO write more info on solution to self.output["results"]
 
     def optimize(self, transformedProblem):
         print(self.sampler.properties)
@@ -231,7 +230,7 @@ class DwaveCloudHybrid(DwaveCloud):
             if sampleset.done():
                 break
             time.sleep(2)
-        self.metaInfo["serial"] = sampleset.to_serializable()
+        self.output["results"]["serial"] = sampleset.to_serializable()
         return sampleset
 
 
@@ -251,7 +250,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for blacklist in blacklists:
             blacklist_name = blacklist[len(networkPath + "/"):]
             blacklisted_timeout = int(blacklist_name.split("_")[0])
-            if blacklisted_timeout <= self.metaInfo["timeout"]:
+            if blacklisted_timeout <= self.adapter.config["DWaveBackend"]["timeout"]:
                 filteredByTimeout.append(blacklist)
 
         for blacklist in filteredByTimeout:
@@ -261,7 +260,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{networkPath}/embedding_' \
-                        f'rep_{self.metaInfo["isingInterface"]["problemFormulation"]}_' \
+                        f'rep_{self.adapter.config["IsingInterface"]["problemFormulation"]}_' \
                         f'{network}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
@@ -278,11 +277,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         If a network raises an error during optimization, add this network
         to the blacklisted networks for this optimizer and timeout value
-        Blacklistfiles are of the form '{networkPath}/{self.metaInfo["timeout"]}_{Backend}_blacklist'
+        Blacklistfiles are of the form '{networkPath}/{self.adapter.config["DWaveBackend"]["timeout"]}_{Backend}_blacklist'
         """
         # on unix writing small buffers is atomic. no file locking necessary
         # append to existing file or create a new one
-        with open(f'{networkPath}/{self.metaInfo["timeout"]}_qpu_blacklist', 'a+') as f:
+        with open(f'{networkPath}/{self.adapter.config["DWaveBackend"]["timeout"]}_qpu_blacklist', 'a+') as f:
             f.write(network + '\n')
         return
 
@@ -306,21 +305,21 @@ class DwaveCloudDirectQPU(DwaveCloud):
                                    token=self.token)
             sampler = FixedEmbeddingComposite(sampler, self.embedding)
             sampleset = sampler.sample(transformedProblem[1],
-                                       num_reads=self.metaInfo["dwaveBackend"]["num_reads"],
-                                       annealing_time=self.metaInfo["dwaveBackend"]["annealing_time"],
-                                       chain_strength=self.metaInfo["dwaveBackend"]["chain_strength"],
-                                       programming_thermalization=self.metaInfo["dwaveBackend"]["programming_thermalization"],
-                                       readout_thermalization=self.metaInfo["dwaveBackend"]["readout_thermalization"],
+                                       num_reads=self.adapter.config["DWaveBackend"]["num_reads"],
+                                       annealing_time=self.adapter.config["DWaveBackend"]["annealing_time"],
+                                       chain_strength=self.adapter.config["DWaveBackend"]["chain_strength"],
+                                       programming_thermalization=self.adapter.config["DWaveBackend"]["programming_thermalization"],
+                                       readout_thermalization=self.adapter.config["DWaveBackend"]["readout_thermalization"],
                                        )
         else:
             try:
                 sampleset = self.sampler.sample(transformedProblem[1],
-                                                num_reads=self.metaInfo["dwaveBackend"]["num_reads"],
-                                                annealing_time=self.metaInfo["dwaveBackend"]["annealing_time"],
-                                                chain_strength=self.metaInfo["dwaveBackend"]["chain_strength"],
-                                                programming_thermalization=self.metaInfo["dwaveBackend"]["programming_thermalization"],
-                                                readout_thermalization=self.metaInfo["dwaveBackend"]["readout_thermalization"],
-                                                embedding_parameters=dict(timeout=self.metaInfo["timeout"]),
+                                                num_reads=self.adapter.config["DWaveBackend"]["num_reads"],
+                                                annealing_time=self.adapter.config["DWaveBackend"]["annealing_time"],
+                                                chain_strength=self.adapter.config["DWaveBackend"]["chain_strength"],
+                                                programming_thermalization=self.adapter.config["DWaveBackend"]["programming_thermalization"],
+                                                readout_thermalization=self.adapter.config["DWaveBackend"]["readout_thermalization"],
+                                                embedding_parameters=dict(timeout=self.adapter.config["DWaveBackend"]["timeout"]),
                                                 return_embedding=True,
                                                 )
             except ValueError:
@@ -334,24 +333,25 @@ class DwaveCloudDirectQPU(DwaveCloud):
             time.sleep(1)
         return sampleset
 
-    def __init__(self, config: dict):
-        super().__init__(config=config)
-        self.token = self.envMgr["dwaveAPIToken"]
+    def __init__(self, *args):
+        super().__init__(args)
+        #self.token = self.envMgr["dwaveAPIToken"]
+        self.token = self.adapter.config["APItoken"]["dWave_API_token"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
 
 
         # additional info
-        if self.metaInfo["timeout"] < 0:
-            self.metaInfo["timeout"] = 1000
+        if self.adapter.config["DWaveBackend"]["timeout"] < 0:
+            self.adapter.config["DWaveBackend"]["timeout"] = 1000
 
-        self.metaInfo["dwaveBackend"]["annealReadRatio"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) / \
-                                           float(self.metaInfo["dwaveBackend"]["num_reads"])
-        self.metaInfo["dwaveBackend"]["totalAnnealTime"] = float(self.metaInfo["dwaveBackend"]["annealing_time"]) * \
-                                           float(self.metaInfo["dwaveBackend"]["num_reads"])
+        self.output["results"]["annealReadRatio"] = float(self.adapter.config["DWaveBackend"]["annealing_time"]) / \
+                                                    float(self.adapter.config["DWaveBackend"]["num_reads"])
+        self.output["results"]["totalAnnealTime"] = float(self.adapter.config["DWaveBackend"]["annealing_time"]) * \
+                                                    float(self.adapter.config["DWaveBackend"]["num_reads"])
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
-        self.metaInfo["dwaveBackend"]["mangledTotalAnnealTime"] = int(self.metaInfo["dwaveBackend"]["totalAnnealTime"] / 1000.0)
+        self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
 
     def power_output(self, generatorState, snapshot):
         """
@@ -413,7 +413,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         lowestEnergyState = [
             id for id, value in lowestEnergySample.items() if value == -1
         ]
-        self.metaInfo["dwaveBackend"]["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
+        self.output["results"]["LowestEnergy"] = transformedProblem[0].calcCost(lowestEnergyState)
 
         _, lineValuesLowestEnergyFlowSample = self.optimizeSampleFlow(
             lowestEnergySample,
@@ -429,9 +429,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
 
 
-        # choose best self.metaInfo["dwaveBackend"]["sampleCutSize"] Samples and optimize Flow
+        # choose best self.adapter.config["DWaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
-        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.metaInfo["dwaveBackend"]["sampleCutSize"]]
+        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.adapter.config["DWaveBackend"]["sampleCutSize"]]
         cutSamples['quantumCost'] = cutSamples.apply(
             lambda row: transformedProblem[0].calcCost(
                     [idx for idx in range(len(row)) if row.iloc[idx] == -1]
@@ -449,7 +449,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             )[0],
             axis=1
         )
-        self.metaInfo["postprocessingTime"] = self.time
+        self.output["results"]["postprocessingTime"] = self.time
 
         cutSamples['marginalCost'] = cutSamples.apply(
             lambda row: transformedProblem[0].calcMarginalCost(
@@ -461,21 +461,21 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
 
 
-        self.metaInfo["cutSamples"] = cutSamples[[
+        self.output["results"]["cutSamples"] = cutSamples[[
                                                     "energy",
                                                     "quantumCost",
                                                     "optimizedCost",
                                                     'marginalCost'
                                                     ]].to_dict('index')
-        self.metaInfo["dwaveBackend"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
+        self.output["results"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         chosenSample = self.choose_sample(
                 solution,
                 self.network,
-                strategy=self.metaInfo["dwaveBackend"]["strategy"]
+                strategy=self.adapter.config["DWaveBackend"]["strategy"]
                 )
         print(chosenSample)
-        self.metaInfo["marginalCost"] = transformedProblem[0].calcMarginalCost(
+        self.output["results"]["marginalCost"] = transformedProblem[0].calcMarginalCost(
             [id for id, value in chosenSample.items() if value == -1]
         )
         self.time = 0.0
@@ -485,12 +485,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
             costKey="optimizedStrategySample"
         )
 
-        print(f'cutSamplesCost with {self.metaInfo["dwaveBackend"]["sampleCutSize"]} samples: {self.metaInfo["dwaveBackend"]["cutSamplesCost"]}')
+        print(f'cutSamplesCost with {self.adapter.config["DWaveBackend"]["sampleCutSize"]} samples: {self.output["results"]["cutSamplesCost"]}')
 
-        if self.metaInfo["dwaveBackend"]["postprocess"] == "flow":
-            if self.metaInfo["dwaveBackend"]["strategy"] == "LowestEnergy":
+        if self.adapter.config["DWaveBackend"]["postprocess"] == "flow":
+            if self.adapter.config["DWaveBackend"]["strategy"] == "LowestEnergy":
                 resultDict['lineValues'] = lineValuesLowestEnergyFlowSample
-            elif self.metaInfo["dwaveBackend"]["strategy"] == "ClosestSample":
+            elif self.adapter.config["DWaveBackend"]["strategy"] == "ClosestSample":
                 resultDict['lineValues'] = lineValuesClosestSample
 
         return resultDict
@@ -499,11 +499,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor of 1 
-        and writes it to metaInfo under costKey. If costKey is None, it runs silently
+        and writes it to results["results"] under costKey. If costKey is None, it runs silently
         and only returns the computed cost value. 
         The generatorState is fixed, so if a costKey is given, the function only
         returns a dictionary of the values it computes for an optimal flow.
-        The cost is written to the field in metaInfo. Flow solutions don't spread
+        The cost is written to the field in results["results"]. Flow solutions don't spread
         imbalances across all buses so they can still be improved. 
         """
 
@@ -531,7 +531,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             return totalCost, None
 
         print(f"TOTAL COST AFTER FLOW OPT {costKey}: {totalCost}")
-        self.metaInfo["dwaveBackend"][costKey] = totalCost
+        self.output["results"][costKey] = totalCost
 
         lineValues = {}
         # TODO split flow on two lines if we have more flow than capacity
@@ -641,19 +641,19 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         sampleset = self.getSampleSet(transformedProblem)
 
-        self.metaInfo["serial"] = sampleset.to_serializable()
+        self.output["results"]["serial"] = sampleset.to_serializable()
 
         if not hasattr(self, 'embedding'):
             embeddingPath = f'{self.networkPath}/embedding_' \
-                            f'rep_{self.metaInfo["isingInterface"]["problemFormulation"]}_' \
+                            f'rep_{self.adapter.config["IsingInterface"]["problemFormulation"]}_' \
                             f'{self.networkName}.json'
 
-            embeddingDict = self.metaInfo["serial"]["info"]["embedding_context"]["embedding"]
+            embeddingDict = self.output["results"]["serial"]["info"]["embedding_context"]["embedding"]
             with open(embeddingPath, "w") as write_embedding:
                 json.dump(
                     embeddingDict, write_embedding, indent=2
                 )
-        self.metaInfo["optimizationTime"] = self.metaInfo["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
+        self.output["results"]["optimizationTime"] = self.output["results"]["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
         return sampleset
 
 
@@ -665,12 +665,13 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
 
     def getSampler(self):
-        self.inputInfo = self.envMgr["inputInfo"]
+        self.inputFilePath = self.adapter.config["DWaveBackend"]["sampleOrigin"]
 
     def getSampleSet(self, transformedProblem):
 
-        with open(self.inputInfo) as inputInfo:
-            self.inputData = json.load(inputInfo)
+        with open(self.inputFilePath) as inputFile:
+            self.inputData = json.load(inputFile)
+        self.inputData = self.inputData["results"]
         if 'cutSamples' not in self.inputData:
             self.inputData['cutSamples'] = {}
 
@@ -688,8 +689,8 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
 
     def processSolution(self, network, transformedProblem, solution, sample=None):
         result = super().processSolution(network, transformedProblem, solution, sample)
-        if len(self.inputData["cutSamples"]) < len(self.metaInfo["cutSamples"]):
-            with open(self.inputInfo, "w") as inputInfo:
-                json.dump(self.getMetaInfo(), inputInfo, indent=2)
+        if len(self.inputData["cutSamples"]) < len(self.output["results"]["cutSamples"]):
+            with open(self.inputFilePath, "w") as overwriteFile:
+                json.dump(self.getResults(), overwriteFile, indent=2)
             print("adding more flow optimizations to qpu result file")
         return result

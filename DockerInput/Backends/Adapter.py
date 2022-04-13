@@ -34,6 +34,11 @@ class YamlAdapter(Adapter):
             self.config = yaml.safe_load(file)
 
 
+class StandardAdapter(Adapter):
+    def setConfig(self):
+        self.config = {}
+
+
 class EnvAdapter(Adapter):
     def setConfig(self):
         pass

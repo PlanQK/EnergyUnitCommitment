@@ -1,17 +1,28 @@
 import abc
 
+import pypsa
+
 from EnvironmentVariableManager import EnvironmentVariableManager
-from .Adapter import Adapter
+from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
+from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, adapter: Adapter, config: dict):
-        self.adapter = adapter
+    def __init__(self, network: pypsa.Network, *args):
+        if isinstance(args[0], dict):
+            self.adapter = DictAdapter(config=args[0])
+        elif isinstance(args[0], str):
+            if args[0][-4:] == "yaml":
+                self.adapter = YamlAdapter(path=args[0])
+            elif args[0][-4:] == "json":
+                self.adapter = JsonAdapter(path=args[0])
+        else:
+            self.adapter = StandardAdapter()
 
-        self.envMgr = EnvironmentVariableManager()
-        self.config = config
-        self.metaInfo = {}
-        self.buildMetaInfo()
+        self.setupOutputDict()
+
+        #TODO: maybe only for DWave, QAOA and SQA?
+        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):
@@ -43,6 +54,25 @@ class BackendBase(abc.ABC):
 
     def getConfig(self) -> dict:
         return self.adapter.config
+
+    def getResults(self) -> dict:
+        return self.output
+
+    def setupOutputDict(self):
+        self.output = {"config": {"Backend": self.adapter.config["Backend"],
+                                   "IsingInterface": self.adapter.config["IsingInterface"]},
+                        "components": {},
+                        "network": {},
+                        "results": {}}
+
+        if self.adapter.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
+            self.output["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
+        elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
+            self.output["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
+        elif self.adapter.config["Backend"] in ["sqa", "classical"]:
+            self.output["config"]["SQABackend"] = self.adapter.config["SQABackend"]
+        elif self.adapter.config["Backend"] in ["qaoa"]:
+            self.output["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
 
     def buildMetaInfo(self):
 
