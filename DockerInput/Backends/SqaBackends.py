@@ -25,10 +25,20 @@ class ClassicalBackend(BackendBase):
     @staticmethod
     def transformProblemForOptimizer(network):
         print("transforming problem...")
-        return IsingBackbone.buildIsingProblem( network, config={
-                "problemFormulation":"fullsplit",
-                "kirchhoff" : {"scaleFactor" : 1.0}
-                })
+        return IsingBackbone.buildIsingProblem(
+                network,
+                config={
+                        "problemFormulation":"fullsplit",
+                        "kirchhoff": {"scaleFactor" : 1.0},
+                        "marginalCost": {
+                                "scaleFactor" : 0.005,
+                                "formulation" : "LocalMarginalEstimation",
+                                "offsetEstimationFactor": 1.1,
+                                "estimatedCostFactor": 1.0,
+                                "offsetBuildFactor": 1.0,
+                                }
+                        }
+                )
         return IsingPypsaInterface.buildCostFunction(
             network,
         )
