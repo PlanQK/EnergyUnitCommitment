@@ -1,11 +1,14 @@
 import abc
 
+import pypsa
+
 from EnvironmentVariableManager import EnvironmentVariableManager
 from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
+from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, *args):
+    def __init__(self, network: pypsa.Network, *args):
         if isinstance(args[0], dict):
             self.adapter = DictAdapter(config=args[0])
         elif isinstance(args[0], str):
@@ -17,6 +20,9 @@ class BackendBase(abc.ABC):
             self.adapter = StandardAdapter()
 
         self.setupOutputDict()
+
+        #TODO: maybe only for DWave, QAOA and SQA?
+        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):

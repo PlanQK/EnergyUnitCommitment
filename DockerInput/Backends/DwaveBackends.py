@@ -71,9 +71,7 @@ class DwaveTabuSampler(BackendBase):
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
 
-        cost = IsingPypsaInterface.buildCostFunction(
-            network,
-        )
+        cost = self.isingInterface
 
         # store the directional qubits first, then the line's binary representations
         linear = {
