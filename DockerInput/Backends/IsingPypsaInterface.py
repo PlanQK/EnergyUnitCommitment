@@ -24,7 +24,7 @@ def binarysplit(capacity):
     """
     return [capacity,-capacity]
 
-def customsplit(self, capacity):
+def customsplit(capacity):
     """
     @param capacity: int
         the capacity of the line that is to be split up

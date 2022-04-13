@@ -111,7 +111,7 @@ def main():
     pypsaNetwork = adapter.getNetwork()
 
     # validate input has to throw and catch exceptions on it's own
-    optimizer.validateInput("Problemset", adapter.config['inputNetwork']))
+    optimizer.validateInput("Problemset", adapter.config['inputNetwork'])
 
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
 
