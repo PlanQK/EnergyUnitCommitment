@@ -104,9 +104,8 @@ class PypsaBackend(BackendBase):
         return self.metaInfo
 
     
-    def __init__(self, config: dict, solver_name = "glpk", ):
-        super().__init__(config=config)
-        self.adapter.config["PypsaBackend"]["solver_name"] = solver_name
+    def __init__(self, *args):
+        super().__init__(args)
 
         if self.adapter.config["PypsaBackend"]["timeout"] < 0:
             self.adapter.config["PypsaBackend"]["timeout"] = 1000
@@ -114,10 +113,10 @@ class PypsaBackend(BackendBase):
 
 class PypsaFico(PypsaBackend):
 
-    def __init__(self, config: dict):
-        super().__init__(config=config, solver_name="fico")
+    def __init__(self, *args):
+        super().__init__(args, solver_name="fico")
 
 class PypsaGlpk(PypsaBackend):
 
-    def __init__(self, config: dict):
-        super().__init__(config=config, solver_name="glpk")
+    def __init__(self, *args):
+        super().__init__(args, solver_name="glpk")
