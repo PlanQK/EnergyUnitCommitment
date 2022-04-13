@@ -667,12 +667,13 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
 
     def getSampler(self):
-        self.inputInfo = self.envMgr["inputInfo"]
+        self.inputFilePath = self.adapter.config["DWaveBackend"]["sampleOrigin"]
 
     def getSampleSet(self, transformedProblem):
 
-        with open(self.inputInfo) as inputInfo:
-            self.inputData = json.load(inputInfo)
+        with open(self.inputFilePath) as inputFile:
+            self.inputData = json.load(inputFile)
+        self.inputData = self.inputData["results"]
         if 'cutSamples' not in self.inputData:
             self.inputData['cutSamples'] = {}
 
@@ -691,7 +692,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     def processSolution(self, network, transformedProblem, solution, sample=None):
         result = super().processSolution(network, transformedProblem, solution, sample)
         if len(self.inputData["cutSamples"]) < len(self.output["results"]["cutSamples"]):
-            with open(self.inputInfo, "w") as inputInfo:
-                json.dump(self.getResults(), inputInfo, indent=2)
+            with open(self.inputFilePath, "w") as overwriteFile:
+                json.dump(self.getResults(), overwriteFile, indent=2)
             print("adding more flow optimizations to qpu result file")
         return result

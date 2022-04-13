@@ -93,7 +93,10 @@ DWaveBackend:
         # (string)
     timeout: 100
         # (int)
-    
+    sampleOrigin: ""
+        # (string) where the sample comes from
+        # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
+
 PypsaBackend:
     solver_name: "glpk"
         # (string)
