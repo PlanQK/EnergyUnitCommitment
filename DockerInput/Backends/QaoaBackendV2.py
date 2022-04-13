@@ -9,9 +9,7 @@ import os.path
 from numpy import random
 
 from .BackendBase import BackendBase                                # import for Docker run
-from .IsingPypsaInterface import IsingBackbone                      # import for Docker run
 #from BackendBase import BackendBase                                # import for local/debug run
-#from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
 #from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
@@ -24,17 +22,21 @@ from qiskit.circuit import Parameter
 
 
 class QaoaQiskit(BackendBase):
-    def __init__(self, config: dict,):
-        super().__init__(config=config)
-        self.metaInfo["results"] = {}
+    def __init__(self, *args):
+        super().__init__(args)
+        self.output["results"] = {"backend": "",
+                                  "qubit_map": {},
+                                  "hamiltonian": {},
+                                  "qc": "",
+                                  "repetitions": {}}
         self.resetResultDict()
 
         self.kirchhoff = {}
         self.components = {}
 
         self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
-        if config["QaoaBackend"]["noise"] or (not config["QaoaBackend"]["simulate"]):
-            IBMQ.save_account(config["APItoken"]["IBMQ_API_token"], overwrite=True)
+        if self.adapter.config["QaoaBackend"]["noise"] or (not self.adapter.config["QaoaBackend"]["simulate"]):
+            IBMQ.save_account(self.adapter.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
     def resetResultDict(self):
@@ -51,10 +53,7 @@ class QaoaQiskit(BackendBase):
                              }
 
     def transformProblemForOptimizer(self, network):
-        print("transforming problem...")
-        self.network = network
-        self.isingInterface = IsingPypsaInterface.buildCostFunction(network=network)
-        return self.getComponents(network=network)
+        return BackendBase.transformProblemForOptimizer(network=network)
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         return network
@@ -134,7 +133,7 @@ class QaoaQiskit(BackendBase):
 
                 last_rep = self.results_dict["iter_count"]
                 last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
-                self.metaInfo["results"][curRepetition] = {"filename": filename,
+                self.output["results"][curRepetition] = {"filename": filename,
                                                "backend_name": self.results_dict["backend_name"],
                                                "initial_guess": self.results_dict["initial_guess"],
                                                "optimize_Iterations": self.results_dict["iter_count"],

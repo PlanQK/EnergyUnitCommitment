@@ -19,14 +19,15 @@ class BackendBase(abc.ABC):
         else:
             self.adapter = StandardAdapter()
 
+        self.output = {},
         self.setupOutputDict()
 
-        #TODO: maybe only for DWave, QAOA and SQA?
+        self.isingInterface = None
+
+    def transformProblemForOptimizer(self, network):
         self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
 
-    @abc.abstractstaticmethod
-    def transformProblemForOptimizer(network):
-        pass
+        return self.isingInterface
 
     @abc.abstractstaticmethod
     def transformSolutionToNetwork(network, transformedProblem, solution):
@@ -60,10 +61,10 @@ class BackendBase(abc.ABC):
 
     def setupOutputDict(self):
         self.output = {"config": {"Backend": self.adapter.config["Backend"],
-                                   "IsingInterface": self.adapter.config["IsingInterface"]},
-                        "components": {},
-                        "network": {},
-                        "results": {}}
+                                  "IsingInterface": self.adapter.config["IsingInterface"]},
+                       "components": {},
+                       "network": {},
+                       "results": {}}
 
         if self.adapter.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
             self.output["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
