@@ -14,8 +14,8 @@ class BackendBase(abc.ABC):
         #TODO: maybe only for DWave, QAOA and SQA? right no, no network is available at this point
 #        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
 
-    @abc.abstractstaticmethod
-    def transformProblemForOptimizer(network):
+    @abc.abstractmethod
+    def transformProblemForOptimizer(self, network):
         pass
 
     @abc.abstractstaticmethod
@@ -60,7 +60,7 @@ class BackendBase(abc.ABC):
         elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
             self.output["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
         elif self.adapter.config["Backend"] in ["sqa", "classical"]:
-            self.output["config"]["SQABackend"] = self.adapter.config["SQABackend"]
+            self.output["config"]["SqaBackend"] = self.adapter.config["SqaBackend"]
         elif self.adapter.config["Backend"] in ["qaoa"]:
             self.output["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
 

@@ -10,7 +10,11 @@ import time
 class ClassicalBackend(BackendBase):
     def __init__(self, adapter, ):
         super().__init__(adapter=adapter)
+        self.config = adapter.getConfig()
         self.solver = siquan.DTSQA()
+
+        # mock > remove later
+        self.metaInfo = {"SqaBackend":{}}
 
     def validateInput(self, path, network):
         pass
@@ -22,22 +26,11 @@ class ClassicalBackend(BackendBase):
         self.metaInfo["postprocessingTime"] = 0.0
         return solution
 
-    @staticmethod
-    def transformProblemForOptimizer(network):
+    def transformProblemForOptimizer(self, network):
         print("transforming problem...")
         return IsingBackbone.buildIsingProblem(
                 network,
-                config={
-                        "problemFormulation":"fullsplit",
-                        "kirchhoff": {"scaleFactor" : 1.0},
-                        "marginalCost": {
-                                "scaleFactor" : 0.005,
-                                "formulation" : "LocalMarginalEstimation",
-                                "offsetEstimationFactor": 1.1,
-                                "estimatedCostFactor": 1.0,
-                                "offsetBuildFactor": 1.0,
-                                }
-                        }
+                config=self.config["IsingInterface"]
                 )
         return IsingPypsaInterface.buildCostFunction(
             network,
@@ -87,13 +80,13 @@ class ClassicalBackend(BackendBase):
             (None) modifies self.solver and sets hyperparameters
         """
         try:
-            self.solver.setSeed(self.metaInfo["sqaBackend"]["seed"])
+            self.solver.setSeed(self.adapter.config["SqaBackend"]["seed"])
         except KeyError:
             pass
-        self.solver.setHSchedule(HSchedule or self.metaInfo["sqaBackend"]["transverseFieldSchedule"])
-        self.solver.setTSchedule(TSchedule or self.metaInfo["sqaBackend"]["temperatureSchedule"])
-        self.solver.setTrotterSlices(trotterSlices or self.metaInfo["sqaBackend"]["trotterSlices"])
-        self.solver.setSteps(steps or self.metaInfo["sqaBackend"]["optimizationCycles"])
+        self.solver.setHSchedule(HSchedule or self.config["transverseFieldSchedule"])
+        self.solver.setTSchedule(TSchedule or self.config["temperatureSchedule"])
+        self.solver.setTrotterSlices(trotterSlices or int(self.config["trotterSlices"]))
+        self.solver.setSteps(steps or int(self.config["optimizationCycles"]))
         return
 
     def printResults(self, transformedProblem, solution):
@@ -144,11 +137,11 @@ class ClassicalBackend(BackendBase):
         self.metaInfo["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
         self.metaInfo["powerImbalance"] = transformedProblem.calcPowerImbalance(result["state"])
         self.metaInfo["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
-        self.metaInfo["sqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(
+        self.metaInfo["SqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(
                 result["state"]
         )
-        self.metaInfo["sqaBackend"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
-        self.metaInfo["sqaBackend"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+        self.metaInfo["SqaBackend"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
+        self.metaInfo["SqaBackend"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
 
 
 class SqaBackend(ClassicalBackend):
