@@ -9,7 +9,7 @@ from .IsingPypsaInterface import IsingBackbone
 
 class BackendBase(abc.ABC):
     def __init__(self, adapter):
-#        self.adapter = BackendBase.makeAdapter(data)
+        self.adapter = adapter
         self.setupOutputDict()
         #TODO: maybe only for DWave, QAOA and SQA? right no, no network is available at this point
 #        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)

@@ -8,8 +8,8 @@ import time
 
 
 class ClassicalBackend(BackendBase):
-    def __init__(self, adapter, config: dict, ):
-        super().__init__(adapter=adapter, config=config,)
+    def __init__(self, adapter, ):
+        super().__init__(adapter=adapter)
         self.solver = siquan.DTSQA()
 
     def validateInput(self, path, network):
