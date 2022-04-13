@@ -101,7 +101,9 @@ PypsaBackend:
     solver_name: "glpk"
         # (string)
     timeout: 100
-    # (int)
+        # (int)
+    terminationCondition: "infeasible"
+        # (string)
 
 
     

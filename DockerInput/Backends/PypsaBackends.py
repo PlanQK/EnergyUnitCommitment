@@ -14,26 +14,25 @@ class PypsaBackend(BackendBase):
     def processSolution(self, network, transformedProblem, solution):
         """
         writes results of generator states and line values of pypsa
-        optimization to metaInfo dictionary. No further postprocessing
+        optimization to output dictionary. No further postprocessing
         for pypsa is done
         """
         # value of bits corresponding to generators in network
-        self.metaInfo["solution"] = {}
-        self.metaInfo["solution"]["genStates"] = {
+        self.output["results"]["genStates"] = {
                 gen[0] : value for gen,value in self.model.generator_status.get_values().items()
         }
         # list of indices of active generators
-        self.metaInfo["solution"]["state"] = [
+        self.output["results"]["state"] = [
                 idx for idx in range(len(network.generators))
-                if self.metaInfo["solution"]["genStates"][network.generators.index[idx]] == 1.0
+                if self.output["results"]["genStates"][network.generators.index[idx]] == 1.0
         ]
         # 
-        self.metaInfo["solution"]["lineValues"] = {
+        self.output["results"]["lineValues"] = {
                 line[1] : value 
                 for line,value in self.model.passive_branch_p.get_values().items()
         }
 
-        self.metaInfo["postprocessingTime"] = 0.0
+        self.output["results"]["postprocessingTime"] = 0.0
         return solution
 
 
@@ -49,21 +48,21 @@ class PypsaBackend(BackendBase):
                 self.network.snapshots,
                 formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                solver_name=self.metaInfo["pypsaBackend"]["solver_name"])
-        self.opt.options["tmlim"] = self.metaInfo["timeout"]
+                solver_name=self.adapter.config["PypsaBackend"]["solver_name"])
+        self.opt.options["tmlim"] = self.adapter.config["PypsaBackend"]["timeout"]
         return self.model
 
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print("Writing from pyoyo model to network is not implemented")
 
-        if self.metaInfo["pypsaBackend"]["terminationCondition"] == "infeasible":
+        if self.adapter.config["PypsaBackend"]["terminationCondition"] == "infeasible":
             print("no feasible solution, stop writing to network")
 
-        elif self.metaInfo["pypsaBackend"]["terminationCondition"] != "infeasible":
+        elif self.adapter.config["PypsaBackend"]["terminationCondition"] != "infeasible":
             
-            print(self.metaInfo["solution"]["genStates"] )
-            print(self.metaInfo["solution"]["lineValues"] )
+            print(self.output["results"]["genStates"] )
+            print(self.output["results"]["lineValues"] )
 
             totalCost = 0
             costPerSnapshot = {snapshot : 0.0 for snapshot in self.network.snapshots}
@@ -72,11 +71,11 @@ class PypsaBackend(BackendBase):
                 incurredCost = self.network.generators["marginal_cost"].loc[key[0]] * val
                 totalCost += incurredCost
                 costPerSnapshot[key[1]] += incurredCost
-            self.metaInfo["totalCost"] = totalCost
-            self.metaInfo["marginalCost"] = totalCost
-            self.metaInfo["powerImbalance"] = 0.0
-            self.metaInfo["kirchhoffCost"] = 0.0
-            print(f"Total marginal cost: {self.metaInfo['marginalCost']}")
+            self.output["results"]["totalCost"] = totalCost
+            self.output["results"]["marginalCost"] = totalCost
+            self.output["results"]["powerImbalance"] = 0.0
+            self.output["results"]["kirchhoffCost"] = 0.0
+            print(f"Total marginal cost: {self.output['results']['marginalCost']}")
         return
 
 
@@ -88,8 +87,8 @@ class PypsaBackend(BackendBase):
         solverstring = str(sol["Solver"])
         solvingTime = solverstring.splitlines()[-1].split()[1]
         terminationCondition = solverstring.splitlines()[-7].split()[2]
-        self.metaInfo["optimizationTime"] = solvingTime
-        self.metaInfo["pypsaBackend"]["terminationCondition"] = terminationCondition
+        self.output["results"]["optimizationTime"] = solvingTime
+        self.adapter.config["PypsaBackend"]["terminationCondition"] = terminationCondition
 
         sol.write()
 
@@ -97,7 +96,7 @@ class PypsaBackend(BackendBase):
         for key in self.model.generator_status.get_values().keys():
             if self.model.generator_status.get_values()[key] == 1.0:
                 committed_gen.append(key[0])
-        self.metaInfo["status"] = committed_gen
+        self.output["results"]["status"] = committed_gen
         return self.model
 
 
@@ -107,10 +106,10 @@ class PypsaBackend(BackendBase):
     
     def __init__(self, config: dict, solver_name = "glpk", ):
         super().__init__(config=config)
-        self.metaInfo["pypsaBackend"]["solver_name"] = solver_name
+        self.adapter.config["PypsaBackend"]["solver_name"] = solver_name
 
-        if self.metaInfo["timeout"] < 0:
-            self.metaInfo["timeout"] = 1000
+        if self.adapter.config["PypsaBackend"]["timeout"] < 0:
+            self.adapter.config["PypsaBackend"]["timeout"] = 1000
 
 
 class PypsaFico(PypsaBackend):
