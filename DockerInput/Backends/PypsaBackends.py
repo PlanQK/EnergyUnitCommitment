@@ -3,6 +3,7 @@ import time
 from .BackendBase import BackendBase
 import pypsa
 
+
 class PypsaBackend(BackendBase):
 
     def validateInput(self, path, network):
@@ -35,7 +36,6 @@ class PypsaBackend(BackendBase):
         self.output["results"]["postprocessingTime"] = 0.0
         return solution
 
-
     def transformProblemForOptimizer(self, network):
         print("transforming problem...") 
         self.network = network.copy()
@@ -44,14 +44,11 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
-        self.model = pypsa.opf.network_lopf_build_model(self.network,
-                self.network.snapshots,
-                formulation="kirchhoff")
+        self.model = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                solver_name=self.adapter.config["PypsaBackend"]["solver_name"])
+                                                         solver_name=self.adapter.config["PypsaBackend"]["solver_name"])
         self.opt.options["tmlim"] = self.adapter.config["PypsaBackend"]["timeout"]
         return self.model
-
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print("Writing from pyoyo model to network is not implemented")
@@ -78,7 +75,6 @@ class PypsaBackend(BackendBase):
             print(f"Total marginal cost: {self.output['results']['marginalCost']}")
         return
 
-
     def optimize(self, transformedProblem):
         print("starting optimization...")
 
@@ -99,11 +95,9 @@ class PypsaBackend(BackendBase):
         self.output["results"]["status"] = committed_gen
         return self.model
 
-
     def getMetaInfo(self):
         return self.metaInfo
 
-    
     def __init__(self, *args):
         super().__init__(args)
 
@@ -114,9 +108,10 @@ class PypsaBackend(BackendBase):
 class PypsaFico(PypsaBackend):
 
     def __init__(self, *args):
-        super().__init__(args, solver_name="fico")
+        super().__init__(args)
+
 
 class PypsaGlpk(PypsaBackend):
 
     def __init__(self, *args):
-        super().__init__(args, solver_name="glpk")
+        super().__init__(args)
