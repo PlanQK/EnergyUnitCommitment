@@ -8,21 +8,11 @@ from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, network: pypsa.Network, *args):
-        if isinstance(args[0], dict):
-            self.adapter = DictAdapter(config=args[0])
-        elif isinstance(args[0], str):
-            if args[0][-4:] == "yaml":
-                self.adapter = YamlAdapter(path=args[0])
-            elif args[0][-4:] == "json":
-                self.adapter = JsonAdapter(path=args[0])
-        else:
-            self.adapter = StandardAdapter()
-
+    def __init__(self, adapter):
+#        self.adapter = BackendBase.makeAdapter(data)
         self.setupOutputDict()
-
-        #TODO: maybe only for DWave, QAOA and SQA?
-        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
+        #TODO: maybe only for DWave, QAOA and SQA? right no, no network is available at this point
+#        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
 
     @abc.abstractstaticmethod
     def transformProblemForOptimizer(network):

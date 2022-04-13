@@ -6,15 +6,27 @@ class Adapter:
     """
     This class is an adapter to obtain the configuration dictionary dependent on the input format
     """
-    def __init__(self):
+    def __init__(self, data):
         self.config = {}
-        self.setConfig()
+        self.setConfig(data)
 
     def setConfig(self, *args):
         pass
 
     def getConfig(self) -> dict:
         return self.config
+
+    @classmethod
+    def makeAdapter(self, data):
+        if isinstance(data, dict):
+            return DictAdapter(data)
+        elif isinstance(data, str):
+            AdapterFormats = {
+                    "yaml" : YamlAdapter,
+                    "json" : JsonAdapter
+            }
+            return AdapterFormats[data[-4:]](data)
+        raise ValueError("input can't be read")
 
 
 class DictAdapter(Adapter):
