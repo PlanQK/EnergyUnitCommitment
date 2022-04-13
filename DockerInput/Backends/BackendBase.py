@@ -63,12 +63,10 @@ class BackendBase(abc.ABC):
             self.results["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
         elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
             self.results["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
-        elif self.adapter.config["Backend"] in ["sqa"]:
+        elif self.adapter.config["Backend"] in ["sqa", "classical"]:
             self.results["config"]["SQABackend"] = self.adapter.config["SQABackend"]
         elif self.adapter.config["Backend"] in ["qaoa"]:
             self.results["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
-        elif self.adapter.config["Backend"] in ["classical"]:
-            self.results["config"]["QaoaBackend"] = {}
 
     def buildMetaInfo(self):
 
