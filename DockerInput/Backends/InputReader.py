@@ -7,7 +7,7 @@ from typing import Union
 
 class InputReader:
     """
-    This class is an adapter to obtain the configuration dictionary dependent on the input format
+    This class is an reader to obtain the configuration dictionary dependent on the input format
     """
     def __init__(self, network: Union[pypsa.Network, str], params: Union[dict, str]):
         self.network = self.makeNetwork(network)

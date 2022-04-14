@@ -114,7 +114,7 @@ class IsingBackbone:
             self.flushCachedProblem()
             subproblemInstance.encodeSubproblem(self)
             
-    # obtain config file using an adapter
+    # obtain config file using an reader
     @classmethod
     def buildIsingProblem(cls, network, config: dict):
         linesplitFunction = config.pop("formulation")

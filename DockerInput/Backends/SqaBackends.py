@@ -8,9 +8,9 @@ import time
 
 
 class ClassicalBackend(BackendBase):
-    def __init__(self, adapter, ):
-        super().__init__(adapter=adapter)
-        self.config = adapter.getConfig()
+    def __init__(self, reader, ):
+        super().__init__(reader=reader)
+        self.config = reader.getConfig()
         self.solver = siquan.DTSQA()
 
         # mock > remove later
@@ -80,7 +80,7 @@ class ClassicalBackend(BackendBase):
             (None) modifies self.solver and sets hyperparameters
         """
         try:
-            self.solver.setSeed(self.adapter.config["SqaBackend"]["seed"])
+            self.solver.setSeed(self.reader.config["SqaBackend"]["seed"])
         except KeyError:
             pass
         self.solver.setHSchedule(HSchedule or self.config["transverseFieldSchedule"])

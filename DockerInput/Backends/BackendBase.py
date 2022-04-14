@@ -8,11 +8,11 @@ from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, adapter):
-        self.adapter = adapter
+    def __init__(self, reader):
+        self.reader = reader
         self.setupOutputDict()
         #TODO: maybe only for DWave, QAOA and SQA? right no, no network is available at this point
-#        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
+#        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.reader.config)
 
     @abc.abstractmethod
     def transformProblemForOptimizer(self, network):
@@ -43,26 +43,26 @@ class BackendBase(abc.ABC):
         pass
 
     def getConfig(self) -> dict:
-        return self.adapter.config
+        return self.reader.config
 
     def getResults(self) -> dict:
         return self.output
 
     def setupOutputDict(self):
-        self.output = {"config": {"Backend": self.adapter.config["Backend"],
-                                   "IsingInterface": self.adapter.config["IsingInterface"]},
+        self.output = {"config": {"Backend": self.reader.config["Backend"],
+                                   "IsingInterface": self.reader.config["IsingInterface"]},
                         "components": {},
                         "network": {},
                         "results": {}}
 
-        if self.adapter.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
-            self.output["config"]["DWaveBackend"] = self.adapter.config["DWaveBackend"]
-        elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
-            self.output["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
-        elif self.adapter.config["Backend"] in ["sqa", "classical"]:
-            self.output["config"]["SqaBackend"] = self.adapter.config["SqaBackend"]
-        elif self.adapter.config["Backend"] in ["qaoa"]:
-            self.output["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
+        if self.reader.config["Backend"] in ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"]:
+            self.output["config"]["DWaveBackend"] = self.reader.config["DWaveBackend"]
+        elif self.reader.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
+            self.output["config"]["PypsaBackend"] = self.reader.config["PypsaBackend"]
+        elif self.reader.config["Backend"] in ["sqa", "classical"]:
+            self.output["config"]["SqaBackend"] = self.reader.config["SqaBackend"]
+        elif self.reader.config["Backend"] in ["qaoa"]:
+            self.output["config"]["QaoaBackend"] = self.reader.config["QaoaBackend"]
 
     def buildMetaInfo(self):
 
