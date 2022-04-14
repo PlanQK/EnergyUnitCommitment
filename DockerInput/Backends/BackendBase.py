@@ -3,7 +3,7 @@ import abc
 import pypsa
 
 from EnvironmentVariableManager import EnvironmentVariableManager
-from .Adapter import Adapter
+from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
 

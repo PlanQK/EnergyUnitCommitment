@@ -7,7 +7,7 @@ import json, yaml
 import random
 import pypsa
 import Backends
-from Backends.Adapter import Adapter
+from Backends.InputReader import InputReader
 from EnvironmentVariableManager import EnvironmentVariableManager
 
 
@@ -94,15 +94,15 @@ def main():
 
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    adapter = Adapter(envMgr['inputNetwork'], params=inputData)
+    adapter = InputReader(envMgr['inputNetwork'], params=inputData)
 
     # TODO currently used so makefile rules still work by adding extra configs to the adapter from
     # environment. Remove this later
-    variablesNotInAdapter = {key : value 
+    variablesNotInInputReader = {key : value 
                     for key, value in envMgr.returnEnvironmentVariables().items()
                     if key in DEFAULT_ENV_VARIABLES.keys() and key not in adapter.config
                     }
-    adapter.config = {**variablesNotInAdapter, **adapter.config}
+    adapter.config = {**variablesNotInInputReader, **adapter.config}
     # end filling up with environmentvariables
 
     OptimizerClass = ganBackends[sys.argv[1]]

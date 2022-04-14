@@ -5,7 +5,7 @@ import pypsa
 import typing
 from typing import Union
 
-class Adapter:
+class InputReader:
     """
     This class is an adapter to obtain the configuration dictionary dependent on the input format
     """
