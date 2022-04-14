@@ -8,7 +8,9 @@ import os.path
 
 from numpy import random
 
+from .IsingPypsaInterface import IsingBackbone                      # import for Docker run
 from .BackendBase import BackendBase                                # import for Docker run
+#from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
 #from BackendBase import BackendBase                                # import for local/debug run
 #from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
@@ -60,7 +62,7 @@ class QaoaQiskit(BackendBase):
                                                       "optimizeResults": {}}
 
     def transformProblemForOptimizer(self, network):
-        return BackendBase.transformProblemForOptimizer(network=network)
+        return IsingBackbone.buildIsingProblem(network=network, config=self.config["IsingInterface"])
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         return network
