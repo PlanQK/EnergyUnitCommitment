@@ -7,7 +7,7 @@ import json, yaml
 import random
 import pypsa
 import Backends
-from Backends.Adapter import JsonAdapter, YamlAdapter, EnvAdapter
+from Backends.InputReader import InputReader
 from EnvironmentVariableManager import EnvironmentVariableManager
 
 
@@ -84,46 +84,39 @@ ganBackends = {
 }
 
 def main():
-    #assert len(sys.argv) == 3, errorMsg
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
-    if len(sys.argv) == 3:
-        with open("Configs/" + sys.argv[2]) as file:
-            config = yaml.safe_load(file)
-        DEFAULT_ENV_VARIABLES["problemFormulation"] = config["IsingInterface"]["problemFormulation"]
+    if len(sys.argv) == 2:
+        # mock object
+        inputData = "config-sqa.yaml"
     else:
-        config = {}
+        inputData = sys.argv[2]
 
-    #TODO: move away from env_variables and pass direct to functions??
-    #TODO: use config.yaml to set env_variables??
-
-
-    # Create Singleton object for the first time with the default parameters
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    filenameSplit = str(envMgr['outputInfo']).split("_")
-    if len(sys.argv) == 3:
-        config["QaoaBackend"]["filenameSplit"] = filenameSplit
+    adapter = InputReader(envMgr['inputNetwork'], params=inputData)
+
+    # TODO currently used so makefile rules still work by adding extra configs to the adapter from
+    # environment. Remove this later
+    variablesNotInInputReader = {key : value 
+                    for key, value in envMgr.returnEnvironmentVariables().items()
+                    if key in DEFAULT_ENV_VARIABLES.keys() and key not in adapter.config
+                    }
+    adapter.config = {**variablesNotInInputReader, **adapter.config}
+    # end filling up with environmentvariables
 
     OptimizerClass = ganBackends[sys.argv[1]]
 
-    optimizer = OptimizerClass(config)
-    try:
-        optimizer.validateInput("Problemset", str(envMgr['inputNetwork']))
-    except TypeError:
-        print("network has been blacklisted for this optimizer and timeout value")
-        print("abort optimization")
-        return
+    optimizer = OptimizerClass(adapter)
 
-    pypsaNetwork = pypsa.Network(f"Problemset/{str(envMgr['inputNetwork'])}")
+    pypsaNetwork = adapter.getNetwork()
+
+    # validate input has to throw and catch exceptions on it's own
+    optimizer.validateInput("Problemset", adapter.config['inputNetwork'])
+
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
 
-#    try:
     solution = optimizer.optimize(transformedProblem)
-#    except ValueError:
-#        optimizer.handleOptimizationStop("Problemset",str(envMgr['inputNetwork']))
-#        print("stopping optimization during solving")
-#       return
 
     processedSolution = optimizer.processSolution(
         pypsaNetwork, transformedProblem, solution

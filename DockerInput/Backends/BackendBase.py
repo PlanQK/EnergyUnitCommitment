@@ -3,31 +3,18 @@ import abc
 import pypsa
 
 from EnvironmentVariableManager import EnvironmentVariableManager
-from Adapter import DictAdapter, YamlAdapter, JsonAdapter, StandardAdapter
+from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, network: pypsa.Network, *args):
-        if isinstance(args[0], dict):
-            self.adapter = DictAdapter(config=args[0])
-        elif isinstance(args[0], str):
-            if args[0][-4:] == "yaml":
-                self.adapter = YamlAdapter(path=args[0])
-            elif args[0][-4:] == "json":
-                self.adapter = JsonAdapter(path=args[0])
-        else:
-            self.adapter = StandardAdapter()
-
-        self.output = {},
+    def __init__(self, adapter):
+        self.adapter = adapter
         self.setupOutputDict()
 
-        self.isingInterface = None
-
+    @abc.abstractmethod
     def transformProblemForOptimizer(self, network):
-        self.isingInterface = IsingBackbone.buildIsingProblem(network=network, config=self.adapter.config)
-
-        return self.isingInterface
+        pass
 
     @abc.abstractstaticmethod
     def transformSolutionToNetwork(network, transformedProblem, solution):
@@ -71,7 +58,7 @@ class BackendBase(abc.ABC):
         elif self.adapter.config["Backend"] in ["pypsa-glpk", "pypsa-fico"]:
             self.output["config"]["PypsaBackend"] = self.adapter.config["PypsaBackend"]
         elif self.adapter.config["Backend"] in ["sqa", "classical"]:
-            self.output["config"]["SQABackend"] = self.adapter.config["SQABackend"]
+            self.output["config"]["SqaBackend"] = self.adapter.config["SqaBackend"]
         elif self.adapter.config["Backend"] in ["qaoa"]:
             self.output["config"]["QaoaBackend"] = self.adapter.config["QaoaBackend"]
 

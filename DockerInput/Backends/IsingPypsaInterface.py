@@ -24,7 +24,7 @@ def binarysplit(capacity):
     """
     return [capacity,-capacity]
 
-def customsplit(self, capacity):
+def customsplit(capacity):
     """
     @param capacity: int
         the capacity of the line that is to be split up
@@ -102,6 +102,11 @@ class IsingBackbone:
             "marginalCost" : MarginalCostSubproblem
         }
         for subproblem, subproblemConfiguration in configuration.items():
+            if subproblem not in subproblemTable:
+                print(f"{subproblem} is not a valid subproblem, skipping encoding")
+                continue
+            if not subproblemConfiguration:
+                print(f"Subproblem {subproblem} has no configuration data, skipping encoding")
             subproblemInstance = subproblemTable[subproblem].buildSubproblem(
                     self, subproblemConfiguration
             )
@@ -112,7 +117,7 @@ class IsingBackbone:
     # obtain config file using an adapter
     @classmethod
     def buildIsingProblem(cls, network, config: dict):
-        linesplitFunction = config.pop("problemFormulation")
+        linesplitFunction = config.pop("formulation")
         return IsingBackbone(network, linesplitFunction, config)
     
     def flushCachedProblem(self,):
