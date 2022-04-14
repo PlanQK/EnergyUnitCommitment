@@ -30,8 +30,13 @@ class QaoaQiskit(BackendBase):
                                   "qubit_map": {},
                                   "hamiltonian": {},
                                   "qc": None,
+                                  "initial_guesses": {"original": self.config["QaoaBackend"]["initial_guess"],
+                                                      "refined": []},
+                                  "kirchhoff": {},
                                   "repetitions": {}}
-        self.resetResultDict()
+        self.isingInterface = IsingBackbone.buildIsingProblem(network=self.network, config=self.config["IsingInterface"])
+        self.iterationCounter = None
+        self.totalRepetition = None
 
         self.kirchhoff = {}
         self.components = {}
@@ -41,34 +46,38 @@ class QaoaQiskit(BackendBase):
             IBMQ.save_account(self.adapter.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
-    def resetResultDict(self):
-        self.results_dict = {"iter_count": 0,
-                             "simulate": None,
-                             "noise": None,
-                             "backend_name": None,
-                             "shots": None,
-                             "components": {},
-                             "qc": None,
-                             "initial_guess": [],
-                             "duration": None,
-                             "optimizeResults": {},
-                             }
+    def prepareRepetitionDict(self):
+        self.output["results"]["repetitions"][self.totalRepetition] = {"init_guess": [],
+                                                                       "iteration": {},
+                                                                       "duration": None,
+                                                                       "optimizeResults": {}}
 
-    def prepareRepetitionDict(self, key: int):
-        self.output["results"]["repetitions"][key] = {"init_guess": [],
-                                                      "iteration": {},
-                                                      "duration": None,
-                                                      "bestAfterRandom": {},
-                                                      "optimizeResults": {}}
+    def prepareIterationDict(self):
+        self.output["results"]["repetitions"][self.totalRepetition]["iteration"][self.iterationCounter] = \
+            {"theta": [],
+             "counts": {},
+             "bitstrings": {},
+             "return": None}
 
     def transformProblemForOptimizer(self, network):
-        return IsingBackbone.buildIsingProblem(network=network, config=self.config["IsingInterface"])
+        self.output["results"]["qubit_map"] = self.isingInterface.getQubitMapping()
+
+        return self.isingInterface
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         return network
 
     def processSolution(self, network, transformedProblem, solution):
         return solution
+
+    def createDrawTheta(self, theta: list) -> list:
+        betaValues = theta[::2]
+        drawTheta = []
+        for layer, _ in enumerate(betaValues):
+            drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
+            drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
+
+        return drawTheta
 
     def optimize(self, transformedProblem):
 
@@ -80,18 +89,26 @@ class QaoaQiskit(BackendBase):
         num_vars = len(initial_guess_original)
         max_iter = self.config["QaoaBackend"]["max_iter"]
         repetitions = self.config["QaoaBackend"]["repetitions"]
-        repetitionResults = []
 
         if "rand" in initial_guess_original:
             randRep = 2
         else:
             randRep = 1
 
+        hamiltonian = transformedProblem.getHamiltonianMatrix()
+        scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
+        self.output["results"]["hamiltonian"]["original"] = hamiltonian
+        self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
+
+        drawTheta = self.createDrawTheta(theta=initial_guess_original)
+        qcDraw = self.create_qc(hamiltonian=scaledHamiltonian, theta=drawTheta)
+        self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
+
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
                 time_start = datetime.timestamp(datetime.now())
-                totalRepetition = rand * repetitions + curRepetition
-                print(f"----------------------- Repetition {totalRepetition} ----------------------------------")
+                self.totalRepetition = rand * repetitions + curRepetition
+                print(f"----------------------- Repetition {self.totalRepetition} ----------------------------------")
 
                 initial_guess = []
                 for j in range(num_vars):
@@ -105,14 +122,13 @@ class QaoaQiskit(BackendBase):
                         initial_guess.append(initial_guess_original[j])
                 initial_guess = np.array(initial_guess)
 
-                self.resetResultDict()
-                self.prepareRepetitionDict(key=totalRepetition)
-                self.output["results"]["repetitions"][totalRepetition]["initial_guess"] = initial_guess.tolist()
+                self.prepareRepetitionDict()
+                self.output["results"]["repetitions"][self.totalRepetition]["initial_guess"] = initial_guess.tolist()
 
-                filename = self.generateFilename(totalRepetition)
+                filename = self.generateFilename(self.totalRepetition)
+                self.iterationCounter = 0
 
-                expectation = self.get_expectation(filename=filename,
-                                                   components=transformedProblem,
+                expectation = self.get_expectation(nqubits=,
                                                    simulator=simulator,
                                                    shots=shots,
                                                    simulate=simulate,
@@ -120,70 +136,24 @@ class QaoaQiskit(BackendBase):
 
                 optimizer = self.getClassicalOptimizer(max_iter)
 
-
                 res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-                self.results_dict["optimizeResults"]["x"] = list(res[0])  # solution [beta, gamma]
-                self.results_dict["optimizeResults"]["fun"] = res[1]  # objective function value
-                self.results_dict["optimizeResults"]["nfev"] = res[2]  # number of objective function calls
+                self.output["results"]["repetitions"][self.totalRepetition] \
+                    ["optimizeResults"] = {"x": list(res[0]),  # solution [beta, gamma]
+                                           "fun": res[1],  # objective function value
+                                           "nfev": res[2]}  # number of objective function calls
 
                 time_end = datetime.timestamp(datetime.now())
                 duration = time_end - time_start
-                self.results_dict["duration"] = duration
-
-                print(f"Score at repetition {curRepetition}: {res[1]} with solution {res[0]}")
-                repetitionResults.append({"score": res[1] , "theta": list(res[0])})
-                # safe final results
-                if self.docker:
-                    with open(f"Problemset/{filename}", "w") as write_file:
-                        json.dump(self.results_dict, write_file, indent=2, default=str)
-                else:
-                    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-                        json.dump(self.results_dict, write_file, indent=2, default=str)
-
-                last_rep = self.results_dict["iter_count"]
-                last_rep_counts = self.results_dict[f"rep{last_rep}"]["counts"]
-                self.output["results"][curRepetition] = {"filename": filename,
-                                               "backend_name": self.results_dict["backend_name"],
-                                               "initial_guess": self.results_dict["initial_guess"],
-                                               "optimize_Iterations": self.results_dict["iter_count"],
-                                               "optimizeResults": self.results_dict["optimizeResults"],
-                                               "duration": duration,
-                                               "counts": last_rep_counts}
+                self.output["results"]["repetitions"][self.totalRepetition]["duration"] = duration
 
             if "rand" in initial_guess_original:
-                # dumping data
-                randFileName = "_".join(self.config["QaoaBackend"]["filenameSplit"]) + "rand"
-                if self.docker:
-                    saveLocation = f"Problemset/{randFileName}"
-                else:
-                    saveLocation = os.path.dirname(__file__) + "/../../sweepNetworks/" + randFileName
-                with open(saveLocation, "w") as write_file:
-                    json.dump(self.metaInfo, write_file, indent=2, default=str)
-
-                minCFvars  = self.getMinCFvars()
+                minCFvars = self.getMinCFvars()
+                self.output["results"]["initial_guesses"]["refined"] = minCFvars
                 for j in range(num_vars):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
-                self.metaInfo["results"] = {}
 
-
-        self.metaInfo["kirchhoff"] = self.kirchhoff[f"rep{last_rep}"]
-        #bestRepetitionIndex = min(range(repetitions), key=lambda x: repetitionResults[x]["score"])
-        #bestRepetition = repetitionResults[bestRepetitionIndex]
-        #bestResult = self.metaInfo['results'][bestRepetitionIndex+1]
-        #mostLikelyBitstring = max(bestResult['counts'], key=bestResult['counts'].get)
-        #bestString = min(bestResult['counts'],key=lambda x: self.kirchhoff[f"rep{bestRepetitionIndex+1}"][x]["total"])
-        #print(f"BEST STRING: {bestString}")
-        #for idx, repetition in self.metaInfo["results"].items():
-        #    if max(repetition['counts'], key=repetition['counts'].get) == bestString:
-        #        print(f"Solution has highest count at repetition {idx+1}")
-        #        print(repetition['counts'])
-
-
-        #print(f"----------------------- Summary -------------------------------------")
-        #print(f"Best result at repetitions {bestRepetitionIndex+1} with {bestRepetition}")
-        #print(f"Highest Count at {mostLikelyBitstring} with cost {self.kirchhoff[f'rep{bestRepetitionIndex+1}'][mostLikelyBitstring]['total']}")
-        return self.metaInfo["results"]
+        return self.output["results"]
 
 
     def generateFilename(self, currentRepetitionNumber):
@@ -223,12 +193,13 @@ class QaoaQiskit(BackendBase):
         Returns:
             minX (list) a list with the betas and gammas associated with the minimal cost function value.
         """
-        minCF = self.metaInfo["results"][1]["optimizeResults"]["fun"]
+        searchData = self.output["results"]["repetitions"]
+        minCF = searchData[1]["optimizeResults"]["fun"]
         minX = []
-        for i in range(1, len(self.metaInfo["results"]) + 1):
-            if self.metaInfo["results"][i]["optimizeResults"]["fun"] <= minCF:
-                minCF = self.metaInfo["results"][i]["optimizeResults"]["fun"]
-                minX = self.metaInfo["results"][i]["optimizeResults"]["x"]
+        for i in range(1, len(searchData) + 1):
+            if searchData[i]["optimizeResults"]["fun"] <= minCF:
+                minCF = searchData[i]["optimizeResults"]["fun"]
+                minX = searchData[i]["optimizeResults"]["x"]
 
         return minX
 
@@ -240,121 +211,6 @@ class QaoaQiskit(BackendBase):
 
     def handleOptimizationStop(self, path, network):
         pass
-
-    def get_power(self, comp: str, network: pypsa.Network, type: str) -> float:
-        """
-        Extracts the power value of the given component and adjusts its sign according to the function this component
-        fulfills for the given bus.
-
-        Args:
-            comp: (str) The component from which the power should be extracted.
-            network: (pypsa.Network) The PyPSA network to be analyzed.
-            type: (str) The type of the component, "line" or "gen".
-
-        Returns:
-            (float) The power value for the given comp.
-        """
-        if type == "gen":
-            return float(network.generators[network.generators.index == comp].p_nom)
-        elif type == "line":
-            return float(network.lines[network.lines.index == comp].s_nom)
-
-    def buildPowerAndQubits(self, components: dict, network: pypsa.Network, bus: str) -> dict:
-        """
-        Builds up the power and qubits lists stored in the components dictionary and returns it.
-
-        Args:
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            network: (pypsa.Network) The PyPSA network to be analyzed.
-            bus: (str) The bus where the components are connected.
-
-        Returns:
-            (dict) The components dictionary with the power and qubits lists for this bus.
-        """
-        qubit_map = components["qubit_map"]
-        for comp in components[bus]["generators"]:
-            components[bus]["qubits"].append(qubit_map[comp][0])
-            components[bus]["power"].append(self.get_power(comp=comp, network=network, type="gen"))
-        for comp in components[bus]["positiveLines"]:
-            components[bus]["power"].append(self.get_power(comp=comp, network=network, type="line"))
-            if network.lines[network.lines.index == comp].bus1[0] == bus:
-                components[bus]["qubits"].append(qubit_map[comp][0])
-            elif network.lines[network.lines.index == comp].bus0[0] == bus:
-                components[bus]["qubits"].append(qubit_map[comp][1])
-        for comp in components[bus]["negativeLines"]:
-            components[bus]["power"].append(-self.get_power(comp=comp, network=network, type="line"))
-            if network.lines[network.lines.index == comp].bus1[0] == bus:
-                components[bus]["qubits"].append(qubit_map[comp][1])
-            elif network.lines[network.lines.index == comp].bus0[0] == bus:
-                components[bus]["qubits"].append(qubit_map[comp][0])
-
-        return components
-
-
-    def getComponents(self, network: pypsa.Network) -> dict:
-        """
-        Separates and organizes all components of a network to be optimized using QAOA.
-        For each bus the generators, positive lines (which add power to the bus), negative lines (which remove power
-        from the bus) and load are accessed and stored in the dictionary, together with a flattened list of generators,
-        positive and negative lines, and the power associated to these components. At last the components are mapped
-        on logical qubits.
-
-        Args:
-            network: (pypsa.Network) The PyPSA network to be analyzed.
-
-        Returns:
-            (dict) All components to be modeled as a Quantum Circuit.
-        """
-        components = {}
-
-        if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
-                self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qubit_map = {}
-            qubit = 0
-            for comp in list(network.generators.index):
-                qubit_map[comp] = [qubit]
-                qubit += 1
-            for comp in list(network.lines.index):
-                qubit_map[comp] = [qubit, qubit + 1]  # [line going to bus1, line going to bus0]
-                qubit += 2
-        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            transformedProblem = self.isingInterface
-            qubit_map = transformedProblem.getQubitMapping()
-
-        components["qubit_map"] = qubit_map
-
-        for bus in network.buses.index.values:
-            components[bus] = {"generators": list(network.generators[network.generators.bus == bus].index),
-                               "positiveLines": list(network.lines[network.lines.bus1 == bus].index) +
-                                                list(network.lines[network.lines.bus0 == bus].index),
-                               # lines are bidirectional
-                               "negativeLines": list(network.lines[network.lines.bus1 == bus].index) +
-                                                list(network.lines[network.lines.bus0 == bus].index),
-                               "load": sum(list(network.loads[network.loads.bus == bus].p_set)), }
-            components[bus][f"flattened_{bus}"] = components[bus]["generators"] + \
-                                                  components[bus]["positiveLines"] + \
-                                                  components[bus]["negativeLines"]
-            components[bus]["power"] = []
-            components[bus]["qubits"] = []
-            components = self.buildPowerAndQubits(components=components, network=network, bus=bus)
-
-        if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            lastKey = list(components["qubit_map"])[-1]
-            nqubits = components["qubit_map"][lastKey][-1] + 1
-            hamiltonian = self.calculateHpMatrix(components=components, nqubits=nqubits)
-        elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-            hamiltonian = transformedProblem.getHamiltonianMatrix()
-        else:
-            hamiltonian = []
-        scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
-
-        components["hamiltonian"] = {}
-        components["hamiltonian"]["scaled"] = scaledHamiltonian
-        components["hamiltonian"]["original"] = hamiltonian
-
-        self.components = components
-
-        return components
 
     def scaleHamiltonian(self, hamiltonian: list) -> list:
         """
@@ -374,159 +230,7 @@ class QaoaQiskit(BackendBase):
 
         return scaledHamiltonian.tolist()
 
-    def addHpIter(self, qc: QuantumCircuit, gamma: float, components: dict) -> QuantumCircuit:
-        """
-        Appends the problem Hamiltonian to a quantum circuit by iterating through the cost function and appending
-        single gates.
-
-        Args:
-            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
-            gamma: (float) The optimizable value for the problem Hamiltonian.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-
-        Returns:
-            (QuantumCircuit) The appended quantum circuit.
-        """
-        for bus in components:
-            if bus != "qubit_map" and bus != "hamiltonian":
-                length = len(components[bus][f"flattened_{bus}"])
-                for i in range(length):
-                    p_comp1 = components[bus]["power"][i]
-                    qubit_comp1 = components[bus]["qubits"][i]
-                    # negative load, since it removes power from the node
-                    factor_load = -(components[bus]["load"]) * p_comp1
-                    qc.rz(factor_load * gamma, qubit_comp1)
-                    qc.barrier()
-                    for j in range(length):
-                        p_comp2 = components[bus]["power"][j]
-                        qubit_comp2 = components[bus]["qubits"][j]
-                        factor = 0.25 * p_comp1 * p_comp2
-                        qc.rz(factor * gamma, qubit_comp1)
-                        qc.rz(factor * gamma, qubit_comp2)
-                        if i != j:
-                            qc.rzz(factor * gamma, qubit_comp1, qubit_comp2)
-                qc.barrier()
-                qc.barrier()
-
-        return qc
-
-    def calculateHpMatrix(self, components: dict, nqubits: int) -> list:
-        """
-        Creates the Hamiltonian Matrix for the given problem.
-
-        Args:
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            nqubits: (int) The number of qubits in the network.
-
-        Returns:
-            (list) The Hamiltonian Matrix.
-        """
-        hp = [[0.0 for j in range(nqubits)] for i in range(nqubits)]
-        for bus in components:
-            if bus != "qubit_map" and bus != "hamiltonian":
-                length = len(components[bus][f"flattened_{bus}"])
-                for i in range(length):
-                    p_comp1 = components[bus]["power"][i]
-                    i_qubit = components[bus]["qubits"][i]
-                    # negative load, since it removes power from the node
-                    factor_load = -(components[bus]["load"]) * p_comp1
-                    hp[i_qubit][i_qubit] += factor_load  # qc.rz(factor_load * gamma, qubit_comp1)
-                    for j in range(length):
-                        p_comp2 = components[bus]["power"][j]
-                        j_qubit = components[bus]["qubits"][j]
-                        factor = 0.25 * p_comp1 * p_comp2
-                        hp[i_qubit][i_qubit] += factor  # qc.rz(factor * gamma, qubit_comp1)
-                        hp[j_qubit][j_qubit] += factor  # qc.rz(factor * gamma, qubit_comp2)
-                        if i != j:
-                            hp[i_qubit][j_qubit] += factor  # qc.rzz(factor * gamma, qubit_comp1, qubit_comp2)
-                            hp[j_qubit][i_qubit] += factor  # creates the symmetry in Hp
-        return hp
-
-    def addHpMatrix(self, qc: QuantumCircuit, gamma: float, nqubits: int, hp: list) -> QuantumCircuit:
-        """
-        Appends the problem Hamiltonian to a quantum circuit using the Hamiltonian matrix.
-
-        Args:
-            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
-            gamma: (float) The optimizable value for the problem Hamiltonian.
-            nqubits: (int) The number of qubits in the network.
-            hp: (list) The Hamiltonian Matrix.
-
-        Returns:
-            (QuantumCircuit) The appended quantum circuit.
-        """
-
-        for i in range(nqubits):
-            for j in range(i, nqubits):
-                if hp[i][j] != 0.0:
-                    if i == j:
-                        qc.rz(hp[i][j] * gamma, i)
-                    else:
-                        qc.rzz(hp[i][j] * gamma, i, j)
-        qc.barrier()
-        qc.barrier()
-
-        return qc
-
-    def addHb(self, qc: QuantumCircuit, beta: float, nqubits: int) -> QuantumCircuit:
-        """
-        Appends the mixer Hamiltonian to a quantum circuit.
-
-        Args:
-            qc: (QuantumCircuit) The quantum circuit to be appended with the problem Hamiltonian.
-            beta: (float) The optimizable value for the mixer Hamiltonian.
-            nqubits: (int) The number of qubits in the network.
-
-        Returns:
-            (QuantumCircuit) The appended quantum circuit.
-        """
-
-        for i in range(nqubits):
-            qc.rx(beta, i)
-        qc.barrier()
-        qc.barrier()
-
-        return qc
-
-    def create_qc1(self, components: dict, theta: list, hamiltonianType: str = "scaled") -> QuantumCircuit:
-        """
-        Creates a quantum circuit based on the components given and the cost function:
-
-        Args:
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
-                          gamma = theta[1].
-            hamiltonianType: (str) The type of the hamiltonian matrix to be used. Options can be "scaled" or "original".
-                                   Default: "scaled"
-
-        Returns:
-            (QuantumCircuit) The created quantum circuit.
-        """
-        lastKey = list(components["qubit_map"])[-1]
-        nqubits = components["qubit_map"][lastKey][-1] + 1
-        qc = QuantumCircuit(nqubits)
-
-        beta = theta[0]
-        gamma = theta[1]
-
-        # add Hadamard gate to each qubit
-        for i in range(nqubits):
-            qc.h(i)
-        qc.barrier()
-        qc.barrier()
-
-        if self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-            qc = self.addHpMatrix(qc=qc, gamma=gamma, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
-        elif self.config["QaoaBackend"]["qcGeneration"] == "Iteration":
-            qc = self.addHpIter(qc=qc, gamma=gamma, components=components)
-
-        qc = self.addHb(qc=qc, beta=beta, nqubits=nqubits)
-
-        qc.measure_all()
-
-        return qc
-
-    def create_qcIsing(self, hamiltonian: dict, theta: list) -> QuantumCircuit:
+    def create_qc(self, hamiltonian: dict, theta: list) -> QuantumCircuit:
         """
         Creates a quantum circuit based on the hamiltonian matrix given.
 
@@ -549,8 +253,6 @@ class QaoaQiskit(BackendBase):
         for i in range(nqubits):
             qc.h(i)
         qc.barrier()
-#        qc.barrier()
-
 
         for layer, _ in enumerate(betaValues):
             # add problem Hamiltonian
@@ -562,7 +264,6 @@ class QaoaQiskit(BackendBase):
                         else:
                             qc.rzz(-hamiltonian[i][j] * gammaValues[layer], i, j)  # negative because it´s the inverse of original QC
             qc.barrier()
-#            qc.barrier()
 
             # add mixing Hamiltonian to each qubit
             for i in range(nqubits):
@@ -572,45 +273,7 @@ class QaoaQiskit(BackendBase):
 
         return qc
 
-    def create_qc3(self, components: dict, theta: list, hamiltonianType: str = "scaled") -> QuantumCircuit:
-        # 2 betas & 2 gammas
-        """
-        Creates a quantum circuit based on the components given and the cost function:
-
-        Args:
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            theta: (list) The optimizable values of the quantum circuit. Four arguments needed: [beta0, gamma0, beta1,
-                          gamma1].
-            hamiltonianType: (str) The type of the hamiltonian matrix to be used. Options can be "scaled" or "original".
-                                   Default: "scaled"
-
-        Returns:
-            (QuantumCircuit) The created quantum circuit.
-        """
-        lastKey = list(components["qubit_map"])[-1]
-        nqubits = components["qubit_map"][lastKey][-1] + 1
-        qc = QuantumCircuit(nqubits)
-        beta0 = theta[0]
-        gamma0 = theta[1]
-        beta1 = theta[2]
-        gamma1 = theta[3]
-
-        # add Hadamard gate to each qubit
-        for i in range(nqubits):
-            qc.h(i)
-        qc.barrier()
-
-        qc = self.addHpMatrix(qc=qc, gamma=gamma0, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
-        qc = self.addHb(qc=qc, beta=beta0, nqubits=nqubits)
-
-        qc = self.addHpMatrix(qc=qc, gamma=gamma1, nqubits=nqubits, hp=components["hamiltonian"][hamiltonianType])
-        qc = self.addHb(qc=qc, beta=beta1, nqubits=nqubits)
-
-        qc.measure_all()
-
-        return qc
-
-    def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
+    def kirchhoff_satisfied(self, bitstring: str) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given solution.
 
@@ -622,28 +285,21 @@ class QaoaQiskit(BackendBase):
             (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
                     satisfied for the given network.
         """
+        try:
+            return self.output["results"]["kirchhoff"][bitstring]["total"]
+        except KeyError:
+            self.output["results"]["kirchhoff"][bitstring] = {}
+            kirchhoffCost = 0.0
+            for bus in self.network.buses.index:
+                bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
+                for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
+                    self.output["results"]["kirchhoff"][bitstring][bus] = val
+                    kirchhoffCost += abs(val) ** 2
+            # TODO seperate into different cost functions
+            self.output["results"]["kirchhoff"][bitstring]["total"] = kirchhoffCost
+            return kirchhoffCost
 
-        self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring] = {}
-        power_total = 0
-        for bus in components:
-            power = 0
-            if bus != "qubit_map" and bus != "hamiltonian":
-                power -= components[bus]["load"]
-                i = 0
-                for comp in components[bus][f"flattened_{bus}"]:
-                    #i = components[bus][f"flattened_{bus}"].index(comp)
-                    i_bit = components[bus]["qubits"][i]
-                    power += (components[bus]["power"][i] * float(bitstring[i_bit]))
-                    i += 1
-                self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring][bus] = power
-#            power_total += abs(power)
-#            power_total += power ** 2
-            power_total += (abs(power) + power ** 2)
-        self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = power_total
-
-        return power_total
-
-    def compute_expectation(self, counts: dict, components: dict, filename: str) -> float:
+    def compute_expectation(self, counts: dict) -> float:
         """
         Computes expectation value based on measurement results
 
@@ -659,22 +315,17 @@ class QaoaQiskit(BackendBase):
         avg = 0
         sum_count = 0
         for bitstring, count in counts.items():
-            obj = self.kirchhoff_satisfied2(bitstring=bitstring, components=components)
+            obj = self.kirchhoff_satisfied(bitstring=bitstring)
             avg += obj * count
             sum_count += count
-            self.results_dict[f"rep{self.results_dict['iter_count']}"][bitstring] = {"count": count,
-                                                                                     "obj": obj,
-                                                                                     "avg": avg,
-                                                                                     "sum_count": sum_count}
-        self.results_dict[f"rep{self.results_dict['iter_count']}"]["return"] = avg / sum_count
+            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
+                ["bitstrings"][bitstring] = {"count": count,
+                                             "obj": obj,
+                                             "avg": avg,
+                                             "sum_count": sum_count}
 
-        # safe results to make sure nothing is lost, even if the code or backend crashes
-        if self.docker:
-            with open(f"Problemset/{filename}", "w") as write_file:
-                json.dump(self.results_dict, write_file, indent=2, default=str)
-        else:
-            with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-                json.dump(self.results_dict, write_file, indent=2, default=str)
+        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
+            ["return"] = avg / sum_count
 
         return avg / sum_count
 
@@ -731,7 +382,7 @@ class QaoaQiskit(BackendBase):
 
         return backend, noise_model, coupling_map, basis_gates
 
-    def get_expectation(self, filename: str, components: dict, simulator: str = "aer_simulator",
+    def get_expectation(self, nqubits: int, simulator: str = "aer_simulator",
                         shots: int = 1024, simulate: bool = True, noise: bool = False):
         """
         Builds the objective function, which can be used in a classical solver.
@@ -750,9 +401,6 @@ class QaoaQiskit(BackendBase):
         Returns:
             (callable) The objective function to be used in a classical solver
         """
-        lastKey = list(components["qubit_map"])[-1]
-        nqubits = components["qubit_map"][lastKey][-1] + 1
-
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
                                                                              simulate=simulate,
                                                                              noise=noise,
@@ -761,21 +409,8 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
         def execute_circ(theta):
-#            thetaDraw = [Parameter("\u03B2\u2081"), Parameter("\u03B3\u2081")]
-            thetaDraw = [Parameter("b"), Parameter("g")]
-            if self.config["QaoaBackend"]["qcGeneration"] == "Iteration" or \
-                    self.config["QaoaBackend"]["qcGeneration"] == "IterationMatrix":
-                if len(self.config["QaoaBackend"]["initial_guess"]) == 2:
-                    qc = self.create_qc1(components=components, theta=theta)
-                    qcDraw = self.create_qc1(components=components, theta=thetaDraw)
-                elif len(self.config["QaoaBackend"]["initial_guess"]) == 4:
-                    qc = self.create_qc3(components=components, theta=theta)
-                    thetaDraw.extend([Parameter("\u03B2\u2082"), Parameter("\u03B3\u2082")])
-                    qcDraw = self.create_qc3(components=components, theta=thetaDraw)
-            elif self.config["QaoaBackend"]["qcGeneration"] == "Ising":
-                qc = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=theta)
-                qcDraw = self.create_qcIsing(hamiltonian=components["hamiltonian"]["scaled"], theta=thetaDraw)
-            self.results_dict["qc"] = qcDraw.draw(output="latex_source")
+            qc = self.create_qc(hamiltonian=self.output["results"]["hamiltonian"]["scaled"], theta=theta)
+
             if simulate:
                 # Run on chosen simulator
                 results = execute(experiments=qc,
@@ -792,14 +427,13 @@ class QaoaQiskit(BackendBase):
                 job_monitor(job_device)
                 results = job_device.result()
             counts = results.get_counts()
-            self.results_dict["iter_count"] += 1
+            self.iterationCounter += 1
+            self.prepareIterationDict()
             self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["theta"] = list(theta)
-            self.results_dict[f"rep{self.results_dict['iter_count']}"]["counts"] = counts
+            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["theta"] = list(theta)
+            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["counts"] = counts
 
-            self.kirchhoff[f"rep{self.results_dict['iter_count']}"] = {}
-
-            return self.compute_expectation(counts=counts, components=components, filename=filename)
+            return self.compute_expectation(counts=counts)
 
         return execute_circ
 
@@ -905,40 +539,6 @@ def main():
     filename = str(envMgr['outputInfo'])
     with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
         json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
-    
-
-class QaoaQiskitIsing(QaoaQiskit):
-
-    def __init__(self, config: dict,):
-        super().__init__(config=config)
-        self._kirchhoffcostDict = {}
-
-    def kirchhoff_satisfied2(self, bitstring: str, components: dict) -> float:
-        """
-        Checks if the kirchhoff constraints are satisfied for the given solution.
-
-        Args:
-            bitstring: (str) The possible solution to the network.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-
-        Returns:
-            (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
-                    satisfied for the given network.
-        """
-        try:
-            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = self._kirchhoffcostDict[bitstring]
-            return self._kirchhoffcostDict[bitstring]
-        except KeyError:
-            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring] = {}
-            kirchhoffCost = 0.0
-            for bus in self.network.buses.index:
-                bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
-                for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
-                    kirchhoffCost += abs(val) ** 2
-            # TODO seperate into different cost functions
-            self._kirchhoffcostDict[bitstring] = kirchhoffCost
-            self.kirchhoff[f"rep{self.results_dict['iter_count']}"][bitstring]["total"] = kirchhoffCost
-            return kirchhoffCost
 
 
 if __name__ == "__main__":
