@@ -24,10 +24,10 @@ from qiskit.circuit import Parameter
 class QaoaQiskit(BackendBase):
     def __init__(self, *args):
         super().__init__(args)
-        self.output["results"] = {"backend": "",
+        self.output["results"] = {"backend": None,
                                   "qubit_map": {},
                                   "hamiltonian": {},
-                                  "qc": "",
+                                  "qc": None,
                                   "repetitions": {}}
         self.resetResultDict()
 
@@ -51,6 +51,13 @@ class QaoaQiskit(BackendBase):
                              "duration": None,
                              "optimizeResults": {},
                              }
+
+    def prepareRepetitionDict(self, key: int):
+        self.output["results"]["repetitions"][key] = {"init_guess": [],
+                                                      "iteration": {},
+                                                      "duration": None,
+                                                      "bestAfterRandom": {},
+                                                      "optimizeResults": {}}
 
     def transformProblemForOptimizer(self, network):
         return BackendBase.transformProblemForOptimizer(network=network)
@@ -82,7 +89,7 @@ class QaoaQiskit(BackendBase):
             for curRepetition in range(1, repetitions + 1):
                 time_start = datetime.timestamp(datetime.now())
                 totalRepetition = rand * repetitions + curRepetition
-                print(f"----------------------- Iteration {totalRepetition} ----------------------------------")
+                print(f"----------------------- Repetition {totalRepetition} ----------------------------------")
 
                 initial_guess = []
                 for j in range(num_vars):
@@ -97,8 +104,8 @@ class QaoaQiskit(BackendBase):
                 initial_guess = np.array(initial_guess)
 
                 self.resetResultDict()
-                self.results_dict["initial_guess"] = initial_guess.tolist()
-                self.results_dict["components"] = self.components
+                self.prepareRepetitionDict(key=totalRepetition)
+                self.output["results"]["repetitions"][totalRepetition]["initial_guess"] = initial_guess.tolist()
 
                 filename = self.generateFilename(totalRepetition)
 
@@ -749,12 +756,7 @@ class QaoaQiskit(BackendBase):
                                                                              noise=noise,
                                                                              nqubits=nqubits)
 
-        self.metaInfo["qaoaBackend"] = backend.configuration().to_dict()
-
-        self.results_dict["shots"] = shots
-        self.results_dict["simulate"] = simulate
-        self.results_dict["noise"] = noise
-        self.results_dict["backend_name"] = self.metaInfo["qaoaBackend"]["backend_name"]
+        self.output["results"]["backend"] = backend.configuration().to_dict()
 
         def execute_circ(theta):
 #            thetaDraw = [Parameter("\u03B2\u2081"), Parameter("\u03B3\u2081")]
