@@ -94,7 +94,7 @@ def main():
 
     envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
 
-    adapter = Adapter.makeAdapter(data=envMgr['inputNetwork'], params=inputData)
+    adapter = Adapter(envMgr['inputNetwork'], params=inputData)
 
     # TODO currently used so makefile rules still work by adding extra configs to the adapter from
     # environment. Remove this later
