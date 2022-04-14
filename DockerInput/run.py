@@ -92,11 +92,12 @@ def main():
     else:
         inputData = sys.argv[2]
 
-    adapter = Adapter.makeAdapter(inputData)
+    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
+
+    adapter = Adapter.makeAdapter(data=envMgr['inputNetwork'], params=inputData)
 
     # TODO currently used so makefile rules still work by adding extra configs to the adapter from
     # environment. Remove this later
-    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
     variablesNotInAdapter = {key : value 
                     for key, value in envMgr.returnEnvironmentVariables().items()
                     if key in DEFAULT_ENV_VARIABLES.keys() and key not in adapter.config
