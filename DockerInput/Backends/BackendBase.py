@@ -1,15 +1,13 @@
 import abc
 
-import pypsa
-
-from EnvironmentVariableManager import EnvironmentVariableManager
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, adapter):
-        self.adapter = adapter
+    def __init__(self, inputReader: InputReader):
+        self.network = inputReader.getNetwork()
+        self.config = inputReader.getConfig()
         self.setupOutputDict()
 
     @abc.abstractmethod
