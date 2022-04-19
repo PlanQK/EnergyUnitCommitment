@@ -8,41 +8,9 @@ import random
 import Backends
 from Backends.InputReader import InputReader
 from EnvironmentVariableManager import EnvironmentVariableManager
-from .program import run
 
 
 FOLDER = "Problemset"
-
-DEFAULT_ENV_VARIABLES = {
-    "inputNetwork": "input.nc",
-    "inputInfo": "",
-    "outputNetwork": "",
-    "outputInfo": "output.json",
-    "optimizationCycles": 1000,
-    "temperatureSchedule": "[0.1,iF,0.0001]",
-    "transverseFieldSchedule": "[10,.1]",
-    "monetaryCostFactor": 0.4,
-    "kirchhoffFactor": 1.0,
-    "slackVarFactor": 60.0,
-    "minUpDownFactor": 0.0,
-    "trotterSlices": 32,
-    "problemFormulation": "fullsplitNoMarginalCost",
-    "dwaveAPIToken": "",
-    "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
-    "annealing_time": 500,
-    "programming_thermalization": 0,
-    "readout_thermalization": 0,
-    "num_reads": 1,
-    "chain_strength": 250,
-    "seed": random.randint(0, 100000),
-    "strategy": "LowestEnergy",
-    "postprocess": "flow",
-    "timeout": "-1",
-    "sampleCutSize": 200,
-    "offsetEstimationFactor" : 1.0,
-    "estimatedCostFactor" : 1.0,
-    "offsetBuildFactor" : 1.0,
-}
 
 
 errorMsg = """
@@ -65,6 +33,18 @@ Any further settings are specified through environment variables:
     cubicConstraints: false  DWave does not support cubic constraints
 
 """
+configs = {
+    "classical": "SqaBackend",
+    "sqa": "SqaBackend",
+    "dwave-tabu": "DwaveBackend",
+    "dwave-greedy": "DwaveBackend",
+    "pypsa-glpk": "PypsaBackend",
+    "pypsa-fico": "PypsaBackend",
+    "dwave-hybrid": "DwaveBackend",
+    "dwave-qpu": "DwaveBackend",
+    "dwave-read-qpu": "DwaveBackend",
+    "qaoa": "QaoaBackend",
+    "test": "QaoaBackend"}
 
 ganBackends = {
     "classical": Backends.ClassicalBackend,
@@ -80,45 +60,27 @@ ganBackends = {
     "test": Backends.QaoaQiskit
 }
 
-def main():
-    assert sys.argv[1] in ganBackends.keys(), errorMsg
+def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None, extraParams: dict = None):
 
-    if len(sys.argv) == 2:
-        # mock object
-        inputData = "config-sqa.yaml"
-    else:
-        inputData = sys.argv[2]
-        network = sys.argv[3]
-        param = sys.argv[4]
-        print(f"config: {inputData}")
-        print(f"network: {network}")
-        print(f"param: {param}")
-        return
+    input = InputReader(network=data, config=params)
 
-    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
+    for key, value in extraParams.items():
+        if key in input.config["IsingInterface"]:
+            input.config["IsingInterface"][key] = value
+        elif key in input.config[configs[input.config["Backend"]]]:
+            input.config[configs[input.config["Backend"]]] = value
+        else:
+            raise ValueError(f"Extra parameter {key} not found in config.")
 
+    OptimizerClass = ganBackends[input.config["Backend"]]
 
-    run()
+    optimizer = OptimizerClass(input)
 
-    adapter = InputReader(envMgr['inputNetwork'], config=inputData)
-
-    # TODO currently used so makefile rules still work by adding extra configs to the adapter from
-    # environment. Remove this later
-    variablesNotInInputReader = {key : value 
-                    for key, value in envMgr.returnEnvironmentVariables().items()
-                    if key in DEFAULT_ENV_VARIABLES.keys() and key not in adapter.config
-                    }
-    adapter.config = {**variablesNotInInputReader, **adapter.config}
-    # end filling up with environmentvariables
-
-    OptimizerClass = ganBackends[sys.argv[1]]
-
-    optimizer = OptimizerClass(adapter)
-
-    pypsaNetwork = adapter.getNetwork()
+    pypsaNetwork = input.getNetwork()
 
     # validate input has to throw and catch exceptions on it's own
-    optimizer.validateInput("Problemset", adapter.config['inputNetwork'])
+    # TODO: possibly useless, as we get Network already in InputReader
+    optimizer.validateInput(path="Problemset", network=pypsaNetwork)
 
     transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
 
@@ -130,6 +92,16 @@ def main():
     outputNetwork = optimizer.transformSolutionToNetwork(
         pypsaNetwork, transformedProblem, processedSolution
     )
+
+    if local docker flag:
+        response = ResultFileResponse(result)
+    else
+        response = ResultResponse(result)
+    or
+        response = ErrorResponse
+
+    response.send
+
     if envMgr["outputNetwork"]:
         outputNetwork.export_to_netcdf(
             f"Problemset/{str(envMgr['outputNetwork'])}"
@@ -138,7 +110,3 @@ def main():
     with open(f"Problemset/{str(envMgr['outputInfo'])}", "w") as write_file:
         json.dump(optimizer.getOutput(), write_file, indent=2, default=str)
     return
-
-
-if __name__ == "__main__":
-    main()

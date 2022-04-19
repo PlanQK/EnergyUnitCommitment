@@ -9,9 +9,9 @@ class InputReader:
     """
     This class is an reader to obtain the configuration dictionary dependent on the input format
     """
-    def __init__(self, network: Union[pypsa.Network, str], params: Union[dict, str]):
+    def __init__(self, network: Union[pypsa.Network, str], config: Union[dict, str]):
         self.network = self.makeNetwork(network)
-        self.config = self.makeConfig(params)
+        self.config = self.makeConfig(config)
 
     def makeNetwork(self, network: Union[str, dict, pypsa.Network]) -> pypsa.Network:
         if isinstance(network, str):
