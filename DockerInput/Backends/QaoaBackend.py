@@ -112,6 +112,12 @@ class QaoaQiskit(BackendBase):
         qcDraw = self.qcParam.bind_parameters({self.paramVector: drawTheta})
         self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
+        backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
+                                                                             simulate=simulate,
+                                                                             noise=noise,
+                                                                             nqubits=nqubits)
+        self.output["results"]["backend"] = backend.configuration().to_dict()
+
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
                 time_start = datetime.timestamp(datetime.now())
@@ -135,11 +141,12 @@ class QaoaQiskit(BackendBase):
 
                 self.iterationCounter = 0
 
-                expectation = self.get_expectation(nqubits=nqubits,
-                                                   simulator=simulator,
+                expectation = self.get_expectation(backend=backend,
+                                                   noise_model=noise_model,
+                                                   coupling_map=coupling_map,
+                                                   basis_gates=basis_gates,
                                                    shots=shots,
-                                                   simulate=simulate,
-                                                   noise=noise)
+                                                   simulate=simulate)
 
                 optimizer = self.getClassicalOptimizer(max_iter)
 
@@ -390,8 +397,8 @@ class QaoaQiskit(BackendBase):
 
         return backend, noise_model, coupling_map, basis_gates
 
-    def get_expectation(self, nqubits: int, simulator: str = "aer_simulator",
-                        shots: int = 1024, simulate: bool = True, noise: bool = False):
+    def get_expectation(self, backend, noise_model, coupling_map, basis_gates, shots: int = 1024,
+                        simulate: bool = True):
         """
         Builds the objective function, which can be used in a classical solver.
 
@@ -409,12 +416,7 @@ class QaoaQiskit(BackendBase):
         Returns:
             (callable) The objective function to be used in a classical solver
         """
-        backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
-                                                                             simulate=simulate,
-                                                                             noise=noise,
-                                                                             nqubits=nqubits)
 
-        self.output["results"]["backend"] = backend.configuration().to_dict()
 
         def execute_circ(theta):
             qc = self.qcParam.bind_parameters({self.paramVector: theta})
