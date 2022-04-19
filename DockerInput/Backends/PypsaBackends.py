@@ -46,17 +46,17 @@ class PypsaBackend(BackendBase):
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
         self.model = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                                                         solver_name=self.adapter.config["PypsaBackend"]["solver_name"])
-        self.opt.options["tmlim"] = self.adapter.config["PypsaBackend"]["timeout"]
+                                                         solver_name=self.config["PypsaBackend"]["solver_name"])
+        self.opt.options["tmlim"] = self.config["PypsaBackend"]["timeout"]
         return self.model
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         print("Writing from pyoyo model to network is not implemented")
 
-        if self.adapter.config["PypsaBackend"]["terminationCondition"] == "infeasible":
+        if self.config["PypsaBackend"]["terminationCondition"] == "infeasible":
             print("no feasible solution, stop writing to network")
 
-        elif self.adapter.config["PypsaBackend"]["terminationCondition"] != "infeasible":
+        elif self.config["PypsaBackend"]["terminationCondition"] != "infeasible":
             
             print(self.output["results"]["genStates"] )
             print(self.output["results"]["lineValues"] )
@@ -84,7 +84,7 @@ class PypsaBackend(BackendBase):
         solvingTime = solverstring.splitlines()[-1].split()[1]
         terminationCondition = solverstring.splitlines()[-7].split()[2]
         self.output["results"]["optimizationTime"] = solvingTime
-        self.adapter.config["PypsaBackend"]["terminationCondition"] = terminationCondition
+        self.config["PypsaBackend"]["terminationCondition"] = terminationCondition
 
         sol.write()
 
@@ -101,8 +101,8 @@ class PypsaBackend(BackendBase):
     def __init__(self, *args):
         super().__init__(args)
 
-        if self.adapter.config["PypsaBackend"]["timeout"] < 0:
-            self.adapter.config["PypsaBackend"]["timeout"] = 1000
+        if self.config["PypsaBackend"]["timeout"] < 0:
+            self.config["PypsaBackend"]["timeout"] = 1000
 
 
 class PypsaFico(PypsaBackend):
