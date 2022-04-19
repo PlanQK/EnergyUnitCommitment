@@ -21,7 +21,7 @@ from qiskit.providers.aer.noise import NoiseModel
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
-from qiskit.circuit import Parameter
+from qiskit.circuit import Parameter, ParameterVector
 
 
 class QaoaQiskit(BackendBase):
@@ -38,6 +38,8 @@ class QaoaQiskit(BackendBase):
         self.isingInterface = IsingBackbone.buildIsingProblem(network=self.network, config=self.config["IsingInterface"])
         self.iterationCounter = None
         self.totalRepetition = None
+        self.qcParam = None
+        self.paramVector = None
 
         self.kirchhoff = {}
         self.components = {}
@@ -75,8 +77,10 @@ class QaoaQiskit(BackendBase):
         betaValues = theta[::2]
         drawTheta = []
         for layer, _ in enumerate(betaValues):
-            drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
-            drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
+            drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
+            drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
+            #drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
+            #drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
 
         return drawTheta
 
@@ -102,9 +106,11 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
         nqubits = len(hamiltonian)
 
+        self.paramVector = ParameterVector('theta', len(initial_guess_original))
+        self.qcParam = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
         drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        #qcDraw = self.create_qc(hamiltonian=scaledHamiltonian, theta=drawTheta)
-        #self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
+        qcDraw = self.qcParam.bind_parameters({self.paramVector: drawTheta})
+        self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
@@ -231,7 +237,7 @@ class QaoaQiskit(BackendBase):
 
         return scaledHamiltonian.tolist()
 
-    def create_qc(self, hamiltonian: list, theta: list) -> QuantumCircuit:
+    def create_qc(self, hamiltonian: list, theta: ParameterVector) -> QuantumCircuit:
         """
         Creates a quantum circuit based on the hamiltonian matrix given.
 
@@ -253,9 +259,10 @@ class QaoaQiskit(BackendBase):
         # add Hadamard gate to each qubit
         for i in range(nqubits):
             qc.h(i)
-        qc.barrier()
 
         for layer, _ in enumerate(betaValues):
+            qc.barrier()
+            qc.barrier()
             # add problem Hamiltonian
             for i in range(len(hamiltonian)):
                 for j in range(i, len(hamiltonian[i])):
@@ -410,7 +417,7 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
         def execute_circ(theta):
-            qc = self.create_qc(hamiltonian=self.output["results"]["hamiltonian"]["scaled"], theta=theta)
+            qc = self.qcParam.bind_parameters({self.paramVector: theta})
 
             if simulate:
                 # Run on chosen simulator
