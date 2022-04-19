@@ -194,8 +194,8 @@ class DwaveTabuSampler(BackendBase):
         print("done")
         return result
 
-    def getMetaInfo(self):
-        return self.metaInfo
+    def getOutput(self):
+        return self.output
 
 
 class DwaveSteepestDescent(DwaveTabuSampler):

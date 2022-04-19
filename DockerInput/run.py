@@ -79,8 +79,7 @@ ganBackends = {
     "dwave-hybrid": Backends.DwaveCloudHybrid,
     "dwave-qpu": Backends.DwaveCloudDirectQPU,
     "dwave-read-qpu": Backends.DwaveReadQPU,
-    "qaoa": Backends.QaoaQiskit,
-#    "qaoa": Backends.QaoaQiskitIsing,
+    "qaoa": Backends.QaoaQiskit
 }
 
 def main():
@@ -130,7 +129,7 @@ def main():
         )
 
     with open(f"Problemset/{str(envMgr['outputInfo'])}", "w") as write_file:
-        json.dump(optimizer.getMetaInfo(), write_file, indent=2, default=str)
+        json.dump(optimizer.getOutput(), write_file, indent=2, default=str)
     return
 
 

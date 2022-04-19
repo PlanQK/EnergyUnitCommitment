@@ -95,8 +95,8 @@ class PypsaBackend(BackendBase):
         self.output["results"]["status"] = committed_gen
         return self.model
 
-    def getMetaInfo(self):
-        return self.metaInfo
+    def getOutput(self):
+        return self.output
 
     def __init__(self, *args):
         super().__init__(args)

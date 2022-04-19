@@ -7,4 +7,4 @@ from .DwaveBackends import (
     DwaveReadQPU,
 )
 from .PypsaBackends import PypsaGlpk, PypsaFico
-from .QaoaBackendV2 import QaoaQiskit, QaoaQiskitIsing
+from .QaoaBackend import QaoaQiskit

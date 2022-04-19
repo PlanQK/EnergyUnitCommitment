@@ -10,6 +10,7 @@ from numpy import random
 
 from .IsingPypsaInterface import IsingBackbone                      # import for Docker run
 from .BackendBase import BackendBase                                # import for Docker run
+from .InputReader import InputReader
 #from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
 #from BackendBase import BackendBase                                # import for local/debug run
 #from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
@@ -24,8 +25,8 @@ from qiskit.circuit import Parameter
 
 
 class QaoaQiskit(BackendBase):
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, inputReader: InputReader):
+        super().__init__(inputReader)
         self.output["results"] = {"backend": None,
                                   "qubit_map": {},
                                   "hamiltonian": {},
@@ -42,18 +43,18 @@ class QaoaQiskit(BackendBase):
         self.components = {}
 
         self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
-        if self.adapter.config["QaoaBackend"]["noise"] or (not self.adapter.config["QaoaBackend"]["simulate"]):
-            IBMQ.save_account(self.adapter.config["APItoken"]["IBMQ_API_token"], overwrite=True)
+        if self.config["QaoaBackend"]["noise"] or (not self.config["QaoaBackend"]["simulate"]):
+            IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
     def prepareRepetitionDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition] = {"init_guess": [],
-                                                                       "iteration": {},
+        self.output["results"]["repetitions"][self.totalRepetition] = {"initial_guess": [],
+                                                                       "iterations": {},
                                                                        "duration": None,
                                                                        "optimizeResults": {}}
 
     def prepareIterationDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition]["iteration"][self.iterationCounter] = \
+        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] = \
             {"theta": [],
              "counts": {},
              "bitstrings": {},
@@ -99,10 +100,11 @@ class QaoaQiskit(BackendBase):
         scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
         self.output["results"]["hamiltonian"]["original"] = hamiltonian
         self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
+        nqubits = len(hamiltonian)
 
         drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        qcDraw = self.create_qc(hamiltonian=scaledHamiltonian, theta=drawTheta)
-        self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
+        #qcDraw = self.create_qc(hamiltonian=scaledHamiltonian, theta=drawTheta)
+        #self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
@@ -125,10 +127,9 @@ class QaoaQiskit(BackendBase):
                 self.prepareRepetitionDict()
                 self.output["results"]["repetitions"][self.totalRepetition]["initial_guess"] = initial_guess.tolist()
 
-                filename = self.generateFilename(self.totalRepetition)
                 self.iterationCounter = 0
 
-                expectation = self.get_expectation(nqubits=,
+                expectation = self.get_expectation(nqubits=nqubits,
                                                    simulator=simulator,
                                                    shots=shots,
                                                    simulate=simulate,
@@ -203,8 +204,8 @@ class QaoaQiskit(BackendBase):
 
         return minX
 
-    def getMetaInfo(self):
-        return self.metaInfo
+    def getOutput(self):
+        return self.output
 
     def validateInput(self, path, network):
         pass
@@ -230,7 +231,7 @@ class QaoaQiskit(BackendBase):
 
         return scaledHamiltonian.tolist()
 
-    def create_qc(self, hamiltonian: dict, theta: list) -> QuantumCircuit:
+    def create_qc(self, hamiltonian: list, theta: list) -> QuantumCircuit:
         """
         Creates a quantum circuit based on the hamiltonian matrix given.
 
@@ -429,7 +430,6 @@ class QaoaQiskit(BackendBase):
             counts = results.get_counts()
             self.iterationCounter += 1
             self.prepareIterationDict()
-            self.results_dict[f"rep{self.results_dict['iter_count']}"] = {}
             self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["theta"] = list(theta)
             self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["counts"] = counts
 
@@ -477,7 +477,6 @@ def main():
         "seed": 2
     }
 
-    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
     netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet)
 
     with open(os.path.dirname(__file__) + "/../Configs/" + configFile) as file:
@@ -487,7 +486,7 @@ def main():
     config["QaoaBackend"]["filenameSplit"] = filenameSplit
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
-    qaoa = QaoaQiskitIsing(config=config)
+    qaoa = QaoaQiskit(config=config)
     components = qaoa.transformProblemForOptimizer(network=netImport)
 
     """

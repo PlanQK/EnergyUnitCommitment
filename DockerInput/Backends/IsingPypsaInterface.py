@@ -636,13 +636,15 @@ class IsingBackbone:
 
     def calcPowerImbalance(self, solution):
         return self._subproblems["kirchhoff"].calcPowerImbalance(solution)
+
+    def calcPowerImbalanceAtBus(self, bus, result):
+        return self._subproblems["kirchhoff"].calcPowerImbalanceAtBus(bus, result)
     
     def individualCostContribution(self, result, silent=True):
         return self._subproblems["kirchhoff"].individualCostContribution(result,silent=silent)
 
     def calcTotalPowerGenerated(self, solution, time=0):
         return self._subproblems["kirchhoff"].calcTotalPowerGenerated(solution, time=time)
-
 
 
 class AbstractIsingSubproblem:

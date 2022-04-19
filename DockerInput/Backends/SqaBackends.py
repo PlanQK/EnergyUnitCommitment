@@ -58,8 +58,8 @@ class ClassicalBackend(BackendBase):
         print("done")
         return result
 
-    def getMetaInfo(self):
-        return self.metaInfo
+    def getOutput(self):
+        return self.output
 
     def configureSolver(self, 
             HSchedule = None,
