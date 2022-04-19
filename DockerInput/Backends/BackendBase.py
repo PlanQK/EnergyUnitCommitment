@@ -5,9 +5,9 @@ from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
-    def __init__(self, inputReader: InputReader):
-        self.network = inputReader.getNetwork()
-        self.config = inputReader.getConfig()
+    def __init__(self, reader: InputReader):
+        self.network = reader.getNetwork()
+        self.config = reader.getConfig()
         self.setupOutputDict()
 
     @abc.abstractmethod

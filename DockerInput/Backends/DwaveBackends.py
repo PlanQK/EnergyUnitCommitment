@@ -45,7 +45,7 @@ class DwaveTabuSampler(BackendBase):
         """
 
         if hasattr(self, 'network'):
-            bestSample = self.choose_sample(solution, self.network, strategy=self.adapter.config["DWaveBackend"]["strategy"])
+            bestSample = self.choose_sample(solution, self.network, strategy=self.reader.config["DWaveBackend"]["strategy"])
         else:
             bestSample = self.choose_sample(solution, network)
 
@@ -133,7 +133,7 @@ class DwaveTabuSampler(BackendBase):
                 lambda col: float(col.loc[-1]) / float(len(df))
             )
             return sample.apply(
-                lambda x: -1 if x >= self.adapter.config["DWaveBackend"]["threshold"] else 1
+                lambda x: -1 if x >= self.reader.config["DWaveBackend"]["threshold"] else 1
             )
 
         # requires postprocessing because in order to match total power output
@@ -212,7 +212,7 @@ class DwaveCloudHybrid(DwaveCloud):
     def __init__(self, *args):
         super().__init__(args)
         #self.token = self.envMgr["dwaveAPIToken"]
-        self.token = self.adapter.config["APItoken"]["dWave_API_token"]
+        self.token = self.reader.config["APItoken"]["dWave_API_token"]
         self.solver = "hybrid_binary_quadratic_model_version2"
         self.sampler = LeapHybridSampler(solver=self.solver,
                                          token=self.token)
@@ -250,7 +250,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for blacklist in blacklists:
             blacklist_name = blacklist[len(networkPath + "/"):]
             blacklisted_timeout = int(blacklist_name.split("_")[0])
-            if blacklisted_timeout <= self.adapter.config["DWaveBackend"]["timeout"]:
+            if blacklisted_timeout <= self.reader.config["DWaveBackend"]["timeout"]:
                 filteredByTimeout.append(blacklist)
 
         for blacklist in filteredByTimeout:
@@ -260,7 +260,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{networkPath}/embedding_' \
-                        f'rep_{self.adapter.config["IsingInterface"]["problemFormulation"]}_' \
+                        f'rep_{self.reader.config["IsingInterface"]["problemFormulation"]}_' \
                         f'{network}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
@@ -277,11 +277,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         If a network raises an error during optimization, add this network
         to the blacklisted networks for this optimizer and timeout value
-        Blacklistfiles are of the form '{networkPath}/{self.adapter.config["DWaveBackend"]["timeout"]}_{Backend}_blacklist'
+        Blacklistfiles are of the form '{networkPath}/{self.reader.config["DWaveBackend"]["timeout"]}_{Backend}_blacklist'
         """
         # on unix writing small buffers is atomic. no file locking necessary
         # append to existing file or create a new one
-        with open(f'{networkPath}/{self.adapter.config["DWaveBackend"]["timeout"]}_qpu_blacklist', 'a+') as f:
+        with open(f'{networkPath}/{self.reader.config["DWaveBackend"]["timeout"]}_qpu_blacklist', 'a+') as f:
             f.write(network + '\n')
         return
 
@@ -305,21 +305,21 @@ class DwaveCloudDirectQPU(DwaveCloud):
                                    token=self.token)
             sampler = FixedEmbeddingComposite(sampler, self.embedding)
             sampleset = sampler.sample(transformedProblem[1],
-                                       num_reads=self.adapter.config["DWaveBackend"]["num_reads"],
-                                       annealing_time=self.adapter.config["DWaveBackend"]["annealing_time"],
-                                       chain_strength=self.adapter.config["DWaveBackend"]["chain_strength"],
-                                       programming_thermalization=self.adapter.config["DWaveBackend"]["programming_thermalization"],
-                                       readout_thermalization=self.adapter.config["DWaveBackend"]["readout_thermalization"],
+                                       num_reads=self.reader.config["DWaveBackend"]["num_reads"],
+                                       annealing_time=self.reader.config["DWaveBackend"]["annealing_time"],
+                                       chain_strength=self.reader.config["DWaveBackend"]["chain_strength"],
+                                       programming_thermalization=self.reader.config["DWaveBackend"]["programming_thermalization"],
+                                       readout_thermalization=self.reader.config["DWaveBackend"]["readout_thermalization"],
                                        )
         else:
             try:
                 sampleset = self.sampler.sample(transformedProblem[1],
-                                                num_reads=self.adapter.config["DWaveBackend"]["num_reads"],
-                                                annealing_time=self.adapter.config["DWaveBackend"]["annealing_time"],
-                                                chain_strength=self.adapter.config["DWaveBackend"]["chain_strength"],
-                                                programming_thermalization=self.adapter.config["DWaveBackend"]["programming_thermalization"],
-                                                readout_thermalization=self.adapter.config["DWaveBackend"]["readout_thermalization"],
-                                                embedding_parameters=dict(timeout=self.adapter.config["DWaveBackend"]["timeout"]),
+                                                num_reads=self.reader.config["DWaveBackend"]["num_reads"],
+                                                annealing_time=self.reader.config["DWaveBackend"]["annealing_time"],
+                                                chain_strength=self.reader.config["DWaveBackend"]["chain_strength"],
+                                                programming_thermalization=self.reader.config["DWaveBackend"]["programming_thermalization"],
+                                                readout_thermalization=self.reader.config["DWaveBackend"]["readout_thermalization"],
+                                                embedding_parameters=dict(timeout=self.reader.config["DWaveBackend"]["timeout"]),
                                                 return_embedding=True,
                                                 )
             except ValueError:
@@ -336,19 +336,19 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def __init__(self, *args):
         super().__init__(args)
         #self.token = self.envMgr["dwaveAPIToken"]
-        self.token = self.adapter.config["APItoken"]["dWave_API_token"]
+        self.token = self.reader.config["APItoken"]["dWave_API_token"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
 
 
         # additional info
-        if self.adapter.config["DWaveBackend"]["timeout"] < 0:
-            self.adapter.config["DWaveBackend"]["timeout"] = 1000
+        if self.reader.config["DWaveBackend"]["timeout"] < 0:
+            self.reader.config["DWaveBackend"]["timeout"] = 1000
 
-        self.output["results"]["annealReadRatio"] = float(self.adapter.config["DWaveBackend"]["annealing_time"]) / \
-                                                    float(self.adapter.config["DWaveBackend"]["num_reads"])
-        self.output["results"]["totalAnnealTime"] = float(self.adapter.config["DWaveBackend"]["annealing_time"]) * \
-                                                    float(self.adapter.config["DWaveBackend"]["num_reads"])
+        self.output["results"]["annealReadRatio"] = float(self.reader.config["DWaveBackend"]["annealing_time"]) / \
+                                                    float(self.reader.config["DWaveBackend"]["num_reads"])
+        self.output["results"]["totalAnnealTime"] = float(self.reader.config["DWaveBackend"]["annealing_time"]) * \
+                                                    float(self.reader.config["DWaveBackend"]["num_reads"])
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
         self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
@@ -429,9 +429,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
 
 
-        # choose best self.adapter.config["DWaveBackend"]["sampleCutSize"] Samples and optimize Flow
+        # choose best self.reader.config["DWaveBackend"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
-        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.adapter.config["DWaveBackend"]["sampleCutSize"]]
+        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.reader.config["DWaveBackend"]["sampleCutSize"]]
         cutSamples['quantumCost'] = cutSamples.apply(
             lambda row: transformedProblem[0].calcCost(
                     [idx for idx in range(len(row)) if row.iloc[idx] == -1]
@@ -472,7 +472,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         chosenSample = self.choose_sample(
                 solution,
                 self.network,
-                strategy=self.adapter.config["DWaveBackend"]["strategy"]
+                strategy=self.reader.config["DWaveBackend"]["strategy"]
                 )
         print(chosenSample)
         self.output["results"]["marginalCost"] = transformedProblem[0].calcMarginalCost(
@@ -485,12 +485,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
             costKey="optimizedStrategySample"
         )
 
-        print(f'cutSamplesCost with {self.adapter.config["DWaveBackend"]["sampleCutSize"]} samples: {self.output["results"]["cutSamplesCost"]}')
+        print(f'cutSamplesCost with {self.reader.config["DWaveBackend"]["sampleCutSize"]} samples: {self.output["results"]["cutSamplesCost"]}')
 
-        if self.adapter.config["DWaveBackend"]["postprocess"] == "flow":
-            if self.adapter.config["DWaveBackend"]["strategy"] == "LowestEnergy":
+        if self.reader.config["DWaveBackend"]["postprocess"] == "flow":
+            if self.reader.config["DWaveBackend"]["strategy"] == "LowestEnergy":
                 resultDict['lineValues'] = lineValuesLowestEnergyFlowSample
-            elif self.adapter.config["DWaveBackend"]["strategy"] == "ClosestSample":
+            elif self.reader.config["DWaveBackend"]["strategy"] == "ClosestSample":
                 resultDict['lineValues'] = lineValuesClosestSample
 
         return resultDict
@@ -645,7 +645,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         if not hasattr(self, 'embedding'):
             embeddingPath = f'{self.networkPath}/embedding_' \
-                            f'rep_{self.adapter.config["IsingInterface"]["problemFormulation"]}_' \
+                            f'rep_{self.reader.config["IsingInterface"]["problemFormulation"]}_' \
                             f'{self.networkName}.json'
 
             embeddingDict = self.output["results"]["serial"]["info"]["embedding_context"]["embedding"]
@@ -665,7 +665,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
 
     def getSampler(self):
-        self.inputFilePath = self.adapter.config["DWaveBackend"]["sampleOrigin"]
+        self.inputFilePath = self.reader.config["DWaveBackend"]["sampleOrigin"]
 
     def getSampleSet(self, transformedProblem):
 

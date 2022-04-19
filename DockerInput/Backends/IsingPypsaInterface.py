@@ -76,7 +76,8 @@ class IsingBackbone:
             (IsingBackbone) An IsingBackbone instance with complete ising formulation as in the configuration
         """
         if "kirchhoff" not in configuration:
-            raise ValueError("the problem formulation doesn't consider the kirchhoff constraint")
+            print("No Kirchhoff configuration found, adding Kirchhoff constraint with Factor 1.0")
+            configuration["kirchhoff"] = {"scaleFactor": 1.0}
             
         self._linesplitName = linesplitName
         self.splitCapacity = IsingBackbone.linesplitDict[linesplitName]
@@ -114,7 +115,7 @@ class IsingBackbone:
             self.flushCachedProblem()
             subproblemInstance.encodeSubproblem(self)
             
-    # obtain config file using an adapter
+    # obtain config file using an reader
     @classmethod
     def buildIsingProblem(cls, network, config: dict):
         linesplitFunction = config.pop("formulation")
