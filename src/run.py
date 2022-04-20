@@ -3,10 +3,10 @@ The docker container loads the pypsa model and performs the optimization of the 
 """
 
 import sys
-import json, yaml
+import json
 import random
-import Backends
-from Backends.InputReader import InputReader
+from src.libs import Backends
+from src.libs.Backends import InputReader
 from EnvironmentVariableManager import EnvironmentVariableManager
 from .program import run
 

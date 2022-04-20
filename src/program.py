@@ -2,14 +2,10 @@
 The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 """
 
-import sys
-import json, yaml
-import random
-import Backends
-from Backends.InputReader import InputReader
+import json
+from src.libs import Backends
+from src.libs.Backends import InputReader
 from typing import Dict, Any, Optional
-from EnvironmentVariableManager import EnvironmentVariableManager
-
 
 FOLDER = "Problemset"
 
