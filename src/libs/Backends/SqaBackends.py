@@ -2,13 +2,15 @@ import numpy as np
 import random
 from ast import literal_eval
 import siquan
+
+from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 from .BackendBase import BackendBase
 import time
 
 
 class ClassicalBackend(BackendBase):
-    def __init__(self, reader):
+    def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
         self.solver = siquan.DTSQA()
 
@@ -56,9 +58,6 @@ class ClassicalBackend(BackendBase):
         self.writeResultsToOutput(result, transformedProblem)
         print("done")
         return result
-
-    def getOutput(self):
-        return self.output
 
     def configureSolver(self, 
             HSchedule = None,

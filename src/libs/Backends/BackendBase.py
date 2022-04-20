@@ -2,7 +2,6 @@ import abc
 
 from .InputReader import InputReader
 from datetime import datetime
-from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
@@ -29,10 +28,6 @@ class BackendBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def getOutput(self):
-        pass
-
-    @abc.abstractmethod
     def validateInput(self, path, network):
         pass
 
@@ -43,7 +38,8 @@ class BackendBase(abc.ABC):
     def getConfig(self) -> dict:
         return self.config
 
-    def getResults(self) -> dict:
+    def getOutput(self) -> dict:
+        self.output["end_time"] = self.getTime()
         return self.output
 
     def setupOutputDict(self):
@@ -66,7 +62,8 @@ class BackendBase(abc.ABC):
             self.output["config"]["QaoaBackend"] = self.config["QaoaBackend"]
 
         self.output["start_time"] = self.getTime()
-        self.output["file_name"] = self.networkName + "_" + self.output["start_time"]
+        self.output["file_name"] = self.networkName + "_" + self.config["Backend"] + "_" + \
+                                   self.output["start_time"] + ".json"
 
     def getTime(self) -> str:
         now = datetime.today()

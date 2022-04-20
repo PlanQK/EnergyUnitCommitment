@@ -3,6 +3,8 @@ import time
 from .BackendBase import BackendBase
 import pypsa
 
+from .InputReader import InputReader
+
 
 class PypsaBackend(BackendBase):
 
@@ -95,11 +97,8 @@ class PypsaBackend(BackendBase):
         self.output["results"]["status"] = committed_gen
         return self.model
 
-    def getOutput(self):
-        return self.output
-
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
 
         if self.config["PypsaBackend"]["timeout"] < 0:
             self.config["PypsaBackend"]["timeout"] = 1000
@@ -107,11 +106,11 @@ class PypsaBackend(BackendBase):
 
 class PypsaFico(PypsaBackend):
 
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
 
 
 class PypsaGlpk(PypsaBackend):
 
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)

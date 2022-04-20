@@ -3,9 +3,9 @@ The docker container loads the pypsa model and performs the optimization of the 
 """
 
 import json
-from .libs import Backends
-from .libs.Backends.InputReader import InputReader
-from .libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
+import libs.Backends as Backends
+from libs.Backends.InputReader import InputReader
+from libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
 from typing import Dict, Any, Optional
 
 FOLDER = "Problemset"
@@ -58,7 +58,7 @@ ganBackends = {
     "test": Backends.QaoaQiskit
 }
 
-def run(data: Optional[Dict[str, Any], str] = None, params: Optional[Dict[str, Any], str] = None,
+def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None,
         storeFile: bool = False, extraParams: dict = None):
 
     response: Response
@@ -66,13 +66,14 @@ def run(data: Optional[Dict[str, Any], str] = None, params: Optional[Dict[str, A
 
         inputReader = InputReader(network=data, config=params)
 
-        for key, value in extraParams.items():
-            if key in inputReader.config["IsingInterface"]:
-                inputReader.config["IsingInterface"][key] = value
-            elif key in inputReader.config[configs[inputReader.config["Backend"]]]:
-                inputReader.config[configs[inputReader.config["Backend"]]] = value
-            else:
-                raise ValueError(f"Extra parameter {key} not found in config.")
+        if extraParams is not None:
+            for key, value in extraParams.items():
+                if key in inputReader.config["IsingInterface"]:
+                    inputReader.config["IsingInterface"][key] = value
+                elif key in inputReader.config[configs[inputReader.config["Backend"]]]:
+                    inputReader.config[configs[inputReader.config["Backend"]]] = value
+                else:
+                    raise ValueError(f"Extra parameter {key} not found in config.")
 
         OptimizerClass = ganBackends[inputReader.config["Backend"]]
 
@@ -97,6 +98,7 @@ def run(data: Optional[Dict[str, Any], str] = None, params: Optional[Dict[str, A
         outputNetwork = optimizer.transformSolutionToNetwork(
             pypsaNetwork, transformedProblem, processedSolution
         )
+
         output = optimizer.getOutput()
 
         if storeFile:

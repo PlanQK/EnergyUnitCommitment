@@ -3,12 +3,9 @@ The docker container loads the pypsa model and performs the optimization of the 
 """
 
 import sys
-import json
 import random
-from src.libs import Backends
-from src.libs.Backends import InputReader
-from EnvironmentVariableManager import EnvironmentVariableManager
-from .program import run
+import libs.Backends as Backends
+from program import run
 
 
 FOLDER = "Problemset"
@@ -92,7 +89,7 @@ def main():
         network = sys.argv[3]
         param = sys.argv[4]
 
-    run(data=network, params=inputData, storeFile=True, extraParams=param)
+    run(data=network, params=inputData, storeFile=True, extraParams=None)
 
     return
 

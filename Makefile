@@ -6,17 +6,18 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
-MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Backends,target=/energy/Backends
+MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
+MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/,target=/energy/libs
 MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs/config.yaml,target=/energy/config.yaml
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
-MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
+MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 PREFIX := infoNocostFixed
 
 
 # config file
 CONFIGFILES = "config.yaml"
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
-PARAMPASSTEST = "test-5"
+PARAMPASSTEST = "test-5_test2-6_"
 #PARAMPASSTEST = "test_" + $(shell seq 5 5 20)
 
 # general parameters
@@ -146,7 +147,7 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 TEST_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		$(foreach testparam, ${PARAMPASSTEST}, \
-		results_test_sweep/${PREFIX}_${filename}_${config}_${testparam})))
+		results_test_sweep/${filename}_${config}_${testparam})))
 
 
 ## creating rules for result files
@@ -325,14 +326,11 @@ $(foreach filename, $(SWEEPFILES), \
 # define test target
 
 define test
-results_test_sweep/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+results_test_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	--env outputInfo=${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3)) \
-	--env inputNetwork=$(strip $(1)) \
-	--env timeout=60 \
 	energy:1.0 test $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_test_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/${PREFIX}_$(strip $(1))_$(strip $(2))_$(strip $(3))* results_test_sweep/
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_qaoa* results_test_sweep/
 
 endef
 
@@ -347,7 +345,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 # Define further helper targets
 
-docker.tmp: Dockerfile src/run.py src/requirements.txt
+docker.tmp: Dockerfile src/run.py src/requirements.txt src/program.py
 	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
 
 

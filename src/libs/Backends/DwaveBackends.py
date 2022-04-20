@@ -6,6 +6,7 @@ import tabu
 import greedy
 
 from .BackendBase import BackendBase
+from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
 from dwave.system import LeapHybridSampler
@@ -26,8 +27,8 @@ from pandas import value_counts
 
 
 class DwaveTabuSampler(BackendBase):
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
         self.time = 0.0
         #self.solver = tabu.Tabusampler()
 
@@ -194,13 +195,10 @@ class DwaveTabuSampler(BackendBase):
         print("done")
         return result
 
-    def getOutput(self):
-        return self.output
-
 
 class DwaveSteepestDescent(DwaveTabuSampler):
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
         self.solver = greedy.SteepestDescentSolver()
 
 
@@ -209,8 +207,8 @@ class DwaveCloud(DwaveTabuSampler):
 
 
 class DwaveCloudHybrid(DwaveCloud):
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
         #self.token = self.envMgr["dwaveAPIToken"]
         self.token = self.config["APItoken"]["dWave_API_token"]
         self.solver = "hybrid_binary_quadratic_model_version2"
@@ -333,8 +331,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
             time.sleep(1)
         return sampleset
 
-    def __init__(self, *args):
-        super().__init__(args)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
         #self.token = self.envMgr["dwaveAPIToken"]
         self.token = self.config["APItoken"]["dWave_API_token"]
         # pegasus topology corresponds to Advantage 4.1

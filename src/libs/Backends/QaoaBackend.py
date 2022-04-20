@@ -25,8 +25,8 @@ from qiskit.circuit import Parameter, ParameterVector
 
 
 class QaoaQiskit(BackendBase):
-    def __init__(self, inputReader: InputReader):
-        super().__init__(inputReader)
+    def __init__(self, reader: InputReader):
+        super().__init__(reader)
         self.output["results"] = {"backend": None,
                                   "qubit_map": {},
                                   "hamiltonian": {},
@@ -216,9 +216,6 @@ class QaoaQiskit(BackendBase):
                 minX = searchData[i]["optimizeResults"]["x"]
 
         return minX
-
-    def getOutput(self):
-        return self.output
 
     def validateInput(self, path, network):
         pass
