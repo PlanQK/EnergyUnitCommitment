@@ -83,60 +83,17 @@ ganBackends = {
 def main():
     assert sys.argv[1] in ganBackends.keys(), errorMsg
 
-    if len(sys.argv) == 2:
-        # mock object
-        inputData = "config-sqa.yaml"
+    if len(sys.argv) == 3:
+        inputData = sys.argv[2]
+        network = sys.argv[3]
+        param = None
     else:
         inputData = sys.argv[2]
         network = sys.argv[3]
         param = sys.argv[4]
-        print(f"config: {inputData}")
-        print(f"network: {network}")
-        print(f"param: {param}")
-        return
 
-    envMgr = EnvironmentVariableManager(DEFAULT_ENV_VARIABLES)
+    run(data=network, params=inputData, storeFile=True, extraParams=param)
 
-
-    run()
-
-    adapter = InputReader(envMgr['inputNetwork'], config=inputData)
-
-    # TODO currently used so makefile rules still work by adding extra configs to the adapter from
-    # environment. Remove this later
-    variablesNotInInputReader = {key : value 
-                    for key, value in envMgr.returnEnvironmentVariables().items()
-                    if key in DEFAULT_ENV_VARIABLES.keys() and key not in adapter.config
-                    }
-    adapter.config = {**variablesNotInInputReader, **adapter.config}
-    # end filling up with environmentvariables
-
-    OptimizerClass = ganBackends[sys.argv[1]]
-
-    optimizer = OptimizerClass(adapter)
-
-    pypsaNetwork = adapter.getNetwork()
-
-    # validate input has to throw and catch exceptions on it's own
-    optimizer.validateInput("Problemset", adapter.config['inputNetwork'])
-
-    transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
-
-    solution = optimizer.optimize(transformedProblem)
-
-    processedSolution = optimizer.processSolution(
-        pypsaNetwork, transformedProblem, solution
-    )
-    outputNetwork = optimizer.transformSolutionToNetwork(
-        pypsaNetwork, transformedProblem, processedSolution
-    )
-    if envMgr["outputNetwork"]:
-        outputNetwork.export_to_netcdf(
-            f"Problemset/{str(envMgr['outputNetwork'])}"
-        )
-
-    with open(f"Problemset/{str(envMgr['outputInfo'])}", "w") as write_file:
-        json.dump(optimizer.getOutput(), write_file, indent=2, default=str)
     return
 
 

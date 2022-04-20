@@ -3,8 +3,9 @@ The docker container loads the pypsa model and performs the optimization of the 
 """
 
 import json
-from src.libs import Backends
-from src.libs.Backends import InputReader
+from .libs import Backends
+from .libs.Backends.InputReader import InputReader
+from .libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
 from typing import Dict, Any, Optional
 
 FOLDER = "Problemset"
@@ -57,58 +58,53 @@ ganBackends = {
     "test": Backends.QaoaQiskit
 }
 
-def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None, storeFile: bool = False,
-        extraParams: dict = None):
+def run(data: Optional[Dict[str, Any], str] = None, params: Optional[Dict[str, Any], str] = None,
+        storeFile: bool = False, extraParams: dict = None):
 
-    input = InputReader(network=data, config=params)
+    response: Response
+    try:
 
-    for key, value in extraParams.items():
-        if key in input.config["IsingInterface"]:
-            input.config["IsingInterface"][key] = value
-        elif key in input.config[configs[input.config["Backend"]]]:
-            input.config[configs[input.config["Backend"]]] = value
-        else:
-            raise ValueError(f"Extra parameter {key} not found in config.")
+        inputReader = InputReader(network=data, config=params)
 
-    OptimizerClass = ganBackends[input.config["Backend"]]
+        for key, value in extraParams.items():
+            if key in inputReader.config["IsingInterface"]:
+                inputReader.config["IsingInterface"][key] = value
+            elif key in inputReader.config[configs[inputReader.config["Backend"]]]:
+                inputReader.config[configs[inputReader.config["Backend"]]] = value
+            else:
+                raise ValueError(f"Extra parameter {key} not found in config.")
 
-    optimizer = OptimizerClass(input)
+        OptimizerClass = ganBackends[inputReader.config["Backend"]]
 
-    pypsaNetwork = input.getNetwork()
+        optimizer = OptimizerClass(reader=inputReader)
 
-    # validate input has to throw and catch exceptions on it's own
-    # TODO: possibly useless, as we get Network already in InputReader
-    optimizer.validateInput(path="Problemset", network=pypsaNetwork)
+        pypsaNetwork = inputReader.getNetwork()
 
-    transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
+        # validate input has to throw and catch exceptions on it's own
+        # TODO: possibly useless, as we get Network already in InputReader
+        optimizer.validateInput(path="Problemset", network=pypsaNetwork)
 
-    solution = optimizer.optimize(transformedProblem)
+        transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
 
-    # TODO: possibly useless? Process what?
-    processedSolution = optimizer.processSolution(
-        pypsaNetwork, transformedProblem, solution
-    )
+        solution = optimizer.optimize(transformedProblem)
 
-    # TODO: implement saving solution in Network and store in output dict.
-    outputNetwork = optimizer.transformSolutionToNetwork(
-        pypsaNetwork, transformedProblem, processedSolution
-    )
-    output = optimizer.getOutput()
-
-    if storeFile:
-        response = ResultFileResponse(output)
-    else:
-        response = ResultResponse(output)
-    or:
-        response = ErrorResponse
-
-    response.send
-
-    if envMgr["outputNetwork"]:
-        outputNetwork.export_to_netcdf(
-            f"Problemset/{str(envMgr['outputNetwork'])}"
+        # TODO: possibly useless? Process what?
+        processedSolution = optimizer.processSolution(
+            pypsaNetwork, transformedProblem, solution
         )
 
-    with open(f"Problemset/{str(envMgr['outputInfo'])}", "w") as write_file:
-        json.dump(optimizer.getOutput(), write_file, indent=2, default=str)
-    return
+        # TODO: implement saving solution in Network and store in output dict.
+        outputNetwork = optimizer.transformSolutionToNetwork(
+            pypsaNetwork, transformedProblem, processedSolution
+        )
+        output = optimizer.getOutput()
+
+        if storeFile:
+            response = ResultFileResponse(result=output)
+        else:
+            response = ResultResponse(result=output)
+    except Exception as e:
+        error_message = e
+        response = ErrorResponse(500, f"{type(e).__name__}: {error_message}")
+
+    response.send()

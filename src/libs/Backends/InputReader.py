@@ -10,16 +10,17 @@ class InputReader:
     This class is an reader to obtain the configuration dictionary dependent on the input format
     """
     def __init__(self, network: Union[pypsa.Network, str], config: Union[dict, str]):
-        self.network = self.makeNetwork(network)
+        self.network, self.networkName = self.makeNetwork(network)
         self.config = self.makeConfig(config)
 
     def makeNetwork(self, network: Union[str, dict, pypsa.Network]) -> pypsa.Network:
         if isinstance(network, str):
-            return pypsa.Network(f"Problemset/" + network)
-        if isinstance(network, dict):
+            return pypsa.Network(f"Problemset/" + network), network
+        if isinstance(network, dict): #TODO: implement network as dict
             raise NotImplementedError
+            # return network(dict), "dict_network"
         if isinstance(network, pypsa.Network):
-            return network
+            return network, "no_name_network"
         raise NotImplementedError
     
     def makeConfig(self, params: Union[dict, str]) -> dict:
@@ -40,4 +41,7 @@ class InputReader:
 
     def getNetwork(self) -> pypsa.Network:
         return self.network
+
+    def getNetworkName(self) -> str:
+        return self.networkName
 

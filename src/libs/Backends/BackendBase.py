@@ -1,12 +1,14 @@
 import abc
 
 from .InputReader import InputReader
+from datetime import datetime
 from .IsingPypsaInterface import IsingBackbone
 
 
 class BackendBase(abc.ABC):
     def __init__(self, reader: InputReader):
         self.network = reader.getNetwork()
+        self.networkName = reader.getNetworkName()
         self.config = reader.getConfig()
         self.setupOutputDict()
 
@@ -45,7 +47,10 @@ class BackendBase(abc.ABC):
         return self.output
 
     def setupOutputDict(self):
-        self.output = {"config": {"Backend": self.config["Backend"],
+        self.output = {"start_time": None,
+                       "end_time": None,
+                       "file_name": None,
+                       "config": {"Backend": self.config["Backend"],
                                   "IsingInterface": self.config["IsingInterface"]},
                        "components": {},
                        "network": {},
@@ -59,3 +64,12 @@ class BackendBase(abc.ABC):
             self.output["config"]["SqaBackend"] = self.config["SqaBackend"]
         elif self.config["Backend"] in ["qaoa"]:
             self.output["config"]["QaoaBackend"] = self.config["QaoaBackend"]
+
+        self.output["start_time"] = self.getTime()
+        self.output["file_name"] = self.networkName + "_" + self.output["start_time"]
+
+    def getTime(self) -> str:
+        now = datetime.today()
+        dateTimeStr = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+
+        return dateTimeStr
