@@ -7,6 +7,7 @@ import json, yaml
 import random
 import Backends
 from Backends.InputReader import InputReader
+from typing import Dict, Any, Optional
 from EnvironmentVariableManager import EnvironmentVariableManager
 
 
@@ -60,7 +61,8 @@ ganBackends = {
     "test": Backends.QaoaQiskit
 }
 
-def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None, extraParams: dict = None):
+def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None, storeFile: bool = False,
+        extraParams: dict = None):
 
     input = InputReader(network=data, config=params)
 
@@ -86,18 +88,22 @@ def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] 
 
     solution = optimizer.optimize(transformedProblem)
 
+    # TODO: possibly useless? Process what?
     processedSolution = optimizer.processSolution(
         pypsaNetwork, transformedProblem, solution
     )
+
+    # TODO: implement saving solution in Network and store in output dict.
     outputNetwork = optimizer.transformSolutionToNetwork(
         pypsaNetwork, transformedProblem, processedSolution
     )
+    output = optimizer.getOutput()
 
-    if local docker flag:
-        response = ResultFileResponse(result)
-    else
-        response = ResultResponse(result)
-    or
+    if storeFile:
+        response = ResultFileResponse(output)
+    else:
+        response = ResultResponse(output)
+    or:
         response = ErrorResponse
 
     response.send

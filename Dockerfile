@@ -2,11 +2,11 @@ FROM herrd1/siquan:latest
 
 
 WORKDIR /energy
-COPY DockerInput/requirements.txt /energy/requirements.txt
+COPY src/requirements.txt /energy/requirements.txt
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 
 
-COPY DockerInput /energy
+COPY src /energy
 RUN chmod -R u+wxr /energy
 
 # add placeholder for the input model

@@ -1,6 +1,5 @@
 from collections import OrderedDict
 import numpy as np
-from EnvironmentVariableManager import EnvironmentVariableManager
 import typing
 
 

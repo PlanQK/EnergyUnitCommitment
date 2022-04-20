@@ -6,16 +6,16 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
-MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Backends,target=/energy/Backends
-MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs/config.yaml,target=/energy/config.yaml
-MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/DockerInput/Configs,target=/energy/Configs
+MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Backends,target=/energy/Backends
+MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs/config.yaml,target=/energy/config.yaml
+MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
 MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 PREFIX := infoNocostFixed
 
 
 # config file
 CONFIGFILES = "config.yaml"
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/DockerInput/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 PARAMPASSTEST = "test-5"
 #PARAMPASSTEST = "test_" + $(shell seq 5 5 20)
 
@@ -347,7 +347,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 # Define further helper targets
 
-docker.tmp: Dockerfile DockerInput/run.py DockerInput/requirements.txt
+docker.tmp: Dockerfile src/run.py src/requirements.txt
 	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
 
 

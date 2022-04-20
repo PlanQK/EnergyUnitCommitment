@@ -167,7 +167,7 @@ class QaoaQiskit(BackendBase):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
 
-        return self.output["results"]
+        return self.output
 
 
     def generateFilename(self, currentRepetitionNumber):
