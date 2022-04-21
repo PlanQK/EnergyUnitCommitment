@@ -7,24 +7,28 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 #PROBLEMDIRECTORY := $(shell pwd)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
-MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/,target=/energy/libs
 MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs/config.yaml,target=/energy/config.yaml
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
-MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
+MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 PREFIX := infoNocostFixed
 
-
-# config file
-CONFIGFILES = "config.yaml"
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
-PARAMPASSTEST = "test-5_test2-6_"
-#PARAMPASSTEST = "test_" + $(shell seq 5 5 20)
-
-# general parameters
+###### general parameters ######
 NUMBERS = $(shell seq 1 ${REPETITIONS})
 TIME := $(shell date +"%Y-%m-%d_%H-%M-%S")
 
-# sqa parameters
+###### define config file ######
+CONFIGFILES = "config.yaml"
+#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+
+###### define sweep files ######
+# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+
+###### define extra parameter ######
+
+### sqa parameters
 SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
 TRANSVERSE_HIGH = $(shell seq 8.0 1.0 8)
 OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
@@ -33,62 +37,89 @@ OPTIMIZATIONCYCLES = 1000
 TROTTERSLICES = $(shell seq 10 10 100)
 TROTTERSLICES = 2000
 
-# classical parameters. reuses OPTIMIZATIONCYCLES
+### classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
 CLASSICAL_LOW_TEMP = $(shell seq 0.5 0.5 0.5)
 
-# dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
-# dwaveAPIToken
-ANNEAL_TIME = $(shell seq 100 50 100)
-NUM_READS = $(shell seq 200 20 200)
-#CHAINSTRENGTH = $(shell seq 60 30 60)
-CHAINSTRENGTH = 60
-SAMPLECUTSIZE = $(shell seq 200 4 200)
+### dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
+### dwaveAPIToken
+ANNEAL_TIME = "annealing_time"
+ANNEAL_TIME_VAL = $(shell seq 100 50 100)
+NUM_READS = "num_reads"
+NUM_READS_VAL = $(shell seq 200 20 200)
+CHAINSTRENGTH = "chain_strength"
+#CHAINSTRENGTH_VAL = $(shell seq 60 30 60)
+CHAINSTRENGTH_VAL = 60
+SAMPLECUTSIZE = "sampleCutSize"
+SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
 
-# Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
-PROBLEMFORMULATION = binarysplitNoMarginalCost
-#PROBLEMFORMULATION = fullsplitGlobalCostSquare
-#PROBLEMFORMULATION = fullsplitMarginalAsPenalty
-#PROBLEMFORMULATION = fullsplitMarginalAsPenaltyAverageOffset
-#PROBLEMFORMULATION = fullsplitNoMarginalCost
-#PROBLEMFORMULATION = fullsplitLocalMarginalEstimationDistance
-#PROBLEMFORMULATION = fullsplitDirectInefficiencyPenalty
+### Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
+PROBLEMFORMULATION = "formulation"
+PROBLEMFORMULATION_VAL = binarysplitNoMarginalCost
+#PROBLEMFORMULATION_VAL = fullsplitGlobalCostSquare
+#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty
+#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenaltyAverageOffset
+#PROBLEMFORMULATION_VAL = fullsplitNoMarginalCost
+#PROBLEMFORMULATION_VAL = fullsplitLocalMarginalEstimationDistance
+#PROBLEMFORMULATION_VAL = fullsplitDirectInefficiencyPenalty
+#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
 
-#PROBLEMFORMULATION = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
-
-MONETARYCOSTFACTOR = 0.02 0.015 0.025
-#MONETARYCOSTFACTOR = 0.2 0.3 0.4
+MONETARYCOSTFACTOR = "monetaryCostFactor"
+MONETARYCOSTFACTOR_VAL = 0.02 0.015 0.025
+#MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
-#OFFSETESTIMATIONFACTOR = 0.95 0.97 1.0 1.03 1.05
-#ESTIMATEDCOSTFACTOR = 0.95 0.97 1.0 1.03 1.05
-#OFFSETBUILDFACTOR = 0.95 0.97 1.0 1.03 1.05
+OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
+#OFFSETESTIMATIONFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 # 10.0
-#OFFSETESTIMATIONFACTOR = 1.32
-OFFSETESTIMATIONFACTOR = 1.3805 1.3800 1.3802
-#OFFSETESTIMATIONFACTOR = 1.210
+#OFFSETESTIMATIONFACTOR_VAL = 1.32
+OFFSETESTIMATIONFACTOR_VAL = 1.3805 1.3800 1.3802
+#OFFSETESTIMATIONFACTOR_VAL = 1.210
 # 10.1
-#OFFSETESTIMATIONFACTOR = 1.349
+#OFFSETESTIMATIONFACTOR_VAL = 1.349
 # 60.0 by 0.16
-#OFFSETESTIMATIONFACTOR = 1.3203
-#OFFSETESTIMATIONFACTOR = 1.4268
-#OFFSETESTIMATIONFACTOR = 1.0 1.1 1.2 1.3 1.4
+#OFFSETESTIMATIONFACTOR_VAL = 1.3203
+#OFFSETESTIMATIONFACTOR_VAL = 1.4268
+#OFFSETESTIMATIONFACTOR_VAL = 1.0 1.1 1.2 1.3 1.4
 
-ESTIMATEDCOSTFACTOR = 1.0
-OFFSETBUILDFACTOR = 1.0
+ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
+ESTIMATEDCOSTFACTOR_VAL = 1.0
+#ESTIMATEDCOSTFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 
-# glpk parameter
-TIMEOUT = 60
+OFFSETBUILDFACTOR = "offsetBuildFactor"
+#OFFSETBUILDFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
+OFFSETBUILDFACTOR_VAL = 1.0
+
+SCALEFACTOR = "scaleFactor"
+SCALEFACTOR_VAL = 2.0
+
+KIRCHFACTOR = "kirchhoffFactor"
+KIRCHFACTOR_VAL = 1.5
+
+### glpk parameter
+TIMEOUT = "timeout"
+TIMEOUT_VAL = 60
 
 
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+### Example extra parameter string generation
+PARAM1 = 'test' # parameter1 name
+PARAM1VAL = $(shell seq 5 5 10) # parameter1 values
+PARAM2 = 'test2' # parameter2 name
+PARAM2VAL = 1.0 1.1 # parameter2 values
+# create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
+EXTRAPARAM = 	$(foreach value1, $(PARAM1VAL), \
+				$(foreach value2, $(PARAM2VAL), \
+				${PARAM1}-${value1}_${PARAM2}-${value2}))
 
-# result files of computations
+### extra parameter generation
+EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
+				$(foreach value2, $(KIRCHFACTOR_VAL), \
+				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
+#EXTRAPARAM = ''
 
 
+
+###### result files of computations ######
 
 CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach hightemp, ${CLASSICAL_HIGH_TEMP}, \
@@ -146,8 +177,8 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 
 TEST_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
-		$(foreach testparam, ${PARAMPASSTEST}, \
-		results_test_sweep/${filename}_${config}_${testparam})))
+		$(foreach extraparam, ${EXTRAPARAM}, \
+		results_test_sweep/${filename}_${config}_${extraparam})))
 
 
 ## creating rules for result files
@@ -336,8 +367,8 @@ endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
-	$(foreach testparam, ${PARAMPASSTEST}, \
-	$(eval $(call test, ${filename}, ${config}, ${testparam})))))
+	$(foreach extraparam, ${EXTRAPARAM}, \
+	$(eval $(call test, ${filename}, ${config}, ${extraparam})))))
 
 # end of creating rules for results
 

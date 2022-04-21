@@ -1,8 +1,6 @@
 """This file is the entrypoint for the docker run command.
 The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 """
-
-import json
 import libs.Backends as Backends
 from libs.Backends.InputReader import InputReader
 from libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
@@ -31,32 +29,20 @@ Any further settings are specified through environment variables:
     cubicConstraints: false  DWave does not support cubic constraints
 
 """
-configs = {
-    "classical": "SqaBackend",
-    "sqa": "SqaBackend",
-    "dwave-tabu": "DwaveBackend",
-    "dwave-greedy": "DwaveBackend",
-    "pypsa-glpk": "PypsaBackend",
-    "pypsa-fico": "PypsaBackend",
-    "dwave-hybrid": "DwaveBackend",
-    "dwave-qpu": "DwaveBackend",
-    "dwave-read-qpu": "DwaveBackend",
-    "qaoa": "QaoaBackend",
-    "test": "QaoaBackend"}
-
 ganBackends = {
-    "classical": Backends.ClassicalBackend,
-    "sqa": Backends.SqaBackend,
-    "dwave-tabu": Backends.DwaveTabuSampler,
-    "dwave-greedy": Backends.DwaveSteepestDescent,
-    "pypsa-glpk": Backends.PypsaGlpk,
-    "pypsa-fico": Backends.PypsaFico,
-    "dwave-hybrid": Backends.DwaveCloudHybrid,
-    "dwave-qpu": Backends.DwaveCloudDirectQPU,
-    "dwave-read-qpu": Backends.DwaveReadQPU,
-    "qaoa": Backends.QaoaQiskit,
-    "test": Backends.QaoaQiskit
+    "classical": [Backends.ClassicalBackend, "SqaBackend"],
+    "sqa": [Backends.SqaBackend, "SqaBackend"],
+    "dwave-tabu": [Backends.DwaveTabuSampler, "DwaveBackend"],
+    "dwave-greedy": [Backends.DwaveSteepestDescent, "DwaveBackend"],
+    "pypsa-glpk": [Backends.PypsaGlpk, "PypsaBackend"],
+    "pypsa-fico": [Backends.PypsaFico, "PypsaBackend"],
+    "dwave-hybrid": [Backends.DwaveCloudHybrid, "DwaveBackend"],
+    "dwave-qpu": [Backends.DwaveCloudDirectQPU, "DwaveBackend"],
+    "dwave-read-qpu": [Backends.DwaveReadQPU, "DwaveBackend"],
+    "qaoa": [Backends.QaoaQiskit, "QaoaBackend"],
+    "test": [Backends.QaoaQiskit, "QaoaBackend"]
 }
+
 
 def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None,
         storeFile: bool = False, extraParams: dict = None):
@@ -66,23 +52,18 @@ def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] 
 
         inputReader = InputReader(network=data, config=params)
 
-        if extraParams is not None:
-            for key, value in extraParams.items():
-                if key in inputReader.config["IsingInterface"]:
-                    inputReader.config["IsingInterface"][key] = value
-                elif key in inputReader.config[configs[inputReader.config["Backend"]]]:
-                    inputReader.config[configs[inputReader.config["Backend"]]] = value
-                else:
-                    raise ValueError(f"Extra parameter {key} not found in config.")
+        # TODO: key naming in IsingInterface config has to be unique!!!
+        inputReader = add_extra_parameters(reader=inputReader, params=extraParams,
+                                           backend=ganBackends[inputReader.config["Backend"]][1])
 
-        OptimizerClass = ganBackends[inputReader.config["Backend"]]
+        OptimizerClass = ganBackends[inputReader.config["Backend"]][0]
 
         optimizer = OptimizerClass(reader=inputReader)
 
         pypsaNetwork = inputReader.getNetwork()
 
         # validate input has to throw and catch exceptions on it's own
-        # TODO: possibly useless, as we get Network already in InputReader
+        # TODO: possibly useless, as we get Network already in InputReader and check if it is a Pypsa.network
         optimizer.validateInput(path="Problemset", network=pypsaNetwork)
 
         transformedProblem = optimizer.transformProblemForOptimizer(pypsaNetwork)
@@ -110,3 +91,35 @@ def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] 
         response = ErrorResponse(500, f"{type(e).__name__}: {error_message}")
 
     response.send()
+
+
+def add_extra_parameters(reader: InputReader, params: dict, backend: str) -> InputReader:
+    if params is not None:
+        for key, value in params.items():
+            if is_number(value):
+                if "." in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            if key in reader.config[backend]:
+                reader.config[backend] = value
+            elif key in reader.config["IsingInterface"]:
+                reader.config["IsingInterface"][key] = value
+            elif key in reader.config["IsingInterface"]["kirchhoff"]:
+                reader.config["IsingInterface"]["kirchhoff"][key] = value
+            elif key in reader.config["IsingInterface"]["marginalCost"]:
+                reader.config["IsingInterface"]["marginalCost"][key] = value
+            elif key in reader.config["IsingInterface"]["minUpDownTime"]:
+                reader.config["IsingInterface"]["minUpDownTime"][key] = value
+            else:
+                raise ValueError(f"Extra parameter {key} not found in config.")
+
+    return reader
+
+
+def is_number(n: str) -> bool:
+    try:
+        float(n)
+    except ValueError:
+        return False
+    return True

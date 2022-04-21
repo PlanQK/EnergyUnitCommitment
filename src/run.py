@@ -89,7 +89,14 @@ def main():
         network = sys.argv[3]
         param = sys.argv[4]
 
-    run(data=network, params=inputData, storeFile=True, extraParams=None)
+    extraParams = {}
+    if param is not None:
+        paramList = param.split("_")
+        for item in paramList:
+            splitItem = item.split("-")
+            extraParams[splitItem[0]] = splitItem[1]
+
+    run(data=network, params=inputData, storeFile=True, extraParams=extraParams)
 
     return
 
