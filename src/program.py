@@ -6,29 +6,7 @@ from libs.Backends.InputReader import InputReader
 from libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
 from typing import Dict, Any, Optional
 
-FOLDER = "Problemset"
 
-
-errorMsg = """
-Usage: run.py [classical | sqa | dwave-tabu | dwave-greedy | dwave-hybrid | dwave-qpu]
-Arguments:
-    classical: run a classical annealing algorithm
-    sqa: run the discrete time simulated quantum annealing algorithm
-    dwave-tabu: run the classical optimization procedure locally using the dwave package (tabu-search)
-    dwave-greedy: run the classical optimization procedure locally using the dwave package (greedy)
-    dwave-hybrid: run a hybrid optimization procedure from dwave (through cloud)
-    dwave-qpu: run the optimization on a dwave quantum annealing device (through cloud)
-    dwave-read-qpu: reuse the optimization of a dwave quantum annealing device (read from local drive)
-
-
-Any further settings are specified through environment variables:
-    optimizationCycles: 1000  Number of optimization cycles
-            (each spin gets an update proposal once during one cycle)
-    temperatureSchedule: []  (for sqa) how the temperature changes during the annealing run
-    transverseFieldSchedule: [] (for sqa) how the transverse field changes during the annealing run
-    cubicConstraints: false  DWave does not support cubic constraints
-
-"""
 ganBackends = {
     "classical": [Backends.ClassicalBackend, "SqaBackend"],
     "sqa": [Backends.SqaBackend, "SqaBackend"],
@@ -39,8 +17,7 @@ ganBackends = {
     "dwave-hybrid": [Backends.DwaveCloudHybrid, "DwaveBackend"],
     "dwave-qpu": [Backends.DwaveCloudDirectQPU, "DwaveBackend"],
     "dwave-read-qpu": [Backends.DwaveReadQPU, "DwaveBackend"],
-    "qaoa": [Backends.QaoaQiskit, "QaoaBackend"],
-    "test": [Backends.QaoaQiskit, "QaoaBackend"]
+    "qaoa": [Backends.QaoaQiskit, "QaoaBackend"]
 }
 
 
