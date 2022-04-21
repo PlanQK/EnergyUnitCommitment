@@ -29,17 +29,23 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Q
 ###### define extra parameter ######
 
 ### sqa parameters
-SIQUAN_TEMP = $(shell seq 0.1 1 0.1)
-TRANSVERSE_HIGH = $(shell seq 8.0 1.0 8)
-OPTIMIZATIONCYCLES = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES = 1000
-#OPTIMIZATIONCYCLES = 10 30 77 215 599 1668 4641 12915 35938 100000
-TROTTERSLICES = $(shell seq 10 10 100)
-TROTTERSLICES = 2000
+SIQUAN_TEMP = ""
+SIQUAN_TEMP_VAL = $(shell seq 0.1 1 0.1)
+TRANSVERSE_HIGH = ""
+TRANSVERSE_HIGH_VAL = $(shell seq 8.0 1.0 8)
+OPTIMIZATIONCYCLES = "optimizationCycles"
+OPTIMIZATIONCYCLES_VAL = $(shell seq 5 5 20)
+OPTIMIZATIONCYCLES_VAL = 1000
+#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915 35938 100000
+TROTTERSLICES = "trotterSlices"
+TROTTERSLICES_VAL = $(shell seq 10 10 100)
+TROTTERSLICES_VAL = 2000
 
 ### classical parameters. reuses OPTIMIZATIONCYCLES
-CLASSICAL_HIGH_TEMP = $(shell seq 10.0 10.0 10)
-CLASSICAL_LOW_TEMP = $(shell seq 0.5 0.5 0.5)
+CLASSICAL_HIGH_TEMP = ""
+CLASSICAL_HIGH_TEMP_VAL = $(shell seq 10.0 10.0 10)
+CLASSICAL_LOW_TEMP = ""
+CLASSICAL_LOW_TEMP_VAL = $(shell seq 0.5 0.5 0.5)
 
 ### dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
 ### dwaveAPIToken
@@ -115,7 +121,7 @@ EXTRAPARAM = 	$(foreach value1, $(PARAM1VAL), \
 EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
 				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
-#EXTRAPARAM = ''
+EXTRAPARAM = ''
 
 
 
