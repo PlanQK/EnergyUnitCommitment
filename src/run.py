@@ -78,19 +78,19 @@ ganBackends = {
 }
 
 def main():
-    assert sys.argv[1] in ganBackends.keys(), errorMsg
+    #assert sys.argv[1] in ganBackends.keys(), errorMsg
 
-    if len(sys.argv) == 3:
-        inputData = sys.argv[2]
-        network = sys.argv[3]
+    if len(sys.argv) == 2:
+        inputData = sys.argv[1]
+        network = sys.argv[2]
         param = None
     else:
-        inputData = sys.argv[2]
-        network = sys.argv[3]
-        param = sys.argv[4]
+        inputData = sys.argv[1]
+        network = sys.argv[2]
+        param = sys.argv[3]
 
     extraParams = {}
-    if param is not None:
+    if param:
         paramList = param.split("_")
         for item in paramList:
             splitItem = item.split("-")
