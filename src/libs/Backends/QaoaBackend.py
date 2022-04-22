@@ -307,7 +307,6 @@ class QaoaQiskit(BackendBase):
                 for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
                     kirchhoffCost += abs(val) ** 2
-            # TODO seperate into different cost functions
             self.output["results"]["kirchhoff"][bitstring]["total"] = kirchhoffCost
             return kirchhoffCost
 
