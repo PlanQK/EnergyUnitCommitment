@@ -1,10 +1,14 @@
 """This file is the entrypoint for the docker run command.
 The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 """
+from typing import Dict, Any, Optional
+
+from loguru import logger
+
 import libs.Backends as Backends
 from libs.Backends.InputReader import InputReader
-from libs.return_objects import Response, ResultResponse, ErrorResponse, ResultFileResponse
-from typing import Dict, Any, Optional
+from libs.return_objects import Response, ResultResponse, ErrorResponse
+
 
 
 ganBackends = {
@@ -22,7 +26,7 @@ ganBackends = {
 
 
 def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None,
-        storeFile: bool = False, extraParams: dict = None):
+        extraParams: dict = None) -> Response:
 
     response: Response
     try:
@@ -58,16 +62,10 @@ def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] 
         )
 
         output = optimizer.getOutput()
-
-        if storeFile:
-            response = ResultFileResponse(result=output)
-        else:
-            response = ResultResponse(result=output)
+        logger.info("Calculation successfully executed")
+        return ResultResponse(result=output)
     except Exception as e:
-        error_message = e
-        response = ErrorResponse(500, f"{type(e).__name__}: {error_message}")
-
-    response.send()
+        return ErrorResponse(code="500", detail=f"{type(e).__name__}: {e}")
 
 
 def add_extra_parameters(reader: InputReader, params: dict, backend: str) -> InputReader:

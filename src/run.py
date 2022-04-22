@@ -4,6 +4,7 @@ The docker container loads the pypsa model and performs the optimization of the 
 
 import sys
 from program import run
+from libs.return_objects import Response
 
 
 def main():
@@ -24,7 +25,9 @@ def main():
             splitItem = item.split("-")
             extraParams[splitItem[0]] = splitItem[1]
 
-    run(data=network, params=inputData, storeFile=True, extraParams=extraParams)
+    response = run(data=network, params=inputData, extraParams=extraParams)
+
+    response.to_json()
 
     return
 
