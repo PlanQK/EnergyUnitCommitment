@@ -27,7 +27,7 @@ def main():
 
     response = run(data=network, params=inputData, extraParams=extraParams)
 
-    response.to_json()
+    response.save_to_json_local_docker()
 
     return
 

@@ -6,3 +6,4 @@ networkx
 qiskit
 pylatexenc
 PyYAML
+loguru

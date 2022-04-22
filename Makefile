@@ -108,20 +108,20 @@ TIMEOUT_VAL = 60
 
 
 ### Example extra parameter string generation
-PARAM1 = 'test' # parameter1 name
-PARAM1VAL = $(shell seq 5 5 10) # parameter1 values
-PARAM2 = 'test2' # parameter2 name
-PARAM2VAL = 1.0 1.1 # parameter2 values
+TEST_PARAM = "test" # parameter1 name
+TEST_PARAM_VAL = $(shell seq 5 5 10) # parameter1 values
+ANOTHER_TEST_PARAM = "test2" # parameter2 name
+ANOTHER_TEST_PARAM_VAL = 1.0 1.1 # parameter2 values
 # create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
-EXTRAPARAM = 	$(foreach value1, $(PARAM1VAL), \
-				$(foreach value2, $(PARAM2VAL), \
-				${PARAM1}-${value1}_${PARAM2}-${value2}))
+EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
+				$(foreach value2, $(ANOTHER_TEST_PARAM_VAL), \
+				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
 
 ### extra parameter generation
 EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
 				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
-EXTRAPARAM = ''
+#EXTRAPARAM = ''
 
 
 
