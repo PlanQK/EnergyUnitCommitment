@@ -47,6 +47,6 @@ class ResultResponse(Response):
         self.metadata = metadata
         self.fileName = result["file_name"]
 
-    def save_to_json_local_docker(self):
-        with open(f"Problemset/{self.fileName}", "w") as write_file:
+    def save_to_json_local_docker(self, folder: str = "Problemset/"):
+        with open(f"{folder}{self.fileName}", "w") as write_file:
             json.dump(self.result, write_file, indent=2, default=str)

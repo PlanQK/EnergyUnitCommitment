@@ -4,7 +4,6 @@ The docker container loads the pypsa model and performs the optimization of the 
 
 import sys
 from program import run
-from libs.return_objects import Response
 
 
 def main():

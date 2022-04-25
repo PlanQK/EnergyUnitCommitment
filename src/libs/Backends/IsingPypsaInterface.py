@@ -982,7 +982,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         super().__init__(backbone, config)
 
     @classmethod
-    def buildSubproblem(cls, backbone, configuration) -> tuple[str, 'AbstractIsingSubproblem']:
+    def buildSubproblem(cls, backbone, configuration) -> [str, 'AbstractIsingSubproblem']:
         """
         returns the name of the subproblem and an instance of the class set up according to the configuration.
         This is done by choosing the corresponding subclass of the configuration.

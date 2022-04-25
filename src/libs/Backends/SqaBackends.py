@@ -1,7 +1,5 @@
-import numpy as np
-import random
 from ast import literal_eval
-import siquan
+from . import siquan
 
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
