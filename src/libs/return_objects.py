@@ -8,7 +8,7 @@ class Response:
         return json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)), sort_keys=True)
 
     @abstractmethod
-    def save_to_json_local_docker(self):
+    def save_to_json_local_docker(self, folder: str = "Problemset/"):
         pass
 
 
@@ -25,12 +25,12 @@ class ErrorResponse(Response):
         self.code = code
         self.detail = detail
 
-    def save_to_json_local_docker(self):
+    def save_to_json_local_docker(self, folder: str = "Problemset/"):
         error = {"status_code": self.code,
                  "message": self.detail}
         now = datetime.today()
         dateTimeStr = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
-        with open(f"Problemset/error_code_{self.code}_{dateTimeStr}.json", "w") as write_file:
+        with open(f"{folder}error_code_{self.code}_{dateTimeStr}.json", "w") as write_file:
             json.dump(error, write_file, indent=2, default=str)
 
 
