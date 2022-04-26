@@ -6,13 +6,17 @@ from typing import Dict, Any, Optional
 from loguru import logger
 
 ## import when debugging locally ##
-import libs.Backends as Backends
-from libs.Backends.InputReader import InputReader
-from libs.return_objects import Response, ResultResponse, ErrorResponse
-## import when using PlanQK docker ##
-#from .libs import Backends
-#from .libs.Backends.InputReader import InputReader
-#from .libs.return_objects import Response, ResultResponse, ErrorResponse
+
+try:
+    # import when building image for local use
+    import libs.Backends as Backends
+    from libs.Backends.InputReader import InputReader
+    from libs.return_objects import Response, ResultResponse, ErrorResponse
+except ImportError:
+    # fall back to relative import when using PlanQK docker ##
+    from .libs import Backends
+    from .libs.Backends.InputReader import InputReader
+    from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
 
 
