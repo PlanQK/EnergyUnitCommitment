@@ -2,7 +2,7 @@ FROM herrd1/siquan:latest
 
 
 WORKDIR /energy
-COPY src/requirements.txt /energy/requirements.txt
+COPY requirements.txt /energy/requirements.txt
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 
 
