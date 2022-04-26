@@ -3,6 +3,7 @@ FROM herrd1/siquan:latest
 
 WORKDIR /energy
 COPY requirements.txt /energy/requirements.txt
+RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 
 
