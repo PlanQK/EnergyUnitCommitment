@@ -13,7 +13,6 @@ from .BackendBase import BackendBase                                # import for
 from .InputReader import InputReader
 #from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
 #from BackendBase import BackendBase                                # import for local/debug run
-#from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
