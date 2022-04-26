@@ -1,18 +1,6 @@
-FROM herrd1/siquan:latest
+FROM ghcr.io/planqk/job-template:latest-base-1.0.0
 
+ENV ENTRY_POINT app.user_code.src.program:run
 
-WORKDIR /energy
-COPY src/requirements.txt /energy/requirements.txt
-RUN pip install -r /energy/requirements.txt
-RUN apt-get install -y glpk-utils 
-
-COPY src /energy
-RUN chmod -R u+wxr /energy
-
-# add placeholder for the input model
-RUN mkdir /energy/input-model
-RUN chmod u+xr /energy/input-model
-ENV RUNNING_IN_DOCKER Yes
-
-
-ENTRYPOINT [ "python3", "run.py"]
+COPY . ${USER_CODE_DIR}
+RUN pip install -r ${USER_CODE_DIR}/requirements.txt
