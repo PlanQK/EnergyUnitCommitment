@@ -21,7 +21,6 @@ CONFIGFILES = "config.yaml"
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
 #SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
@@ -35,11 +34,11 @@ TRANSVERSE_HIGH = ""
 TRANSVERSE_HIGH_VAL = $(shell seq 8.0 1.0 8)
 OPTIMIZATIONCYCLES = "optimizationCycles"
 OPTIMIZATIONCYCLES_VAL = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES_VAL = 1000
-#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915 35938 100000
+OPTIMIZATIONCYCLES_VAL = 100
+#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915 
 TROTTERSLICES = "trotterSlices"
 TROTTERSLICES_VAL = $(shell seq 10 10 100)
-TROTTERSLICES_VAL = 2000
+TROTTERSLICES_VAL = 500
 
 ### classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = ""
@@ -59,41 +58,30 @@ CHAINSTRENGTH_VAL = 60
 SAMPLECUTSIZE = "sampleCutSize"
 SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
 
-### Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
-PROBLEMFORMULATION = "formulation"
-PROBLEMFORMULATION_VAL = binarysplitNoMarginalCost
-#PROBLEMFORMULATION_VAL = fullsplitGlobalCostSquare
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenaltyAverageOffset
-#PROBLEMFORMULATION_VAL = fullsplitNoMarginalCost
-#PROBLEMFORMULATION_VAL = fullsplitLocalMarginalEstimationDistance
-#PROBLEMFORMULATION_VAL = fullsplitDirectInefficiencyPenalty
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
+## Ising Model Parameters. Determines how network, constraints, and optimization goals are encoded
+# Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
+# TODO: add comments for options that exist
+
+# network representation:
+# 	line encoding
+# constraints:
+# 	kirchhoff
+# 	minUpDownTime
+# optimization goals
+# 	marginalCost
+
 
 MONETARYCOSTFACTOR = "monetaryCostFactor"
-MONETARYCOSTFACTOR_VAL = 0.02 0.015 0.025
-#MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
+MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
 OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
-#OFFSETESTIMATIONFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
-# 10.0
-#OFFSETESTIMATIONFACTOR_VAL = 1.32
-OFFSETESTIMATIONFACTOR_VAL = 1.3805 1.3800 1.3802
-#OFFSETESTIMATIONFACTOR_VAL = 1.210
-# 10.1
-#OFFSETESTIMATIONFACTOR_VAL = 1.349
-# 60.0 by 0.16
-#OFFSETESTIMATIONFACTOR_VAL = 1.3203
-#OFFSETESTIMATIONFACTOR_VAL = 1.4268
-#OFFSETESTIMATIONFACTOR_VAL = 1.0 1.1 1.2 1.3 1.4
+OFFSETESTIMATIONFACTOR_VAL = 1.1 1.2 1.3 
 
 ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
 ESTIMATEDCOSTFACTOR_VAL = 1.0
-#ESTIMATEDCOSTFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 
 OFFSETBUILDFACTOR = "offsetBuildFactor"
-#OFFSETBUILDFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 OFFSETBUILDFACTOR_VAL = 1.0
 
 SCALEFACTOR = "scaleFactor"
