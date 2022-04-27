@@ -1,5 +1,14 @@
 from ast import literal_eval
-from . import siquan
+
+# try import from local .so
+# Error message for image: herrd1/siquan:latest 
+# /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
+try:
+    from . import siquan
+# try import from installed module siquan
+except ImportError:
+    import siquan
+
 
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
