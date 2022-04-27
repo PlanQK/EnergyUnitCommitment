@@ -262,7 +262,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-docker.tmp: old_Dockerfile src/run.py requirements.txt src/program.py
+docker.tmp: Dockerfile src/run.py requirements.txt src/program.py
 	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
 
 

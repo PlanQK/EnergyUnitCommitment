@@ -71,6 +71,7 @@ class QaoaQiskit(BackendBase):
         return network
 
     def processSolution(self, network, transformedProblem, solution):
+        solution["components"] = self.isingInterface.getData()
         return solution
 
     def createDrawTheta(self, theta: list) -> list:

@@ -330,6 +330,9 @@ class IsingBackbone:
     # end making qubits
 
     # helper functions for getting encoded values
+    def getData(self):
+        return self.data
+
     def getBusComponents(self, bus):
         """
         Returns all labels of components that connect to a bus as a dictionary. 

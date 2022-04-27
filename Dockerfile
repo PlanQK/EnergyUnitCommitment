@@ -1,7 +1,20 @@
-FROM ghcr.io/planqk/job-template:latest-base-1.0.0
+FROM herrd1/siquan:latest
 
-ENV ENTRY_POINT app.user_code.src.program:run
 
-COPY . ${USER_CODE_DIR}
-RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
-RUN pip install -r ${USER_CODE_DIR}/requirements.txt
+WORKDIR /energy
+COPY requirements.txt /energy/requirements.txt
+COPY pypsa-0.19.3.zip /energy/pypsa-0.19.3.zip
+RUN pip install pypsa-0.19.3.zip
+RUN pip install -r /energy/requirements.txt
+RUN apt-get install -y glpk-utils 
+
+COPY src /energy
+RUN chmod -R u+wxr /energy
+
+# add placeholder for the input model
+RUN mkdir /energy/input-model
+RUN chmod u+xr /energy/input-model
+ENV RUNNING_IN_DOCKER Yes
+
+
+ENTRYPOINT [ "python3", "run.py"]
