@@ -8,21 +8,12 @@ from program import run
 
 def main():
 
-    if len(sys.argv) == 2:
-        inputData = sys.argv[1]
-        network = sys.argv[2]
-        param = None
+    inputData = sys.argv[1]
+    network = sys.argv[2]
+    if (len(sys.argv) <= 3 or sys.argv[3] == ""):
+        extraParams = []
     else:
-        inputData = sys.argv[1]
-        network = sys.argv[2]
-        param = sys.argv[3]
-
-    extraParams = {}
-    if param:
-        paramList = param.split("_")
-        for item in paramList:
-            splitItem = item.split("-")
-            extraParams[splitItem[0]] = splitItem[1]
+        extraParams = [ keyChain.split("-") for keyChain in sys.argv[3].split("--") ]
 
     response = run(data=network, params=inputData, extraParams=extraParams)
 

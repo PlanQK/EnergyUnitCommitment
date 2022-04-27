@@ -35,16 +35,14 @@ ganBackends = {
 
 
 def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None,
-        extraParams: dict = None) -> Response:
+        extraParams: list = []) -> Response:
 
     response: Response
     try:
 
         inputReader = InputReader(network=data, config=params)
 
-        # TODO: key naming in IsingInterface config has to be unique!!!
-        inputReader = add_extra_parameters(reader=inputReader, params=extraParams,
-                                           backend=ganBackends[inputReader.config["Backend"]][1])
+        inputReader.addExtraParameters(extraParams)
 
         OptimizerClass = ganBackends[inputReader.config["Backend"]][0]
 
@@ -82,33 +80,3 @@ def run(data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] 
         return ErrorResponse(code=error_code, detail=error_detail)
 
 
-def add_extra_parameters(reader: InputReader, params: dict, backend: str) -> InputReader:
-    if params is not None:
-        for key, value in params.items():
-            if is_number(value):
-                if "." in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            if key in reader.config[backend]:
-                reader.config[backend] = value
-            elif key in reader.config["IsingInterface"]:
-                reader.config["IsingInterface"][key] = value
-            elif key in reader.config["IsingInterface"]["kirchhoff"]:
-                reader.config["IsingInterface"]["kirchhoff"][key] = value
-            elif key in reader.config["IsingInterface"]["marginalCost"]:
-                reader.config["IsingInterface"]["marginalCost"][key] = value
-            elif key in reader.config["IsingInterface"]["minUpDownTime"]:
-                reader.config["IsingInterface"]["minUpDownTime"][key] = value
-            else:
-                raise ValueError(f"Extra parameter {key} not found in config.")
-
-    return reader
-
-
-def is_number(n: str) -> bool:
-    try:
-        float(n)
-    except ValueError:
-        return False
-    return True

@@ -38,7 +38,22 @@ class InputReader:
             elif filetype == "yaml":
                 with open("Configs/" + params) as file:
                     return yaml.safe_load(file)
+        if params is None:
+            return {}
         raise ValueError("input can't be read")
+
+
+    def addExtraParameters(self, extraParams: list):
+        for keyChain in extraParams:
+            descentInConfig = self.config
+            for key in keyChain[:-2]:
+                try:
+                    descentInConfig = descentInConfig[key]
+                except KeyError:
+                    descentInConfig[key] = {}
+                    descentInConfig = descentInConfig[key]
+            descentInConfig[-2] = keyChain[-1]
+    
 
     def getConfig(self) -> dict:
         return self.config
