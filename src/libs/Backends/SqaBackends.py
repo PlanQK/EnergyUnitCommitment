@@ -67,10 +67,10 @@ class ClassicalBackend(BackendBase):
         return result
 
     def configureSolver(self, 
-            HSchedule = None,
-            TSchedule = None,
-            trotterSlices = None,
-            steps = None
+            HSchedule = "[8.0,0.0]",
+            TSchedule = "[0.1,iF,0.0001]",
+            trotterSlices = 32,
+            steps = 16,
             ):
         """
         reads and sets sqa solver parameter from the environment unless
@@ -84,14 +84,16 @@ class ClassicalBackend(BackendBase):
         Returns:
             (None) modifies self.solver and sets hyperparameters
         """
+        siquanConfig = self.config["SqaBackend"]
+        print(siquanConfig)
         try:
-            self.solver.setSeed(self.config["SqaBackend"]["seed"])
+            self.solver.setSeed(siquanConfig["seed"])
         except KeyError:
             pass
-        self.solver.setHSchedule(HSchedule or self.config["transverseFieldSchedule"])
-        self.solver.setTSchedule(TSchedule or self.config["temperatureSchedule"])
-        self.solver.setTrotterSlices(trotterSlices or int(self.config["trotterSlices"]))
-        self.solver.setSteps(steps or int(self.config["optimizationCycles"]))
+        self.solver.setHSchedule(siquanConfig.get("transverseFieldSchedule", HSchedule))
+        self.solver.setTSchedule(siquanConfig.get("temperatureSchedule", TSchedule))
+        self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices", trotterSlices)))
+        self.solver.setSteps(int(siquanConfig.get("optimizationCycles", steps)))
         return
 
     def printResults(self, transformedProblem, solution):
@@ -137,16 +139,17 @@ class ClassicalBackend(BackendBase):
         """
         for key in result:
             self.output["results"][key] = result[key]
+        print(self.output)
         self.output["results"]["totalCost"] = transformedProblem.calcCost(result["state"])
         self.output["results"]["solution"] = transformedProblem.calcMarginalCost(result["state"])
         self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
         self.output["results"]["powerImbalance"] = transformedProblem.calcPowerImbalance(result["state"])
         self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
-        self.output["results"]["SqaBackend"]["individualCost"] = transformedProblem.individualCostContribution(
+        self.output["results"]["individualCost"] = transformedProblem.individualCostContribution(
                 result["state"]
         )
-        self.output["results"]["SqaBackend"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
-        self.output["results"]["SqaBackend"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+        self.output["results"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
+        self.output["results"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
 
 
 class SqaBackend(ClassicalBackend):
@@ -154,6 +157,8 @@ class SqaBackend(ClassicalBackend):
         print("starting optimization...")
         self.configureSolver()
         tic = time.perf_counter()
+        print(f"format:{transformedProblem.siquanFormat()}")
+        print(f"num:{transformedProblem.numVariables()}")
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
