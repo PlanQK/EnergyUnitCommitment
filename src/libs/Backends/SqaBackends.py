@@ -85,7 +85,6 @@ class ClassicalBackend(BackendBase):
             (None) modifies self.solver and sets hyperparameters
         """
         siquanConfig = self.config["SqaBackend"]
-        print(siquanConfig)
         try:
             self.solver.setSeed(siquanConfig["seed"])
         except KeyError:
@@ -139,7 +138,6 @@ class ClassicalBackend(BackendBase):
         """
         for key in result:
             self.output["results"][key] = result[key]
-        print(self.output)
         self.output["results"]["totalCost"] = transformedProblem.calcCost(result["state"])
         self.output["results"]["solution"] = transformedProblem.calcMarginalCost(result["state"])
         self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
@@ -157,8 +155,6 @@ class SqaBackend(ClassicalBackend):
         print("starting optimization...")
         self.configureSolver()
         tic = time.perf_counter()
-        print(f"format:{transformedProblem.siquanFormat()}")
-        print(f"num:{transformedProblem.numVariables()}")
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
             transformedProblem.numVariables(),
