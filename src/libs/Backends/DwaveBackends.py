@@ -72,7 +72,10 @@ class DwaveTabuSampler(BackendBase):
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
 
-        cost = self.isingInterface
+        cost = IsingBackbone.buildIsingProblem(
+                network,
+                config=self.config["IsingInterface"]
+                )
 
         # store the directional qubits first, then the line's binary representations
         linear = {
@@ -238,15 +241,17 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
-    def validateInput(self, networkPath, network):
+    def validateInput(self, path, network):
+        return
 
-        self.networkPath = networkPath
+        # TODO implement file validation
+        self.path = path
         self.networkName = network
 
-        blacklists = self.get_filepaths(networkPath, "*_qpu_blacklist")
+        blacklists = self.get_filepaths(path, "*_qpu_blacklist")
         filteredByTimeout = []
         for blacklist in blacklists:
-            blacklist_name = blacklist[len(networkPath + "/"):]
+            blacklist_name = blacklist[len(path + "/"):]
             blacklisted_timeout = int(blacklist_name.split("_")[0])
             if blacklisted_timeout <= self.config["DWaveBackend"]["timeout"]:
                 filteredByTimeout.append(blacklist)
@@ -257,7 +262,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 if s.find(bytes(network, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
-        embeddingPath = f'{networkPath}/embedding_' \
+        embeddingPath = f'{path}/embedding_' \
                         f'rep_{self.config["IsingInterface"]["problemFormulation"]}_' \
                         f'{network}.json'
         if path.isfile(embeddingPath):
@@ -271,15 +276,15 @@ class DwaveCloudDirectQPU(DwaveCloud):
             }
         return
 
-    def handleOptimizationStop(self, networkPath, network):
+    def handleOptimizationStop(self, path, network):
         """
         If a network raises an error during optimization, add this network
         to the blacklisted networks for this optimizer and timeout value
-        Blacklistfiles are of the form '{networkPath}/{self.config["DWaveBackend"]["timeout"]}_{Backend}_blacklist'
+        Blacklistfiles are of the form '{path}/{self.config["DWaveBackend"]["timeout"]}_{Backend}_blacklist'
         """
         # on unix writing small buffers is atomic. no file locking necessary
         # append to existing file or create a new one
-        with open(f'{networkPath}/{self.config["DWaveBackend"]["timeout"]}_qpu_blacklist', 'a+') as f:
+        with open(f'{path}/{self.config["DWaveBackend"]["timeout"]}_qpu_blacklist', 'a+') as f:
             f.write(network + '\n')
         return
 
@@ -640,17 +645,17 @@ class DwaveCloudDirectQPU(DwaveCloud):
         sampleset = self.getSampleSet(transformedProblem)
 
         self.output["results"]["serial"] = sampleset.to_serializable()
-
-        if not hasattr(self, 'embedding'):
-            embeddingPath = f'{self.networkPath}/embedding_' \
-                            f'rep_{self.config["IsingInterface"]["problemFormulation"]}_' \
-                            f'{self.networkName}.json'
-
-            embeddingDict = self.output["results"]["serial"]["info"]["embedding_context"]["embedding"]
-            with open(embeddingPath, "w") as write_embedding:
-                json.dump(
-                    embeddingDict, write_embedding, indent=2
-                )
+        
+        # TODO fix reusing embeddings
+#        if not hasattr(self, 'embedding'):
+#            embeddingPath = f'/energy/Problemset/embedding_' \
+#                            f'{self.networkName}.json'
+#
+#            embeddingDict = self.output["results"]["serial"]["info"]["embedding_context"]["embedding"]
+#            with open(embeddingPath, "w") as write_embedding:
+#                json.dump(
+#                    embeddingDict, write_embedding, indent=2
+#                )
         self.output["results"]["optimizationTime"] = self.output["results"]["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
         return sampleset
 
@@ -663,13 +668,14 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
 
     def getSampler(self):
-        self.inputFilePath = self.config["DWaveBackend"]["sampleOrigin"]
+        self.inputFilePath =  "/energy/results_qpu/" +  self.config["DWaveBackend"]["sampleOrigin"]
 
     def getSampleSet(self, transformedProblem):
 
+        print(self.inputFilePath)
         with open(self.inputFilePath) as inputFile:
             self.inputData = json.load(inputFile)
-        self.inputData = self.inputData["results"]
+#        self.inputData = self.inputData["results"]
         if 'cutSamples' not in self.inputData:
             self.inputData['cutSamples'] = {}
 
