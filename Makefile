@@ -96,10 +96,10 @@ OFFSETBUILDFACTOR = "offsetBuildFactor"
 #OFFSETBUILDFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 OFFSETBUILDFACTOR_VAL = 1.0
 
-SCALEFACTOR = "scaleFactor"
+SCALEFACTOR = "IsingInterface-kirchhoff-scaleFactor"
 SCALEFACTOR_VAL = 2.0
 
-KIRCHFACTOR = "kirchhoffFactor"
+KIRCHFACTOR = "IsingInterface-kirchhoff-kirchhoffFactor"
 KIRCHFACTOR_VAL = 1.5
 
 ### glpk parameter
@@ -115,12 +115,12 @@ ANOTHER_TEST_PARAM_VAL = 1.0 1.1 # parameter2 values
 # create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
 EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
 				$(foreach value2, $(ANOTHER_TEST_PARAM_VAL), \
-				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
+				${TEST_PARAM}--${value1}_${ANOTHER_TEST_PARAM}--${value2}))
 
 ### extra parameter generation
 EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
-				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
+				${SCALEFACTOR}--${value1}_${KIRCHFACTOR}--${value2}))
 #EXTRAPARAM = ''
 
 

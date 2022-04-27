@@ -21,7 +21,7 @@ def main():
     if param:
         paramList = param.split("_")
         for item in paramList:
-            splitItem = item.split("-")
+            splitItem = item.split("--")
             extraParams[splitItem[0]] = splitItem[1]
 
     response = run(data=network, params=inputData, extraParams=extraParams)
