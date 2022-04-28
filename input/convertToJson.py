@@ -14,14 +14,14 @@ import os
 
 def main():
     # make a prefix so all paths start from git root. 
-    if os.path.split(__file__)[0] == 'inputJson':
+    if os.path.split(__file__)[0] == 'input':
         pathPrefix = "./"
     else:
         pathPrefix = "../"
 
     inputFile = sys.argv[1]
     filetype = inputFile.split(".")[-1]
-    outputFile = pathPrefix + "inputJson/" + sys.argv[2] + ".json"
+    outputFile = pathPrefix + "input/" + sys.argv[2] + ".json"
 
     print(f"reading {inputFile}")
     if filetype == "yaml":
