@@ -1,5 +1,7 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
+DOCKERFILE = PlanQK_Dockerfile
+DOCKERTAG = energy:2.0
 REPETITIONS := 1
 
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
@@ -21,8 +23,8 @@ CONFIGFILES = "config.yaml"
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
@@ -109,9 +111,8 @@ EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
 EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
 				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
-#EXTRAPARAM = ''
 
-
+EXTRAPARAM = ''
 
 ###### result files of computations ######
 
@@ -153,7 +154,7 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 define classicalParameterSweep
 results_classical_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_classical_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_classical* results_classical_sweep/
 
@@ -169,7 +170,7 @@ $(foreach filename, $(SWEEPFILES), \
 define sqaParameterSweep
 results_sqa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_sqa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_sqa* results_sqa_sweep/
 
@@ -185,7 +186,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuParameterSweep
 results_qpu_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_qpu_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-qpu* results_qpu_sweep/
 
@@ -201,7 +202,8 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuReadSweep
 results_qpu_read_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu \
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_qpu_read_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* results_qpu_read_sweep/
 
@@ -217,7 +219,7 @@ $(foreach filename, $(SWEEPFILES), \
 define pypsa-glpk
 results_pypsa_glpk_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_pypsa_glpk_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_pypsa-glpk* results_pypsa_glpk_sweep/
 
@@ -233,7 +235,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qaoa
 results_qaoa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_qaoa* results_qaoa_sweep/
 
@@ -250,8 +252,8 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-docker.tmp: Dockerfile src/run.py requirements.txt src/program.py
-	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
+docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py
+	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch docker.tmp
 
 
 # all plots are generated using the python plot_results script
