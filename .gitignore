@@ -10,3 +10,4 @@ plots/*
 /build_and_run_euc.sh
 makePlots.py
 *.yaml
+*.json
