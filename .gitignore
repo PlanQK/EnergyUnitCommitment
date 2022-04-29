@@ -13,3 +13,4 @@ makePlots.py
 *.json
 *.zip
 !pypsa-0.19.3.zip
+!input/testService.json

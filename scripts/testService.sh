@@ -1,7 +1,7 @@
 #!/bin/bash
 
 git_root=`git rev-parse --show-toplevel`
-path_prefix=""
+path_prefix="/input/"
 path_to_json="testService"
 
 file="${git_root}/${path_prefix}${path_to_json}.json"
@@ -28,6 +28,15 @@ params=`cat $file | jq '.params' | base64`
 
 echo "jq done"
 
-winpty docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${params}" planqk-service
+unameOut=$(uname -s)
+
+case $unameOut in
+    Linux)
+        docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${params}" planqk-service
+        ;;
+    *)
+        winpty docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${params}" planqk-service
+        ;;
+esac
 
 
