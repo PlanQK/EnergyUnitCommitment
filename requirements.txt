@@ -6,3 +6,4 @@ qiskit
 pylatexenc
 PyYAML
 loguru
+/app/user_code/pypsa-0.19.3.zip
