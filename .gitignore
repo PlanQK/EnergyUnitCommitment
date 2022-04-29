@@ -11,3 +11,5 @@ plots/*
 makePlots.py
 *.yaml
 *.json
+*.zip
+!pypsa-0.19.3.zip
