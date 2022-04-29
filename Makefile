@@ -154,7 +154,7 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 define classicalParameterSweep
 results_classical_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_classical_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_classical* results_classical_sweep/
 
@@ -170,7 +170,7 @@ $(foreach filename, $(SWEEPFILES), \
 define sqaParameterSweep
 results_sqa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_sqa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_sqa* results_sqa_sweep/
 
@@ -186,7 +186,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuParameterSweep
 results_qpu_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qpu_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-qpu* results_qpu_sweep/
 
@@ -203,7 +203,7 @@ define qpuReadSweep
 results_qpu_read_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qpu_read_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* results_qpu_read_sweep/
 
@@ -219,7 +219,7 @@ $(foreach filename, $(SWEEPFILES), \
 define pypsa-glpk
 results_pypsa_glpk_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_pypsa_glpk_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_pypsa-glpk* results_pypsa_glpk_sweep/
 
@@ -235,7 +235,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qaoa
 results_qaoa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_qaoa* results_qaoa_sweep/
 
