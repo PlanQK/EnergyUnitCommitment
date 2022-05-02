@@ -398,6 +398,24 @@ class IsingBackbone:
         """
         return self.data[gen]['indices'][time] in solution
 
+    def getGeneratorDictionary(self, solution):
+        """
+        builds a dictionary containing the status of all generators at all time 
+        slices for a given solution of qubit spins
+
+        @param solution: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            @key: (str,int)
+                label of generator and index of time slice
+        """
+        solution = set(solution)
+        result = {}
+        for generator in self.network.generators.index:
+            for time in range(len(self.snapshots)):
+                result[str((generator, time))] = int(self.getGeneratorStatus(generator, solution, time))
+        return result
+
     def getFlowDictionary(self, solution):
         """
         builds a dictionary containing all power flows at all time slices for a given
@@ -413,7 +431,7 @@ class IsingBackbone:
         result = {}
         for lineId in self.network.lines.index:
             for time in range(len(self.snapshots)):
-                result[(lineId, time)] = self.getEncodedValueOfComponent(lineId, solution, time)
+                result[str((lineId, time))] = self.getEncodedValueOfComponent(lineId, solution, time)
         return result
 
     def getLineValues(self, solution):

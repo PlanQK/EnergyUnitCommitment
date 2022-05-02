@@ -92,6 +92,7 @@ class ClassicalBackend(BackendBase):
         self.solver.setSteps(int(siquanConfig.get("optimizationCycles", steps)))
         return
 
+    # TODO use new report function of ising
     def printResults(self, transformedProblem, solution):
         """
         print the solution and then several derived values of the solution to quantify how
@@ -107,7 +108,6 @@ class ClassicalBackend(BackendBase):
         """
         print(f"\n--- Solution ---")
 #        print(f"Qubits with spin -1: {solution['state']}")
-#        print(f"Power on transmission lines: {transformedProblem.getLineValues(solution['state'])}")
         print(f"\n--- Meta parameters of the solution ---")
         print(f"Cost at each bus: {transformedProblem.individualCostContribution(solution['state'])}")
         print(f"Total Kirchhoff cost: {self.output['results']['kirchhoffCost']}")
@@ -136,15 +136,16 @@ class ClassicalBackend(BackendBase):
         for key in result:
             self.output["results"][key] = result[key]
         self.output["results"]["totalCost"] = transformedProblem.calcCost(result["state"])
-        self.output["results"]["solution"] = transformedProblem.calcMarginalCost(result["state"])
         self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
         self.output["results"]["powerImbalance"] = transformedProblem.calcPowerImbalance(result["state"])
         self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
-        self.output["results"]["individualCost"] = transformedProblem.individualCostContribution(
+        self.output["results"]["individualKirchhoffCost"] = transformedProblem.individualCostContribution(
                 result["state"]
         )
-        self.output["results"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
-        self.output["results"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+        self.output["results"]["unitCommitment"] = transformedProblem.getGeneratorDictionary(result["state"])
+        self.output["results"]["powerflow"] = transformedProblem.getFlowDictionary(result["state"])
+#        self.output["results"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
+#        self.output["results"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
 
 
 class SqaBackend(ClassicalBackend):
