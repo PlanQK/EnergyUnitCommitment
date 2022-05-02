@@ -21,9 +21,6 @@ class ClassicalBackend(BackendBase):
         super().__init__(reader=reader)
         self.solver = siquan.DTSQA()
 
-        # mock > remove later
-        self.metaInfo = {"SqaBackend":{}}
-
     def validateInput(self, path, network):
         pass
 

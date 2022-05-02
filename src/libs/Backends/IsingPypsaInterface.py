@@ -2,6 +2,7 @@ from collections import OrderedDict
 import numpy as np
 import typing
 
+# TODO make report function
 
 def fullsplit(capacity):
     return [1]*capacity + [-1]*capacity
@@ -40,7 +41,7 @@ def customsplit(capacity):
     if capacity==3:
         return [3,-2,-1]
     if capacity==4:
-        return [3,1,-3,-1,]
+        return [2,2,-3,-1,]
     if capacity==5:
         return [4,1,-3,-2]
     raise ValueError("Capacity is too big to be decomposed")
@@ -87,6 +88,8 @@ class IsingBackbone:
 
         # contains ising coefficients
         self.problem = {}
+        # mirrors encodings of `self.problem`, but is reset after encoding a subproblem
+        # to get ising formulations of subproblems
         self.cachedProblem = {}
 
         # initializing data structures that encode the network into qubits
@@ -95,8 +98,9 @@ class IsingBackbone:
         self.storeGenerators()
         self.storeLines()
 
-        #read configuration dict, store in _subproblems and apply encodings
+        # read configuration dict, store in _subproblems and apply encodings
         self._subproblems = {}
+        # dicitionary of all support subproblems
         subproblemTable = {
             "kirchhoff" : KirchhoffSubproblem,
             "marginalCost" : MarginalCostSubproblem
@@ -324,10 +328,6 @@ class IsingBackbone:
         for idx, qubit in enumerate(indices):
             self.data[qubit] = weights[idx]
         
-
-    # TODO make functions to allow subproblems to get qubits allocated for their subproblem 
-    # and accept data on their encoding weigths. Also requires getter for accessing those qubits
-    # end making qubits
 
     # helper functions for getting encoded values
     def getData(self):
