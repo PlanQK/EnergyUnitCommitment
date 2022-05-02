@@ -4,6 +4,8 @@ import xarray
 import yaml
 import pypsa
 
+import copy
+
 from typing import Union
 
 
@@ -42,7 +44,6 @@ class InputReader:
             return {}
         raise ValueError("input can't be read")
 
-
     def addExtraParameters(self, extraParams: list):
         for keyChain in extraParams:
             descentInConfig = self.config
@@ -52,7 +53,14 @@ class InputReader:
                 except KeyError:
                     descentInConfig[key] = {}
                     descentInConfig = descentInConfig[key]
-            descentInConfig[-2] = keyChain[-1]
+            descentInConfig[keyChain[-2]] = keyChain[-1]
+        configWithoutToken = copy.deepcopy(self.config)
+
+        # print config
+        for provider, token in self.config["APItoken"].items():
+            if token != '':
+                configWithoutToken["APItoken"][provider] = "*****"
+        print(f"running with the following configuration {configWithoutToken}")
     
 
     def getConfig(self) -> dict:
