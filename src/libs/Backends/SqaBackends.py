@@ -50,7 +50,7 @@ class ClassicalBackend(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        self.configureSolver(HSchedule="[0]")
+        self.configureSolver()
         tic = time.perf_counter()
         result = self.solver.minimize(
             transformedProblem.siquanFormat(),
@@ -63,18 +63,19 @@ class ClassicalBackend(BackendBase):
         print("done")
         return result
 
+    def getHSchedule(self):
+        return "[0]"
+
     def configureSolver(self, 
-            HSchedule = "[8.0,0.0]",
             TSchedule = "[0.1,iF,0.0001]",
             trotterSlices = 32,
             steps = 16,
             ):
         """
-        reads and sets sqa solver parameter from the environment unless
+        reads and sets siquan solver parameter from the config dict unless
         a hyper parameter is set in the function call
         
         Args:
-            HSchedule: (str) a string describing the transverse field schedule
             TSchedule: (str) a string describing the temperature schedule
             trotterSlices: (int) number of trotter slices to be used
             steps: (int) number of steps to be used
@@ -86,7 +87,7 @@ class ClassicalBackend(BackendBase):
             self.solver.setSeed(siquanConfig["seed"])
         except KeyError:
             pass
-        self.solver.setHSchedule(siquanConfig.get("transverseFieldSchedule", HSchedule))
+        self.solver.setHSchedule(self.getHSchedule())
         self.solver.setTSchedule(siquanConfig.get("temperatureSchedule", TSchedule))
         self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices", trotterSlices)))
         self.solver.setSteps(int(siquanConfig.get("optimizationCycles", steps)))
@@ -149,17 +150,5 @@ class ClassicalBackend(BackendBase):
 
 
 class SqaBackend(ClassicalBackend):
-    def optimize(self, transformedProblem):
-        print("starting optimization...")
-        self.configureSolver()
-        tic = time.perf_counter()
-        result = self.solver.minimize(
-            transformedProblem.siquanFormat(),
-            transformedProblem.numVariables(),
-        )
-        self.output["results"]["optimizationTime"] = time.perf_counter() - tic
-        # parse the entry in "state" before using it
-        result["state"] = literal_eval(result["state"])
-        self.writeResultsToOutput(result, transformedProblem)
-        print("done")
-        return result
+    def getHSchedule(self):
+        return self.config["SqaBackend"].get("transverseFieldSchedule", "[8.0,0.0]")
