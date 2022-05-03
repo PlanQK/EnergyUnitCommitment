@@ -29,13 +29,9 @@ class ClassicalBackend(BackendBase):
                 network,
                 config=self.config["IsingInterface"]
                 )
-        return IsingPypsaInterface.buildCostFunction(
-            network,
-        )
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         self.printReport()
-        self.printResults(transformedProblem, solution)
         # transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
         # )
@@ -108,6 +104,7 @@ class ClassicalBackend(BackendBase):
         self.output["results"]["totalCost"] = transformedProblem.calcCost(result["state"])
         self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
         self.output["results"]["powerImbalance"] = transformedProblem.calcPowerImbalance(result["state"])
+        self.output["results"]["totalPower"] = transformedProblem.calcTotalPowerGenerated(result["state"])
         self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
         self.output["results"]["individualKirchhoffCost"] = transformedProblem.individualCostContribution(
                 result["state"]
