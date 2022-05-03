@@ -16,7 +16,7 @@ except ImportError:
     from .libs.Backends.InputReader import InputReader
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
-
+# TODO elimate ${solver}Backend strings
 ganBackends = {
     "classical": [Backends.ClassicalBackend, "SqaBackend"],
     "sqa": [Backends.SqaBackend, "SqaBackend"],
@@ -38,8 +38,7 @@ def run(data: Optional[Dict[str, Any]] = None,
     response: Response
     try:
         # load all relevant data and parameters
-        inputReader = InputReader(network=data, config=params)
-        inputReader.addExtraParameters(extraParams)
+        inputReader = InputReader(network=data, config=params, extraParams=extraParams)
         network = inputReader.getNetwork()
 
         # set up optimizer with input data
