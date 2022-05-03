@@ -52,10 +52,11 @@ class DwaveTabuSampler(BackendBase):
 
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
-        return IsingBackbone.buildIsingProblem(
+        self.isingBackbone = IsingBackbone.buildIsingProblem(
                 network,
                 config=self.config["IsingInterface"]
                 )
+        return self.isingBackbone
 
     def getDimodModel(self, isingProblem: IsingBackbone) -> dimod.BinaryQuadraticModel:
         # store the directional qubits first, then the line's binary representations
@@ -378,8 +379,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
 
 
-
-
         self.output["results"]["cutSamples"] = cutSamples[[
                                                     "energy",
                                                     "quantumCost",
@@ -468,15 +467,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
             lineValues[(line, 0)] = newValue
         return totalCost, lineValues
 
-    def powerAtBus(self, network, generatorState, bus):
-        """
-        calculate generated power at a bus. generatorState has to be a list of indices
-        of active generators. Indices that are out of range are ignored
-        """
-        activeGeneratorIndex = [idx for idx in generatorState if idx < self.num_generators]
-        activeGenerators = network.generators_t['p_max_pu'].iloc[0].iloc[activeGeneratorIndex]
-        return activeGenerators[network.generators.loc[activeGenerators.index].bus == bus].sum()
-
     # quantum computation struggles with finetuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
     # archieved in polynomial time
@@ -512,7 +502,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             graph.add_edge(
                 "superSource",
                 bus,
-                capacity=self.powerAtBus(network, generatorState, bus)
+                capacity=self.isingBackbone.calcTotalPowerGeneratedAtBus(bus, generatorState)
             )
         for load in network.loads.index:
             graph.add_edge(
@@ -538,7 +528,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             # might be wrong if kirchhoff constraint was violated in quantum
             # solution
             for bus in network.buses.index:
-                generatedPower = self.powerAtBus(network, generatorState, bus)
+                generatedPower = self.isingBackbone.calcTotalPowerGeneratedAtBus(bus, generatorState)
                 loadName = network.loads.index[network.loads.bus == bus][0]
                 load = network.loads_t['p_set'].iloc[0][loadName]
                 netFlowThroughBus = 0
