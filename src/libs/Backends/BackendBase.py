@@ -47,6 +47,20 @@ class BackendBase(abc.ABC):
         self.output["end_time"] = self.getTime()
         return self.output
 
+    def printSolverspecificReport(self):
+        pass
+
+    def printReport(self):
+        print(f'\n--- General information of the solution ---')
+        print(f'Kirchhoff cost at each bus: {self.output["results"].get("individualKirchhoffCost","N/A")}')
+        print(f'Total Kirchhoff cost: {self.output["results"].get("kirchhoffCost","N/A")}')
+        print(f'Total power imbalance: {self.output["results"].get("powerImbalance","N/A")}')
+        print(f'Total Power generated: {self.output["results"].get("totalPower","N/A")}')
+        print(f'Total marginal cost: {self.output["results"].get("marginalCost","N/A")}')
+        self.printSolverspecificReport()
+        print('---')
+
+
     def setupOutputDict(self):
         """
         creates an 'output' attribute in self in which to save results and configuration
@@ -82,8 +96,10 @@ class BackendBase(abc.ABC):
                                         ]),
                                "config": {
                                         "Backend": self.config["Backend"],
+                                        "BackendType": backend,
+                                        "BackendConfig": self.config[backend],
                                         "IsingInterface": self.config["IsingInterface"],
-                                        backend: self.config[backend],
+                                         
                                       },
                                "components": {},
                                "network": {},

@@ -43,6 +43,7 @@ class ClassicalBackend(BackendBase):
         )
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
+        self.printReport()
         self.printResults(transformedProblem, solution)
         # transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
@@ -91,34 +92,13 @@ class ClassicalBackend(BackendBase):
         self.solver.setSteps(int(siquanConfig.get("optimizationCycles", steps)))
         return
 
-    # TODO use new report function of ising
-    def printResults(self, transformedProblem, solution):
-        """
-        print the solution and then several derived values of the solution to quantify how
-        good it is
-        
-        Args:
-            transformedProblem: (IsingPypsaInterface) the isinginterface instance that encoded the spin glass
-            problem
-            solution: (list) list of all qubits which have spin -1 in the solution
-
-        Returns:
-            (None) Only side effect is printing information
-        """
-        print(f"\n--- Solution ---")
-#        print(f"Qubits with spin -1: {solution['state']}")
-        print(f"\n--- Meta parameters of the solution ---")
-        print(f"Cost at each bus: {transformedProblem.individualCostContribution(solution['state'])}")
-        print(f"Total Kirchhoff cost: {self.output['results']['kirchhoffCost']}")
-        print(f"Total power imbalance: {self.output['results']['powerImbalance']}")
-        print(f"Marginal Cost at each bus: {transformedProblem.individualMarginalCost(solution['state'])}")
-        print(f"Total Power generated: {transformedProblem.calcTotalPowerGenerated(solution['state'])}")
-        print(f"Total marginal cost: {self.output['results']['marginalCost']}")
-        print(
-            f"Total cost (with constant terms): {self.output['results']['totalCost']}\n"
-        )
-        return
     
+    def printSolverspecificReport(self):
+        print(
+            f"Total energy cost of QUBO (with constant terms): {self.output['results']['totalCost']}"
+        )
+    
+
     def writeResultsToOutput(self, result, transformedProblem):
         """
         This writes solution specific values of the optimizer result and the ising spin glass
