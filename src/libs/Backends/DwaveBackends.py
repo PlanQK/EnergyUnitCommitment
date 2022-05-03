@@ -77,21 +77,6 @@ class DwaveTabuSampler(BackendBase):
             self.dimodModel = dimod.BinaryQuadraticModel(linear, quadratic, 0, dimod.Vartype.SPIN)
             return self.dimodModel
     
-
-    def power_output(network, generatorState, snapshot):
-        """
-        calculates total powerput of the network at a given snapshot.
-        generatorState is given as list of index of active generators
-        and not the qubit values of the solution.
-        """
-        result = 0
-        num_generators = len(network.generators_t['p_max_pu'].loc[snapshot])
-        for index in generatorState:
-            if index >= num_generators:
-                break
-            result += network.generators_t['p_max_pu'].loc[snapshot].iloc[index]
-        return result
-
     def choose_sample(self, transformedProblem, solution, strategy="LowestEnergy"):
         if hasattr(self.output["results"], "sample_df"):
             df = self.output["results"]["sample_df"]
@@ -299,19 +284,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
         self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
-
-    def power_output(self, generatorState, snapshot):
-        """
-        calculate total power output of all all active generators at a
-        snapshot. generatorState has to be the indices of generators.
-        Indices that are out of range are ignored.
-        """
-        result = 0
-        for index in generatorState:
-            if index >= self.num_generators:
-                break
-            result += self.generators_t.loc[snapshot].iloc[index]
-        return result
 
     def transformProblemForOptimizer(self, network):
         """
