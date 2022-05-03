@@ -46,6 +46,24 @@ def customsplit(capacity):
         return [4,1,-3,-2]
     raise ValueError("Capacity is too big to be decomposed")
 
+def binaryPower(number):
+    """
+    return a cut off binary represenation of the argument. It is a list of powers
+    of two + a rest such that the sum over the list is equal to the number
+    
+    Args:
+        number: (int) the integer to be decomposed
+    Returns:
+        (list) list of integer whose sum is equal to the number
+    """
+    if number < 0:
+        raise ValueError
+    if number == 0:
+        return []
+    number_of_bits = number.bit_length()
+    result = [2 ** exp for exp in range(number_of_bits - 1)]
+    return result + [number - 2 ** (number_of_bits - 1) + 1]
+
 
 class IsingBackbone:
     """
@@ -55,11 +73,14 @@ class IsingBackbone:
     instances of IsingSubprolem, which are stored as attributes. IsingSubproblem provide a method which
     adds the ising representation of the subproblem it models to the stored ising problem in this class
     """
+    # a dict to map config strings to functions which are used to decompose the capacity
+    # of a line into qubits
     linesplitDict = {
             "fullsplit" : fullsplit,
             "binarysplit" : binarysplit,
             "customsplit" : customsplit,
     } 
+
 
     def __init__(self, network, linesplitName, configuration):
         """
@@ -1191,14 +1212,23 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         return contrib
 
 class GlobalCostSquareWithSlack(GlobalCostSquare):
+    # a dict to map config strings to functions which are used creating lists of numbers, which
+    # can be used for weights of slack variables
+    slackRepresentationDict = {
+            "binaryPower" : binaryPower,
+    }
     def __init__(self, backbone, config):
         super().__init__(backbone, config)
+        slackWeightGenerator = self.slackRepresentationDict[config.get("slackType", "binaryPower")]
+        slackScale = config.get("slackScale",1.0)
+        slackSize = config.get("slackSize", 7)
+
+        slackWeights = [ - slackScale * i for i in slackWeightGenerator(slackSize)]
         self.backbone.createQubitEntriesForComponent(
                 "slackMarginalCost",
-                weights=[-2**i for i in range(4)],
-                encodingLength=6
+                weights=slackWeights * len(backbone.snapshots),
+                encodingLength=len(slackWeights)
         )
-        print(f"SUM:{sum([-2**i for i in range(4)])}")
 
     def encodeMarginalCosts(self, time):
         """
