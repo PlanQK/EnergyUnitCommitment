@@ -36,25 +36,31 @@ class PypsaBackend(BackendBase):
     def writeResultToOutput(self, solverstring):
         self.output["results"]["optimizationTime"] = solverstring.splitlines()[-1].split()[1]
         self.output["results"]["terminationCondition"] = solverstring.splitlines()[-7].split()[2]
-
-        # TODO get result better out of model?
-        totalCost = 0
-        for key, val in  self.model.generator_p.get_values().items():
-            totalCost += self.network.generators["marginal_cost"].loc[key[0]] * val
-        self.output["results"]["marginalCost"] = totalCost
-    
-        self.output["results"]["unitCommitment"] = {
-                gen[0] : value for gen,value in self.model.generator_status.get_values().items()
-        }
-        # list of indices of active generators
-        self.output["results"]["state"] = [
-                idx for idx in range(len(self.network.generators))
-                if self.output["results"]["unitCommitment"][self.network.generators.index[idx]] == 1.0
-        ]
-        self.output["results"]["powerflow"] = {
-                line[1] : value 
-                for line,value in self.model.passive_branch_p.get_values().items()
-        }
+        if self.output["results"]["terminationCondition"] != "infeasible":
+            # TODO get result better out of model?
+            totalCost = 0
+            totalPower = 0
+            for key, val in  self.model.generator_p.get_values().items():
+                totalCost += self.network.generators["marginal_cost"].loc[key[0]] * val
+                totalPower += self.network.generators.p_nom.loc[key[0]] * val
+            self.output["results"]["marginalCost"] = totalCost
+            self.output["results"]["totalPower"] = totalPower
+        
+            self.output["results"]["unitCommitment"] = {
+                    gen[0] : value for gen,value in self.model.generator_status.get_values().items()
+            }
+            # list of indices of active generators
+            self.output["results"]["state"] = [
+                    idx for idx in range(len(self.network.generators))
+                    if self.output["results"]["unitCommitment"][self.network.generators.index[idx]] == 1.0
+            ]
+            self.output["results"]["powerflow"] = {
+                    line[1] : value 
+                    for line,value in self.model.passive_branch_p.get_values().items()
+            }
+            # solver only allows feasible solutions 
+            self.output["results"]["kirchhoffCost"] = 0
+            self.output["results"]["powerImbalance"] = 0
 
 
     def optimize(self, transformedProblem):
