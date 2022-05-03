@@ -105,47 +105,28 @@ class DwaveTabuSampler(BackendBase):
             result += network.generators_t['p_max_pu'].loc[snapshot].iloc[index]
         return result
 
-    def choose_sample(self, solution, network, strategy="LowestEnergy", snapshot=None):
-
+    def choose_sample(self, transformedProblem, solution, strategy="LowestEnergy"):
         if hasattr(self.output["results"], "sample_df"):
             df = self.output["results"]["sample_df"]
         else:
             df = solution.to_pandas_dataframe()
             self.output["results"]["sample_df"] = df.to_dict('split')
 
-        if snapshot is None:
-            snapshot = network.snapshots[0]
-
         if strategy == 'LowestEnergy':
             return solution.first.sample
-
-        # basically always doesn't fulfill kirchhoff constraint and thus
-        # yields bad results
-        if strategy == 'MajorityVote':
-            return df.mode().iloc[0]
-
-        # instead of requireing a majority, a percentage voting for -1 is enough
-        if strategy == 'PercentageVote':
-            sample = df.apply(value_counts).fillna(0).apply(
-                lambda col: float(col.loc[-1]) / float(len(df))
-            )
-            return sample.apply(
-                lambda x: -1 if x >= self.config["BackendConfig"]["threshold"] else 1
-            )
 
         # requires postprocessing because in order to match total power output
         # local knapsack problems are usually solved worsed compared to
         # the lowest energy sample
         if strategy == 'ClosestSample':
-            total_load = network.loads_t['p_set'].loc[snapshot].sum()
+            totalLoad = 0.0
+            for idx, _ in enumerate(transformedProblem.snapshots):
+                totalLoad += transformedProblem.getTotalLoad(idx)
             df['deviation_from_opt_load'] = df.apply(
-                lambda row: abs(total_load -
-                                DwaveTabuSampler.power_output(
-                                    network,
-                                    [id for id, value in row.items() if value == -1],
-                                    snapshot
-                                )
-                                ),
+                lambda row: abs(
+                        total_load -
+                        transformedProblem.calcTotalPowerGenerated(
+                        [id for id, value in row.items() if value == -1])),
                 axis=1
             )
             min_deviation = df['deviation_from_opt_load'].min()
