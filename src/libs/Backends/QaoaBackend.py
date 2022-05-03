@@ -7,12 +7,13 @@ import pypsa
 import os.path
 
 from numpy import random
-
-from .IsingPypsaInterface import IsingBackbone                      # import for Docker run
-from .BackendBase import BackendBase                                # import for Docker run
+try:
+    from .IsingPypsaInterface import IsingBackbone              # import for Docker run
+    from .BackendBase import BackendBase                        # import for Docker run
+except ImportError:
+    from IsingPypsaInterface import IsingBackbone               # import for local/debug run
+    from BackendBase import BackendBase                         # import for local/debug run
 from .InputReader import InputReader
-#from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
-#from BackendBase import BackendBase                                # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
