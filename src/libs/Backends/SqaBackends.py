@@ -14,6 +14,7 @@ from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 from .BackendBase import BackendBase
 import time
+import random
 
 
 class ClassicalBackend(BackendBase):
@@ -83,10 +84,7 @@ class ClassicalBackend(BackendBase):
             (None) modifies self.solver and sets hyperparameters
         """
         siquanConfig = self.config["SqaBackend"]
-        try:
-            self.solver.setSeed(siquanConfig["seed"])
-        except KeyError:
-            pass
+        self.solver.setSeed(siquanConfig.get("seed", random.randrange(10 ** 6)))
         self.solver.setHSchedule(self.getHSchedule())
         self.solver.setTSchedule(siquanConfig.get("temperatureSchedule", TSchedule))
         self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices", trotterSlices)))
