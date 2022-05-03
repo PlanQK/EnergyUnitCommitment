@@ -101,18 +101,10 @@ class ClassicalBackend(BackendBase):
         """
         for key in result:
             self.output["results"][key] = result[key]
-        self.output["results"]["totalCost"] = transformedProblem.calcCost(result["state"])
-        self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(result["state"])
-        self.output["results"]["powerImbalance"] = transformedProblem.calcPowerImbalance(result["state"])
-        self.output["results"]["totalPower"] = transformedProblem.calcTotalPowerGenerated(result["state"])
-        self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(result["state"])
-        self.output["results"]["individualKirchhoffCost"] = transformedProblem.individualCostContribution(
-                result["state"]
-        )
-        self.output["results"]["unitCommitment"] = transformedProblem.getGeneratorDictionary(result["state"])
-        self.output["results"]["powerflow"] = transformedProblem.getFlowDictionary(result["state"])
-#        self.output["results"]["eigenValues"] = sorted(transformedProblem.getHamiltonianEigenvalues()[0])
-#        self.output["results"]["hamiltonian"] = transformedProblem.getHamiltonianMatrix()
+        self.output["results"] = {
+                        **self.output["results"],
+                        **transformedProblem.generateReport(result["state"])
+                    }
 
 
 class SqaBackend(ClassicalBackend):

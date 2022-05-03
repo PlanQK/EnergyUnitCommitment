@@ -565,6 +565,25 @@ class IsingBackbone:
                 value += self.data[component]['weights'][idx]
         return value
 
+    def generateReport(self, solution):
+        """
+        For the given solution, calculates various properties of the solution
+        Args:
+            solution: (list) list of all qubits that have spin -1 in a solution
+        Returns:
+            (dict) a dicitionary containing information about the solution
+        """
+        return {
+                "totalCost": self.calcCost(solution),
+                "kirchhoffCost": self.calcKirchhoffCost(solution),
+                "powerImbalance": self.calcPowerImbalance(solution),
+                "totalPower": self.calcTotalPowerGenerated(solution),
+                "marginalCost": self.calcMarginalCost(solution),
+                "individualKirchhoffCost": self.individualCostContribution(solution),
+                "unitCommitment": self.getGeneratorDictionary(solution),
+                "powerflow": self.getFlowDictionary(solution),
+        }
+
     def calcCost(self, result, isingInteractions=None):
         """
         calculates the energy of a spin state including the constant energy contribution
