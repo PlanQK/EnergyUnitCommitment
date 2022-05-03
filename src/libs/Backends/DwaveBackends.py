@@ -32,12 +32,6 @@ class DwaveTabuSampler(BackendBase):
         self.time = 0.0
         #self.solver = tabu.Tabusampler()
 
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
-
     def processSolution(self, network, transformedProblem, solution):
         """
         gets and writes info about the solution and returns it as a dictionary.

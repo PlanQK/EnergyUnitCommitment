@@ -218,12 +218,6 @@ class QaoaQiskit(BackendBase):
 
         return minX
 
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
-
     def scaleHamiltonian(self, hamiltonian: list) -> list:
         """
         Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi

@@ -20,19 +20,17 @@ class BackendBase(abc.ABC):
     def transformSolutionToNetwork(network, transformedProblem, solution):
         pass
 
-    @abc.abstractmethod
     def processSolution(self, network, transformedProblem, solution):
-        pass
+        self.output["results"]["postprocessingTime"] = 0.0
+        return solution
 
     @abc.abstractmethod
     def optimize(self, transformedProblem):
         pass
 
-    @abc.abstractmethod
     def validateInput(self, path, network):
         pass
 
-    @abc.abstractmethod
     def handleOptimizationStop(self, path, network):
         pass
 
@@ -59,7 +57,6 @@ class BackendBase(abc.ABC):
         print(f'Total marginal cost: {self.output["results"].get("marginalCost","N/A")}')
         self.printSolverspecificReport()
         print('---')
-
 
     def setupOutputDict(self):
         """

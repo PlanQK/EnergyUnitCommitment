@@ -8,21 +8,6 @@ from .InputReader import InputReader
 
 class PypsaBackend(BackendBase):
 
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
-
-    def processSolution(self, network, transformedProblem, solution):
-        """
-        writes results of generator states and line values of pypsa
-        optimization to output dictionary. No further postprocessing
-        for pypsa is done
-        """
-        self.output["results"]["postprocessingTime"] = 0.0
-        return solution
-
     def transformProblemForOptimizer(self, network):
         print("transforming problem...") 
         self.network = network.copy()

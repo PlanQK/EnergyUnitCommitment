@@ -22,15 +22,6 @@ class ClassicalBackend(BackendBase):
         super().__init__(reader=reader)
         self.solver = siquan.DTSQA()
 
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
-
-    def processSolution(self, network, transformedProblem, solution):
-        self.output["results"]["postprocessingTime"] = 0.0
-        return solution
 
     def transformProblemForOptimizer(self, network):
         print("transforming problem...")
