@@ -44,24 +44,11 @@ class DwaveTabuSampler(BackendBase):
         else:
             bestSample = self.choose_sample(solution, network)
 
-        solutionState = [
-            id for id, value in bestSample.items() if value == -1
-        ]
-        lineValues = transformedProblem.getLineValues(solutionState)
-        indCostCon = transformedProblem.individualCostContribution(solutionState)
-        totalCost = transformedProblem.calcCost(solutionState)
-        self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(solutionState)
-        self.output["results"]["totalCost"] = totalCost
-        self.output["results"]["kirchhoffCost"] = transformedProblem.calcKirchhoffCost(solutionState)
-        print(f"Kirchhoff: {self.output['results']['kirchhoffCost']}")
-
-        resultDict = {
-            'solutionState': solutionState,
-            'lineValues': lineValues,
-            'individualCostContribution': indCostCon,
-            'totalCost': totalCost,
-        }
-        return resultDict
+        resultInfo = transformedProblem.generateReport([
+                id for id, value in bestSample.items() if value == -1
+                ])
+        self.output["result"] = {**self.output["result"], **resultInfo}
+        return resultInfo
 
     def transformProblemForOptimizer(self, network):
         print("transforming Problem...")
@@ -141,24 +128,7 @@ class DwaveTabuSampler(BackendBase):
             raise ValueError("The chosen strategy for picking a sample is not supported")
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
-
-        solutionState = solution['solutionState']
-
-        print("done")
-        print(solutionState)
-        print(solution['lineValues'])
-        print(solution['individualCostContribution'])
-        print(
-            f"Total cost (with constant terms): {solution['totalCost']}"
-        )
-        for snapshot in network.snapshots:
-            power = DwaveTabuSampler.power_output(network,
-                                                  solutionState,
-                                                  snapshot)
-            load = network.loads_t['p_set'].loc[snapshot].sum()
-            print(f"Total output at {snapshot}: {power}")
-            print(f"Total load at {snapshot}: {load}")
-        print(f"Marginal Cost: {transformedProblem.calcMarginalCost( solutionState)}")
+        self.printReport()
         # network = transformedProblem.addSQASolutionToNetwork(
         #      network, solutionState
         # )
