@@ -139,6 +139,14 @@ class IsingBackbone:
             self.flushCachedProblem()
             subproblemInstance.encodeSubproblem(self)
             
+    def __getattr__(self, method_name):
+        for subproblem, subproblemInstance in self._subproblems.items():
+            try:
+                method = getattr(subproblemInstance, method_name)
+                return method
+            except AttributeError:
+                pass
+
     # obtain config file using an reader
     @classmethod
     def buildIsingProblem(cls, network, config: dict):
@@ -690,22 +698,6 @@ class IsingBackbone:
             (np.ndarray) a numpy array containing all eigenvalues
         """
         return np.linalg.eigh(self.getHamiltonianMatrix())
-
-    # wrappers to translate old calling conventions into ones that delegate to subproblems
-    def calcKirchhoffCost(self, solution):
-        return self._subproblems["kirchhoff"].calcCost(solution)
-
-    def calcPowerImbalance(self, solution):
-        return self._subproblems["kirchhoff"].calcPowerImbalance(solution)
-
-    def calcPowerImbalanceAtBus(self, bus, result):
-        return self._subproblems["kirchhoff"].calcPowerImbalanceAtBus(bus, result)
-    
-    def individualCostContribution(self, result, silent=True):
-        return self._subproblems["kirchhoff"].individualCostContribution(result,silent=silent)
-
-    def calcTotalPowerGenerated(self, solution, time=0):
-        return self._subproblems["kirchhoff"].calcTotalPowerGenerated(solution, time=time)
 
 
 class AbstractIsingSubproblem:
