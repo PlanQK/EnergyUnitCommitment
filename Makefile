@@ -1,7 +1,8 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
-DOCKERFILE = PlanQK_Dockerfile
-DOCKERTAG = energy:2.0
+#DOCKERFILE = PlanQK_Dockerfile
+DOCKERFILE = Dockerfile
+DOCKERTAG = energy:1.0
 REPETITIONS := 1
 
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
@@ -112,7 +113,8 @@ EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
 				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
 
-EXTRAPARAM = ''
+#BACKEND = sqa
+#EXTRAPARAM = Backend-$(strip $(BACKEND))
 
 ###### result files of computations ######
 
