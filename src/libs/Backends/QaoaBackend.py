@@ -7,12 +7,13 @@ import pypsa
 import os.path
 
 from numpy import random
+
 try:
-    from .IsingPypsaInterface import IsingBackbone              # import for Docker run
-    from .BackendBase import BackendBase                        # import for Docker run
+    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
+    from .BackendBase import BackendBase  # import for Docker run
 except ImportError:
-    from IsingPypsaInterface import IsingBackbone               # import for local/debug run
-    from BackendBase import BackendBase                         # import for local/debug run
+    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
+    from BackendBase import BackendBase  # import for local/debug run
 from .InputReader import InputReader
 from datetime import datetime
 from qiskit import QuantumCircuit
@@ -27,40 +28,49 @@ from qiskit.circuit import Parameter, ParameterVector
 class QaoaQiskit(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader)
-        self.output["results"] = {"backend": None,
-                                  "qubit_map": {},
-                                  "hamiltonian": {},
-                                  "qc": None,
-                                  "initial_guesses": {"original": self.config["QaoaBackend"]["initial_guess"],
-                                                      "refined": []},
-                                  "kirchhoff": {},
-                                  "repetitions": {}}
-        self.isingInterface = IsingBackbone.buildIsingProblem(network=self.network, config=self.config["IsingInterface"])
+
+        self.config_qaoa = self.config[
+            "QaoaBackend"
+        ]  # copy relevant config to make code more readable
+        self.addResultsDict()
+        self.isingInterface = IsingBackbone.buildIsingProblem(
+            network=self.network, config=self.config["IsingInterface"]
+        )
+
         self.iterationCounter = None
-        self.totalRepetition = None
-        self.qcParam = None
+        self.iter_result = {}
+        self.rep_result = {}
+        self.qc = None
         self.paramVector = None
 
-        self.kirchhoff = {}
-        self.components = {}
-
-        self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
-        if self.config["QaoaBackend"]["noise"] or (not self.config["QaoaBackend"]["simulate"]):
+        if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
             IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
+    def addResultsDict(self):
+        self.output["results"] = {
+            "backend": None,
+            "qubit_map": {},
+            "hamiltonian": {},
+            "qc": None,
+            "initial_guesses": {
+                "original": self.config_qaoa["initial_guess"],
+                "refined": [],
+            },
+            "kirchhoff": {},
+            "repetitions": {},
+        }
+
     def prepareRepetitionDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition] = {"initial_guess": [],
-                                                                       "iterations": {},
-                                                                       "duration": None,
-                                                                       "optimizeResults": {}}
+        self.rep_result = {
+            "initial_guess": [],
+            "iterations": {},
+            "duration": None,
+            "optimizeResults": {},
+        }
 
     def prepareIterationDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] = \
-            {"theta": [],
-             "counts": {},
-             "bitstrings": {},
-             "return": None}
+        self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
 
     def transformProblemForOptimizer(self, network):
         self.output["results"]["qubit_map"] = self.isingInterface.getQubitMapping()
@@ -80,21 +90,21 @@ class QaoaQiskit(BackendBase):
         for layer, _ in enumerate(betaValues):
             drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
             drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
-            #drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
-            #drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
+            # drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
+            # drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
 
         return drawTheta
 
     def optimize(self, transformedProblem):
 
-        shots = self.config["QaoaBackend"]["shots"]
-        simulator = self.config["QaoaBackend"]["simulator"]
-        simulate = self.config["QaoaBackend"]["simulate"]
-        noise = self.config["QaoaBackend"]["noise"]
-        initial_guess_original = copy.deepcopy(self.config["QaoaBackend"]["initial_guess"])
+        shots = self.config_qaoa["shots"]
+        simulator = self.config_qaoa["simulator"]
+        simulate = self.config_qaoa["simulate"]
+        noise = self.config_qaoa["noise"]
+        initial_guess_original = copy.deepcopy(self.config_qaoa["initial_guess"])
         num_vars = len(initial_guess_original)
-        max_iter = self.config["QaoaBackend"]["max_iter"]
-        repetitions = self.config["QaoaBackend"]["repetitions"]
+        max_iter = self.config_qaoa["max_iter"]
+        repetitions = self.config_qaoa["repetitions"]
 
         if "rand" in initial_guess_original:
             randRep = 2
@@ -107,23 +117,27 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
         nqubits = len(hamiltonian)
 
-        self.paramVector = ParameterVector('theta', len(initial_guess_original))
-        self.qcParam = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
+        # create ParameterVector to be used as placeholder when creating the quantum circuit
+        self.paramVector = ParameterVector("theta", len(initial_guess_original))
+        self.qc = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
+        # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
         drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        qcDraw = self.qcParam.bind_parameters({self.paramVector: drawTheta})
+        qcDraw = self.qc.bind_parameters({self.paramVector: drawTheta})
         self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
-        backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
-                                                                             simulate=simulate,
-                                                                             noise=noise,
-                                                                             nqubits=nqubits)
+        # setup IBMQ backend and save its configuration to output
+        backend, noise_model, coupling_map, basis_gates = self.setup_backend(
+            simulator=simulator, simulate=simulate, noise=noise, nqubits=nqubits
+        )
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
                 time_start = datetime.timestamp(datetime.now())
-                self.totalRepetition = rand * repetitions + curRepetition
-                print(f"----------------------- Repetition {self.totalRepetition} ----------------------------------")
+                totalRepetition = rand * repetitions + curRepetition
+                print(
+                    f"----------------------- Repetition {totalRepetition} ----------------------------------"
+                )
 
                 initial_guess = []
                 for j in range(num_vars):
@@ -138,28 +152,37 @@ class QaoaQiskit(BackendBase):
                 initial_guess = np.array(initial_guess)
 
                 self.prepareRepetitionDict()
-                self.output["results"]["repetitions"][self.totalRepetition]["initial_guess"] = initial_guess.tolist()
+                self.rep_result["initial_guess"] = initial_guess.tolist()
 
                 self.iterationCounter = 0
 
-                expectation = self.get_expectation(backend=backend,
-                                                   noise_model=noise_model,
-                                                   coupling_map=coupling_map,
-                                                   basis_gates=basis_gates,
-                                                   shots=shots,
-                                                   simulate=simulate)
+                expectation = self.get_expectation(
+                    backend=backend,
+                    noise_model=noise_model,
+                    coupling_map=coupling_map,
+                    basis_gates=basis_gates,
+                    shots=shots,
+                    simulate=simulate,
+                )
 
                 optimizer = self.getClassicalOptimizer(max_iter)
 
-                res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-                self.output["results"]["repetitions"][self.totalRepetition] \
-                    ["optimizeResults"] = {"x": list(res[0]),  # solution [beta, gamma]
-                                           "fun": res[1],  # objective function value
-                                           "nfev": res[2]}  # number of objective function calls
+                res = optimizer.optimize(
+                    num_vars=num_vars,
+                    objective_function=expectation,
+                    initial_point=initial_guess,
+                )
+                self.rep_result["optimizeResults"] = {
+                    "x": list(res[0]),  # solution [beta, gamma]
+                    "fun": res[1],  # objective function value
+                    "nfev": res[2],
+                }  # number of objective function calls
 
                 time_end = datetime.timestamp(datetime.now())
                 duration = time_end - time_start
-                self.output["results"]["repetitions"][self.totalRepetition]["duration"] = duration
+                self.rep_result["duration"] = duration
+
+                self.output["results"]["repetitions"][totalRepetition] = self.rep_result
 
             if "rand" in initial_guess_original:
                 minCFvars = self.getMinCFvars()
@@ -170,36 +193,17 @@ class QaoaQiskit(BackendBase):
 
         return self.output
 
-
-    def generateFilename(self, currentRepetitionNumber):
-
-        filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][4])
-        filename_date = str(self.config["QaoaBackend"]["filenameSplit"][7])
-        filename_time = str(self.config["QaoaBackend"]["filenameSplit"][8])
-        filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
-        if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
-            filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
-
-        filename = "_".join([
-                "Qaoa", filename_input, filename_date, filename_time, \
-                filename_config, "", str(currentRepetitionNumber)
-        ]) 
-        return filename + ".json"
-    
-
     def getClassicalOptimizer(self, max_iter):
-        configString = self.config["QaoaBackend"]["classical_optimizer"]
+        configString = self.config_qaoa["classical_optimizer"]
         if configString == "SPSA":
             return SPSA(maxiter=max_iter, blocking=False)
         elif configString == "COBYLA":
             return COBYLA(maxiter=max_iter, tol=0.0001)
         elif configString == "ADAM":
             return ADAM(maxiter=max_iter, tol=0.0001)
-        raise ValueError("Optimizer name in config file doesn't match any known optimizers")
-
+        raise ValueError(
+            "Optimizer name in config file doesn't match any known optimizers"
+        )
 
     def getMinCFvars(self):
         """
@@ -267,9 +271,13 @@ class QaoaQiskit(BackendBase):
                 for j in range(i, len(hamiltonian[i])):
                     if hamiltonian[i][j] != 0.0:
                         if i == j:
-                            qc.rz(-hamiltonian[i][j] * gammaValues[layer], i)  # negative because it´s the inverse of original QC
+                            qc.rz(
+                                -hamiltonian[i][j] * gammaValues[layer], i
+                            )  # negative because it´s the inverse of original QC
                         else:
-                            qc.rzz(-hamiltonian[i][j] * gammaValues[layer], i, j)  # negative because it´s the inverse of original QC
+                            qc.rzz(
+                                -hamiltonian[i][j] * gammaValues[layer], i, j
+                            )  # negative because it´s the inverse of original QC
             qc.barrier()
 
             # add mixing Hamiltonian to each qubit
@@ -298,8 +306,12 @@ class QaoaQiskit(BackendBase):
             self.output["results"]["kirchhoff"][bitstring] = {}
             kirchhoffCost = 0.0
             for bus in self.network.buses.index:
-                bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
-                for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
+                bitstringToSolution = [
+                    idx for idx, bit in enumerate(bitstring) if bit == "1"
+                ]
+                for _, val in self.isingInterface.calcPowerImbalanceAtBus(
+                    bus, bitstringToSolution
+                ).items():
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
                     kirchhoffCost += abs(val) ** 2
             self.output["results"]["kirchhoff"][bitstring]["total"] = kirchhoffCost
@@ -324,16 +336,17 @@ class QaoaQiskit(BackendBase):
             obj = self.kirchhoff_satisfied(bitstring=bitstring)
             avg += obj * count
             sum_count += count
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
-                ["bitstrings"][bitstring] = {"count": count,
-                                             "obj": obj,
-                                             "avg": avg,
-                                             "sum_count": sum_count}
+            self.iter_result["bitstrings"][bitstring] = {
+                "count": count,
+                "obj": obj,
+                "avg": avg,
+                "sum_count": sum_count,
+            }
 
-        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
-            ["return"] = avg / sum_count
+        self.iter_result["return"] = avg / sum_count
+        self.rep_result["iterations"][self.iterationCounter] = self.iter_result
 
-        return avg / sum_count
+        return self.iter_result["return"]
 
     def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
         """
@@ -358,7 +371,9 @@ class QaoaQiskit(BackendBase):
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
                 large_enough_devices = self.provider.backends(
-                    filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+                    filters=lambda x: x.configuration().n_qubits > nqubits
+                    and not x.configuration().simulator
+                )
                 device = least_busy(large_enough_devices)
 
                 # Get noise model from backend
@@ -379,7 +394,9 @@ class QaoaQiskit(BackendBase):
 
         else:
             large_enough_devices = self.provider.backends(
-                filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+                filters=lambda x: x.configuration().n_qubits > nqubits
+                and not x.configuration().simulator
+            )
             backend = least_busy(large_enough_devices)
             # backend = provider.get_backend("ibmq_lima")
             noise_model = None
@@ -388,8 +405,15 @@ class QaoaQiskit(BackendBase):
 
         return backend, noise_model, coupling_map, basis_gates
 
-    def get_expectation(self, backend, noise_model, coupling_map, basis_gates, shots: int = 1024,
-                        simulate: bool = True):
+    def get_expectation(
+        self,
+        backend,
+        noise_model,
+        coupling_map,
+        basis_gates,
+        shots: int = 1024,
+        simulate: bool = True,
+    ):
         """
         Builds the objective function, which can be used in a classical solver.
 
@@ -408,30 +432,29 @@ class QaoaQiskit(BackendBase):
             (callable) The objective function to be used in a classical solver
         """
 
-
         def execute_circ(theta):
-            qc = self.qcParam.bind_parameters({self.paramVector: theta})
+            qc = self.qc.bind_parameters({self.paramVector: theta})
 
             if simulate:
                 # Run on chosen simulator
-                results = execute(experiments=qc,
-                                  backend=backend,
-                                  shots=shots,
-                                  noise_model=noise_model,
-                                  coupling_map=coupling_map,
-                                  basis_gates=basis_gates).result()
+                results = execute(
+                    experiments=qc,
+                    backend=backend,
+                    shots=shots,
+                    noise_model=noise_model,
+                    coupling_map=coupling_map,
+                    basis_gates=basis_gates,
+                ).result()
             else:
                 # Submit job to real device and wait for results
-                job_device = execute(experiments=qc,
-                                     backend=backend,
-                                     shots=shots)
+                job_device = execute(experiments=qc, backend=backend, shots=shots)
                 job_monitor(job_device)
                 results = job_device.result()
             counts = results.get_counts()
             self.iterationCounter += 1
             self.prepareIterationDict()
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["theta"] = list(theta)
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["counts"] = counts
+            self.iter_result["theta"] = list(theta)
+            self.iter_result["counts"] = counts
 
             return self.compute_expectation(counts=counts)
 
@@ -443,7 +466,9 @@ def main():
     configFile = "config.yaml"
     outPREFIX = "infoNoCost"
     now = datetime.today()
-    outDateTime = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+    outDateTime = (
+        f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+    )
     outInfo = f"{outPREFIX}_{inputNet}_1_1_{outDateTime}_{configFile}"
     DEFAULT_ENV_VARIABLES = {
         "inputNetwork": inputNet,
@@ -474,15 +499,17 @@ def main():
         "maxOrder": 0,
         "sampleCutSize": 200,
         "threshold": 0.5,
-        "seed": 2
+        "seed": 2,
     }
 
-    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet)
+    netImport = pypsa.Network(
+        os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet
+    )
 
     with open(os.path.dirname(__file__) + "/../Configs/" + configFile) as file:
         config = yaml.safe_load(file)
 
-    filenameSplit = str(envMgr['outputInfo']).split("_")
+    filenameSplit = str(envMgr["outputInfo"]).split("_")
     config["QaoaBackend"]["filenameSplit"] = filenameSplit
     config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
 
@@ -535,8 +562,10 @@ def main():
 
     qaoa.optimize(transformedProblem=components)
 
-    filename = str(envMgr['outputInfo'])
-    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
+    filename = str(envMgr["outputInfo"])
+    with open(
+        os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w"
+    ) as write_file:
         json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
 
 
