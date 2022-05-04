@@ -1,12 +1,6 @@
 import copy
-import json, yaml
 import math
-
 import numpy as np
-import pypsa
-import os.path
-
-from numpy import random
 
 try:
     from .IsingPypsaInterface import IsingBackbone  # import for Docker run
@@ -144,9 +138,9 @@ class QaoaQiskit(BackendBase):
                     # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
                     if initial_guess_original[j] == "rand":
                         if j % 2 == 0:
-                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
+                            initial_guess.append((0.5 - np.random.rand()) * 2 * math.pi)
                         else:
-                            initial_guess.append((0.5 - random.rand()) * math.pi)
+                            initial_guess.append((0.5 - np.random.rand()) * math.pi)
                     else:
                         initial_guess.append(initial_guess_original[j])
                 initial_guess = np.array(initial_guess)
@@ -459,115 +453,3 @@ class QaoaQiskit(BackendBase):
             return self.compute_expectation(counts=counts)
 
         return execute_circ
-
-
-def main():
-    inputNet = "testNetwork4QubitIsing_2_0_20.nc"
-    configFile = "config.yaml"
-    outPREFIX = "infoNoCost"
-    now = datetime.today()
-    outDateTime = (
-        f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
-    )
-    outInfo = f"{outPREFIX}_{inputNet}_1_1_{outDateTime}_{configFile}"
-    DEFAULT_ENV_VARIABLES = {
-        "inputNetwork": inputNet,
-        "inputInfo": "",
-        "outputNetwork": "",
-        "outputInfo": outInfo,
-        "outputInfoTime": outDateTime,
-        "optimizationCycles": 1000,
-        "temperatureSchedule": "[0.1,iF,0.0001]",
-        "transverseFieldSchedule": "[10,.1]",
-        "monetaryCostFactor": 0.1,
-        "kirchhoffFactor": 1.0,
-        "slackVarFactor": 70.0,
-        "minUpDownFactor": 0.0,
-        "trotterSlices": 32,
-        "problemFormulation": "binarysplitNoMarginalCost",
-        "dwaveAPIToken": "",
-        "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
-        "annealing_time": 500,
-        "programming_thermalization": 0,
-        "readout_thermalization": 0,
-        "num_reads": 1,
-        "chain_strength": 250,
-        "strategy": "LowestEnergy",
-        "lineRepresentation": 0,
-        "postprocess": "flow",
-        "timeout": "-1",
-        "maxOrder": 0,
-        "sampleCutSize": 200,
-        "threshold": 0.5,
-        "seed": 2,
-    }
-
-    netImport = pypsa.Network(
-        os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet
-    )
-
-    with open(os.path.dirname(__file__) + "/../Configs/" + configFile) as file:
-        config = yaml.safe_load(file)
-
-    filenameSplit = str(envMgr["outputInfo"]).split("_")
-    config["QaoaBackend"]["filenameSplit"] = filenameSplit
-    config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
-
-    qaoa = QaoaQiskit(config=config)
-    components = qaoa.transformProblemForOptimizer(network=netImport)
-
-    """
-    # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
-    # https://blog.xa0.de/post/Solving-QUBOs-with-qiskit-QAOA-example/
-    # https://qiskit.org/documentation/optimization/stubs/qiskit_optimization.QuadraticProgram.html
-    qp = QuadraticProgram()
-    #[qp.binary_var() for _ in range(components["hamiltonian"]["scaled"].shape[0])]
-    [qp.binary_var() for _ in range(4)]
-    qp.minimize(quadratic=components["hamiltonian"]["scaled"])
-
-    quantum_instance = QuantumInstance(Aer.get_backend('aer_simulator'))
-    cobyla = COBYLA(maxiter=100)
-    qaoaQiskit = QAOA(optimizer=cobyla,reps=10,quantum_instance=quantum_instance)
-    #qaoaQiskit = QAOA(quantum_instance=quantum_instance)
-    qiskitOpt = MinimumEigenOptimizer(qaoaQiskit)
-    qaoa_result = qiskitOpt.solve(qp)
-
-    cobyla = COBYLA(maxiter=100)
-    #qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
-    #qaoa_result = qaoaQiskit.find_minimum()
-    #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
-    """
-    """
-    theta = [Parameter("\u03B2"), Parameter("\u03B3")]
-    config["QaoaBackend"]["qcGeneration"] = "IterationMatrix"
-    componentsIterM = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIterM = qaoa.create_qc1(components=componentsIterM, theta=theta)
-    qcIterDrawnM = qcIterM.draw(output="latex_source")
-    config["QaoaBackend"]["qcGeneration"] = "Iteration"
-    componentsIter = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIter = qaoa.create_qc1(components=componentsIter, theta=theta)
-    qcIterDrawn = qcIter.draw(output="latex_source")
-    config["QaoaBackend"]["qcGeneration"] = "Ising"
-    componentsIsing = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"]["scaled"], theta=theta)
-    qcIsingDrawn = qcIsing.draw(output="latex_source")
-
-    qcCompare = {"Iteration": qcIterDrawn,
-                 "IterationMatrix": qcIterDrawnM,
-                 "Ising": qcIsingDrawn}
-
-    with open("qcCompare.json", "w") as write_file:
-        json.dump(qcCompare, write_file, indent=2, default=str)
-    """
-
-    qaoa.optimize(transformedProblem=components)
-
-    filename = str(envMgr["outputInfo"])
-    with open(
-        os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w"
-    ) as write_file:
-        json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
-
-
-if __name__ == "__main__":
-    main()
