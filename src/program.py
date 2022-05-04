@@ -44,7 +44,7 @@ def run(
         network = inputReader.getNetwork()
 
         # set up optimizer with input data
-        OptimizerClass = ganBackends[inputReader.config["Backend"]]refact
+        OptimizerClass = ganBackends[inputReader.config["Backend"]]
         optimizer = OptimizerClass(reader=inputReader)
         # validate input in case there are restrictions like limited computation time
         # TODO: implement checks for different backends
