@@ -278,7 +278,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         if self.config["BackendConfig"]["timeout"] < 0:
             self.config["BackendConfig"]["timeout"] = 3600
 
-    def optimizeSampleFlow(self, sample, costKey):
+    def optimizeSampleFlow(self, sample):
         generatorState = [
             id for id, value in sample.items() if value == -1
         ]
@@ -288,7 +288,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         return self.solveFlowproblem(
             graph,
             generatorState,
-            costKey=costKey
         )
 
     def processSamples(self, transformedProblem, sampleset):
@@ -302,8 +301,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         processedSamples_df['optimizedCost'] = processedSamples_df.apply(
             lambda row: self.optimizeSampleFlow(
                 row[:-3],
-                costKey=None,
-            )[0],
+            ),
             axis=1
         )
         processedSamples_df['marginalCost'] = processedSamples_df.apply(
@@ -361,7 +359,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.output["results"]["postprocessingTime"] = time.perf_counter() - tic
         return resultDict
 
-    def solveFlowproblem(self, graph, generatorState, costKey="totalCostFlow"):
+    def solveFlowproblem(self, graph, generatorState):
         """
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor of 1 
@@ -393,27 +391,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             except KeyError:
                 pass
 
-        if costKey is None:
-            return totalCost, None
-
-        print(f"total cost after flow opt {costKey}: {totalCost}")
-        self.output["results"][costKey] = totalCost
-
-        lineValues = {}
-        # TODO split flow on two lines if we have more flow than capacity
-        # we had lines a->b and b->a which were merged in previous step
-        for line in self.network.lines.index:
-            bus0 = self.network.lines.loc[line].bus0
-            bus1 = self.network.lines.loc[line].bus1
-            try:
-                newValue = FlowSolution[bus0][bus1]['flow']
-            except KeyError:
-                try:
-                    newValue = - FlowSolution[bus1][bus0]['flow']
-                except KeyError:
-                    newValue = 0
-            lineValues[(line, 0)] = newValue
-        return totalCost, lineValues
+        return totalCost
 
     # quantum computation struggles with finetuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
@@ -426,7 +404,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         can speed up flow optimization by about 30%, but if it was bad, a warmstart
         makes it slower. warmstart is used if lineValues is not None
         """
-
         # turn pypsa self.network in nx.DiGraph. Power generation and consumption
         # is modeled by adjusting capacity of the edge to a super source/super sink 
         graph = nx.DiGraph()
@@ -526,7 +503,6 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     use the Cloud. Instead it reads a serialized Sample and pretends
     that it got that from the cloud
     """
-
     def getSampler(self):
         self.inputFilePath =  "/energy/results_qpu/" +  self.config["BackendConfig"]["sampleOrigin"]
 
@@ -534,16 +510,5 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
         print(f"reading from {self.inputFilePath}")
         with open(self.inputFilePath) as inputFile:
             self.inputData = json.load(inputFile)
-        if 'cutSamples' not in self.inputData:
-            self.inputData['cutSamples'] = {}
         return dimod.SampleSet.from_serializable(self.inputData["serial"])
 
-    def optimizeSampleFlow(self, sample, costKey):
-        if costKey is None:
-            try:
-                previousResults = self.inputData["cutSamples"]
-                thisResult = previousResults[sample.name]
-                return thisResult, None
-            except (KeyError, AttributeError):
-                pass
-        return super().optimizeSampleFlow(sample, costKey)
