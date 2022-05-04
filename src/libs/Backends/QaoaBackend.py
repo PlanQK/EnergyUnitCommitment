@@ -121,10 +121,33 @@ class QaoaQiskit(BackendBase):
         return network
 
     def processSolution(self, network, transformedProblem, solution):
-        solution["components"] = self.isingInterface.getData()
-        return solution
+        """
+        Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
+
+        Args:
+            network: (pypsa.Network) The network to be optimized.
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+            solution: (dict) The optimal solution to the problem.
+
+        Returns:
+            (dict) The post-processed solution.
+        """
+        self.output["components"] = self.isingInterface.getData()
+        return self.output
 
     def createDrawTheta(self, theta: list) -> list:
+        """
+        Creates a list of the same size as theta with Parameters (beta(s) and gamma(s)) as values. This list can then
+        be used to bind to a quantum circuit, using Qiskit's bind_parameters function, which can be saved as a generic
+        circuit, using Qiskit's draw function.
+
+        Args:
+            theta: (list) The list of optimizable values of the quantum circuit. It will be used to create a list of
+                          the same length with beta(s) and gamma(s).
+
+        Returns:
+            (list) The created list of beta(s) and gamma(s).
+        """
         betaValues = theta[::2]
         drawTheta = []
         for layer, _ in enumerate(betaValues):
@@ -136,7 +159,18 @@ class QaoaQiskit(BackendBase):
         return drawTheta
 
     def optimize(self, transformedProblem):
+        """
+        Optimizes the network encoded in the IsingInterface-instance. A self-written Qaoa algorithm is used, which can
+        either simulate the quantum part or solve it on one of IBMQ's servers (provided the correct credentials).
+        As classic solvers SPSA, COBYLA or ADAM can be chosen.
 
+        Args:
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+
+        Returns:
+            (dict) The optimized solution.
+        """
+        # retrieve various parameters from the config
         shots = self.config_qaoa["shots"]
         simulator = self.config_qaoa["simulator"]
         simulate = self.config_qaoa["simulate"]
