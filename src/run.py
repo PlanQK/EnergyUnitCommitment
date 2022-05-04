@@ -21,10 +21,10 @@ def main():
     # the keys of the different levels of one parameters are seperated using '-'
     # for each parameter, the last value is the value of the config, and the rest are keys of the nesting
     # any value found in extraParams will overwrite a value found in params
-    if (len(sys.argv) <= 3 or sys.argv[3] == ""):
+    if len(sys.argv) <= 3 or sys.argv[3] == "":
         extraParams = []
     else:
-        extraParams = [ keyChain.split("-") for keyChain in sys.argv[3].split("--") ]
+        extraParams = [keyChain.split("-") for keyChain in sys.argv[3].split("--")]
     # run optimization
     response = run(data=network, params=params, extraParams=extraParams)
     # save reusults
