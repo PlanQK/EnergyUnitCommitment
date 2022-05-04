@@ -1,6 +1,7 @@
 import copy
 import math
 import numpy as np
+import pypsa
 
 try:
     from .IsingPypsaInterface import IsingBackbone  # import for Docker run
@@ -23,25 +24,30 @@ class QaoaQiskit(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader)
 
-        self.config_qaoa = self.config[
-            "QaoaBackend"
-        ]  # copy relevant config to make code more readable
+        # copy relevant config to make code more readable
+        self.config_qaoa = self.config["QaoaBackend"]
         self.addResultsDict()
-        self.isingInterface = IsingBackbone.buildIsingProblem(
-            network=self.network, config=self.config["IsingInterface"]
-        )
 
+        # initiate local parameters
+        self.isingInterface = None
         self.iterationCounter = None
         self.iter_result = {}
         self.rep_result = {}
         self.qc = None
         self.paramVector = None
 
+        # set up connection to IBMQ servers
         if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
             IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
     def addResultsDict(self):
+        """
+        Adds the basic structure for the self.output["results"]-dictionary.
+
+        Returns:
+            Nothing. Modifies the self.output["results"]-dictionary.
+        """
         self.output["results"] = {
             "backend": None,
             "qubit_map": {},
@@ -56,6 +62,13 @@ class QaoaQiskit(BackendBase):
         }
 
     def prepareRepetitionDict(self):
+        """
+        Initializes the basic structure for the self.rep_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
+
+        Returns:
+            Nothing. Modifies the self.rep_result-dictionary.
+        """
         self.rep_result = {
             "initial_guess": [],
             "iterations": {},
@@ -64,14 +77,47 @@ class QaoaQiskit(BackendBase):
         }
 
     def prepareIterationDict(self):
+        """
+        Initializes the basic structure for the self.iter_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
+
+        Returns:
+            Nothing. Modifies the self.iter_result-dictionary.
+        """
         self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
 
-    def transformProblemForOptimizer(self, network):
+    def transformProblemForOptimizer(self, network: pypsa.Network) -> IsingBackbone:
+        """
+        Initializes an IsingInterface-instance, which encodes the Ising Spin Glass Problem, using the network to be
+        optimized.
+
+        Args:
+            network: (pypsa.Network) The network to be optimized.
+
+        Returns:
+            (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+        """
+        self.isingInterface = IsingBackbone.buildIsingProblem(
+            network=self.network, config=self.config["IsingInterface"]
+        )
         self.output["results"]["qubit_map"] = self.isingInterface.getQubitMapping()
 
         return self.isingInterface
 
-    def transformSolutionToNetwork(self, network, transformedProblem, solution):
+    def transformSolutionToNetwork(
+            self, network: pypsa.Network, transformedProblem: IsingBackbone, solution: dict
+    ) -> pypsa.Network:
+        """
+        Encodes the optimal solution found during optimization into a pypsa.Network.
+
+        Args:
+            network: (pypsa.Network) The network to be optimized.
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+            solution: (dict) The optimal solution to the problem.
+
+        Returns:
+            (pypsa.Network) The optimized network.
+        """
         return network
 
     def processSolution(self, network, transformedProblem, solution):
