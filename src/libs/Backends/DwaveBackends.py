@@ -129,12 +129,18 @@ class DwaveTabuSampler(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        result = self.sampler.sample(self.getDimodModel(transformedProblem))
+        sampleset = self.getSampleSet(transformedProblem)
+        self.saveSample(sampleset)
+        print("done")
+        return sampleset
+
+    def getSampleSet(self, transformedProblem):
+        return self.sampler.sample(self.getDimodModel(transformedProblem))
+
+    def saveSample(self, sampleset):
         self.sample_df = sampleset.to_pandas_dataframe()
         self.output["results"]["sample_df"] = self.sample_df.to_dict('split')
-        self.output["results"]["serial"] = result.to_serializable()
-        print("done")
-        return result
+        self.output["results"]["serial"] = sampleset.to_serializable()
 
 
 class DwaveSteepestDescent(DwaveTabuSampler):
@@ -159,11 +165,7 @@ class DwaveCloudHybrid(DwaveCloud):
         self.time = 0.0
 
     def getSampleSet(self, transformedProblem):
-        return self.sampler.sample(self.getDimodModel(transformedProblem))
-
-    def optimize(self, transformedProblem):
-        print("optimize")
-        sampleset = self.getSampleSet(transformedProblem)
+        sampleset = super().getSampleSet(transformedProblem)
         print("Waiting for server response...")
         # wait for response, ensure that loop is eventually broken
         watchdog = 0
@@ -173,7 +175,6 @@ class DwaveCloudHybrid(DwaveCloud):
             if watchdog > 42:
                 raise ValueError
             time.sleep(2)
-        self.output["results"]["serial"] = sampleset.to_serializable()
         return sampleset
 
 
