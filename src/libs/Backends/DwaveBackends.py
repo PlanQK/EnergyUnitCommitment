@@ -29,6 +29,8 @@ from pandas import value_counts
 class DwaveTabuSampler(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
+        # TODO instert correct call for sampler
+        self.sampler = None
         self.time = 0.0
 
     def processSolution(self, network, transformedProblem, solution):
@@ -37,12 +39,9 @@ class DwaveTabuSampler(BackendBase):
         Does not improve the solution, instead override this method in child class
         for postprocessing.
         """
-        if hasattr(self, 'network'):
-            bestSample = self.choose_sample(solution,
-                                            self.network,
-                                            strategy=self.config["BackendConfig"]["strategy"])
-        else:
-            bestSample = self.choose_sample(solution, network)
+        bestSample = self.choose_sample(solution,
+                                        self.network,
+                                        strategy=self.config["BackendConfig"]["strategy"])
 
         resultInfo = transformedProblem.generateReport([
                 id for id, value in bestSample.items() if value == -1
@@ -75,16 +74,22 @@ class DwaveTabuSampler(BackendBase):
                 for spins, strength in isingProblem.problem.items()
                 if len(spins) == 2
             }
-            self.dimodModel = dimod.BinaryQuadraticModel(linear, quadratic, 0, dimod.Vartype.SPIN)
+            self.dimodModel = dimod.BinaryQuadraticModel(
+                            linear,
+                            quadratic,
+                            0,
+                            dimod.Vartype.SPIN
+                            )
             return self.dimodModel
     
-    def choose_sample(self, transformedProblem, solution, strategy="LowestEnergy"):
-        if hasattr(self.output["results"], "sample_df"):
-            df = self.output["results"]["sample_df"]
-        else:
-            df = solution.to_pandas_dataframe()
-            self.output["results"]["sample_df"] = df.to_dict('split')
+    def getSampleDataframe(self):
+        return self.sample_df
 
+    def choose_sample(self,
+                transformedProblem,
+                solution,
+                strategy="LowestEnergy"):
+        df = self.getSampleDataframe()
         if strategy == 'LowestEnergy':
             return solution.first.sample
 
@@ -122,9 +127,10 @@ class DwaveTabuSampler(BackendBase):
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
-        result = self.solver.sample(self.getDimodModel(transformedProblem))
+        result = self.sampler.sample(self.getDimodModel(transformedProblem))
+        self.sample_df = sampleset.to_pandas_dataframe()
+        self.output["results"]["sample_df"] = self.sample_df.to_dict('split')
         self.output["results"]["serial"] = result.to_serializable()
-        self.output["results"]["energy"] = result.first.energy
         print("done")
         return result
 
@@ -150,16 +156,20 @@ class DwaveCloudHybrid(DwaveCloud):
         self.output["results"]["solver_id"] = self.solver
         self.time = 0.0
 
-        # TODO write more info on solution to self.output["results"]
+    def getSampleSet(self, transformedProblem):
+        return self.sampler.sample(self.getDimodModel(transformedProblem))
 
     def optimize(self, transformedProblem):
-        print(self.sampler.properties)
         print("optimize")
-        sampleset = self.sampler.sample(self.getDimodModel(transformedProblem))
+        sampleset = self.getSampleSet(transformedProblem)
         print("Waiting for server response...")
+        # wait for response, ensure that loop is eventually broken
+        watchdog = 0
         while True:
             if sampleset.done():
                 break
+            if watchdog > 42:
+                raise ValueError
             time.sleep(2)
         self.output["results"]["serial"] = sampleset.to_serializable()
         return sampleset
@@ -219,46 +229,35 @@ class DwaveCloudDirectQPU(DwaveCloud):
         return
 
     def getSampler(self):
-        self.sampler = EmbeddingComposite(
-            DWaveSampler(
-                solver={
-                    'qpu': True,
-                    'topology__type': 'pegasus'
-                },
-                token=self.token
-            )
-        )
+        DirectSampler = DWaveSampler(solver={
+                                    'qpu': True,
+                                    'topology__type': 'pegasus'
+                                    },
+                                    token=self.token)
+        if hasattr(self, 'embedding'):
+            self.sampler = FixedEmbeddingComposite(DirectSampler, self.embedding)
+        else:
+            self.sampler = EmbeddingComposite(DirectSampler)
         return
 
     def getSampleSet(self, transformedProblem):
+        sampleArguments = {
+                    arg : val 
+                    for arg, val in self.config["BackendConfig"].items() 
+                    if arg in ["num_reads",
+                            "annealing_time",
+                            "chain_strength",
+                            "programming_thermalization",
+                            "readout_thermalization"]}
         if hasattr(self, 'embedding'):
-            print("Reusing embedding from previous run")
-            sampler = DWaveSampler(solver={'qpu': True,
-                                           'topology__type': 'pegasus'},
-                                   token=self.token)
-            sampler = FixedEmbeddingComposite(sampler, self.embedding)
-            sampleset = sampler.sample(self.getDimodModel(transformedProblem),
-                                       num_reads=self.config["BackendConfig"]["num_reads"],
-                                       annealing_time=self.config["BackendConfig"]["annealing_time"],
-                                       chain_strength=self.config["BackendConfig"]["chain_strength"],
-                                       programming_thermalization=self.config["BackendConfig"]["programming_thermalization"],
-                                       readout_thermalization=self.config["BackendConfig"]["readout_thermalization"],
-                                       )
-        else:
-            try:
-                sampleset = self.sampler.sample(self.getDimodModel(transformedProblem),
-                                                num_reads=self.config["BackendConfig"]["num_reads"],
-                                                annealing_time=self.config["BackendConfig"]["annealing_time"],
-                                                chain_strength=self.config["BackendConfig"]["chain_strength"],
-                                                programming_thermalization=self.config["BackendConfig"]["programming_thermalization"],
-                                                readout_thermalization=self.config["BackendConfig"]["readout_thermalization"],
-                                                embedding_parameters=dict(timeout=self.config["BackendConfig"]["timeout"]),
-                                                return_embedding=True,
-                                                )
-            except ValueError:
-                print("no embedding found in given time limit")
-                raise ValueError("no embedding onto qpu was found")
+            sampleArguments["embedding_parameters"] = dict(timeout=self.config["BackendConfig"]["timeout"])
+            sampleArguments["return_embedding"] = True
 
+        try:
+            sampleset = self.sampler.sample(**sampleArguments)
+        except ValueError:
+            print("no embedding found in given time limit")
+            raise ValueError("no embedding onto qpu was found")
         print("Waiting for server response...")
         while True:
             if sampleset.done():
@@ -273,18 +272,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
 
-
         # additional info
         if self.config["BackendConfig"]["timeout"] < 0:
             self.config["BackendConfig"]["timeout"] = 1000
 
-        self.output["results"]["annealReadRatio"] = float(self.config["BackendConfig"]["annealing_time"]) / \
-                                                    float(self.config["BackendConfig"]["num_reads"])
-        self.output["results"]["totalAnnealTime"] = float(self.config["BackendConfig"]["annealing_time"]) * \
-                                                    float(self.config["BackendConfig"]["num_reads"])
-        # intentionally round totalAnnealTime so computations with similar anneal time
-        # can ge grouped together
-        self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
 
     def transformProblemForOptimizer(self, network):
         """
@@ -547,9 +538,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
     def optimize(self, transformedProblem):
         print("optimize")
-
         sampleset = self.getSampleSet(transformedProblem)
-
+        self.sample_df = sampleset.to_pandas_dataframe()
         self.output["results"]["serial"] = sampleset.to_serializable()
         
         # TODO fix reusing embeddings
@@ -563,6 +553,13 @@ class DwaveCloudDirectQPU(DwaveCloud):
 #                    embeddingDict, write_embedding, indent=2
 #                )
         self.output["results"]["optimizationTime"] = self.output["results"]["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
+        self.output["results"]["annealReadRatio"] = float(self.config["BackendConfig"]["annealing_time"]) / \
+                                                    float(self.config["BackendConfig"]["num_reads"])
+        self.output["results"]["totalAnnealTime"] = float(self.config["BackendConfig"]["annealing_time"]) * \
+                                                    float(self.config["BackendConfig"]["num_reads"])
+        # intentionally round totalAnnealTime so computations with similar anneal time
+        # can ge grouped together
+        self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
         return sampleset
 
 
@@ -577,14 +574,11 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
         self.inputFilePath =  "/energy/results_qpu/" +  self.config["BackendConfig"]["sampleOrigin"]
 
     def getSampleSet(self, transformedProblem):
-
-        print(self.inputFilePath)
+        print(f"reading from {self.inputFilePath}")
         with open(self.inputFilePath) as inputFile:
             self.inputData = json.load(inputFile)
-#        self.inputData = self.inputData["results"]
         if 'cutSamples' not in self.inputData:
             self.inputData['cutSamples'] = {}
-
         return dimod.SampleSet.from_serializable(self.inputData["serial"])
 
     def optimizeSampleFlow(self, sample, network, costKey):
