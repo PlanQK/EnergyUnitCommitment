@@ -39,14 +39,15 @@ class DwaveTabuSampler(BackendBase):
         Does not improve the solution, instead override this method in child class
         for postprocessing.
         """
-        bestSample = self.choose_sample(solution,
-                                        self.network,
-                                        strategy=self.config["BackendConfig"]["strategy"])
+        bestSample = self.choose_sample(transformedProblem,
+                                        solution,
+                                        strategy=self.config["BackendConfig"]["strategy"]
+                                        )
 
         resultInfo = transformedProblem.generateReport([
                 id for id, value in bestSample.items() if value == -1
                 ])
-        self.output["result"] = {**self.output["result"], **resultInfo}
+        self.output["results"] = {**self.output["results"], **resultInfo}
         return resultInfo
 
     def transformProblemForOptimizer(self, network):
@@ -98,13 +99,14 @@ class DwaveTabuSampler(BackendBase):
         # the lowest energy sample
         if strategy == 'ClosestSample':
             totalLoad = 0.0
-            for idx, _ in enumerate(transformedProblem.snapshots):
+            for idx, _ in enumerate(self.network.snapshots):
                 totalLoad += transformedProblem.getTotalLoad(idx)
             df['deviation_from_opt_load'] = df.apply(
                 lambda row: abs(
-                        total_load -
+                        totalLoad - \
                         transformedProblem.calcTotalPowerGenerated(
-                        [id for id, value in row.items() if value == -1])),
+                        [id for id, value in row.items() if value == -1])
+                        ),
                 axis=1
             )
             min_deviation = df['deviation_from_opt_load'].min()
@@ -332,13 +334,16 @@ class DwaveCloudDirectQPU(DwaveCloud):
             costKey="LowestFlow"
         )
 
-        closestSample = self.choose_sample(solution, self.network, strategy="ClosestSample")
+        closestSample = self.choose_sample(
+                                    transformedProblem,
+                                    solution,
+                                    strategy="ClosestSample"
+                                    )
         _, lineValuesClosestSample = self.optimizeSampleFlow(
             closestSample,
             network,
             costKey="ClosestFlow"
         )
-
 
         # choose best self.config["BackendConfig"]["sampleCutSize"] Samples and optimize Flow
         df = solution.to_pandas_dataframe()
@@ -379,8 +384,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.output["results"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
 
         chosenSample = self.choose_sample(
+                transformedProblem,
                 solution,
-                self.network,
                 strategy=self.config["BackendConfig"]["strategy"]
                 )
         print(chosenSample)
