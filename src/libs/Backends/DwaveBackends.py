@@ -241,7 +241,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             self.sampler = FixedEmbeddingComposite(DirectSampler, self.embedding)
         else:
             self.sampler = EmbeddingComposite(DirectSampler)
-        return
+        return self.sampler
 
     def getSampleSet(self, transformedProblem):
         sampleArguments = {
@@ -274,32 +274,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.token = self.config["APItoken"]["dWave_API_token"]
         # pegasus topology corresponds to Advantage 4.1
         self.getSampler()
-
         # additional info
         if self.config["BackendConfig"]["timeout"] < 0:
-            self.config["BackendConfig"]["timeout"] = 1000
-
-
-    def transformProblemForOptimizer(self, network):
-        """
-        stores some variables of the network that are necessary for later
-        optimization in self. Also provides linesplitting of network to
-        eliminate capacity constraint of lines. Then hands over actual
-        ising formulation to parent class method
-        """
-        self.num_generators = len(network.generators_t['p_max_pu'].iloc[0])
-        self.loads = {
-            idx: network.loads_t['p_set'].loc[idx].sum()
-            for idx in network.snapshots
-        }
-        self.generators_t = network.generators_t['p_max_pu']
-
-        # copy that will be modified to better suit the problem. Only
-        # self.network will be changed, the original network should 
-        # never be changed
-        self.network = network.copy()
-
-        return super().transformProblemForOptimizer(self.network)
+            self.config["BackendConfig"]["timeout"] = 3600
 
     def optimizeSampleFlow(self, sample, network, costKey):
         generatorState = [
