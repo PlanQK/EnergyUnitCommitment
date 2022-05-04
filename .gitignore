@@ -10,3 +10,9 @@ plots/*
 /build_and_run_euc.sh
 makePlots.py
 *.yaml
+*.json
+*.zip
+.ipynb_checkpoints/
+JobResponse
+!pypsa-0.19.3.zip
+!input/testService.json

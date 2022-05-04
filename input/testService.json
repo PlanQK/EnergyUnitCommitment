@@ -1,0 +1,278 @@
+{
+	"data": {
+	  "coords": {
+		"snapshots": {
+		  "dims": [
+			"snapshots"
+		  ],
+		  "attrs": {},
+		  "data": [
+			0
+		  ]
+		},
+		"investment_periods": {
+		  "dims": [
+			"investment_periods"
+		  ],
+		  "attrs": {},
+		  "data": []
+		},
+		"loads_i": {
+		  "dims": [
+			"loads_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"load1",
+			"load2"
+		  ]
+		},
+		"buses_i": {
+		  "dims": [
+			"buses_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"bus1",
+			"bus2"
+		  ]
+		},
+		"lines_i": {
+		  "dims": [
+			"lines_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"line1"
+		  ]
+		},
+		"generators_i": {
+		  "dims": [
+			"generators_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"Gen1",
+			"Gen2"
+		  ]
+		}
+	  },
+	  "attrs": {
+		"network_name": "",
+		"network_pypsa_version": "0.18.1",
+		"network_srid": 4326
+	  },
+	  "dims": {
+		"snapshots": 1,
+		"investment_periods": 0,
+		"loads_i": 2,
+		"buses_i": 2,
+		"lines_i": 1,
+		"generators_i": 2
+	  },
+	  "data_vars": {
+		"snapshots_snapshot": {
+		  "dims": [
+			"snapshots"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"now"
+		  ]
+		},
+		"snapshots_objective": {
+		  "dims": [
+			"snapshots"
+		  ],
+		  "attrs": {},
+		  "data": [
+			1
+		  ]
+		},
+		"snapshots_generators": {
+		  "dims": [
+			"snapshots"
+		  ],
+		  "attrs": {},
+		  "data": [
+			1
+		  ]
+		},
+		"snapshots_stores": {
+		  "dims": [
+			"snapshots"
+		  ],
+		  "attrs": {},
+		  "data": [
+			1
+		  ]
+		},
+		"investment_periods_objective": {
+		  "dims": [
+			"investment_periods"
+		  ],
+		  "attrs": {},
+		  "data": []
+		},
+		"investment_periods_years": {
+		  "dims": [
+			"investment_periods"
+		  ],
+		  "attrs": {},
+		  "data": []
+		},
+		"loads_bus": {
+		  "dims": [
+			"loads_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"bus1",
+			"bus2"
+		  ]
+		},
+		"loads_p_set": {
+		  "dims": [
+			"loads_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			2.0,
+			1.0
+		  ]
+		},
+		"lines_bus0": {
+		  "dims": [
+			"lines_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"bus1"
+		  ]
+		},
+		"lines_bus1": {
+		  "dims": [
+			"lines_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"bus2"
+		  ]
+		},
+		"lines_x": {
+		  "dims": [
+			"lines_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			0.0001
+		  ]
+		},
+		"lines_s_nom": {
+		  "dims": [
+			"lines_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			2.0
+		  ]
+		},
+		"generators_bus": {
+		  "dims": [
+			"generators_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			"bus1",
+			"bus2"
+		  ]
+		},
+		"generators_p_nom": {
+		  "dims": [
+			"generators_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			1.0,
+			3.0
+		  ]
+		},
+		"generators_marginal_cost": {
+		  "dims": [
+			"generators_i"
+		  ],
+		  "attrs": {},
+		  "data": [
+			5.0,
+			5.0
+		  ]
+		}
+	  }
+	},
+	"params": {
+	  "APItoken": {
+		"IBMQ_API_token": "01db0f263e0ab5ec4214ca2652330899ea195c4a737139dda145d871b8a200e2d563ee839d9031153e10a3a5e32d223e39b11b17555d400aef5ed365861407dd",
+		"dWave_API_token": ""
+	  },
+	  "Backend": "qaoa",
+	  "IsingInterface": {
+		"formulation": "binarysplit",
+		"kirchhoff": {
+		  "scaleFactor": 1.0,
+		  "kirchhoffFactor": 1.0
+		},
+		"marginalCost": {
+		  "formulation": "GlobalCostSquare",
+		  "monetaryCostFactor": 1.0,
+		  "scaleFactor": 1.0,
+		  "offsetEstimationFactor": 1.0,
+		  "estimatedCostFactor": 1.0,
+		  "offsetBuildFactor": 1.0
+		},
+		"minUpDownTime": {
+		  "minUpDownFactor": 1.0
+		}
+	  },
+	  "QaoaBackend": {
+		"shots": 20000,
+		"simulate": true,
+		"noise": true,
+		"simulator": "aer_simulator",
+		"initial_guess": [
+		  "rand",
+		  "rand",
+		  "rand",
+		  "rand"
+		],
+		"max_iter": 100,
+		"repetitions": 1,
+		"classical_optimizer": "COBYLA",
+		"qcGeneration": "Ising"
+	  },
+	  "SqaBackend": {
+		"seed": 10,
+		"transverseFieldSchedule": "",
+		"temperatureSchedule": "",
+		"trotterSlices": 10,
+		"optimizationCycles": 2
+	  },
+	  "DWaveBackend": {
+		"annealing_time": 1,
+		"num_reads": 1,
+		"chain_strength": 1,
+		"programming_thermalization": 1,
+		"readout_thermalization": 1,
+		"sampleCutSize": 1,
+		"threshold": 1.0,
+		"strategy": "LowestEnergy",
+		"postprocess": "flow",
+		"timeout": 100,
+		"sampleOrigin": ""
+	  },
+	  "PypsaBackend": {
+		"solver_name": "glpk",
+		"timeout": 100,
+		"terminationCondition": "infeasible"
+	  }
+	}
+}

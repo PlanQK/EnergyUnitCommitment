@@ -8,36 +8,6 @@ from .InputReader import InputReader
 
 class PypsaBackend(BackendBase):
 
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
-
-    def processSolution(self, network, transformedProblem, solution):
-        """
-        writes results of generator states and line values of pypsa
-        optimization to output dictionary. No further postprocessing
-        for pypsa is done
-        """
-        # value of bits corresponding to generators in network
-        self.output["results"]["genStates"] = {
-                gen[0] : value for gen,value in self.model.generator_status.get_values().items()
-        }
-        # list of indices of active generators
-        self.output["results"]["state"] = [
-                idx for idx in range(len(network.generators))
-                if self.output["results"]["genStates"][network.generators.index[idx]] == 1.0
-        ]
-        # 
-        self.output["results"]["lineValues"] = {
-                line[1] : value 
-                for line,value in self.model.passive_branch_p.get_values().items()
-        }
-
-        self.output["results"]["postprocessingTime"] = 0.0
-        return solution
-
     def transformProblemForOptimizer(self, network):
         print("transforming problem...") 
         self.network = network.copy()
@@ -48,60 +18,65 @@ class PypsaBackend(BackendBase):
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
         self.model = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                                                         solver_name=self.config["PypsaBackend"]["solver_name"])
-        self.opt.options["tmlim"] = self.config["PypsaBackend"]["timeout"]
+                                                         solver_name=self.config["BackendConfig"]["solver_name"])
+        self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
         return self.model
 
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
+        # TODO implement write from pyomo
         print("Writing from pyoyo model to network is not implemented")
 
-        if self.config["PypsaBackend"]["terminationCondition"] == "infeasible":
-            print("no feasible solution, stop writing to network")
-
-        elif self.config["PypsaBackend"]["terminationCondition"] != "infeasible":
-            
-            print(self.output["results"]["genStates"] )
-            print(self.output["results"]["lineValues"] )
-
-            totalCost = 0
-            costPerSnapshot = {snapshot : 0.0 for snapshot in self.network.snapshots}
-
-            for key, val in  self.model.generator_p.get_values().items():
-                incurredCost = self.network.generators["marginal_cost"].loc[key[0]] * val
-                totalCost += incurredCost
-                costPerSnapshot[key[1]] += incurredCost
-            self.output["results"]["totalCost"] = totalCost
-            self.output["results"]["marginalCost"] = totalCost
-            self.output["results"]["powerImbalance"] = 0.0
-            self.output["results"]["kirchhoffCost"] = 0.0
-            print(f"Total marginal cost: {self.output['results']['marginalCost']}")
+        if self.output["results"]["terminationCondition"] == "infeasible":
+            print("no feasible solution was found, stop writing to network")
+        else:
+            self.printReport()
         return
+
+
+    def writeResultToOutput(self, solverstring):
+        self.output["results"]["optimizationTime"] = solverstring.splitlines()[-1].split()[1]
+        self.output["results"]["terminationCondition"] = solverstring.splitlines()[-7].split()[2]
+        if self.output["results"]["terminationCondition"] != "infeasible":
+            # TODO get result better out of model?
+            totalCost = 0
+            totalPower = 0
+            for key, val in  self.model.generator_p.get_values().items():
+                totalCost += self.network.generators["marginal_cost"].loc[key[0]] * val
+                totalPower += self.network.generators.p_nom.loc[key[0]] * val
+            self.output["results"]["marginalCost"] = totalCost
+            self.output["results"]["totalPower"] = totalPower
+        
+            self.output["results"]["unitCommitment"] = {
+                    gen[0] : value for gen,value in self.model.generator_status.get_values().items()
+            }
+            # list of indices of active generators
+            self.output["results"]["state"] = [
+                    idx for idx in range(len(self.network.generators))
+                    if self.output["results"]["unitCommitment"][self.network.generators.index[idx]] == 1.0
+            ]
+            self.output["results"]["powerflow"] = {
+                    line[1] : value 
+                    for line,value in self.model.passive_branch_p.get_values().items()
+            }
+            # solver only allows feasible solutions 
+            self.output["results"]["kirchhoffCost"] = 0
+            self.output["results"]["powerImbalance"] = 0
+
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
 
         sol = self.opt.solve(transformedProblem)
-
-        solverstring = str(sol["Solver"])
-        solvingTime = solverstring.splitlines()[-1].split()[1]
-        terminationCondition = solverstring.splitlines()[-7].split()[2]
-        self.output["results"]["optimizationTime"] = solvingTime
-        self.config["PypsaBackend"]["terminationCondition"] = terminationCondition
-
         sol.write()
 
-        committed_gen = []
-        for key in self.model.generator_status.get_values().keys():
-            if self.model.generator_status.get_values()[key] == 1.0:
-                committed_gen.append(key[0])
-        self.output["results"]["status"] = committed_gen
+        solverstring = str(sol["Solver"])
+        self.writeResultToOutput(solverstring=solverstring)
         return self.model
 
     def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
-
-        if self.config["PypsaBackend"]["timeout"] < 0:
-            self.config["PypsaBackend"]["timeout"] = 1000
+        if self.config["BackendConfig"].get("timeout", -1) < 0:
+            self.config["BackendConfig"]["timeout"] = 3600
 
 
 class PypsaFico(PypsaBackend):

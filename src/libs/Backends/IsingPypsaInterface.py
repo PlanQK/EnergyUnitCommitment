@@ -2,6 +2,7 @@ from collections import OrderedDict
 import numpy as np
 import typing
 
+# TODO make report function
 
 def fullsplit(capacity):
     return [1]*capacity + [-1]*capacity
@@ -40,10 +41,28 @@ def customsplit(capacity):
     if capacity==3:
         return [3,-2,-1]
     if capacity==4:
-        return [3,1,-3,-1,]
+        return [2,2,-3,-1,]
     if capacity==5:
         return [4,1,-3,-2]
     raise ValueError("Capacity is too big to be decomposed")
+
+def binaryPower(number):
+    """
+    return a cut off binary represenation of the argument. It is a list of powers
+    of two + a rest such that the sum over the list is equal to the number
+    
+    Args:
+        number: (int) the integer to be decomposed
+    Returns:
+        (list) list of integer whose sum is equal to the number
+    """
+    if number < 0:
+        raise ValueError
+    if number == 0:
+        return []
+    number_of_bits = number.bit_length()
+    result = [2 ** exp for exp in range(number_of_bits - 1)]
+    return result + [number - 2 ** (number_of_bits - 1) + 1]
 
 
 class IsingBackbone:
@@ -54,11 +73,14 @@ class IsingBackbone:
     instances of IsingSubprolem, which are stored as attributes. IsingSubproblem provide a method which
     adds the ising representation of the subproblem it models to the stored ising problem in this class
     """
+    # a dict to map config strings to functions which are used to decompose the capacity
+    # of a line into qubits
     linesplitDict = {
             "fullsplit" : fullsplit,
             "binarysplit" : binarysplit,
             "customsplit" : customsplit,
     } 
+
 
     def __init__(self, network, linesplitName, configuration):
         """
@@ -87,6 +109,8 @@ class IsingBackbone:
 
         # contains ising coefficients
         self.problem = {}
+        # mirrors encodings of `self.problem`, but is reset after encoding a subproblem
+        # to get ising formulations of subproblems
         self.cachedProblem = {}
 
         # initializing data structures that encode the network into qubits
@@ -95,8 +119,9 @@ class IsingBackbone:
         self.storeGenerators()
         self.storeLines()
 
-        #read configuration dict, store in _subproblems and apply encodings
+        # read configuration dict, store in _subproblems and apply encodings
         self._subproblems = {}
+        # dicitionary of all support subproblems
         subproblemTable = {
             "kirchhoff" : KirchhoffSubproblem,
             "marginalCost" : MarginalCostSubproblem
@@ -325,10 +350,6 @@ class IsingBackbone:
             self.data[qubit] = weights[idx]
         
 
-    # TODO make functions to allow subproblems to get qubits allocated for their subproblem 
-    # and accept data on their encoding weigths. Also requires getter for accessing those qubits
-    # end making qubits
-
     # helper functions for getting encoded values
     def getData(self):
         return self.data
@@ -398,6 +419,24 @@ class IsingBackbone:
         """
         return self.data[gen]['indices'][time] in solution
 
+    def getGeneratorDictionary(self, solution):
+        """
+        builds a dictionary containing the status of all generators at all time 
+        slices for a given solution of qubit spins
+
+        @param solution: list
+           list of all qubits which have spin -1 in the solution 
+        @return: dict
+            @key: (str,int)
+                label of generator and index of time slice
+        """
+        solution = set(solution)
+        result = {}
+        for generator in self.network.generators.index:
+            for time in range(len(self.snapshots)):
+                result[str((generator, time))] = int(self.getGeneratorStatus(generator, solution, time))
+        return result
+
     def getFlowDictionary(self, solution):
         """
         builds a dictionary containing all power flows at all time slices for a given
@@ -413,7 +452,7 @@ class IsingBackbone:
         result = {}
         for lineId in self.network.lines.index:
             for time in range(len(self.snapshots)):
-                result[(lineId, time)] = self.getEncodedValueOfComponent(lineId, solution, time)
+                result[str((lineId, time))] = self.getEncodedValueOfComponent(lineId, solution, time)
         return result
 
     def getLineValues(self, solution):
@@ -525,6 +564,25 @@ class IsingBackbone:
             if self.data[component]['indices'][idx] in result:
                 value += self.data[component]['weights'][idx]
         return value
+
+    def generateReport(self, solution):
+        """
+        For the given solution, calculates various properties of the solution
+        Args:
+            solution: (list) list of all qubits that have spin -1 in a solution
+        Returns:
+            (dict) a dicitionary containing information about the solution
+        """
+        return {
+                "totalCost": self.calcCost(solution),
+                "kirchhoffCost": self.calcKirchhoffCost(solution),
+                "powerImbalance": self.calcPowerImbalance(solution),
+                "totalPower": self.calcTotalPowerGenerated(solution),
+                "marginalCost": self.calcMarginalCost(solution),
+                "individualKirchhoffCost": self.individualCostContribution(solution),
+                "unitCommitment": self.getGeneratorDictionary(solution),
+                "powerflow": self.getFlowDictionary(solution),
+        }
 
     def calcCost(self, result, isingInteractions=None):
         """
@@ -1173,14 +1231,23 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         return contrib
 
 class GlobalCostSquareWithSlack(GlobalCostSquare):
+    # a dict to map config strings to functions which are used creating lists of numbers, which
+    # can be used for weights of slack variables
+    slackRepresentationDict = {
+            "binaryPower" : binaryPower,
+    }
     def __init__(self, backbone, config):
         super().__init__(backbone, config)
+        slackWeightGenerator = self.slackRepresentationDict[config.get("slackType", "binaryPower")]
+        slackScale = config.get("slackScale",1.0)
+        slackSize = config.get("slackSize", 7)
+
+        slackWeights = [ - slackScale * i for i in slackWeightGenerator(slackSize)]
         self.backbone.createQubitEntriesForComponent(
                 "slackMarginalCost",
-                weights=[-2**i for i in range(4)],
-                encodingLength=6
+                weights=slackWeights * len(backbone.snapshots),
+                encodingLength=len(slackWeights)
         )
-        print(f"SUM:{sum([-2**i for i in range(4)])}")
 
     def encodeMarginalCosts(self, time):
         """

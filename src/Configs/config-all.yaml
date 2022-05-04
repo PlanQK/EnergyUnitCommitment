@@ -1,0 +1,120 @@
+# Please make a copy of this file and call it config.yaml. Make sure not to share it on GitHub, as you will need to
+# add sensitive information, e.g. API token.
+# Use this newly created copy to adjust all configurations.
+APItoken: # your token here
+    IBMQ_API_token: ""
+    dWave_API_token: ""
+
+# choose backend
+Backend: "sqa"
+    # (string) the backend algorithm to be used. options are:
+    # "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
+    # "pypsa-glpk", "pypsa-fico", "qaoa"
+    #
+IsingInterface:
+    formulation: "customsplit"
+        # (string) name of the function to split lines
+        # choose between binarysplit, fullsplit, customsplit
+#    kirchhoff:
+#        # Adding Kirchhoff subproblem to QUBO
+#        scaleFactor: 1.0
+#        # (float) weight of the kirchhoff subproblem in the QUBO
+    marginalCost:
+#        # Adding Marginal cost optimization in the QUBO
+        formulation: "GlobalCostSquareWithSlack"
+        slackType: "binaryPower"
+        slackScale: 0.1
+        slackSize: 12
+#            # (string) name of the method how to encode the marginal cost optimization
+#            # choose between GlobalCostSquare, GlobalCostSquareWithSlack, MarginalAsPenalty, LocalMarginalEstimationDistance
+        scaleFactor: 1.0
+#            # (float) weight of the marginal cost optimization in the QUBO
+        offsetEstimationFactor: 1.225
+        offsetEstimationFactor: 1.22
+#            # (float)
+        estimatedCostFactor: 1.0
+#            # (float)
+        offsetBuildFactor: 1.0
+#            # (float)
+        slackRange: 7
+            # (int)
+#
+#    minUpDownTime:
+#        minUpDownFactor: 1.0
+#
+
+QaoaBackend:
+    shots: 500
+        # (int) the number of shots
+        # max 20,000
+    simulate: True
+        # (boolean) use a simulator or a QPU
+        # if True: use simulator;
+        # if False: use real IBMQ QPU (IBMQ API token required)
+    noise: False
+        # (boolean) simulate with or without noise (only used, when simulate is True)
+        # if True: use simulator with noise model (IBMQ API token required);
+        # if False: use simulator without noise model
+    simulator: "aer_simulator"
+        # (string) the qiskit simulator to be used (only used, when simulate is True)
+        # choose between "qasm_simulator", "aer_simulator", "statevector_simulator" and "aer_simulator_statevector"
+    initial_guess: ["rand", "rand"]
+        # (list of float or "rand") the initial guess for the classical optimizer
+        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
+        # use "rand" if a random initial guess should be used for this parameter. For beta between 0 and 2Pi and for
+        # gamma between 0 and Pi
+    max_iter: 10
+        # (int) maximum number iterations of the classical optimizer
+    repetitions: 10
+        # (int) number of experiment repetitions
+    classical_optimizer: "COBYLA"
+        # (string) the classical optimizer to be used
+        # choose between "SPSA", "COBYLA" and "ADAM"
+    qcGeneration: "IterationMatrix"
+        # (string) the method for the generation of the quantum circuit
+        # choose between "Ising", "Iteration" and "IterationMatrix"
+
+SqaBackend:
+    # seed: 10
+        # (int)
+    transverseFieldSchedule: "[8.0,0.0]"
+        # (string)
+    temperatureSchedule: "[0.1,iF,0.0001]"
+        # (string)
+    trotterSlices: 300
+        # (int)
+    optimizationCycles: 200
+        # (int)
+
+DWaveBackend:
+    annealing_time: 1
+        # (int)
+    num_reads: 1
+        # (int)
+    chain_strength: 1
+        # (int)
+    programming_thermalization: 1
+        # (int)
+    readout_thermalization: 1
+        # (int)
+    sampleCutSize: 1
+        # (int)
+    strategy: "LowestEnergy"
+        # (string)
+        # choose between "LowestEnergy", "MajorityVote", "PercentageVote" and "ClosestSample"
+    postprocess: "flow"
+        # (string)
+    timeout: 100
+        # (int)
+    sampleOrigin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+        # (string) where the sample comes from
+        # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
+
+PypsaBackend:
+    solver_name: "glpk"
+        # (string)
+    timeout: 10
+        # (int)
+        
+BackendConfig:
+    #

@@ -1,5 +1,8 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
+#DOCKERFILE = PlanQK_Dockerfile
+DOCKERFILE = Dockerfile
+DOCKERTAG = energy:1.0
 REPETITIONS := 1
 
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
@@ -21,9 +24,8 @@ CONFIGFILES = "config.yaml"
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "nocostinput_15_[0]_[2][0].nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[9]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 # SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
@@ -35,11 +37,11 @@ TRANSVERSE_HIGH = ""
 TRANSVERSE_HIGH_VAL = $(shell seq 8.0 1.0 8)
 OPTIMIZATIONCYCLES = "optimizationCycles"
 OPTIMIZATIONCYCLES_VAL = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES_VAL = 1000
-#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915 35938 100000
+OPTIMIZATIONCYCLES_VAL = 100
+#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915
 TROTTERSLICES = "trotterSlices"
 TROTTERSLICES_VAL = $(shell seq 10 10 100)
-TROTTERSLICES_VAL = 2000
+TROTTERSLICES_VAL = 500
 
 ### classical parameters. reuses OPTIMIZATIONCYCLES
 CLASSICAL_HIGH_TEMP = ""
@@ -59,47 +61,36 @@ CHAINSTRENGTH_VAL = 60
 SAMPLECUTSIZE = "sampleCutSize"
 SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
 
-### Ising Model Parameters. Determines how lines are represented. Used for any solver that uses a QUBO (sqa, dwave annealer)
-PROBLEMFORMULATION = "formulation"
-PROBLEMFORMULATION_VAL = binarysplitNoMarginalCost
-#PROBLEMFORMULATION_VAL = fullsplitGlobalCostSquare
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenaltyAverageOffset
-#PROBLEMFORMULATION_VAL = fullsplitNoMarginalCost
-#PROBLEMFORMULATION_VAL = fullsplitLocalMarginalEstimationDistance
-#PROBLEMFORMULATION_VAL = fullsplitDirectInefficiencyPenalty
-#PROBLEMFORMULATION_VAL = fullsplitMarginalAsPenalty fullsplitLocalMarginalEstimationDistance fullsplitGlobalCostSquare
+## Ising Model Parameters. Determines how network, constraints, and optimization goals are encoded
+# Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
+# TODO: add comments for options that exist
+
+# network representation:
+# 	line encoding
+# constraints:
+# 	kirchhoff
+# 	minUpDownTime
+# optimization goals
+# 	marginalCost
+
 
 MONETARYCOSTFACTOR = "monetaryCostFactor"
-MONETARYCOSTFACTOR_VAL = 0.02 0.015 0.025
-#MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
+MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
 
 # only relevant for problem formulation using an estimation-of-marginal-costs ansatz
 OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
-#OFFSETESTIMATIONFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
-# 10.0
-#OFFSETESTIMATIONFACTOR_VAL = 1.32
-OFFSETESTIMATIONFACTOR_VAL = 1.3805 1.3800 1.3802
-#OFFSETESTIMATIONFACTOR_VAL = 1.210
-# 10.1
-#OFFSETESTIMATIONFACTOR_VAL = 1.349
-# 60.0 by 0.16
-#OFFSETESTIMATIONFACTOR_VAL = 1.3203
-#OFFSETESTIMATIONFACTOR_VAL = 1.4268
-#OFFSETESTIMATIONFACTOR_VAL = 1.0 1.1 1.2 1.3 1.4
+OFFSETESTIMATIONFACTOR_VAL = 1.1 1.2 1.3
 
 ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
 ESTIMATEDCOSTFACTOR_VAL = 1.0
-#ESTIMATEDCOSTFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 
 OFFSETBUILDFACTOR = "offsetBuildFactor"
-#OFFSETBUILDFACTOR_VAL = 0.95 0.97 1.0 1.03 1.05
 OFFSETBUILDFACTOR_VAL = 1.0
 
-SCALEFACTOR = "IsingInterface-kirchhoff-scaleFactor"
+SCALEFACTOR = "scaleFactor"
 SCALEFACTOR_VAL = 2.0
 
-KIRCHFACTOR = "IsingInterface-kirchhoff-kirchhoffFactor"
+KIRCHFACTOR = "kirchhoffFactor"
 KIRCHFACTOR_VAL = 1.5
 
 ### glpk parameter
@@ -115,15 +106,15 @@ ANOTHER_TEST_PARAM_VAL = 1.0 1.1 # parameter2 values
 # create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
 EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
 				$(foreach value2, $(ANOTHER_TEST_PARAM_VAL), \
-				${TEST_PARAM}--${value1}_${ANOTHER_TEST_PARAM}--${value2}))
+				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
 
 ### extra parameter generation
 EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 				$(foreach value2, $(KIRCHFACTOR_VAL), \
-				${SCALEFACTOR}--${value1}_${KIRCHFACTOR}--${value2}))
-#EXTRAPARAM = ''
+				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
 
-
+#BACKEND = sqa
+#EXTRAPARAM = Backend-$(strip $(BACKEND))
 
 ###### result files of computations ######
 
@@ -165,7 +156,7 @@ QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 define classicalParameterSweep
 results_classical_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_classical_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_classical* results_classical_sweep/
 
@@ -181,7 +172,7 @@ $(foreach filename, $(SWEEPFILES), \
 define sqaParameterSweep
 results_sqa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_sqa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_sqa* results_sqa_sweep/
 
@@ -197,7 +188,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuParameterSweep
 results_qpu_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qpu_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-qpu* results_qpu_sweep/
 
@@ -213,7 +204,8 @@ $(foreach filename, $(SWEEPFILES), \
 define qpuReadSweep
 results_qpu_read_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu \
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qpu_read_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* results_qpu_read_sweep/
 
@@ -229,7 +221,7 @@ $(foreach filename, $(SWEEPFILES), \
 define pypsa-glpk
 results_pypsa_glpk_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_pypsa_glpk_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_pypsa-glpk* results_pypsa_glpk_sweep/
 
@@ -245,7 +237,7 @@ $(foreach filename, $(SWEEPFILES), \
 define qaoa
 results_qaoa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	energy:1.0 $(strip $(2)) $(strip $(1)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p results_qaoa_sweep
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_qaoa* results_qaoa_sweep/
 
@@ -262,8 +254,8 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-docker.tmp: Dockerfile src/run.py requirements.txt src/program.py
-	$(DOCKERCOMMAND) build -t energy:1.0 . && touch docker.tmp
+docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py
+	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch docker.tmp
 
 
 # all plots are generated using the python plot_results script

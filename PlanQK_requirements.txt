@@ -1,0 +1,9 @@
+./pypsa-0.19.3.zip
+dwave-ocean-sdk
+xarray
+netcdf4
+networkx
+qiskit
+pylatexenc
+PyYAML
+loguru

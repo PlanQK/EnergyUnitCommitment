@@ -7,13 +7,13 @@ import pypsa
 import os.path
 
 from numpy import random
-
-from .IsingPypsaInterface import IsingBackbone                      # import for Docker run
-from .BackendBase import BackendBase                                # import for Docker run
+try:
+    from .IsingPypsaInterface import IsingBackbone              # import for Docker run
+    from .BackendBase import BackendBase                        # import for Docker run
+except ImportError:
+    from IsingPypsaInterface import IsingBackbone               # import for local/debug run
+    from BackendBase import BackendBase                         # import for local/debug run
 from .InputReader import InputReader
-#from IsingPypsaInterface import IsingBackbone                      # import for local/debug run
-#from BackendBase import BackendBase                                # import for local/debug run
-#from EnvironmentVariableManager import EnvironmentVariableManager  # import for local/debug run
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
@@ -217,12 +217,6 @@ class QaoaQiskit(BackendBase):
                 minX = searchData[i]["optimizeResults"]["x"]
 
         return minX
-
-    def validateInput(self, path, network):
-        pass
-
-    def handleOptimizationStop(self, path, network):
-        pass
 
     def scaleHamiltonian(self, hamiltonian: list) -> list:
         """
