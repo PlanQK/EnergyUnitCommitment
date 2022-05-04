@@ -278,116 +278,90 @@ class DwaveCloudDirectQPU(DwaveCloud):
         if self.config["BackendConfig"]["timeout"] < 0:
             self.config["BackendConfig"]["timeout"] = 3600
 
-    def optimizeSampleFlow(self, sample, network, costKey):
+    def optimizeSampleFlow(self, sample, costKey):
         generatorState = [
             id for id, value in sample.items() if value == -1
         ]
         graph = self.buildFlowproblem(
-            network,
             generatorState
         )
         return self.solveFlowproblem(
             graph,
-            network,
             generatorState,
             costKey=costKey
         )
 
-    def processSolution(self, network, transformedProblem, solution, sample=None):
-        resultDict = super().processSolution(
-            network,
-            transformedProblem,
-            solution,
-        )
-
-        lowestEnergySample = solution.first.sample
-        lowestEnergyState = [
-            id for id, value in lowestEnergySample.items() if value == -1
-        ]
-        self.output["results"]["LowestEnergy"] = transformedProblem.calcCost(lowestEnergyState)
-
-        _, lineValuesLowestEnergyFlowSample = self.optimizeSampleFlow(
-            lowestEnergySample,
-            network,
-            costKey="LowestFlow"
-        )
-
-        closestSample = self.choose_sample(
-                                    transformedProblem,
-                                    solution,
-                                    strategy="ClosestSample"
-                                    )
-        _, lineValuesClosestSample = self.optimizeSampleFlow(
-            closestSample,
-            network,
-            costKey="ClosestFlow"
-        )
-
-        # choose best self.config["BackendConfig"]["sampleCutSize"] Samples and optimize Flow
-        df = solution.to_pandas_dataframe()
-        cutSamples = df.sort_values("energy", ascending=True).iloc[:self.config["BackendConfig"]["sampleCutSize"]]
-        cutSamples['quantumCost'] = cutSamples.apply(
+    def processSamples(self, transformedProblem, sampleset):
+        processedSamples_df = sampleset.to_pandas_dataframe()
+        processedSamples_df['quantumCost'] = processedSamples_df.apply(
             lambda row: transformedProblem.calcCost(
                     [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
         )
-
-
-        self.time = 0.0
-        cutSamples['optimizedCost'] = cutSamples.apply(
+        processedSamples_df['optimizedCost'] = processedSamples_df.apply(
             lambda row: self.optimizeSampleFlow(
                 row[:-3],
-                self.network,
                 costKey=None,
             )[0],
             axis=1
         )
-        self.output["results"]["postprocessingTime"] = self.time
-
-        cutSamples['marginalCost'] = cutSamples.apply(
+        processedSamples_df['marginalCost'] = processedSamples_df.apply(
             lambda row: transformedProblem.calcMarginalCost(
                     [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
         )
-
-
-        self.output["results"]["cutSamples"] = cutSamples[[
-                                                    "energy",
-                                                    "quantumCost",
-                                                    "optimizedCost",
-                                                    'marginalCost'
-                                                    ]].to_dict('index')
-        self.output["results"]["cutSamplesCost"] = cutSamples['optimizedCost'].min()
-
-        chosenSample = self.choose_sample(
-                transformedProblem,
-                solution,
-                strategy=self.config["BackendConfig"]["strategy"]
-                )
-        print(chosenSample)
-        self.output["results"]["marginalCost"] = transformedProblem.calcMarginalCost(
-            [id for id, value in chosenSample.items() if value == -1]
+        processedSamples_df['totalPower'] = processedSamples_df.apply(
+            lambda row: transformedProblem.calcTotalPowerGenerated(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
         )
-        self.time = 0.0
-        self.optimizeSampleFlow(
-            chosenSample,
-            self.network,
-            costKey="optimizedStrategySample"
+        totalLoad = 0.0
+        for idx, _ in enumerate(self.network.snapshots):
+            totalLoad += transformedProblem.getTotalLoad(idx)
+        processedSamples_df['deviation_from_opt_load'] = processedSamples_df.apply(
+                lambda row: abs(
+                                totalLoad - \
+                                transformedProblem.calcTotalPowerGenerated(
+                                        [id for id, value in row.items() if value == -1])
+                                ),
+                axis=1
         )
+        return processedSamples_df[["energy",
+                                    "quantumCost",
+                                    "optimizedCost",
+                                    "marginalCost",
+                                    "totalPower",
+                                    "deviation_from_opt_load"
+                                    ]]
 
-        print(f'cutSamplesCost with {self.config["BackendConfig"]["sampleCutSize"]} samples: {self.output["results"]["cutSamplesCost"]}')
 
-        if self.config["BackendConfig"]["postprocess"] == "flow":
-            if self.config["BackendConfig"]["strategy"] == "LowestEnergy":
-                resultDict['lineValues'] = lineValuesLowestEnergyFlowSample
-            elif self.config["BackendConfig"]["strategy"] == "ClosestSample":
-                resultDict['lineValues'] = lineValuesClosestSample
-
+    def processSolution(self, network, transformedProblem, solution, sample=None):
+        tic = time.perf_counter()
+        resultDict = super().processSolution(
+            network,
+            transformedProblem,
+            solution,
+        )
+        processedSamples_df = self.processSamples(transformedProblem, solution)
+        lowestEnergyIndex = processedSamples_df["energy"].idxmin()
+        self.output["results"]["LowestEnergy"] = processedSamples_df.iloc[lowestEnergyIndex]["quantumCost"]
+        closestSamples = processedSamples_df[
+                processedSamples_df['deviation_from_opt_load'] == \
+                processedSamples_df['deviation_from_opt_load'].min()
+                ]
+        closestTotalPowerIndex = closestSamples['energy'].idxmin()
+        self.output["samples_df"] = processedSamples_df.to_dict('index')
+        self.output["results"]["lowestEnergy"] = processedSamples_df.iloc[lowestEnergyIndex]["quantumCost"]
+        self.output["results"]["lowestEnergyProcessedFlow"] = processedSamples_df.iloc[lowestEnergyIndex]["optimizedCost"]
+        self.output["results"]["closestPowerProcessedFlow"] = processedSamples_df.iloc[closestTotalPowerIndex]["optimizedCost"]
+        self.output["results"]["bestProcessedFlow"] = processedSamples_df["optimizedCost"].min()
+        self.output["results"]["postprocessingTime"] = time.perf_counter() - tic
         return resultDict
 
-    def solveFlowproblem(self, graph, network, generatorState, costKey="totalCostFlow"):
+    def solveFlowproblem(self, graph, generatorState, costKey="totalCostFlow"):
         """
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor of 1 
@@ -407,7 +381,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # key errors occur iff there is no power generated or no load at a bus.
         # Power can still flow through the bus, but no cost is incurred
         totalCost = 0
-        for bus in network.buses.index:
+        for bus in self.network.buses.index:
             try:
                 totalCost += (FlowSolution['superSource'][bus]['capacity'] - \
                               FlowSolution['superSource'][bus]['flow']) ** 2
@@ -422,15 +396,15 @@ class DwaveCloudDirectQPU(DwaveCloud):
         if costKey is None:
             return totalCost, None
 
-        print(f"TOTAL COST AFTER FLOW OPT {costKey}: {totalCost}")
+        print(f"total cost after flow opt {costKey}: {totalCost}")
         self.output["results"][costKey] = totalCost
 
         lineValues = {}
         # TODO split flow on two lines if we have more flow than capacity
         # we had lines a->b and b->a which were merged in previous step
-        for line in network.lines.index:
-            bus0 = network.lines.loc[line].bus0
-            bus1 = network.lines.loc[line].bus1
+        for line in self.network.lines.index:
+            bus0 = self.network.lines.loc[line].bus0
+            bus1 = self.network.lines.loc[line].bus1
             try:
                 newValue = FlowSolution[bus0][bus1]['flow']
             except KeyError:
@@ -444,26 +418,26 @@ class DwaveCloudDirectQPU(DwaveCloud):
     # quantum computation struggles with finetuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
     # archieved in polynomial time
-    def buildFlowproblem(self, network, generatorState, lineValues=None, ):
+    def buildFlowproblem(self, generatorState, lineValues=None, ):
         """
-        build a networkx model to further optimise power flow. If using a warmstart,
+        build a self.networkx model to further optimise power flow. If using a warmstart,
         it uses the solution of the quantum computer encoded in generatorState to
-        initialize a residual network. If the intial solution is good, a warmstart
+        initialize a residual self.network. If the intial solution is good, a warmstart
         can speed up flow optimization by about 30%, but if it was bad, a warmstart
         makes it slower. warmstart is used if lineValues is not None
         """
 
-        # turn pypsa network in nx.DiGraph. Power generation and consumption
+        # turn pypsa self.network in nx.DiGraph. Power generation and consumption
         # is modeled by adjusting capacity of the edge to a super source/super sink 
         graph = nx.DiGraph()
-        graph.add_nodes_from(network.buses.index)
+        graph.add_nodes_from(self.network.buses.index)
         graph.add_nodes_from(["superSource", "superSink"])
 
-        for line in network.lines.index:
-            bus0 = network.lines.loc[line].bus0
-            bus1 = network.lines.loc[line].bus1
-            cap = network.lines.loc[line].s_nom
-            # if network has multiple lines between buses, make sure not to 
+        for line in self.network.lines.index:
+            bus0 = self.network.lines.loc[line].bus0
+            bus1 = self.network.lines.loc[line].bus1
+            cap = self.network.lines.loc[line].s_nom
+            # if self.network has multiple lines between buses, make sure not to 
             # erase the capacity of previous lines
             if graph.has_edge(bus0, bus1):
                 graph[bus0][bus1]['capacity'] += cap
@@ -472,25 +446,25 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 graph.add_edges_from([(bus0, bus1, {'capacity': cap}),
                                       (bus1, bus0, {'capacity': cap})])
 
-        for bus in network.buses.index:
+        for bus in self.network.buses.index:
             graph.add_edge(
                 "superSource",
                 bus,
                 capacity=self.isingBackbone.calcTotalPowerGeneratedAtBus(bus, generatorState)
             )
-        for load in network.loads.index:
+        for load in self.network.loads.index:
             graph.add_edge(
-                network.loads.loc[load].bus,
+                self.network.loads.loc[load].bus,
                 "superSink",
-                capacity=network.loads_t['p_set'].iloc[0][load],
+                capacity=self.network.loads_t['p_set'].iloc[0][load],
             )
         # done building nx.DiGrpah
 
         if lineValues is not None:
-            # generate flow for network lines
-            for line in network.lines.index:
-                bus0 = network.lines.loc[line].bus0
-                bus1 = network.lines.loc[line].bus1
+            # generate flow for self.network lines
+            for line in self.network.lines.index:
+                bus0 = self.network.lines.loc[line].bus0
+                bus1 = self.network.lines.loc[line].bus1
                 if hasattr(graph[bus1][bus0], 'flow'):
                     graph[bus1][bus0]['flow'] -= lineValues[(line, 0)]
                 else:
@@ -501,14 +475,14 @@ class DwaveCloudDirectQPU(DwaveCloud):
             # demand/power generated after subtraction power flow at that bus
             # might be wrong if kirchhoff constraint was violated in quantum
             # solution
-            for bus in network.buses.index:
+            for bus in self.network.buses.index:
                 generatedPower = self.isingBackbone.calcTotalPowerGeneratedAtBus(bus, generatorState)
-                loadName = network.loads.index[network.loads.bus == bus][0]
-                load = network.loads_t['p_set'].iloc[0][loadName]
+                loadName = self.network.loads.index[self.network.loads.bus == bus][0]
+                load = self.network.loads_t['p_set'].iloc[0][loadName]
                 netFlowThroughBus = 0
-                for line in network.lines.index[network.lines.bus0 == bus]:
+                for line in self.network.lines.index[self.network.lines.bus0 == bus]:
                     netFlowThroughBus += lineValues[(line, 0)]
-                for line in network.lines.index[network.lines.bus1 == bus]:
+                for line in self.network.lines.index[self.network.lines.bus1 == bus]:
                     netFlowThroughBus -= lineValues[(line, 0)]
                 netPower = generatedPower \
                            - load \
@@ -564,7 +538,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
             self.inputData['cutSamples'] = {}
         return dimod.SampleSet.from_serializable(self.inputData["serial"])
 
-    def optimizeSampleFlow(self, sample, network, costKey):
+    def optimizeSampleFlow(self, sample, costKey):
         if costKey is None:
             try:
                 previousResults = self.inputData["cutSamples"]
@@ -572,12 +546,4 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
                 return thisResult, None
             except (KeyError, AttributeError):
                 pass
-        return super().optimizeSampleFlow(sample, network, costKey)
-
-    def processSolution(self, network, transformedProblem, solution, sample=None):
-        result = super().processSolution(network, transformedProblem, solution, sample)
-        if len(self.inputData["cutSamples"]) < len(self.output["results"]["cutSamples"]):
-            with open(self.inputFilePath, "w") as overwriteFile:
-                json.dump(self.getResults(), overwriteFile, indent=2)
-            print("adding more flow optimizations to qpu result file")
-        return result
+        return super().optimizeSampleFlow(sample, costKey)
