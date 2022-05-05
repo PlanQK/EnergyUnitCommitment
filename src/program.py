@@ -1,7 +1,9 @@
 """This file is the entrypoint for the docker run command.
 The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+
+import pypsa
 from loguru import logger
 
 
@@ -32,8 +34,8 @@ ganBackends = {
 
 
 def run(
-    data: Optional[Dict[str, Any]] = None,
-    params: Optional[Dict[str, Any]] = None,
+    data: Union[pypsa.Network, str] = None,
+    params: Union[dict, str] = None,
     extraParams: list = [],
 ) -> Response:
 

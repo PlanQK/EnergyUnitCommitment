@@ -1,5 +1,7 @@
 import abc
 
+import pypsa
+
 from .InputReader import InputReader
 from datetime import datetime
 
@@ -13,14 +15,14 @@ class BackendBase(abc.ABC):
         self.setupOutputDict()
 
     @abc.abstractmethod
-    def transformProblemForOptimizer(self, network):
+    def transformProblemForOptimizer(self):  # -> transformedProblem
         pass
 
     @abc.abstractstaticmethod
-    def transformSolutionToNetwork(network, transformedProblem, solution):
+    def transformSolutionToNetwork(transformedProblem, solution) -> pypsa.Network:
         pass
 
-    def processSolution(self, network, transformedProblem, solution):
+    def processSolution(self, transformedProblem, solution) -> dict:
         self.output["results"]["postprocessingTime"] = 0.0
         return solution
 

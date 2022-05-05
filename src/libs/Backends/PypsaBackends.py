@@ -8,9 +8,9 @@ from .InputReader import InputReader
 
 class PypsaBackend(BackendBase):
 
-    def transformProblemForOptimizer(self, network):
+    def transformProblemForOptimizer(self):
         print("transforming problem...") 
-        self.network = network.copy()
+        # self.network = network.copy() TODO: maybe deepcopy before setting things in network.
         self.network.generators.committable = True
         self.network.generators.p_nom_extendable = False
 
@@ -22,7 +22,7 @@ class PypsaBackend(BackendBase):
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
         return self.model
 
-    def transformSolutionToNetwork(self, network, transformedProblem, solution):
+    def transformSolutionToNetwork(self, transformedProblem, solution):
         # TODO implement write from pyomo
         print("Writing from pyoyo model to network is not implemented")
 
@@ -30,8 +30,7 @@ class PypsaBackend(BackendBase):
             print("no feasible solution was found, stop writing to network")
         else:
             self.printReport()
-        return
-
+        return self.network
 
     def writeResultToOutput(self, solverstring):
         self.output["results"]["optimizationTime"] = solverstring.splitlines()[-1].split()[1]

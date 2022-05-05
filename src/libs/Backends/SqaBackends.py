@@ -23,19 +23,18 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
 
 
-    def transformProblemForOptimizer(self, network):
+    def transformProblemForOptimizer(self):
         print("transforming problem...")
         return IsingBackbone.buildIsingProblem(
-                network,
-                config=self.config["IsingInterface"]
+                network=self.network, config=self.config["IsingInterface"]
                 )
 
-    def transformSolutionToNetwork(self, network, transformedProblem, solution):
+    def transformSolutionToNetwork(self, transformedProblem, solution):
         self.printReport()
         # transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
         # )
-        return network
+        return self.network
 
     def optimize(self, transformedProblem):
         print("starting optimization...")

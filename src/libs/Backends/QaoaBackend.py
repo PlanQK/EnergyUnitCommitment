@@ -87,13 +87,10 @@ class QaoaQiskit(BackendBase):
         """
         self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
 
-    def transformProblemForOptimizer(self, network: pypsa.Network) -> IsingBackbone:
+    def transformProblemForOptimizer(self) -> IsingBackbone:
         """
         Initializes an IsingInterface-instance, which encodes the Ising Spin Glass Problem, using the network to be
         optimized.
-
-        Args:
-            network: (pypsa.Network) The network to be optimized.
 
         Returns:
             (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
@@ -106,27 +103,25 @@ class QaoaQiskit(BackendBase):
         return self.isingInterface
 
     def transformSolutionToNetwork(
-            self, network: pypsa.Network, transformedProblem: IsingBackbone, solution: dict
+            self, transformedProblem: IsingBackbone, solution: dict
     ) -> pypsa.Network:
         """
         Encodes the optimal solution found during optimization into a pypsa.Network.
 
         Args:
-            network: (pypsa.Network) The network to be optimized.
             transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
             solution: (dict) The optimal solution to the problem.
 
         Returns:
             (pypsa.Network) The optimized network.
         """
-        return network
+        return self.network
 
-    def processSolution(self, network, transformedProblem, solution):
+    def processSolution(self, transformedProblem, solution):
         """
         Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
 
         Args:
-            network: (pypsa.Network) The network to be optimized.
             transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
             solution: (dict) The optimal solution to the problem.
 
