@@ -1,7 +1,9 @@
 """This file is the entrypoint for the docker run command.
 The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+
+import pypsa
 from loguru import logger
 
 
@@ -18,22 +20,24 @@ except ImportError:
 
 # TODO elimate ${solver}Backend strings
 ganBackends = {
-    "classical": [Backends.ClassicalBackend, "SqaBackend"],
-    "sqa": [Backends.SqaBackend, "SqaBackend"],
-    "dwave-tabu": [Backends.DwaveTabuSampler, "DwaveBackend"],
-    "dwave-greedy": [Backends.DwaveSteepestDescent, "DwaveBackend"],
-    "pypsa-glpk": [Backends.PypsaGlpk, "PypsaBackend"],
-    "pypsa-fico": [Backends.PypsaFico, "PypsaBackend"],
-    "dwave-hybrid": [Backends.DwaveCloudHybrid, "DwaveBackend"],
-    "dwave-qpu": [Backends.DwaveCloudDirectQPU, "DwaveBackend"],
-    "dwave-read-qpu": [Backends.DwaveReadQPU, "DwaveBackend"],
-    "qaoa": [Backends.QaoaQiskit, "QaoaBackend"]
+    "classical": Backends.ClassicalBackend,
+    "sqa": Backends.SqaBackend,
+    "dwave-tabu": Backends.DwaveTabuSampler,
+    "dwave-greedy": Backends.DwaveSteepestDescent,
+    "pypsa-glpk": Backends.PypsaGlpk,
+    "pypsa-fico": Backends.PypsaFico,
+    "dwave-hybrid": Backends.DwaveCloudHybrid,
+    "dwave-qpu": Backends.DwaveCloudDirectQPU,
+    "dwave-read-qpu": Backends.DwaveReadQPU,
+    "qaoa": Backends.QaoaQiskit,
 }
 
 
-def run(data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        extraParams: list = []) -> Response:
+def run(
+    data: Union[pypsa.Network, str] = None,
+    params: Union[dict, str] = None,
+    extraParams: list = [],
+) -> Response:
 
     response: Response
     try:
@@ -42,22 +46,18 @@ def run(data: Optional[Dict[str, Any]] = None,
         network = inputReader.getNetwork()
 
         # set up optimizer with input data
-        OptimizerClass = ganBackends[inputReader.config["Backend"]][0]
+        OptimizerClass = ganBackends[inputReader.config["Backend"]]
         optimizer = OptimizerClass(reader=inputReader)
 
         # run optimization
-        transformedProblem = optimizer.transformProblemForOptimizer(network)
+        transformedProblem = optimizer.transformProblemForOptimizer()
         solution = optimizer.optimize(transformedProblem)
 
         # hook for potential post processing like flow optimization for dwave solutions
-        processedSolution = optimizer.processSolution(
-            network, transformedProblem, solution
-        )
+        processedSolution = optimizer.processSolution(transformedProblem, solution)
         # return results
         # TODO: implement saving solution in Network and store in output dict.
-        outputNetwork = optimizer.transformSolutionToNetwork(
-            network, transformedProblem, processedSolution
-        )
+        outputNetwork = optimizer.transformSolutionToNetwork(transformedProblem, processedSolution)
         output = optimizer.getOutput()
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)

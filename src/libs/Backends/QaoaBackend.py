@@ -1,23 +1,23 @@
 import copy
-import json, yaml
 import math
+from typing import Tuple
 
 import numpy as np
 import pypsa
-import os.path
+import qiskit
 
-from numpy import random
 try:
-    from .IsingPypsaInterface import IsingBackbone              # import for Docker run
-    from .BackendBase import BackendBase                        # import for Docker run
+    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
+    from .BackendBase import BackendBase  # import for Docker run
 except ImportError:
-    from IsingPypsaInterface import IsingBackbone               # import for local/debug run
-    from BackendBase import BackendBase                         # import for local/debug run
+    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
+    from BackendBase import BackendBase  # import for local/debug run
 from .InputReader import InputReader
 from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers import BaseBackend
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
@@ -27,74 +27,157 @@ from qiskit.circuit import Parameter, ParameterVector
 class QaoaQiskit(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader)
-        self.output["results"] = {"backend": None,
-                                  "qubit_map": {},
-                                  "hamiltonian": {},
-                                  "qc": None,
-                                  "initial_guesses": {"original": self.config["QaoaBackend"]["initial_guess"],
-                                                      "refined": []},
-                                  "kirchhoff": {},
-                                  "repetitions": {}}
-        self.isingInterface = IsingBackbone.buildIsingProblem(network=self.network, config=self.config["IsingInterface"])
+
+        # copy relevant config to make code more readable
+        self.config_qaoa = self.config["QaoaBackend"]
+        self.addResultsDict()
+
+        # initiate local parameters
         self.iterationCounter = None
-        self.totalRepetition = None
-        self.qcParam = None
+        self.iter_result = {}
+        self.rep_result = {}
+        self.qc = None
         self.paramVector = None
 
-        self.kirchhoff = {}
-        self.components = {}
-
-        self.docker = os.environ.get("RUNNING_IN_DOCKER", False)
-        if self.config["QaoaBackend"]["noise"] or (not self.config["QaoaBackend"]["simulate"]):
+        # set up connection to IBMQ servers
+        if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
             IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
-    def prepareRepetitionDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition] = {"initial_guess": [],
-                                                                       "iterations": {},
-                                                                       "duration": None,
-                                                                       "optimizeResults": {}}
+    def addResultsDict(self) -> None:
+        """
+        Adds the basic structure for the self.output["results"]-dictionary.
 
-    def prepareIterationDict(self):
-        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] = \
-            {"theta": [],
-             "counts": {},
-             "bitstrings": {},
-             "return": None}
+        Returns:
+            (None) Modifies the self.output["results"]-dictionary.
+        """
+        self.output["results"] = {
+            "backend": None,
+            "qubit_map": {},
+            "hamiltonian": {},
+            "qc": None,
+            "initial_guesses": {
+                "original": self.config_qaoa["initial_guess"],
+                "refined": [],
+            },
+            "kirchhoff": {},
+            "repetitions": {},
+        }
 
-    def transformProblemForOptimizer(self, network):
-        self.output["results"]["qubit_map"] = self.isingInterface.getQubitMapping()
+    def prepareRepetitionDict(self) -> None:
+        """
+        Initializes the basic structure for the self.rep_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
 
-        return self.isingInterface
+        Returns:
+            (None) Modifies the self.rep_result-dictionary.
+        """
+        self.rep_result = {
+            "initial_guess": [],
+            "iterations": {},
+            "duration": None,
+            "optimizeResults": {},
+        }
 
-    def transformSolutionToNetwork(self, network, transformedProblem, solution):
-        return network
+    def prepareIterationDict(self) -> None:
+        """
+        Initializes the basic structure for the self.iter_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
 
-    def processSolution(self, network, transformedProblem, solution):
-        solution["components"] = self.isingInterface.getData()
-        return solution
+        Returns:
+            (None) Modifies the self.iter_result-dictionary.
+        """
+        self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
+
+    def transformProblemForOptimizer(self) -> IsingBackbone:
+        """
+        Initializes an IsingInterface-instance, which encodes the Ising Spin Glass Problem, using the network to be
+        optimized.
+
+        Returns:
+            (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+        """
+        self.transformedProblem = IsingBackbone.buildIsingProblem(
+            network=self.network, config=self.config["IsingInterface"]
+        )
+        self.output["results"]["qubit_map"] = self.transformedProblem.getQubitMapping()
+
+        return self.transformedProblem
+
+    def transformSolutionToNetwork(
+            self, transformedProblem: IsingBackbone, solution: dict
+    ) -> pypsa.Network:
+        """
+        Encodes the optimal solution found during optimization into a pypsa.Network.
+
+        Args:
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+            solution: (dict) The optimal solution to the problem.
+
+        Returns:
+            (pypsa.Network) The optimized network.
+        """
+        self.printReport()
+        return self.network
+
+    def processSolution(self, transformedProblem, solution) -> dict:
+        """
+        Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
+
+        Args:
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+            solution: (dict) The optimal solution to the problem.
+
+        Returns:
+            (dict) The post-processed solution.
+        """
+        self.output["components"] = self.transformedProblem.getData()
+        return self.output
 
     def createDrawTheta(self, theta: list) -> list:
+        """
+        Creates a list of the same size as theta with Parameters (beta(s) and gamma(s)) as values. This list can then
+        be used to bind to a quantum circuit, using Qiskit's bind_parameters function, which can be saved as a generic
+        circuit, using Qiskit's draw function.
+
+        Args:
+            theta: (list) The list of optimizable values of the quantum circuit. It will be used to create a list of
+                          the same length with beta(s) and gamma(s).
+
+        Returns:
+            (list) The created list of beta(s) and gamma(s).
+        """
         betaValues = theta[::2]
         drawTheta = []
         for layer, _ in enumerate(betaValues):
             drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
             drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
-            #drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
-            #drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
+            # drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
+            # drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
 
         return drawTheta
 
-    def optimize(self, transformedProblem):
+    def optimize(self, transformedProblem) -> dict:
+        """
+        Optimizes the network encoded in the IsingInterface-instance. A self-written Qaoa algorithm is used, which can
+        either simulate the quantum part or solve it on one of IBMQ's servers (provided the correct credentials).
+        As classic solvers SPSA, COBYLA or ADAM can be chosen.
 
-        shots = self.config["QaoaBackend"]["shots"]
-        simulator = self.config["QaoaBackend"]["simulator"]
-        simulate = self.config["QaoaBackend"]["simulate"]
-        noise = self.config["QaoaBackend"]["noise"]
-        initial_guess_original = copy.deepcopy(self.config["QaoaBackend"]["initial_guess"])
+        Args:
+            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
+
+        Returns:
+            (dict) The optimized solution.
+        """
+        # retrieve various parameters from the config
+        shots = self.config_qaoa["shots"]
+        simulator = self.config_qaoa["simulator"]
+        simulate = self.config_qaoa["simulate"]
+        noise = self.config_qaoa["noise"]
+        initial_guess_original = copy.deepcopy(self.config_qaoa["initial_guess"])
         num_vars = len(initial_guess_original)
-        max_iter = self.config["QaoaBackend"]["max_iter"]
-        repetitions = self.config["QaoaBackend"]["repetitions"]
+        max_iter = self.config_qaoa["max_iter"]
+        repetitions = self.config_qaoa["repetitions"]
 
         if "rand" in initial_guess_original:
             randRep = 2
@@ -107,59 +190,72 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
         nqubits = len(hamiltonian)
 
-        self.paramVector = ParameterVector('theta', len(initial_guess_original))
-        self.qcParam = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
+        # create ParameterVector to be used as placeholder when creating the quantum circuit
+        self.paramVector = ParameterVector("theta", len(initial_guess_original))
+        self.qc = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
+        # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
         drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        qcDraw = self.qcParam.bind_parameters({self.paramVector: drawTheta})
+        qcDraw = self.qc.bind_parameters({self.paramVector: drawTheta})
         self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
-        backend, noise_model, coupling_map, basis_gates = self.setup_backend(simulator=simulator,
-                                                                             simulate=simulate,
-                                                                             noise=noise,
-                                                                             nqubits=nqubits)
+        # setup IBMQ backend and save its configuration to output
+        backend, noise_model, coupling_map, basis_gates = self.setup_backend(
+            simulator=simulator, simulate=simulate, noise=noise, nqubits=nqubits
+        )
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
         for rand in range(randRep):
             for curRepetition in range(1, repetitions + 1):
                 time_start = datetime.timestamp(datetime.now())
-                self.totalRepetition = rand * repetitions + curRepetition
-                print(f"----------------------- Repetition {self.totalRepetition} ----------------------------------")
+                totalRepetition = rand * repetitions + curRepetition
+                print(
+                    f"----------------------- Repetition {totalRepetition} ----------------------------------"
+                )
 
                 initial_guess = []
                 for j in range(num_vars):
                     # choose initial guess randomly (between 0 and 2PI for beta and 0 and PI for gamma)
                     if initial_guess_original[j] == "rand":
                         if j % 2 == 0:
-                            initial_guess.append((0.5 - random.rand()) * 2 * math.pi)
+                            initial_guess.append((0.5 - np.random.rand()) * 2 * math.pi)
                         else:
-                            initial_guess.append((0.5 - random.rand()) * math.pi)
+                            initial_guess.append((0.5 - np.random.rand()) * math.pi)
                     else:
                         initial_guess.append(initial_guess_original[j])
                 initial_guess = np.array(initial_guess)
 
                 self.prepareRepetitionDict()
-                self.output["results"]["repetitions"][self.totalRepetition]["initial_guess"] = initial_guess.tolist()
+                self.rep_result["initial_guess"] = initial_guess.tolist()
 
                 self.iterationCounter = 0
 
-                expectation = self.get_expectation(backend=backend,
-                                                   noise_model=noise_model,
-                                                   coupling_map=coupling_map,
-                                                   basis_gates=basis_gates,
-                                                   shots=shots,
-                                                   simulate=simulate)
+                expectation = self.get_expectation(
+                    backend=backend,
+                    noise_model=noise_model,
+                    coupling_map=coupling_map,
+                    basis_gates=basis_gates,
+                    shots=shots,
+                    simulate=simulate,
+                )
 
                 optimizer = self.getClassicalOptimizer(max_iter)
 
-                res = optimizer.optimize(num_vars=num_vars, objective_function=expectation, initial_point=initial_guess)
-                self.output["results"]["repetitions"][self.totalRepetition] \
-                    ["optimizeResults"] = {"x": list(res[0]),  # solution [beta, gamma]
-                                           "fun": res[1],  # objective function value
-                                           "nfev": res[2]}  # number of objective function calls
+                res = optimizer.optimize(
+                    num_vars=num_vars,
+                    objective_function=expectation,
+                    initial_point=initial_guess,
+                )
+                self.rep_result["optimizeResults"] = {
+                    "x": list(res[0]),  # solution [beta, gamma]
+                    "fun": res[1],  # objective function value
+                    "nfev": res[2],
+                }  # number of objective function calls
 
                 time_end = datetime.timestamp(datetime.now())
                 duration = time_end - time_start
-                self.output["results"]["repetitions"][self.totalRepetition]["duration"] = duration
+                self.rep_result["duration"] = duration
+
+                self.output["results"]["repetitions"][totalRepetition] = self.rep_result
 
             if "rand" in initial_guess_original:
                 minCFvars = self.getMinCFvars()
@@ -170,43 +266,36 @@ class QaoaQiskit(BackendBase):
 
         return self.output
 
+    def getClassicalOptimizer(self, max_iter: int) -> qiskit.algorithms.optimizers:
+        """
+        Initiates and returns the classical optimizer set in the config file. If another optimizer than SPSA, COBYLA or
+        Adam is specified, an error is thrown.
 
-    def generateFilename(self, currentRepetitionNumber):
+        Args:
+            max_iter: (int) The maximum number of iterations the classical optimizer is allowed to perform.
 
-        filename_input = str(self.config["QaoaBackend"]["filenameSplit"][1]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][2]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][3]) + "_" + \
-                         str(self.config["QaoaBackend"]["filenameSplit"][4])
-        filename_date = str(self.config["QaoaBackend"]["filenameSplit"][7])
-        filename_time = str(self.config["QaoaBackend"]["filenameSplit"][8])
-        filename_config = str(self.config["QaoaBackend"]["filenameSplit"][9])
-        if len(self.config["QaoaBackend"]["filenameSplit"]) == 11:
-            filename_config += "_" + str(self.config["QaoaBackend"]["filenameSplit"][10])
-
-        filename = "_".join([
-                "Qaoa", filename_input, filename_date, filename_time, \
-                filename_config, "", str(currentRepetitionNumber)
-        ]) 
-        return filename + ".json"
-    
-
-    def getClassicalOptimizer(self, max_iter):
-        configString = self.config["QaoaBackend"]["classical_optimizer"]
+        Returns:
+            (qiskit.algorithms.optimizers) The initialized classical optimizer, as specified in the config.
+        """
+        configString = self.config_qaoa["classical_optimizer"]
         if configString == "SPSA":
             return SPSA(maxiter=max_iter, blocking=False)
         elif configString == "COBYLA":
             return COBYLA(maxiter=max_iter, tol=0.0001)
         elif configString == "ADAM":
             return ADAM(maxiter=max_iter, tol=0.0001)
-        raise ValueError("Optimizer name in config file doesn't match any known optimizers")
+        raise ValueError(
+            "Optimizer name in config file doesn't match any known optimizers"
+        )
 
-
-    def getMinCFvars(self):
+    def getMinCFvars(self) -> list:
         """
-        Searches through metaInfo["results"] and finds the minimum cost function value along with the associated betas
-        and gammas, which will be returned as a list.
+        Searches through the optimization results of all repetitions done with random (or partly random) initial values
+        for beta and gamma and finds the minimum cost function value. The associated beta and gamma values will be
+        returned as a list to be used in the refinement phase of the optimization.
+
         Returns:
-            minX (list) a list with the betas and gammas associated with the minimal cost function value.
+            (list) The beta and gamma values associated with the minimal cost function value.
         """
         searchData = self.output["results"]["repetitions"]
         minCF = searchData[1]["optimizeResults"]["fun"]
@@ -220,13 +309,13 @@ class QaoaQiskit(BackendBase):
 
     def scaleHamiltonian(self, hamiltonian: list) -> list:
         """
-        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi
+        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi.
 
         Args:
             hamiltonian: (list) The input hamiltonian to be scaled.
 
         Returns:
-            (list) the scaled hamiltonian.
+            (list) The scaled hamiltonian.
         """
         matrixMax = np.max(hamiltonian)
         matrixMin = np.min(hamiltonian)
@@ -238,12 +327,13 @@ class QaoaQiskit(BackendBase):
 
     def create_qc(self, hamiltonian: list, theta: ParameterVector) -> QuantumCircuit:
         """
-        Creates a quantum circuit based on the hamiltonian matrix given.
+        Creates a qiskit quantum circuit based on the hamiltonian matrix given. The quantum circuit will be created
+        using a ParameterVector to create placeholders, which can be filled with the actual parameters using qiskit's
+        bind_parameters function.
 
         Args:
             hamiltonian: (dict) The matrix representing the problem Hamiltonian.
-            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
-                          gamma = theta[1].
+            theta: (ParameterVector) The ParameterVector of the same length as the list of optimizable parameters.
 
         Returns:
             (QuantumCircuit) The created quantum circuit.
@@ -260,16 +350,20 @@ class QaoaQiskit(BackendBase):
             qc.h(i)
 
         for layer, _ in enumerate(betaValues):
-            qc.barrier()
+            qc.barrier()  # for visual purposes only, when the quantum circuit is drawn
             qc.barrier()
             # add problem Hamiltonian
             for i in range(len(hamiltonian)):
                 for j in range(i, len(hamiltonian[i])):
                     if hamiltonian[i][j] != 0.0:
                         if i == j:
-                            qc.rz(-hamiltonian[i][j] * gammaValues[layer], i)  # negative because it´s the inverse of original QC
+                            qc.rz(
+                                -hamiltonian[i][j] * gammaValues[layer], i
+                            )  # negative because it´s the inverse of original QC
                         else:
-                            qc.rzz(-hamiltonian[i][j] * gammaValues[layer], i, j)  # negative because it´s the inverse of original QC
+                            qc.rzz(
+                                -hamiltonian[i][j] * gammaValues[layer], i, j
+                            )  # negative because it´s the inverse of original QC
             qc.barrier()
 
             # add mixing Hamiltonian to each qubit
@@ -285,21 +379,27 @@ class QaoaQiskit(BackendBase):
         Checks if the kirchhoff constraints are satisfied for the given solution.
 
         Args:
-            bitstring: (str) The possible solution to the network.
-            components: (dict) All components to be modeled as a Quantum Circuit.
+            bitstring: (str) The bitstring encoding a possible solution to the network.
 
         Returns:
             (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
                     satisfied for the given network.
         """
         try:
+            # check if the kirchhoff costs for this bitstring have already been calculated and if so use this value
             return self.output["results"]["kirchhoff"][bitstring]["total"]
         except KeyError:
             self.output["results"]["kirchhoff"][bitstring] = {}
             kirchhoffCost = 0.0
+            # calculate the deviation from the optimal for each bus separately
             for bus in self.network.buses.index:
-                bitstringToSolution = [idx for idx, bit in enumerate(bitstring) if bit == "1" ]
-                for _, val in self.isingInterface.calcPowerImbalanceAtBus(bus, bitstringToSolution).items():
+                bitstringToSolution = [
+                    idx for idx, bit in enumerate(bitstring) if bit == "1"
+                ]
+                for _, val in self.transformedProblem.calcPowerImbalanceAtBus(
+                    bus, bitstringToSolution
+                ).items():
+                    # store the penalty for each bus and then add them to the total costs
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
                     kirchhoffCost += abs(val) ** 2
             self.output["results"]["kirchhoff"][bitstring]["total"] = kirchhoffCost
@@ -307,12 +407,11 @@ class QaoaQiskit(BackendBase):
 
     def compute_expectation(self, counts: dict) -> float:
         """
-        Computes expectation value based on measurement results
+        Computes expectation values based on the measurement/simulation results.
 
         Args:
-            counts: (dict) The bitstring is the key and its count the value.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            filename: (str) The name of the file to which the results shall be safed.
+            counts: (dict) The number of times as specific bitstring was measured. The bitstring is the key and its
+            count the value.
 
         Returns:
             (float) The expectation value.
@@ -324,41 +423,47 @@ class QaoaQiskit(BackendBase):
             obj = self.kirchhoff_satisfied(bitstring=bitstring)
             avg += obj * count
             sum_count += count
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
-                ["bitstrings"][bitstring] = {"count": count,
-                                             "obj": obj,
-                                             "avg": avg,
-                                             "sum_count": sum_count}
+            self.iter_result["bitstrings"][bitstring] = {
+                "count": count,
+                "obj": obj,
+                "avg": avg,
+                "sum_count": sum_count,
+            }
 
-        self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter] \
-            ["return"] = avg / sum_count
+        self.iter_result["return"] = avg / sum_count
+        self.rep_result["iterations"][self.iterationCounter] = self.iter_result
 
-        return avg / sum_count
+        return self.iter_result["return"]
 
-    def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
+    def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int
+                      ) -> Tuple[BaseBackend, NoiseModel, list, list]:
         """
-        Sets up the backend based on the settings passed to the function.
+        Sets up the qiskit backend based on the settings passed into the function.
 
         Args:
             simulator: (str) The name of the Quantum Simulator to be used, if simulate is True.
             simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit.
-                             If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum
-                             Circuit.
+                             If False, the least busy IBMQ Quantum Comupter will be initiated to be used to execute the
+                             Quantum Circuit.
             noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
-                          if "simulate" is set to True.
-            nqubits: (int) Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
+                          if "simulate" is set to True. On actual IBMQ devices noise is always present and cannot be
+                          deactivated
+            nqubits: (int) The number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
 
         Returns:
             (BaseBackend) The backend to be used.
-            (NoiseModel) The noise model of the chosen backend, if noise is set to True.
-            (list) The coupling map of the chosen backend, if noise is set to True.
-            (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True.
+            (NoiseModel) The noise model of the chosen backend, if noise is set to True. Otherwise it is set to None.
+            (list) The coupling map of the chosen backend, if noise is set to True. Otherwise it is set to None.
+            (list) The initial basis gates used to compile the noise model, if noise is set to True. Otherwise it is set
+                   to None.
         """
         if simulate:
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
                 large_enough_devices = self.provider.backends(
-                    filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+                    filters=lambda x: x.configuration().n_qubits > nqubits
+                    and not x.configuration().simulator
+                )
                 device = least_busy(large_enough_devices)
 
                 # Get noise model from backend
@@ -379,7 +484,9 @@ class QaoaQiskit(BackendBase):
 
         else:
             large_enough_devices = self.provider.backends(
-                filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator)
+                filters=lambda x: x.configuration().n_qubits > nqubits
+                and not x.configuration().simulator
+            )
             backend = least_busy(large_enough_devices)
             # backend = provider.get_backend("ibmq_lima")
             noise_model = None
@@ -388,157 +495,56 @@ class QaoaQiskit(BackendBase):
 
         return backend, noise_model, coupling_map, basis_gates
 
-    def get_expectation(self, backend, noise_model, coupling_map, basis_gates, shots: int = 1024,
-                        simulate: bool = True):
+    def get_expectation(
+        self,
+        backend: BaseBackend,
+        noise_model: NoiseModel = None,
+        coupling_map: list = None,
+        basis_gates: list = None,
+        shots: int = 1024,
+        simulate: bool = True,
+    ):
         """
         Builds the objective function, which can be used in a classical solver.
 
         Args:
-            filename: (str) The name of the file to which the results shall be safed.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            simulator: (str) The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
-            shots: (int) Number of repetitions of each circuit, for sampling. Default: 1024
+            backend: (BaseBackend) The backend to be used.
+            noise_model: (NoiseModel) The noise model of the chosen backend. Default: None
+            coupling_map: (list) The coupling map of the chosen backend Default: None
+            basis_gates: (list) The initial basis gates used to compile the noise model Default: None
+            shots: (int) The number of repetitions of each circuit, for sampling. Default: 1024
             simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If
-                               False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit.
-                               Default: True
-            noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
-                            if "simulate" is set to True. Default: False
+                             False, the IBMQ Quantum Comupter set in setup_backend will be used to execute the Quantum
+                             Circuit. Default: True
 
         Returns:
             (callable) The objective function to be used in a classical solver
         """
 
-
         def execute_circ(theta):
-            qc = self.qcParam.bind_parameters({self.paramVector: theta})
+            qc = self.qc.bind_parameters({self.paramVector: theta})
 
             if simulate:
                 # Run on chosen simulator
-                results = execute(experiments=qc,
-                                  backend=backend,
-                                  shots=shots,
-                                  noise_model=noise_model,
-                                  coupling_map=coupling_map,
-                                  basis_gates=basis_gates).result()
+                results = execute(
+                    experiments=qc,
+                    backend=backend,
+                    shots=shots,
+                    noise_model=noise_model,
+                    coupling_map=coupling_map,
+                    basis_gates=basis_gates,
+                ).result()
             else:
                 # Submit job to real device and wait for results
-                job_device = execute(experiments=qc,
-                                     backend=backend,
-                                     shots=shots)
+                job_device = execute(experiments=qc, backend=backend, shots=shots)
                 job_monitor(job_device)
                 results = job_device.result()
             counts = results.get_counts()
             self.iterationCounter += 1
             self.prepareIterationDict()
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["theta"] = list(theta)
-            self.output["results"]["repetitions"][self.totalRepetition]["iterations"][self.iterationCounter]["counts"] = counts
+            self.iter_result["theta"] = list(theta)
+            self.iter_result["counts"] = counts
 
             return self.compute_expectation(counts=counts)
 
         return execute_circ
-
-
-def main():
-    inputNet = "testNetwork4QubitIsing_2_0_20.nc"
-    configFile = "config.yaml"
-    outPREFIX = "infoNoCost"
-    now = datetime.today()
-    outDateTime = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
-    outInfo = f"{outPREFIX}_{inputNet}_1_1_{outDateTime}_{configFile}"
-    DEFAULT_ENV_VARIABLES = {
-        "inputNetwork": inputNet,
-        "inputInfo": "",
-        "outputNetwork": "",
-        "outputInfo": outInfo,
-        "outputInfoTime": outDateTime,
-        "optimizationCycles": 1000,
-        "temperatureSchedule": "[0.1,iF,0.0001]",
-        "transverseFieldSchedule": "[10,.1]",
-        "monetaryCostFactor": 0.1,
-        "kirchhoffFactor": 1.0,
-        "slackVarFactor": 70.0,
-        "minUpDownFactor": 0.0,
-        "trotterSlices": 32,
-        "problemFormulation": "binarysplitNoMarginalCost",
-        "dwaveAPIToken": "",
-        "dwaveBackend": "hybrid_discrete_quadratic_model_version1",
-        "annealing_time": 500,
-        "programming_thermalization": 0,
-        "readout_thermalization": 0,
-        "num_reads": 1,
-        "chain_strength": 250,
-        "strategy": "LowestEnergy",
-        "lineRepresentation": 0,
-        "postprocess": "flow",
-        "timeout": "-1",
-        "maxOrder": 0,
-        "sampleCutSize": 200,
-        "threshold": 0.5,
-        "seed": 2
-    }
-
-    netImport = pypsa.Network(os.path.dirname(__file__) + "../../../sweepNetworks/" + inputNet)
-
-    with open(os.path.dirname(__file__) + "/../Configs/" + configFile) as file:
-        config = yaml.safe_load(file)
-
-    filenameSplit = str(envMgr['outputInfo']).split("_")
-    config["QaoaBackend"]["filenameSplit"] = filenameSplit
-    config["QaoaBackend"]["outputInfoTime"] = envMgr["outputInfoTime"]
-
-    qaoa = QaoaQiskit(config=config)
-    components = qaoa.transformProblemForOptimizer(network=netImport)
-
-    """
-    # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
-    # https://blog.xa0.de/post/Solving-QUBOs-with-qiskit-QAOA-example/
-    # https://qiskit.org/documentation/optimization/stubs/qiskit_optimization.QuadraticProgram.html
-    qp = QuadraticProgram()
-    #[qp.binary_var() for _ in range(components["hamiltonian"]["scaled"].shape[0])]
-    [qp.binary_var() for _ in range(4)]
-    qp.minimize(quadratic=components["hamiltonian"]["scaled"])
-
-    quantum_instance = QuantumInstance(Aer.get_backend('aer_simulator'))
-    cobyla = COBYLA(maxiter=100)
-    qaoaQiskit = QAOA(optimizer=cobyla,reps=10,quantum_instance=quantum_instance)
-    #qaoaQiskit = QAOA(quantum_instance=quantum_instance)
-    qiskitOpt = MinimumEigenOptimizer(qaoaQiskit)
-    qaoa_result = qiskitOpt.solve(qp)
-
-    cobyla = COBYLA(maxiter=100)
-    #qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
-    #qaoa_result = qaoaQiskit.find_minimum()
-    #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
-    """
-    """
-    theta = [Parameter("\u03B2"), Parameter("\u03B3")]
-    config["QaoaBackend"]["qcGeneration"] = "IterationMatrix"
-    componentsIterM = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIterM = qaoa.create_qc1(components=componentsIterM, theta=theta)
-    qcIterDrawnM = qcIterM.draw(output="latex_source")
-    config["QaoaBackend"]["qcGeneration"] = "Iteration"
-    componentsIter = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIter = qaoa.create_qc1(components=componentsIter, theta=theta)
-    qcIterDrawn = qcIter.draw(output="latex_source")
-    config["QaoaBackend"]["qcGeneration"] = "Ising"
-    componentsIsing = qaoa.transformProblemForOptimizer(network=netImport)
-    qcIsing = qaoa.create_qcIsing(hamiltonian=componentsIsing["hamiltonian"]["scaled"], theta=theta)
-    qcIsingDrawn = qcIsing.draw(output="latex_source")
-
-    qcCompare = {"Iteration": qcIterDrawn,
-                 "IterationMatrix": qcIterDrawnM,
-                 "Ising": qcIsingDrawn}
-
-    with open("qcCompare.json", "w") as write_file:
-        json.dump(qcCompare, write_file, indent=2, default=str)
-    """
-
-    qaoa.optimize(transformedProblem=components)
-
-    filename = str(envMgr['outputInfo'])
-    with open(os.path.dirname(__file__) + "/../../sweepNetworks/" + filename, "w") as write_file:
-        json.dump(qaoa.metaInfo["results"], write_file, indent=2, default=str)
-
-
-if __name__ == "__main__":
-    main()

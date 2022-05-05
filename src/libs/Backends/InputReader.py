@@ -13,17 +13,31 @@ class InputReader:
     """
     This class is an reader to obtain the configuration dictionary dependent on the input format
     """
+
+    # dictionary which solver has which backend specific extra data where. Keys are
+    # broader categories of backends and values are a list of solvers that use that
+    # key to store additional config info
+    # TODO flatten structure, by making new key, backend category and a generic key
+    ## for additional configs for this category of solvers
     BackendToSolver = {
-            "DWaveBackend": ["dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu"],
-            "PypsaBackend": ["pypsa-glpk", "pypsa-fico"],
-            "SqaBackend": ["sqa", "classical"],
-            "QaoaBackend": ["qaoa"],
+        "DWaveBackend": [
+            "dwave-tabu",
+            "dwave-greedy",
+            "dwave-hybrid",
+            "dwave-qpu",
+            "dwave-read-qpu",
+        ],
+        "PypsaBackend": ["pypsa-glpk", "pypsa-fico"],
+        "SqaBackend": ["sqa", "classical"],
+        "QaoaBackend": ["qaoa"],
     }
 
-    def __init__(self, 
-                network: Union[pypsa.Network, str],
-                config: Union[dict, str],
-                extraParams: list = []):
+    def __init__(
+        self,
+        network: Union[pypsa.Network, str],
+        config: Union[dict, str],
+        extraParams: list = [],
+    ):
         self.network, self.networkName = self.makeNetwork(network)
         self.config = self.makeConfig(config)
         self.addExtraParameters(extraParams)
@@ -31,7 +45,7 @@ class InputReader:
         # print final config, but hide api tokens
         configWithoutToken = copy.deepcopy(self.config)
         for provider, token in self.config["APItoken"].items():
-            if token != '':
+            if token != "":
                 configWithoutToken["APItoken"][provider] = "*****"
         print(f"running with the following configuration {configWithoutToken}")
 
@@ -40,9 +54,14 @@ class InputReader:
             if self.config["Backend"] in solverList:
                 sourceKey = BackendType
                 break
-        self.config["BackendConfig"] = {**self.config["BackendConfig"],**self.config[sourceKey]}
+        self.config["BackendConfig"] = {
+            **self.config["BackendConfig"],
+            **self.config[sourceKey],
+        }
 
-    def makeNetwork(self, network: Union[str, dict, pypsa.Network]) -> [pypsa.Network, str]:
+    def makeNetwork(
+        self, network: Union[str, dict, pypsa.Network]
+    ) -> [pypsa.Network, str]:
         if isinstance(network, str):
             return pypsa.Network(f"Problemset/" + network), network
         if isinstance(network, dict):
@@ -53,7 +72,7 @@ class InputReader:
         if isinstance(network, pypsa.Network):
             return network, "no_name_network"
         raise NotImplementedError
-    
+
     def makeConfig(self, params: Union[dict, str]) -> dict:
         result = {}
         if isinstance(params, dict):
@@ -80,7 +99,7 @@ class InputReader:
                     descentInConfig[key] = {}
                     descentInConfig = descentInConfig[key]
             descentInConfig[keyChain[-2]] = keyChain[-1]
-    
+
     def getConfig(self) -> dict:
         return self.config
 
@@ -89,4 +108,3 @@ class InputReader:
 
     def getNetworkName(self) -> str:
         return self.networkName
-
