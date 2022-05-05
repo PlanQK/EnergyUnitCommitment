@@ -342,11 +342,11 @@ class QaoaQiskit(BackendBase):
                         if i == j:
                             qc.rz(
                                 -hamiltonian[i][j] * gammaValues[layer], i
-                            )  # negative because it´s the inverse of original QC
+                            )  # inversed, as the implementation in the IsingInterface inverses the values
                         else:
                             qc.rzz(
                                 -hamiltonian[i][j] * gammaValues[layer], i, j
-                            )  # negative because it´s the inverse of original QC
+                            )  # inversed, as the implementation in the IsingInterface inverses the values
             qc.barrier()
 
             # add mixing Hamiltonian to each qubit
