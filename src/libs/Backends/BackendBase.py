@@ -111,7 +111,7 @@ class BackendBase(abc.ABC):
             if self.config["Backend"] in solverList:
                 self.output = {
                     "start_time": startTime,
-                    "end_time": None,
+                    "end_time": "",
                     "file_name": "_".join(
                         [self.networkName, self.config["Backend"], startTime + ".json"]
                     ),
