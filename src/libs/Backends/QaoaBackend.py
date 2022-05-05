@@ -115,6 +115,7 @@ class QaoaQiskit(BackendBase):
         Returns:
             (pypsa.Network) The optimized network.
         """
+        self.printReport()
         return self.network
 
     def processSolution(self, transformedProblem, solution):

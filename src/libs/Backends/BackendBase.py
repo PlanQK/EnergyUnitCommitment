@@ -30,27 +30,51 @@ class BackendBase(abc.ABC):
     def optimize(self, transformedProblem):
         pass
 
-    def validateInput(self, path, network):
+    def validateInput(self, path):
         pass
 
+    # TODO: implemented in DWave, but not used right now. (Can we have a blacklist on PlanQK?)
     def handleOptimizationStop(self, path, network):
         pass
 
     def getConfig(self) -> dict:
+        """
+        Getter function for the config-dictionary.
+
+        Returns:
+            (dict) The config used for the current problem.
+        """
         return self.config
 
     def getTime(self) -> str:
+        """
+        Getter function for the current time.
+
+        Returns:
+            (str) The current time in the format YYYY-MM-DD_hh-mm-ss
+        """
         now = datetime.today()
         return f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
 
     def getOutput(self) -> dict:
+        """
+        Getter function for the output-dictionary.
+
+        Returns:
+            (dict) The output (result) of the current problem.
+        """
         self.output["end_time"] = self.getTime()
         return self.output
 
     def printSolverspecificReport(self):
         pass
 
-    def printReport(self):
+    def printReport(self) -> None:
+        """
+        Prints a short report with general information about the solution.
+        Returns:
+            None.
+        """
         print(f"\n--- General information of the solution ---")
         print(
             f'Kirchhoff cost at each bus: {self.output["results"].get("individualKirchhoffCost","N/A")}'
