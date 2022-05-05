@@ -49,7 +49,7 @@ class ClassicalBackend(BackendBase):
         self.output["results"]["optimizationTime"] = time.perf_counter() - tic
         # parse the entry in "state" before using it
         result["state"] = literal_eval(result["state"])
-        self.writeResultsToOutput(result, self.transformedProblem)
+        self.writeResultsToOutput(result)
         print("done")
 
     def getHSchedule(self):

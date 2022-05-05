@@ -58,7 +58,7 @@ class BackendBase(abc.ABC):
 
     def getOutput(self) -> dict:
         """
-        Getter function for the output-dictionary.
+        Getter function for the output-dictionary. Before returning the dictionary the end time is added to it.
 
         Returns:
             (dict) The output (result) of the current problem.
