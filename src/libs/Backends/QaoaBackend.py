@@ -1,5 +1,7 @@
 import copy
 import math
+from typing import Tuple
+
 import numpy as np
 import pypsa
 import qiskit
@@ -15,6 +17,7 @@ from datetime import datetime
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers import BaseBackend
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
@@ -42,12 +45,12 @@ class QaoaQiskit(BackendBase):
             IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
-    def addResultsDict(self):
+    def addResultsDict(self) -> None:
         """
         Adds the basic structure for the self.output["results"]-dictionary.
 
         Returns:
-            Nothing. Modifies the self.output["results"]-dictionary.
+            (None) Modifies the self.output["results"]-dictionary.
         """
         self.output["results"] = {
             "backend": None,
@@ -62,13 +65,13 @@ class QaoaQiskit(BackendBase):
             "repetitions": {},
         }
 
-    def prepareRepetitionDict(self):
+    def prepareRepetitionDict(self) -> None:
         """
         Initializes the basic structure for the self.rep_result-dictionary, setting its values to empty dictionaries,
         empty lists or None values.
 
         Returns:
-            Nothing. Modifies the self.rep_result-dictionary.
+            (None) Modifies the self.rep_result-dictionary.
         """
         self.rep_result = {
             "initial_guess": [],
@@ -77,13 +80,13 @@ class QaoaQiskit(BackendBase):
             "optimizeResults": {},
         }
 
-    def prepareIterationDict(self):
+    def prepareIterationDict(self) -> None:
         """
         Initializes the basic structure for the self.iter_result-dictionary, setting its values to empty dictionaries,
         empty lists or None values.
 
         Returns:
-            Nothing. Modifies the self.iter_result-dictionary.
+            (None) Modifies the self.iter_result-dictionary.
         """
         self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
 
@@ -118,7 +121,7 @@ class QaoaQiskit(BackendBase):
         self.printReport()
         return self.network
 
-    def processSolution(self, transformedProblem, solution):
+    def processSolution(self, transformedProblem, solution) -> dict:
         """
         Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
 
@@ -155,7 +158,7 @@ class QaoaQiskit(BackendBase):
 
         return drawTheta
 
-    def optimize(self, transformedProblem):
+    def optimize(self, transformedProblem) -> dict:
         """
         Optimizes the network encoded in the IsingInterface-instance. A self-written Qaoa algorithm is used, which can
         either simulate the quantum part or solve it on one of IBMQ's servers (provided the correct credentials).
@@ -433,7 +436,8 @@ class QaoaQiskit(BackendBase):
 
         return self.iter_result["return"]
 
-    def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
+    def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int
+                      ) -> Tuple[BaseBackend, NoiseModel, list, list]:
         """
         Sets up the qiskit backend based on the settings passed into the function.
 
@@ -494,10 +498,10 @@ class QaoaQiskit(BackendBase):
 
     def get_expectation(
         self,
-        backend: qiskit.providers.BaseBackend,
-        noise_model: qiskit.providers.aer.noise.NoiseModel = None,
+        backend: BaseBackend,
+        noise_model: NoiseModel = None,
         coupling_map: list = None,
-        basis_gates: qiskit.providers.aer.noise.NoiseModel.basis_gates = None,
+        basis_gates: list = None,
         shots: int = 1024,
         simulate: bool = True,
     ):

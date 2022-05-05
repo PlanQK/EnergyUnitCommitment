@@ -21,7 +21,7 @@ def main():
     inputReader = InputReader(network=netImport, config=config)
 
     qaoa = QaoaQiskit(reader=inputReader)
-    components = qaoa.transformProblemForOptimizer(network=netImport)
+    components = qaoa.transformProblemForOptimizer()
 
     """
     # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
