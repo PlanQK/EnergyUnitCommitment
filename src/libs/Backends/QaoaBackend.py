@@ -455,8 +455,8 @@ class QaoaQiskit(BackendBase):
             (BaseBackend) The backend to be used.
             (NoiseModel) The noise model of the chosen backend, if noise is set to True. Otherwise it is set to None.
             (list) The coupling map of the chosen backend, if noise is set to True. Otherwise it is set to None.
-            (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True. Otherwise it is set
-                                    to None.
+            (list) The initial basis gates used to compile the noise model, if noise is set to True. Otherwise it is set
+                   to None.
         """
         if simulate:
             if noise:
@@ -498,10 +498,10 @@ class QaoaQiskit(BackendBase):
 
     def get_expectation(
         self,
-        backend,
-        noise_model,
-        coupling_map,
-        basis_gates,
+        backend: qiskit.providers.BaseBackend,
+        noise_model: qiskit.providers.aer.noise.NoiseModel = None,
+        coupling_map: list = None,
+        basis_gates: qiskit.providers.aer.noise.NoiseModel.basis_gates = None,
         shots: int = 1024,
         simulate: bool = True,
     ):
@@ -509,15 +509,14 @@ class QaoaQiskit(BackendBase):
         Builds the objective function, which can be used in a classical solver.
 
         Args:
-            filename: (str) The name of the file to which the results shall be safed.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            simulator: (str) The name of the Quantum Simulator to be used, if simulate is True. Default: "aer_simulator"
-            shots: (int) Number of repetitions of each circuit, for sampling. Default: 1024
+            backend: (BaseBackend) The backend to be used.
+            noise_model: (NoiseModel) The noise model of the chosen backend. Default: None
+            coupling_map: (list) The coupling map of the chosen backend Default: None
+            basis_gates: (list) The initial basis gates used to compile the noise model Default: None
+            shots: (int) The number of repetitions of each circuit, for sampling. Default: 1024
             simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit. If
-                               False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum Circuit.
-                               Default: True
-            noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
-                            if "simulate" is set to True. Default: False
+                             False, the IBMQ Quantum Comupter set in setup_backend will be used to execute the Quantum
+                             Circuit. Default: True
 
         Returns:
             (callable) The objective function to be used in a classical solver
