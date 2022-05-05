@@ -13,9 +13,10 @@ class BackendBase(abc.ABC):
         self.networkName = reader.getNetworkName()
         self.config = reader.getConfig()
         self.setupOutputDict()
+        self.transformedProblem = None
 
     @abc.abstractmethod
-    def transformProblemForOptimizer(self):  # -> transformedProblem
+    def transformProblemForOptimizer(self):  # -> set self.transformedProblem
         pass
 
     @abc.abstractstaticmethod

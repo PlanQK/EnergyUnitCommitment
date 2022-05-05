@@ -33,7 +33,6 @@ class QaoaQiskit(BackendBase):
         self.addResultsDict()
 
         # initiate local parameters
-        self.isingInterface = None
         self.iterationCounter = None
         self.iter_result = {}
         self.rep_result = {}
@@ -98,12 +97,12 @@ class QaoaQiskit(BackendBase):
         Returns:
             (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
         """
-        self.isingInterface = IsingBackbone.buildIsingProblem(
+        self.transformedProblem = IsingBackbone.buildIsingProblem(
             network=self.network, config=self.config["IsingInterface"]
         )
-        self.output["results"]["qubit_map"] = self.isingInterface.getQubitMapping()
+        self.output["results"]["qubit_map"] = self.transformedProblem.getQubitMapping()
 
-        return self.isingInterface
+        return self.transformedProblem
 
     def transformSolutionToNetwork(
             self, transformedProblem: IsingBackbone, solution: dict
@@ -132,7 +131,7 @@ class QaoaQiskit(BackendBase):
         Returns:
             (dict) The post-processed solution.
         """
-        self.output["components"] = self.isingInterface.getData()
+        self.output["components"] = self.transformedProblem.getData()
         return self.output
 
     def createDrawTheta(self, theta: list) -> list:
@@ -397,7 +396,7 @@ class QaoaQiskit(BackendBase):
                 bitstringToSolution = [
                     idx for idx, bit in enumerate(bitstring) if bit == "1"
                 ]
-                for _, val in self.isingInterface.calcPowerImbalanceAtBus(
+                for _, val in self.transformedProblem.calcPowerImbalanceAtBus(
                     bus, bitstringToSolution
                 ).items():
                     # store the penalty for each bus and then add them to the total costs

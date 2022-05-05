@@ -16,11 +16,11 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
-        self.model = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
+        self.transformedProblem = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
                                                          solver_name=self.config["BackendConfig"]["solver_name"])
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
-        return self.model
+        return self.transformedProblem
 
     def transformSolutionToNetwork(self, transformedProblem, solution):
         # TODO implement write from pyomo
@@ -39,14 +39,14 @@ class PypsaBackend(BackendBase):
             # TODO get result better out of model?
             totalCost = 0
             totalPower = 0
-            for key, val in  self.model.generator_p.get_values().items():
+            for key, val in  self.transformedProblem.generator_p.get_values().items():
                 totalCost += self.network.generators["marginal_cost"].loc[key[0]] * val
                 totalPower += self.network.generators.p_nom.loc[key[0]] * val
             self.output["results"]["marginalCost"] = totalCost
             self.output["results"]["totalPower"] = totalPower
         
             self.output["results"]["unitCommitment"] = {
-                    gen[0] : value for gen,value in self.model.generator_status.get_values().items()
+                    gen[0] : value for gen,value in self.transformedProblem.generator_status.get_values().items()
             }
             # list of indices of active generators
             self.output["results"]["state"] = [
@@ -55,7 +55,7 @@ class PypsaBackend(BackendBase):
             ]
             self.output["results"]["powerflow"] = {
                     line[1] : value 
-                    for line,value in self.model.passive_branch_p.get_values().items()
+                    for line,value in self.transformedProblem.passive_branch_p.get_values().items()
             }
             # solver only allows feasible solutions 
             self.output["results"]["kirchhoffCost"] = 0
@@ -70,7 +70,7 @@ class PypsaBackend(BackendBase):
 
         solverstring = str(sol["Solver"])
         self.writeResultToOutput(solverstring=solverstring)
-        return self.model
+        return self.transformedProblem
 
     def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
