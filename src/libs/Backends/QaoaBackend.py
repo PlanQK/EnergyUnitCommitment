@@ -89,7 +89,7 @@ class QaoaQiskit(BackendBase):
         """
         self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
 
-    def transformProblemForOptimizer(self) -> IsingBackbone:
+    def transformProblemForOptimizer(self):
         """
         Initializes an IsingInterface-instance, which encodes the Ising Spin Glass Problem, using the network to be
         optimized.
@@ -102,17 +102,9 @@ class QaoaQiskit(BackendBase):
         )
         self.output["results"]["qubit_map"] = self.transformedProblem.getQubitMapping()
 
-        return self.transformedProblem
-
-    def transformSolutionToNetwork(
-            self, transformedProblem: IsingBackbone, solution: dict
-    ) -> pypsa.Network:
+    def transformSolutionToNetwork(self) -> pypsa.Network:
         """
-        Encodes the optimal solution found during optimization into a pypsa.Network.
-
-        Args:
-            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
-            solution: (dict) The optimal solution to the problem.
+        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network.
 
         Returns:
             (pypsa.Network) The optimized network.
@@ -120,16 +112,12 @@ class QaoaQiskit(BackendBase):
         self.printReport()
         return self.network
 
-    def processSolution(self, transformedProblem, solution) -> dict:
+    def processSolution(self) -> None:
         """
         Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
 
-        Args:
-            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
-            solution: (dict) The optimal solution to the problem.
-
         Returns:
-            (dict) The post-processed solution.
+            (None) The self.output dictionary is modified with post-process information.
         """
         self.output["components"] = self.transformedProblem.getData()
         return self.output
@@ -157,17 +145,14 @@ class QaoaQiskit(BackendBase):
 
         return drawTheta
 
-    def optimize(self, transformedProblem) -> dict:
+    def optimize(self):
         """
         Optimizes the network encoded in the IsingInterface-instance. A self-written Qaoa algorithm is used, which can
         either simulate the quantum part or solve it on one of IBMQ's servers (provided the correct credentials).
         As classic solvers SPSA, COBYLA or ADAM can be chosen.
 
-        Args:
-            transformedProblem: (IsingBackbone) The IsingInterface-instance, which encodes the Ising Spin Glass Problem.
-
         Returns:
-            (dict) The optimized solution.
+            (None) The optimized solution is stored in the self.output dictionary.
         """
         # retrieve various parameters from the config
         shots = self.config_qaoa["shots"]
@@ -184,7 +169,7 @@ class QaoaQiskit(BackendBase):
         else:
             randRep = 1
 
-        hamiltonian = transformedProblem.getHamiltonianMatrix()
+        hamiltonian = self.transformedProblem.getHamiltonianMatrix()
         scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
         self.output["results"]["hamiltonian"]["original"] = hamiltonian
         self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
@@ -263,8 +248,6 @@ class QaoaQiskit(BackendBase):
                 for j in range(num_vars):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
-
-        return self.output
 
     def getClassicalOptimizer(self, max_iter: int) -> qiskit.algorithms.optimizers:
         """

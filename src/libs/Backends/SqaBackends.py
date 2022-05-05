@@ -3,6 +3,8 @@ from ast import literal_eval
 # try import from local .so
 # Error message for image: herrd1/siquan:latest 
 # /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
+import pypsa
+
 try:
     from . import siquan
 # try import from installed module siquan
@@ -23,33 +25,32 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
 
 
-    def transformProblemForOptimizer(self):
+    def transformProblemForOptimizer(self) -> None:
         print("transforming problem...")
         return IsingBackbone.buildIsingProblem(
                 network=self.network, config=self.config["IsingInterface"]
                 )
 
-    def transformSolutionToNetwork(self, transformedProblem, solution):
+    def transformSolutionToNetwork(self) -> pypsa.Network:
         self.printReport()
-        # transformedProblem.addSQASolutionToNetwork(
+        # self.transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
         # )
         return self.network
 
-    def optimize(self, transformedProblem):
+    def optimize(self) -> None:
         print("starting optimization...")
         self.configureSolver()
         tic = time.perf_counter()
         result = self.solver.minimize(
-            transformedProblem.siquanFormat(),
-            transformedProblem.numVariables(),
+            self.transformedProblem.siquanFormat(),
+            self.transformedProblem.numVariables(),
         )
         self.output["results"]["optimizationTime"] = time.perf_counter() - tic
         # parse the entry in "state" before using it
         result["state"] = literal_eval(result["state"])
-        self.writeResultsToOutput(result, transformedProblem)
+        self.writeResultsToOutput(result)
         print("done")
-        return result
 
     def getHSchedule(self):
         return "[0]"
@@ -85,16 +86,15 @@ class ClassicalBackend(BackendBase):
         )
     
 
-    def writeResultsToOutput(self, result, transformedProblem):
+    def writeResultsToOutput(self, result):
         """
         This writes solution specific values of the optimizer result and the ising spin glass
         problem solution the output dictionary. Parse the value to the key "state" via
         literal_eval before calling this function.
         
-        solution:
+        Args:
             result: (dict) the python dictionary returned from the sqa solver
-            transformedProblem: (IsingPypsaInterface) the isinginterface instance that encoded 
-                    the problem into an ising sping glass problem
+
         Returns:
             (None) modifies self.output with solution specific parameters and values
         """
@@ -102,7 +102,7 @@ class ClassicalBackend(BackendBase):
             self.output["results"][key] = result[key]
         self.output["results"] = {
                         **self.output["results"],
-                        **transformedProblem.generateReport(result["state"])
+                        **self.transformedProblem.generateReport(result["state"])
                     }
 
 

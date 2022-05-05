@@ -50,14 +50,14 @@ def run(
         optimizer = OptimizerClass(reader=inputReader)
 
         # run optimization
-        transformedProblem = optimizer.transformProblemForOptimizer()
-        solution = optimizer.optimize(transformedProblem)
+        optimizer.transformProblemForOptimizer()
+        optimizer.optimize()
 
         # hook for potential post processing like flow optimization for dwave solutions
-        processedSolution = optimizer.processSolution(transformedProblem, solution)
+        optimizer.processSolution()
         # return results
         # TODO: implement saving solution in Network and store in output dict.
-        outputNetwork = optimizer.transformSolutionToNetwork(transformedProblem, processedSolution)
+        outputNetwork = optimizer.transformSolutionToNetwork()
         output = optimizer.getOutput()
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)

@@ -16,22 +16,21 @@ class BackendBase(abc.ABC):
         self.transformedProblem = None
 
     @abc.abstractmethod
-    def transformProblemForOptimizer(self):  # -> set self.transformedProblem
+    def transformProblemForOptimizer(self) -> None:
         pass
 
     @abc.abstractstaticmethod
-    def transformSolutionToNetwork(transformedProblem, solution) -> pypsa.Network:
+    def transformSolutionToNetwork() -> pypsa.Network:
         pass
 
-    def processSolution(self, transformedProblem, solution) -> dict:
+    def processSolution(self) -> None:
         self.output["results"]["postprocessingTime"] = 0.0
-        return solution
 
     @abc.abstractmethod
-    def optimize(self, transformedProblem):
+    def optimize(self) -> None:
         pass
 
-    def handleOptimizationStop(self, path, network):
+    def handleOptimizationStop(self, path):
         pass
 
     def getConfig(self) -> dict:
@@ -55,7 +54,7 @@ class BackendBase(abc.ABC):
 
     def getOutput(self) -> dict:
         """
-        Getter function for the output-dictionary.
+        Getter function for the output-dictionary. Before returning the dictionary the end time is added to it.
 
         Returns:
             (dict) The output (result) of the current problem.
@@ -108,7 +107,7 @@ class BackendBase(abc.ABC):
             if self.config["Backend"] in solverList:
                 self.output = {
                     "start_time": startTime,
-                    "end_time": None,
+                    "end_time": "",
                     "file_name": "_".join(
                         [self.networkName, self.config["Backend"], startTime + ".json"]
                     ),
