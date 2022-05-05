@@ -2,6 +2,7 @@ import copy
 import math
 import numpy as np
 import pypsa
+import qiskit
 
 try:
     from .IsingPypsaInterface import IsingBackbone  # import for Docker run
@@ -267,7 +268,17 @@ class QaoaQiskit(BackendBase):
 
         return self.output
 
-    def getClassicalOptimizer(self, max_iter):
+    def getClassicalOptimizer(self, max_iter: int) -> qiskit.algorithms.optimizers:
+        """
+        Initiates and returns the classical optimizer set in the config file. If another optimizer than SPSA, COBYLA or
+        Adam is specified, an error is thrown.
+
+        Args:
+            max_iter: (int) The maximum number of iterations the classical optimizer is allowed to perform.
+
+        Returns:
+            (qiskit.algorithms.optimizers) The initialized classical optimizer, as specified in the config.
+        """
         configString = self.config_qaoa["classical_optimizer"]
         if configString == "SPSA":
             return SPSA(maxiter=max_iter, blocking=False)
@@ -279,12 +290,14 @@ class QaoaQiskit(BackendBase):
             "Optimizer name in config file doesn't match any known optimizers"
         )
 
-    def getMinCFvars(self):
+    def getMinCFvars(self) -> list:
         """
-        Searches through metaInfo["results"] and finds the minimum cost function value along with the associated betas
-        and gammas, which will be returned as a list.
+        Searches through the optimization results of all repetitions done with random (or partly random) initial values
+        for beta and gamma and finds the minimum cost function value. The associated beta and gamma values will be
+        returned as a list to be used in the refinement phase of the optimization.
+
         Returns:
-            minX (list) a list with the betas and gammas associated with the minimal cost function value.
+            (list) The beta and gamma values associated with the minimal cost function value.
         """
         searchData = self.output["results"]["repetitions"]
         minCF = searchData[1]["optimizeResults"]["fun"]
@@ -298,13 +311,13 @@ class QaoaQiskit(BackendBase):
 
     def scaleHamiltonian(self, hamiltonian: list) -> list:
         """
-        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi
+        Scales the hamiltonian so that the maximum absolute value in the input hamiltonian is equal to Pi.
 
         Args:
             hamiltonian: (list) The input hamiltonian to be scaled.
 
         Returns:
-            (list) the scaled hamiltonian.
+            (list) The scaled hamiltonian.
         """
         matrixMax = np.max(hamiltonian)
         matrixMin = np.min(hamiltonian)
@@ -316,12 +329,13 @@ class QaoaQiskit(BackendBase):
 
     def create_qc(self, hamiltonian: list, theta: ParameterVector) -> QuantumCircuit:
         """
-        Creates a quantum circuit based on the hamiltonian matrix given.
+        Creates a qiskit quantum circuit based on the hamiltonian matrix given. The quantum circuit will be created
+        using a ParameterVector to create placeholders, which can be filled with the actual parameters using qiskit's
+        bind_parameters function.
 
         Args:
             hamiltonian: (dict) The matrix representing the problem Hamiltonian.
-            theta: (list) The optimizable values of the quantum circuit. Two arguments needed: beta = theta[0] and
-                          gamma = theta[1].
+            theta: (ParameterVector) The ParameterVector of the same length as the list of optimizable parameters.
 
         Returns:
             (QuantumCircuit) The created quantum circuit.
@@ -338,7 +352,7 @@ class QaoaQiskit(BackendBase):
             qc.h(i)
 
         for layer, _ in enumerate(betaValues):
-            qc.barrier()
+            qc.barrier()  # for visual purposes only, when the quantum circuit is drawn
             qc.barrier()
             # add problem Hamiltonian
             for i in range(len(hamiltonian)):
@@ -367,18 +381,19 @@ class QaoaQiskit(BackendBase):
         Checks if the kirchhoff constraints are satisfied for the given solution.
 
         Args:
-            bitstring: (str) The possible solution to the network.
-            components: (dict) All components to be modeled as a Quantum Circuit.
+            bitstring: (str) The bitstring encoding a possible solution to the network.
 
         Returns:
             (float) The absolut deviation from the optimal (0), where the kirchhoff constrains would be completely
                     satisfied for the given network.
         """
         try:
+            # check if the kirchhoff costs for this bitstring have already been calculated and if so use this value
             return self.output["results"]["kirchhoff"][bitstring]["total"]
         except KeyError:
             self.output["results"]["kirchhoff"][bitstring] = {}
             kirchhoffCost = 0.0
+            # calculate the deviation from the optimal for each bus separately
             for bus in self.network.buses.index:
                 bitstringToSolution = [
                     idx for idx, bit in enumerate(bitstring) if bit == "1"
@@ -386,6 +401,7 @@ class QaoaQiskit(BackendBase):
                 for _, val in self.isingInterface.calcPowerImbalanceAtBus(
                     bus, bitstringToSolution
                 ).items():
+                    # store the penalty for each bus and then add them to the total costs
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
                     kirchhoffCost += abs(val) ** 2
             self.output["results"]["kirchhoff"][bitstring]["total"] = kirchhoffCost
@@ -393,12 +409,11 @@ class QaoaQiskit(BackendBase):
 
     def compute_expectation(self, counts: dict) -> float:
         """
-        Computes expectation value based on measurement results
+        Computes expectation values based on the measurement/simulation results.
 
         Args:
-            counts: (dict) The bitstring is the key and its count the value.
-            components: (dict) All components to be modeled as a Quantum Circuit.
-            filename: (str) The name of the file to which the results shall be safed.
+            counts: (dict) The number of times as specific bitstring was measured. The bitstring is the key and its
+            count the value.
 
         Returns:
             (float) The expectation value.
@@ -424,22 +439,24 @@ class QaoaQiskit(BackendBase):
 
     def setup_backend(self, simulator: str, simulate: bool, noise: bool, nqubits: int):
         """
-        Sets up the backend based on the settings passed to the function.
+        Sets up the qiskit backend based on the settings passed into the function.
 
         Args:
             simulator: (str) The name of the Quantum Simulator to be used, if simulate is True.
             simulate: (bool) If True, the specified Quantum Simulator will be used to execute the Quantum Circuit.
-                             If False, the least busy IBMQ Quantum Comupter will be used to execute the Quantum
-                             Circuit.
+                             If False, the least busy IBMQ Quantum Comupter will be initiated to be used to execute the
+                             Quantum Circuit.
             noise: (bool) If True, noise will be added to the Simulator. If False, no noise will be added. Only works
-                          if "simulate" is set to True.
-            nqubits: (int) Number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
+                          if "simulate" is set to True. On actual IBMQ devices noise is always present and cannot be
+                          deactivated
+            nqubits: (int) The number of Qubits of the Quantum Circuit. Used to find a suitable IBMQ Quantum Computer.
 
         Returns:
             (BaseBackend) The backend to be used.
-            (NoiseModel) The noise model of the chosen backend, if noise is set to True.
-            (list) The coupling map of the chosen backend, if noise is set to True.
-            (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True.
+            (NoiseModel) The noise model of the chosen backend, if noise is set to True. Otherwise it is set to None.
+            (list) The coupling map of the chosen backend, if noise is set to True. Otherwise it is set to None.
+            (NoiseModel.basis_gates) The basis gates of the noise model, if noise is set to True. Otherwise it is set
+                                    to None.
         """
         if simulate:
             if noise:
