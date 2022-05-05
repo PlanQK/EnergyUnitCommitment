@@ -7,6 +7,10 @@ from .InputReader import InputReader
 
 
 class PypsaBackend(BackendBase):
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
+        if self.config["BackendConfig"].get("timeout", -1) < 0:
+            self.config["BackendConfig"]["timeout"] = 3600
 
     def transformProblemForOptimizer(self):
         print("transforming problem...") 
@@ -16,13 +20,17 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
-        self.transformedProblem = pypsa.opf.network_lopf_build_model(self.network, self.network.snapshots, formulation="kirchhoff")
+        self.transformedProblem = pypsa.opf.network_lopf_build_model(
+            network=self.network,
+            snapshots=self.network.snapshots,
+            formulation="kirchhoff"
+        )
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
                                                          solver_name=self.config["BackendConfig"]["solver_name"])
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
         return self.transformedProblem
 
-    def transformSolutionToNetwork(self, transformedProblem, solution):
+    def transformSolutionToNetwork(self, solution):
         # TODO implement write from pyomo
         print("Writing from pyoyo model to network is not implemented")
 
@@ -61,21 +69,15 @@ class PypsaBackend(BackendBase):
             self.output["results"]["kirchhoffCost"] = 0
             self.output["results"]["powerImbalance"] = 0
 
-
-    def optimize(self, transformedProblem):
+    def optimize(self):
         print("starting optimization...")
 
-        sol = self.opt.solve(transformedProblem)
+        sol = self.opt.solve(self.transformedProblem)
         sol.write()
 
         solverstring = str(sol["Solver"])
         self.writeResultToOutput(solverstring=solverstring)
         return self.transformedProblem
-
-    def __init__(self, reader: InputReader):
-        super().__init__(reader=reader)
-        if self.config["BackendConfig"].get("timeout", -1) < 0:
-            self.config["BackendConfig"]["timeout"] = 3600
 
 
 class PypsaFico(PypsaBackend):

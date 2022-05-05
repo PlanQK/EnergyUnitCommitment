@@ -29,25 +29,25 @@ class ClassicalBackend(BackendBase):
                 network=self.network, config=self.config["IsingInterface"]
                 )
 
-    def transformSolutionToNetwork(self, transformedProblem, solution):
+    def transformSolutionToNetwork(self, solution):
         self.printReport()
-        # transformedProblem.addSQASolutionToNetwork(
+        # self.transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
         # )
         return self.network
 
-    def optimize(self, transformedProblem):
+    def optimize(self):
         print("starting optimization...")
         self.configureSolver()
         tic = time.perf_counter()
         result = self.solver.minimize(
-            transformedProblem.siquanFormat(),
-            transformedProblem.numVariables(),
+            self.transformedProblem.siquanFormat(),
+            self.transformedProblem.numVariables(),
         )
         self.output["results"]["optimizationTime"] = time.perf_counter() - tic
         # parse the entry in "state" before using it
         result["state"] = literal_eval(result["state"])
-        self.writeResultsToOutput(result, transformedProblem)
+        self.writeResultsToOutput(result, self.transformedProblem)
         print("done")
         return result
 
@@ -85,7 +85,7 @@ class ClassicalBackend(BackendBase):
         )
     
 
-    def writeResultsToOutput(self, result, transformedProblem):
+    def writeResultsToOutput(self, result):
         """
         This writes solution specific values of the optimizer result and the ising spin glass
         problem solution the output dictionary. Parse the value to the key "state" via
@@ -93,8 +93,7 @@ class ClassicalBackend(BackendBase):
         
         solution:
             result: (dict) the python dictionary returned from the sqa solver
-            transformedProblem: (IsingPypsaInterface) the isinginterface instance that encoded 
-                    the problem into an ising sping glass problem
+
         Returns:
             (None) modifies self.output with solution specific parameters and values
         """
@@ -102,7 +101,7 @@ class ClassicalBackend(BackendBase):
             self.output["results"][key] = result[key]
         self.output["results"] = {
                         **self.output["results"],
-                        **transformedProblem.generateReport(result["state"])
+                        **self.transformedProblem.generateReport(result["state"])
                     }
 
 

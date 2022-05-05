@@ -20,22 +20,22 @@ class BackendBase(abc.ABC):
         pass
 
     @abc.abstractstaticmethod
-    def transformSolutionToNetwork(transformedProblem, solution) -> pypsa.Network:
+    def transformSolutionToNetwork( solution) -> pypsa.Network:
         pass
 
-    def processSolution(self, transformedProblem, solution) -> dict:
+    def processSolution(self, solution) -> dict:
         self.output["results"]["postprocessingTime"] = 0.0
         return solution
 
     @abc.abstractmethod
-    def optimize(self, transformedProblem):
+    def optimize(self):
         pass
 
     def validateInput(self, path):
         pass
 
     # TODO: implemented in DWave, but not used right now. (Can we have a blacklist on PlanQK?)
-    def handleOptimizationStop(self, path, network):
+    def handleOptimizationStop(self, path):
         pass
 
     def getConfig(self) -> dict:
