@@ -28,9 +28,6 @@ class BackendBase(abc.ABC):
     def optimize(self, transformedProblem):
         pass
 
-    def validateInput(self, path, network):
-        pass
-
     def handleOptimizationStop(self, path, network):
         pass
 

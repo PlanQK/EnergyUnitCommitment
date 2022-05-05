@@ -44,9 +44,6 @@ def run(data: Optional[Dict[str, Any]] = None,
         # set up optimizer with input data
         OptimizerClass = ganBackends[inputReader.config["Backend"]][0]
         optimizer = OptimizerClass(reader=inputReader)
-        # validate input in case there are restrictions like limited computation time
-        # TODO: implement checks for different backends
-        #optimizer.validateInput(path="Problemset", network=network)
 
         # run optimization
         transformedProblem = optimizer.transformProblemForOptimizer(network)

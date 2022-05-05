@@ -177,12 +177,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
-    def validateInput(self, path, network):
+    def validateInput(self, path):
         return
-
-        # TODO implement file validation
+        # TODO fix file validation
         self.path = path
-        self.networkName = network
+        self.networkName = ""
 
         blacklists = self.get_filepaths(path, "*_qpu_blacklist")
         filteredByTimeout = []
@@ -195,12 +194,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for blacklist in filteredByTimeout:
             with open(blacklist) as f:
                 s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-                if s.find(bytes(network, 'utf-8')) != -1:
+                if s.find(bytes(networkName, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{path}/embedding_' \
                         f'rep_{self.config["IsingInterface"]["problemFormulation"]}_' \
-                        f'{network}.json'
+                        f'{networkName}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
             with open(embeddingPath) as embeddingFile:
@@ -225,6 +224,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         return
 
     def getSampler(self):
+        self.validateInput(path="Problemset")
         self.token = self.config["APItoken"]["dWave_API_token"]
         # pegasus topology corresponds to Advantage 4.1
         DirectSampler = DWaveSampler(solver={
