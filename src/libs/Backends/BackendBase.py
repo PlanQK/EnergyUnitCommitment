@@ -16,19 +16,18 @@ class BackendBase(abc.ABC):
         self.transformedProblem = None
 
     @abc.abstractmethod
-    def transformProblemForOptimizer(self):  # -> set self.transformedProblem
+    def transformProblemForOptimizer(self) -> None:
         pass
 
     @abc.abstractstaticmethod
-    def transformSolutionToNetwork( solution) -> pypsa.Network:
+    def transformSolutionToNetwork() -> pypsa.Network:
         pass
 
-    def processSolution(self, solution) -> dict:
+    def processSolution(self) -> None:
         self.output["results"]["postprocessingTime"] = 0.0
-        return solution
 
     @abc.abstractmethod
-    def optimize(self):
+    def optimize(self) -> None:
         pass
 
     def validateInput(self, path):

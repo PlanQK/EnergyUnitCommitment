@@ -28,9 +28,8 @@ class PypsaBackend(BackendBase):
         self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
                                                          solver_name=self.config["BackendConfig"]["solver_name"])
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
-        return self.transformedProblem
 
-    def transformSolutionToNetwork(self, solution):
+    def transformSolutionToNetwork(self):
         # TODO implement write from pyomo
         print("Writing from pyoyo model to network is not implemented")
 
@@ -77,7 +76,6 @@ class PypsaBackend(BackendBase):
 
         solverstring = str(sol["Solver"])
         self.writeResultToOutput(solverstring=solverstring)
-        return self.transformedProblem
 
 
 class PypsaFico(PypsaBackend):

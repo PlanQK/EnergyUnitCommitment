@@ -3,6 +3,8 @@ from ast import literal_eval
 # try import from local .so
 # Error message for image: herrd1/siquan:latest 
 # /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
+import pypsa
+
 try:
     from . import siquan
 # try import from installed module siquan
@@ -23,20 +25,20 @@ class ClassicalBackend(BackendBase):
         self.solver = siquan.DTSQA()
 
 
-    def transformProblemForOptimizer(self):
+    def transformProblemForOptimizer(self) -> None:
         print("transforming problem...")
         return IsingBackbone.buildIsingProblem(
                 network=self.network, config=self.config["IsingInterface"]
                 )
 
-    def transformSolutionToNetwork(self, solution):
+    def transformSolutionToNetwork(self) -> pypsa.Network:
         self.printReport()
         # self.transformedProblem.addSQASolutionToNetwork(
         #     network, solution["state"]
         # )
         return self.network
 
-    def optimize(self):
+    def optimize(self) -> None:
         print("starting optimization...")
         self.configureSolver()
         tic = time.perf_counter()
@@ -49,7 +51,6 @@ class ClassicalBackend(BackendBase):
         result["state"] = literal_eval(result["state"])
         self.writeResultsToOutput(result, self.transformedProblem)
         print("done")
-        return result
 
     def getHSchedule(self):
         return "[0]"
@@ -91,7 +92,7 @@ class ClassicalBackend(BackendBase):
         problem solution the output dictionary. Parse the value to the key "state" via
         literal_eval before calling this function.
         
-        solution:
+        Args:
             result: (dict) the python dictionary returned from the sqa solver
 
         Returns:

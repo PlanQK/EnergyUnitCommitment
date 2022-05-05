@@ -102,12 +102,9 @@ class QaoaQiskit(BackendBase):
         )
         self.output["results"]["qubit_map"] = self.transformedProblem.getQubitMapping()
 
-    def transformSolutionToNetwork(self, solution: dict) -> pypsa.Network:
+    def transformSolutionToNetwork(self) -> pypsa.Network:
         """
-        Encodes the optimal solution found during optimization into a pypsa.Network.
-
-        Args:
-            solution: (dict) The optimal solution to the problem.
+        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network.
 
         Returns:
             (pypsa.Network) The optimized network.
@@ -115,15 +112,12 @@ class QaoaQiskit(BackendBase):
         self.printReport()
         return self.network
 
-    def processSolution(self, solution) -> dict:
+    def processSolution(self) -> None:
         """
         Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
 
-        Args:
-            solution: (dict) The optimal solution to the problem.
-
         Returns:
-            (dict) The post-processed solution.
+            (None) The self.output dictionary is modified with post-process information.
         """
         self.output["components"] = self.transformedProblem.getData()
         return self.output
@@ -151,14 +145,14 @@ class QaoaQiskit(BackendBase):
 
         return drawTheta
 
-    def optimize(self) -> dict:
+    def optimize(self):
         """
         Optimizes the network encoded in the IsingInterface-instance. A self-written Qaoa algorithm is used, which can
         either simulate the quantum part or solve it on one of IBMQ's servers (provided the correct credentials).
         As classic solvers SPSA, COBYLA or ADAM can be chosen.
 
         Returns:
-            (dict) The optimized solution.
+            (None) The optimized solution is stored in the self.output dictionary.
         """
         # retrieve various parameters from the config
         shots = self.config_qaoa["shots"]
@@ -254,8 +248,6 @@ class QaoaQiskit(BackendBase):
                 for j in range(num_vars):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
-
-        return self.output
 
     def getClassicalOptimizer(self, max_iter: int) -> qiskit.algorithms.optimizers:
         """
