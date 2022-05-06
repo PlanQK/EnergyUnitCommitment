@@ -47,6 +47,8 @@ def main():
 
     qaoa.optimize()
 
+    qaoa.processSolution()
+
     output = qaoa.getOutput()
 
     filename = qaoa.output["file_name"]

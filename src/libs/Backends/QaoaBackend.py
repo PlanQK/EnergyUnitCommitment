@@ -5,6 +5,8 @@ from typing import Tuple
 import numpy as np
 import pypsa
 import qiskit
+from numpy import median
+from scipy import stats
 
 try:
     from .IsingPypsaInterface import IsingBackbone  # import for Docker run
@@ -38,6 +40,12 @@ class QaoaQiskit(BackendBase):
         self.rep_result = {}
         self.qc = None
         self.paramVector = None
+        self.statistics = {"confidence": 0.0,
+                           "bestBitstring": "",
+                           "probabilities": {},
+                           "pValues": {},
+                           "uValues": {}
+                           }
 
         # set up connection to IBMQ servers
         if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
@@ -75,6 +83,7 @@ class QaoaQiskit(BackendBase):
         num_vars = len(initial_guess_original)
         max_iter = self.config_qaoa["max_iter"]
         repetitions = self.config_qaoa["repetitions"]
+        totalRepetition = 0
 
         if "rand" in initial_guess_original:
             randRep = 2
@@ -161,6 +170,7 @@ class QaoaQiskit(BackendBase):
                 for j in range(num_vars):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
+        self.output["results"]["totalReps"] = totalRepetition
 
     def processSolution(self) -> None:
         """
@@ -171,8 +181,15 @@ class QaoaQiskit(BackendBase):
         """
         self.output["components"] = self.transformedProblem.getData()
 
-
-        return self.output
+        # get probabilities of bitstrings
+        self.extractPvalues()
+        # one-sided Mann-Witney U Test (x=bestBitstring, y=otherBitstring, alternative=greater)
+        self.findBestBitstring()
+        self.compareBitStringToRest()
+        # check p against alphas of [0.01, 0.05, 0.1]
+        self.determineConfidence()
+        # write best alpha to output together with bestBitstring and its p-values
+        self.output["results"]["statistics"] = self.statistics
 
     def transformSolutionToNetwork(self) -> pypsa.Network:
         """
@@ -201,6 +218,8 @@ class QaoaQiskit(BackendBase):
                 "refined": [],
             },
             "kirchhoff": {},
+            "statistics": {},
+            "totalReps": 0,
             "repetitions": {},
         }
 
@@ -245,8 +264,8 @@ class QaoaQiskit(BackendBase):
         betaValues = theta[::2]
         drawTheta = []
         for layer, _ in enumerate(betaValues):
-            drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
-            drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
+            drawTheta.append(Parameter(f"\u03B2{layer + 1}"))  # append beta_i
+            drawTheta.append(Parameter(f"\u03B3{layer + 1}"))  # append gamma_i
             # drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
             # drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
 
@@ -383,7 +402,7 @@ class QaoaQiskit(BackendBase):
                     idx for idx, bit in enumerate(bitstring) if bit == "1"
                 ]
                 for _, val in self.transformedProblem.calcPowerImbalanceAtBus(
-                    bus, bitstringToSolution
+                        bus, bitstringToSolution
                 ).items():
                     # store the penalty for each bus and then add them to the total costs
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
@@ -443,52 +462,43 @@ class QaoaQiskit(BackendBase):
             (list) The initial basis gates used to compile the noise model, if noise is set to True. Otherwise it is set
                    to None.
         """
+        noise_model = None
+        coupling_map = None
+        basis_gates = None
         if simulate:
             if noise:
                 # https://qiskit.org/documentation/apidoc/aer_noise.html
-                large_enough_devices = self.provider.backends(
-                    filters=lambda x: x.configuration().n_qubits > nqubits
-                    and not x.configuration().simulator
-                )
-                device = least_busy(large_enough_devices)
-
-                # Get noise model from backend
+                # set IBMQ server to extract noise model and coupling_map
+                device = self.provider.get_backend("ibmq_lima")
+                # Get noise model from IBMQ server
                 noise_model = NoiseModel.from_backend(device)
                 # Get coupling map from backend
                 coupling_map = device.configuration().coupling_map
                 # Get the basis gates for the noise model
                 basis_gates = noise_model.basis_gates
-
                 # Select the QasmSimulator from the Aer provider
                 backend = Aer.get_backend(simulator)
 
             else:
                 backend = Aer.get_backend(simulator)
-                noise_model = None
-                coupling_map = None
-                basis_gates = None
-
         else:
             large_enough_devices = self.provider.backends(
                 filters=lambda x: x.configuration().n_qubits > nqubits
-                and not x.configuration().simulator
+                                  and not x.configuration().simulator
             )
             backend = least_busy(large_enough_devices)
-            # backend = provider.get_backend("ibmq_lima")
-            noise_model = None
-            coupling_map = None
-            basis_gates = None
+            # backend = self.provider.get_backend("ibmq_lima")
 
         return backend, noise_model, coupling_map, basis_gates
 
     def get_expectation(
-        self,
-        backend: BaseBackend,
-        noise_model: NoiseModel = None,
-        coupling_map: list = None,
-        basis_gates: list = None,
-        shots: int = 1024,
-        simulate: bool = True,
+            self,
+            backend: BaseBackend,
+            noise_model: NoiseModel = None,
+            coupling_map: list = None,
+            basis_gates: list = None,
+            shots: int = 1024,
+            simulate: bool = True,
     ):
         """
         Builds the objective function, which can be used in a classical solver.
@@ -534,3 +544,88 @@ class QaoaQiskit(BackendBase):
             return self.compute_expectation(counts=counts)
 
         return execute_circ
+
+    def extractPvalues(self) -> None:
+        """
+        Searches through the results and combines the probability for each bitstring in each repetition of the
+        "optimizedResult" in lists. E.g. For 100 repetitions, a list for each bitstring is created, containing the 100
+        probability values (one from each repetition)
+
+        Returns:
+            (None) Writes the created lists of probabilities into the self.statistics dictionary.
+        """
+        data = self.output["results"]["repetitions"]
+        bitstrings = self.output["results"]["kirchhoff"].keys()
+        probabilities = {}
+        shots = self.config_qaoa["shots"]
+        start = self.output["results"]["totalReps"] - self.config_qaoa["repetitions"]
+        for bitstring in bitstrings:
+            probabilities[bitstring] = []
+            for key in data:
+                if key <= start:
+                    continue
+                if bitstring in data[key]["optimizedResult"]["counts"]:
+                    p = data[key]["optimizedResult"]["counts"][bitstring] / shots
+                else:
+                    p = 0
+                probabilities[bitstring].append(p)
+        self.statistics["probabilities"] = probabilities
+
+    def findBestBitstring(self) -> None:
+        """
+        Takes the median of the probabilites of each bitstring and determines, which bitstring has objectively the
+        highest probability and stores this bitstring in self.statistics.
+
+        Returns:
+            (None) Modifies the self.statistics dictionary.
+        """
+        probabilities = self.statistics["probabilities"]
+        bestBitstring = list(probabilities.keys())[0]
+        bestMedian = median(probabilities[bestBitstring])
+
+        for bitstring in probabilities:
+            if median(probabilities[bitstring]) > bestMedian:
+                bestMedian = median(probabilities[bitstring])
+                bestBitstring = bitstring
+        self.statistics["bestBitstring"] = bestBitstring
+
+    def compareBitStringToRest(self) -> None:
+        """
+        Compares the bestBitstring (found in the findBestBitstring function) to every other bitstring using a one-
+        sided Mann Whitney U Test, where the alternative hypothesis is that the probability to find the bestBitstring is
+        greater than the probabilities of the other bitstrings. The results of the tests are stored in the
+        self.statistics dictionary.
+
+        Returns:
+            (None) Modifies the self.statistics dictionary.
+        """
+        bestBitstring = self.statistics["bestBitstring"]
+        probabilities = self.statistics["probabilities"]
+        for bitstring in probabilities.keys():
+            if bitstring == bestBitstring:
+                continue
+            u, p = stats.mannwhitneyu(x=probabilities[bestBitstring],
+                                      y=probabilities[bitstring],
+                                      alternative="greater")
+            self.statistics["pValues"][f"{bestBitstring}-{bitstring}"] = float(p)
+            self.statistics["uValues"][f"{bestBitstring}-{bitstring}"] = float(u)
+
+    def determineConfidence(self) -> None:
+        """
+        Determines with which confidence, if any, the bestBitstring can be found. A list of alphas is checked, starting
+        at 0.01 up until 0.5. The found confidence is then stored in self.statistics. If none is found the value in
+        self.statistics["confidence"] is kept at 0.0, thus indicating no bestBitstring can be confidently determined.
+
+        Returns:
+            (None) Modifies the self.statistics dictionary.
+        """
+        alphas = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+        for alpha in alphas:
+            broken = False
+            for key, value in self.statistics["pValues"].items():
+                if value > alpha:
+                    broken = True
+                    break
+            if not broken:
+                self.statistics["confidence"] = 1 - alpha
+                break
