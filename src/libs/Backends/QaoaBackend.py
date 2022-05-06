@@ -558,6 +558,7 @@ class QaoaQiskit(BackendBase):
         bitstrings = self.output["results"]["kirchhoff"].keys()
         probabilities = {}
         shots = self.config_qaoa["shots"]
+        # find repetition value from where the refinement process started
         start = self.output["results"]["totalReps"] - self.config_qaoa["repetitions"]
         for bitstring in bitstrings:
             probabilities[bitstring] = []
@@ -580,8 +581,8 @@ class QaoaQiskit(BackendBase):
             (None) Modifies the self.statistics dictionary.
         """
         probabilities = self.statistics["probabilities"]
-        bestBitstring = list(probabilities.keys())[0]
-        bestMedian = median(probabilities[bestBitstring])
+        bestBitstring = list(probabilities.keys())[0]  # set first bitstring as best for now
+        bestMedian = median(probabilities[bestBitstring])  # get median of first bitstring
 
         for bitstring in probabilities:
             if median(probabilities[bitstring]) > bestMedian:
