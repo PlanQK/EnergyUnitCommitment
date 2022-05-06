@@ -44,51 +44,6 @@ class QaoaQiskit(BackendBase):
             IBMQ.save_account(self.config["APItoken"]["IBMQ_API_token"], overwrite=True)
             self.provider = IBMQ.load_account()
 
-    def addResultsDict(self) -> None:
-        """
-        Adds the basic structure for the self.output["results"]-dictionary.
-
-        Returns:
-            (None) Modifies the self.output["results"]-dictionary.
-        """
-        self.output["results"] = {
-            "backend": None,
-            "qubit_map": {},
-            "hamiltonian": {},
-            "qc": None,
-            "initial_guesses": {
-                "original": self.config_qaoa["initial_guess"],
-                "refined": [],
-            },
-            "kirchhoff": {},
-            "repetitions": {},
-        }
-
-    def prepareRepetitionDict(self) -> None:
-        """
-        Initializes the basic structure for the self.rep_result-dictionary, setting its values to empty dictionaries,
-        empty lists or None values.
-
-        Returns:
-            (None) Modifies the self.rep_result-dictionary.
-        """
-        self.rep_result = {
-            "initial_guess": [],
-            "duration": None,
-            "optimizedResult": {},
-            "iterations": {},
-        }
-
-    def prepareIterationDict(self) -> None:
-        """
-        Initializes the basic structure for the self.iter_result-dictionary, setting its values to empty dictionaries,
-        empty lists or None values.
-
-        Returns:
-            (None) Modifies the self.iter_result-dictionary.
-        """
-        self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
-
     def transformProblemForOptimizer(self):
         """
         Initializes an IsingInterface-instance, which encodes the Ising Spin Glass Problem, using the network to be
@@ -101,49 +56,6 @@ class QaoaQiskit(BackendBase):
             network=self.network, config=self.config["IsingInterface"]
         )
         self.output["results"]["qubit_map"] = self.transformedProblem.getQubitMapping()
-
-    def transformSolutionToNetwork(self) -> pypsa.Network:
-        """
-        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network.
-
-        Returns:
-            (pypsa.Network) The optimized network.
-        """
-        self.printReport()
-        return self.network
-
-    def processSolution(self) -> None:
-        """
-        Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
-
-        Returns:
-            (None) The self.output dictionary is modified with post-process information.
-        """
-        self.output["components"] = self.transformedProblem.getData()
-        return self.output
-
-    def createDrawTheta(self, theta: list) -> list:
-        """
-        Creates a list of the same size as theta with Parameters (beta(s) and gamma(s)) as values. This list can then
-        be used to bind to a quantum circuit, using Qiskit's bind_parameters function, which can be saved as a generic
-        circuit, using Qiskit's draw function.
-
-        Args:
-            theta: (list) The list of optimizable values of the quantum circuit. It will be used to create a list of
-                          the same length with beta(s) and gamma(s).
-
-        Returns:
-            (list) The created list of beta(s) and gamma(s).
-        """
-        betaValues = theta[::2]
-        drawTheta = []
-        for layer, _ in enumerate(betaValues):
-            drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
-            drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
-            # drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
-            # drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
-
-        return drawTheta
 
     def optimize(self):
         """
@@ -249,6 +161,96 @@ class QaoaQiskit(BackendBase):
                 for j in range(num_vars):
                     if initial_guess_original[j] == "rand":
                         initial_guess_original[j] = minCFvars[j]
+
+    def processSolution(self) -> None:
+        """
+        Post processing of the solution. Adds the components from the IsingInterface-instance to the output.
+
+        Returns:
+            (None) The self.output dictionary is modified with post-process information.
+        """
+        self.output["components"] = self.transformedProblem.getData()
+
+
+        return self.output
+
+    def transformSolutionToNetwork(self) -> pypsa.Network:
+        """
+        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network.
+
+        Returns:
+            (pypsa.Network) The optimized network.
+        """
+        self.printReport()
+        return self.network
+
+    def addResultsDict(self) -> None:
+        """
+        Adds the basic structure for the self.output["results"]-dictionary.
+
+        Returns:
+            (None) Modifies the self.output["results"]-dictionary.
+        """
+        self.output["results"] = {
+            "backend": None,
+            "qubit_map": {},
+            "hamiltonian": {},
+            "qc": None,
+            "initial_guesses": {
+                "original": self.config_qaoa["initial_guess"],
+                "refined": [],
+            },
+            "kirchhoff": {},
+            "repetitions": {},
+        }
+
+    def prepareRepetitionDict(self) -> None:
+        """
+        Initializes the basic structure for the self.rep_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
+
+        Returns:
+            (None) Modifies the self.rep_result-dictionary.
+        """
+        self.rep_result = {
+            "initial_guess": [],
+            "duration": None,
+            "optimizedResult": {},
+            "iterations": {},
+        }
+
+    def prepareIterationDict(self) -> None:
+        """
+        Initializes the basic structure for the self.iter_result-dictionary, setting its values to empty dictionaries,
+        empty lists or None values.
+
+        Returns:
+            (None) Modifies the self.iter_result-dictionary.
+        """
+        self.iter_result = {"theta": [], "counts": {}, "bitstrings": {}, "return": None}
+
+    def createDrawTheta(self, theta: list) -> list:
+        """
+        Creates a list of the same size as theta with Parameters (beta(s) and gamma(s)) as values. This list can then
+        be used to bind to a quantum circuit, using Qiskit's bind_parameters function, which can be saved as a generic
+        circuit, using Qiskit's draw function.
+
+        Args:
+            theta: (list) The list of optimizable values of the quantum circuit. It will be used to create a list of
+                          the same length with beta(s) and gamma(s).
+
+        Returns:
+            (list) The created list of beta(s) and gamma(s).
+        """
+        betaValues = theta[::2]
+        drawTheta = []
+        for layer, _ in enumerate(betaValues):
+            drawTheta.append(Parameter(f"\u03B2{layer+1}"))  # append beta_i
+            drawTheta.append(Parameter(f"\u03B3{layer+1}"))  # append gamma_i
+            # drawTheta.append(f"{chr(946)}{chr(8320 + layer)}")  #append beta_i
+            # drawTheta.append(f"{chr(947)}{chr(8320 + layer)}")  #append gamma_i
+
+        return drawTheta
 
     def getClassicalOptimizer(self, max_iter: int) -> qiskit.algorithms.optimizers:
         """
