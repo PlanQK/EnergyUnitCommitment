@@ -21,7 +21,7 @@ def main():
     inputReader = InputReader(network=netImport, config=config)
 
     qaoa = QaoaQiskit(reader=inputReader)
-    components = qaoa.transformProblemForOptimizer()
+    qaoa.transformProblemForOptimizer()
 
     """
     # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
@@ -45,7 +45,7 @@ def main():
     #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
     """
 
-    qaoa.optimize(transformedProblem=components)
+    qaoa.optimize()
 
     output = qaoa.getOutput()
 

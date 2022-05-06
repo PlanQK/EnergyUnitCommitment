@@ -74,9 +74,9 @@ class QaoaQiskit(BackendBase):
         """
         self.rep_result = {
             "initial_guess": [],
-            "iterations": {},
             "duration": None,
-            "optimizeResults": {},
+            "optimizedResult": {},
+            "iterations": {},
         }
 
     def prepareIterationDict(self) -> None:
@@ -230,11 +230,12 @@ class QaoaQiskit(BackendBase):
                     objective_function=expectation,
                     initial_point=initial_guess,
                 )
-                self.rep_result["optimizeResults"] = {
+                self.rep_result["optimizedResult"] = {
                     "x": list(res[0]),  # solution [beta, gamma]
                     "fun": res[1],  # objective function value
-                    "nfev": res[2],
-                }  # number of objective function calls
+                    "counts": self.rep_result["iterations"][res[2]]["counts"],  # counts of the optimized result
+                    "nfev": res[2],  # number of objective function calls
+                }
 
                 time_end = datetime.timestamp(datetime.now())
                 duration = time_end - time_start
@@ -281,12 +282,12 @@ class QaoaQiskit(BackendBase):
             (list) The beta and gamma values associated with the minimal cost function value.
         """
         searchData = self.output["results"]["repetitions"]
-        minCF = searchData[1]["optimizeResults"]["fun"]
+        minCF = searchData[1]["optimizedResult"]["fun"]
         minX = []
         for i in range(1, len(searchData) + 1):
-            if searchData[i]["optimizeResults"]["fun"] <= minCF:
-                minCF = searchData[i]["optimizeResults"]["fun"]
-                minX = searchData[i]["optimizeResults"]["x"]
+            if searchData[i]["optimizedResult"]["fun"] <= minCF:
+                minCF = searchData[i]["optimizedResult"]["fun"]
+                minX = searchData[i]["optimizedResult"]["x"]
 
         return minX
 
