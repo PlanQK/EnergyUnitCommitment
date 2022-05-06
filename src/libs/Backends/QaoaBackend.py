@@ -181,14 +181,11 @@ class QaoaQiskit(BackendBase):
         """
         self.output["components"] = self.transformedProblem.getData()
 
-        # get probabilities of bitstrings
-        self.extractPvalues()
-        # one-sided Mann-Witney U Test (x=bestBitstring, y=otherBitstring, alternative=greater)
+        self.extractPvalues()  # get probabilities of bitstrings
         self.findBestBitstring()
-        self.compareBitStringToRest()
-        # check p against alphas of [0.01, 0.05, 0.1]
-        self.determineConfidence()
-        # write best alpha to output together with bestBitstring and its p-values
+        self.compareBitStringToRest()  # one-sided Mann-Witney U Test
+        self.determineConfidence()  # check p against various alphas
+
         self.output["results"]["statistics"] = self.statistics
 
     def transformSolutionToNetwork(self) -> pypsa.Network:
