@@ -282,6 +282,8 @@ class IsingBackbone:
             # term with constant cost constribution after applying QUBO to Ising transformation
             self.addInteraction(0.5 * couplingStrength * self.data[qubit])
 
+    # TODO add a method to conveniently encode the squared distance to a fixed value into an ising
+
     def coupleComponents(self, firstComponent, secondComponent, couplingStrength=1, time=0, additionalTime=None):
         """
         This method couples two labeled groups of qubits as a product according to their weight 
@@ -1135,6 +1137,24 @@ class GlobalCostSquare(MarginalCostSubproblem):
         # interactions
         self.offsetBuildFactor = float(config["offsetBuildFactor"])
 
+    def printEstimationReport(self, estimatedCost, offset, time):
+        """
+        prints the estimated marginal cost and the offset of the cost per MW produced
+    
+        Args:
+            estimatedCost: (float) TODO
+            offset: (float) TODO
+            time: (int) index of the current time step
+        Returns:
+            (None) prints to stdout
+        """
+        print(f"--- Estimation Parameters at timestep {time} ---")
+        print(f"Absolute offset: {offset}")
+        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
+        print(f"Load at time step {time}: {load}")
+        print(f"Current total estimation at {time}: {offset * self.backbone.getTotalLoad(time)}")
+        print("---")
+
     def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
         for time in range(len(self.network.snapshots)):
             self.encodeMarginalCosts(time)
@@ -1187,6 +1207,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
             load -= suppliedPower
         return costEstimation + expectedAdditonalCost, offset
 
+    # TODO refactor using a isingbackbone function for encoding squared distances
     def encodeMarginalCosts(self, time):
         """
         The marginal costs of using generators
@@ -1200,19 +1221,15 @@ class GlobalCostSquare(MarginalCostSubproblem):
         @return: None 
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
+        # TODO make this more readable
+        estimatedCost , offset = self.estimateGlobalMarginalCost(time, expectedAdditonalCost=0)
+        self.printEstimationReport(estimatedCost, offset, time)
         generators = self.network.generators.index
-
+        # estimation of marginal costs is a global estimation. Calculate total power needed
         load = 0.0
         for bus in self.network.buses.index:
             load += self.backbone.getLoad(bus, time)
-        
-        print("")
-        print("--- Estimation Parameters ---")
-        print(f"Offset: {offset}")
-        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
-        print(f"Load: {load}")
-        print(f"Current total estimation at {time}: {offset * self.backbone.getTotalLoad(time)}")
+        # offset the marginal costs per energy produces and encode problem into backbone
         for gen1 in generators:
             marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
             for gen2 in generators:
@@ -1487,6 +1504,7 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                 encodingLength=len(slackWeights)
         )
 
+    # TODO refactor using a isingbackbone function for encoding squared distances
     def encodeMarginalCosts(self, time):
         """
         The marginal costs of using generators
@@ -1500,20 +1518,13 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
         @return: None 
             modifies self.problem. Adds to previously written interaction cofficient 
         """
-        estimatedCost , offset = self.estimateGlobalMarginalCost(time,expectedAdditonalCost= 0)
+        estimatedCost , offset = self.estimateGlobalMarginalCost(time, expectedAdditonalCost= 0)
+        self.printEstimationReport(estimatedCost, offset, time)
         generators = self.network.generators.index
         generators = list(generators) + ["slackMarginalCost"]
-
         load = 0.0
         for bus in self.network.buses.index:
             load += self.backbone.getLoad(bus, time)
-        
-        print("")
-        print("--- Estimation Parameters ---")
-        print(f"Offset: {offset}")
-        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
-        print(f"Load: {load}")
-        print(f"Current total estimation at {time}: {offset * self.backbone.getTotalLoad(time)}")
         for gen1 in generators:
             if gen1 == "slackMarginalCost":
                 marginalCostGen1 = 1.
@@ -1532,7 +1543,6 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                         gen2,
                         couplingStrength=curFactor
                 )
-
     
 
 class StartupShutdown(AbstractIsingSubproblem):
