@@ -2,7 +2,6 @@ from collections import OrderedDict
 import numpy as np
 import typing
 
-# TODO make report function
 
 def fullsplit(capacity):
     return [1]*capacity + [-1]*capacity
@@ -357,7 +356,7 @@ class IsingBackbone:
         for idx, qubit in enumerate(indices):
             self.data[qubit] = weights[idx]
         
-
+    # helper functions to set encoded values
     # helper functions for getting encoded values
     def getData(self):
         return self.data
@@ -507,7 +506,6 @@ class IsingBackbone:
             load += self.getLoad(bus,time)
         return load
 
-    # TODO accept more that just generators and lines for access
     def getRepresentingQubits(self, component, time=0):
         """
         Returns a list of all qubits that are used to encode a network component

@@ -29,8 +29,8 @@ class BackendBase(abc.ABC):
     def processSolution(self) -> None:
         self.output["results"]["postprocessingTime"] = 0.0
 
-    @abc.abstractstaticmethod
-    def transformSolutionToNetwork() -> pypsa.Network:
+    @abc.abstractmethod
+    def transformSolutionToNetwork(self) -> pypsa.Network:
         pass
 
     # TODO: implemented in DWave, but not used right now. (Can we have a blacklist on PlanQK?)

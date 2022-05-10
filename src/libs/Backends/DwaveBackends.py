@@ -187,7 +187,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def validateInput(self, path, network):
         return
 
-        # TODO implement file validation
         self.path = path
         self.networkName = network
 
