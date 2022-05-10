@@ -13,6 +13,16 @@ class PypsaBackend(BackendBase):
             self.config["BackendConfig"]["timeout"] = 3600
 
     def transformProblemForOptimizer(self):
+        """
+        sets up the linear programming optimizer and the linear programming
+        formulation.
+
+        The optimizer can be accessed at `self.opt` and then linear program
+        can be accessed at `self.transformedProblem` 
+        
+        Returns:
+            (None) Modifies `self.opt` and `self.transformedProblem`
+        """
         print("transforming problem...") 
         # self.network = network.copy() TODO: maybe deepcopy before setting things in network.
         self.network.generators.committable = True
@@ -21,12 +31,14 @@ class PypsaBackend(BackendBase):
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
         self.transformedProblem = pypsa.opf.network_lopf_build_model(
-            network=self.network,
-            snapshots=self.network.snapshots,
-            formulation="kirchhoff"
+                network=self.network,
+                snapshots=self.network.snapshots,
+                formulation="kirchhoff"
         )
-        self.opt = pypsa.opf.network_lopf_prepare_solver(self.network,
-                                                         solver_name=self.config["BackendConfig"]["solver_name"])
+        self.opt = pypsa.opf.network_lopf_prepare_solver(
+                                    self.network,
+                                    solver_name=self.config["BackendConfig"]["solver_name"]
+                                    )
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
 
     def transformSolutionToNetwork(self):
@@ -69,22 +81,22 @@ class PypsaBackend(BackendBase):
             self.output["results"]["powerImbalance"] = 0
 
     def optimize(self):
+        """
+        solves the linear program stored in self using the solver stored in self
+        
+        Returns:
+            (None) Writes the solution into self.output["results"]
+        """
         print("starting optimization...")
-
-        sol = self.opt.solve(self.transformedProblem)
-        sol.write()
-
-        solverstring = str(sol["Solver"])
+        solution = self.opt.solve(self.transformedProblem)
+        solution.write()
+        solverstring = str(solution["Solver"])
         self.writeResultToOutput(solverstring=solverstring)
+        print("done")
 
 
 class PypsaFico(PypsaBackend):
-
-    def __init__(self, reader: InputReader):
-        super().__init__(reader=reader)
-
+    pass
 
 class PypsaGlpk(PypsaBackend):
-
-    def __init__(self, reader: InputReader):
-        super().__init__(reader=reader)
+    pass

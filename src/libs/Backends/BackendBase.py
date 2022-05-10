@@ -15,9 +15,6 @@ class BackendBase(abc.ABC):
         self.setupOutputDict()
         self.transformedProblem = None
 
-    def validateInput(self, path):
-        pass
-
     @abc.abstractmethod
     def transformProblemForOptimizer(self) -> None:
         pass
@@ -31,6 +28,10 @@ class BackendBase(abc.ABC):
 
     @abc.abstractmethod
     def transformSolutionToNetwork(self) -> pypsa.Network:
+        pass
+
+    @abc.abstractmethod
+    def optimize(self) -> None:
         pass
 
     # TODO: implemented in DWave, but not used right now. (Can we have a blacklist on PlanQK?)

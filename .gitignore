@@ -13,6 +13,7 @@ makePlots.py
 *.json
 *.zip
 .ipynb_checkpoints/
+*.ipynb
 JobResponse
 !pypsa-0.19.3.zip
 !input/testService.json
