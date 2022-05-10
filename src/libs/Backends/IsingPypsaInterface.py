@@ -100,6 +100,7 @@ class IsingBackbone:
             print("No Kirchhoff configuration found, adding Kirchhoff constraint with Factor 1.0")
             configuration["kirchhoff"] = {"scaleFactor": 1.0}
             
+        # resolve string for splitting line capacty to function
         self._linesplitName = linesplitName
         self.splitCapacity = IsingBackbone.linesplitDict[linesplitName]
 
@@ -132,6 +133,7 @@ class IsingBackbone:
                 continue
             if not subproblemConfiguration:
                 print(f"Subproblem {subproblem} has no configuration data, skipping encoding")
+                continue
             subproblemInstance = subproblemTable[subproblem].buildSubproblem(
                     self, subproblemConfiguration
             )
@@ -140,16 +142,45 @@ class IsingBackbone:
             subproblemInstance.encodeSubproblem(self)
             
     def __getattr__(self, method_name):
+        """
+        This function delegates method calls of an ising backbone to a subproblem instance
+        if backbone doesn't have such a method. 
+
+        We can use this by calling methods about subproblems from the backbone instance. If
+        the name of the method is not unique among all subproblems it will raise an attribute
+        error.
+        
+        Args:
+            method_name: (str) the name of the method to be delegated to a subproblem
+        Returns:
+            (callable) the corresponding method of an ising subproblem
+        """
+        uniqueResolution = True 
         for subproblem, subproblemInstance in self._subproblems.items():
-            try:
-                method = getattr(subproblemInstance, method_name)
-                return method
-            except AttributeError:
-                pass
+            if hasattr(subproblemInstance, method_name):
+                if uniqueResolution:
+                    uniqueResolution = False
+                    method = getattr(subproblemInstance, method_name)
+                else:
+                    raise AttributeError(f"{method_name} didn't resolve to unique subproblem")
+        return method
 
     # obtain config file using an reader
     @classmethod
     def buildIsingProblem(cls, network, config: dict):
+        """
+        This is a factory method for making an IsingBackbone that corresponds to the problem in network
+
+        First, it retrieves information from the config dictionary which kind of ising backbone
+        to make and then return the an IsingBackbone object made using the rest of
+        the configuration.
+        
+        Args:
+            network: (pypsa.Network) The pypsa network problem to be cast into QUBO/Ising form
+            config: (dict) a dictionary containing all information about the QUBO formulations
+        Returns:
+            (IsingBackbone) An IsingBackbone that models the unit commitment problem of the network
+        """
         linesplitFunction = config.pop("formulation")
         return IsingBackbone(network, linesplitFunction, config)
     
@@ -286,6 +317,15 @@ class IsingBackbone:
     # end of coupling functions
 
     def numVariables(self, ):
+        """
+        Returns how many qubits have already been used to model problem components
+        
+        When allocating qubits for a new component, those qubits will start at the value
+        that this method returns and later updated
+
+        Returns:
+            (int) description
+        """
         return self.allocatedQubits
 
     # create qubits for generators and lines
@@ -325,11 +365,17 @@ class IsingBackbone:
                     encodingLength=len(singleTimestepSplit),
             )
 
-    def createQubitEntriesForComponent(self, componentName, numQubits=None, weights=None, encodingLength=None):
+    def createQubitEntriesForComponent(self, 
+                                    componentName,
+                                    numQubits=None,
+                                    weights=None,
+                                    encodingLength=None):
         """
         a function to create qubits in the data dictionary that represent some network component
         The qubits can be accessed using the componentName
         
+        The method places several restriction on what it accepts in order to generate a valid QUBO later on.
+        componentNames have to be of type str and unique
         Args:
             componentName: (str) the string used to couple the component with qubits
             numQubits: (int) number of qubits necessary to encode the component
@@ -340,13 +386,16 @@ class IsingBackbone:
         """
         if isinstance(componentName, int):
             raise ValueError("Component names mustn't be of type int")
+        if componentName in self.data:
+            raise ValueError("Component name has already been used")
         if weights is None:
-            raise ValueError("Assigned Qubits don't have any weight")
+            raise ValueError("Assigned qubits don't have any weight")
         if numQubits is None:
-            numQubits = len(weights)
-        if numQubits != len(weights):
-            raise ValueError("Assigned Qubits don't match number of weights")
-
+            numQubits = len(weights) * len(self.snapshots)
+        if numQubits * len(self.snapshots) != len(weights):
+            raise ValueError("Assigned qubits don't match number of weights")
+        if len(self.snapshots) * encodingLength != numQubits:
+            raise ValueError("total number of qubits, numer of snapshots and qubits per snapshot is not consistent")
         indices = range(self.allocatedQubits, self.allocatedQubits + numQubits)
         self.allocatedQubits += numQubits
         self.data[componentName] = {
@@ -357,7 +406,6 @@ class IsingBackbone:
         for idx, qubit in enumerate(indices):
             self.data[qubit] = weights[idx]
         
-
     # helper functions for getting encoded values
     def getData(self):
         return self.data
@@ -502,18 +550,27 @@ class IsingBackbone:
         return result
 
     def getTotalLoad(self, time):
+        """
+        Returns the total load over all buses at one time step
+        
+        Args:
+            time: (int) index of time step at which to return the load
+        Returns:
+            (float) the total load of the network at timestep `time`
+        """
         load = 0.0
         for bus in self.network.buses.index:
             load += self.getLoad(bus,time)
         return load
 
-    # TODO accept more that just generators and lines for access
     def getRepresentingQubits(self, component, time=0):
         """
         Returns a list of all qubits that are used to encode a network component
-        at a given time slice. A component is assumed to be encoded in one block
+        at a given time slice. 
+
+        A component is identified by a string assumed to be encoded in one block
         with constant encoding size per time slice and order of time slices
-        being respected in the encoding
+        being respected in the encoding.
 
         @param component: str
             label of the network component
@@ -557,6 +614,9 @@ class IsingBackbone:
         Returns the encoded value of a component according to the spin configuration in result
         at a given time slice
 
+        A component is represented by a list of weighted qubits and the encoded value is the 
+        weighted sum of all active qubits.
+
         @param component: str
             label of the network component for which to retrieve encoded value
         @param result: list
@@ -590,12 +650,18 @@ class IsingBackbone:
                 "individualKirchhoffCost": self.individualCostContribution(solution),
                 "unitCommitment": self.getGeneratorDictionary(solution),
                 "powerflow": self.getFlowDictionary(solution),
+                "hamiltonian": self.getHamiltonianMatrix()
         }
 
     def calcCost(self, result, isingInteractions=None):
         """
         calculates the energy of a spin state including the constant energy contribution
         
+        The default Ising spin glass state that is used to calculate the energy of a
+        solution is the full problem stored in the IsingBackbone. Ising subproblems can
+        overwrite which ising interactions are used to calculate the energy to get subproblem
+        specific information. The assignemt of qubits to the network is still fixed.
+
         @param result: list
             list of all qubits which have spin -1 in the solution 
         @return: float
@@ -703,8 +769,20 @@ class IsingBackbone:
 class AbstractIsingSubproblem:
     """
     An interface for classes that model the ising formulation of subproblem of an unit commitment problem
+
+    Classes that model a subproblem/constraint are children of this class and adhere to the following
+    structure. Each subproblem/constraint corresponds to one class
     """
     def __init__(self, backbone, config):
+        """
+        The constructor for a subproblem to be encode into the ising subproblem. It is subclass specific.
+        Different formulations of the same subproblems use a (factory) classmethod to choose
+        the correct subclass and call this constructor
+        
+        Args:
+            backbone: (IsingBackbone) The backbone on which's qubits to encode the problem
+            config: (dict) a dictionary containing all necessary configurations to construct an instance
+        """
         self.problem = {}
         self.scaleFactor = config["scaleFactor"]
         self.backbone = backbone
@@ -721,36 +799,24 @@ class AbstractIsingSubproblem:
         raise NotImplementedError
 
     # TODO remove backbone because it is already saved in self
-    def encodeSubproblem(self, isingBackbone: IsingBackbone, ):
+    def encodeSubproblem(self, isingBackbone: IsingBackbone):
         """
         This encodes the problem an instance of a subclass is describing into the isingBackbone instance
         After this call, the corresponding QUBO is stored in the isingBackbone
         """
         raise NotImplementedError
 
-    def calcCost(self, result, isingInteractions=None):
+    def calcCost(self, result):
         """
         calculates the energy of a spin state including the constant energy contribution
+        by delegating it to the IsingBackbone
         
         @param result: list
             list of all qubits which have spin -1 in the solution 
         @return: float
             the energy of the spin glass state in result
         """
-        result = set(result)
-        if isingInteractions is None:
-            isingInteractions = self.problem
-        totalCost = 0.0
-        for spins, weight in isingInteractions.items():
-            if len(spins) == 1:
-                factor = 1
-            else:
-                factor = -1
-            for spin in spins:
-                if spin in result:
-                    factor *= -1
-            totalCost += factor * weight
-        return totalCost
+        return self.isingBackbone.calcCost(result, self.problem)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem):
@@ -764,13 +830,18 @@ class MarginalCostSubproblem(AbstractIsingSubproblem):
         }
         return subclassTable[configuration.pop("formulation")](backbone, configuration)
 
-    def __init__(self, backbone, config):
-        super().__init__(backbone, config)
-
 
 class MarginalAsPenalty(MarginalCostSubproblem):
+    """
+    A subproblem class that models the minimization of the marginal costs. It does this
+    by adding a penalty to each qubit of a generator with the value being the marginal
+    costs incurred by commiting that generator. This linear penalty can be slightly changed
+    """
     def __init__(self, backbone, config):
         super().__init__(backbone, config)
+        # factor which in conjuction with the minimal cost per energy produced describes 
+        # by how much each marginal cost per unit procuded is offset in all generators to bring
+        # the average cost of a generator closer to zero
         self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
         # factor to scale estimated cost at a bus after calculation
         self.estimatedCostFactor = float(config["estimatedCostFactor"])
@@ -778,6 +849,17 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         self.offsetBuildFactor = float(config["offsetBuildFactor"])
 
     def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
+        """
+        Encodes the minimization of the marginal cost by applying a penalty at each qubit of
+        a generator equal to the cost it would incurr if committed
+        
+        Args:
+            isingBackbone: (IsingBackbone) isingBackbone on which qubits the marginal cost will be encoded
+        Returns:
+            (None) modifies `isingBackone`
+        """
+        # Marginal costs are only modelled as linear penalty. Thus, it suffices to iterate over
+        # all time steps and all buses to get all generators
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
                 self.encodeMarginalCosts(bus, time)
@@ -820,6 +902,11 @@ class MarginalAsPenalty(MarginalCostSubproblem):
             )
 
 class LocalMarginalEstimation(MarginalCostSubproblem):
+    """
+    A subproblem class that models the minimization of the marginal costs. It does this
+    by estimation the cost at each bus and models a minimization of the distance of the 
+    incurred cost to the estimated cost.
+    """
     def __init__(self, backbone, config):
         super().__init__(backbone, config)
         self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
@@ -830,6 +917,20 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         self.offsetBuildFactor = float(config["offsetBuildFactor"])
 
     def encodeSubproblem(self, isingBackbone: IsingBackbone, ): 
+        """
+        Encodes the minimization of the marginal cost.
+
+        It estimates the cost at each bus and models a minimization of the distance of the 
+        incurred cost to the estimated cost. The exact modeling of this can be adjusted
+        using the parameters: ``
+        
+        Args:
+            isingBackbone: (IsingBackbone) isingBackbone on which qubits the marginal cost will be encoded
+        Returns:
+            (None) modifies `isingBackone`
+        """
+        # Estimation is done independently at each bus. Thus it suffices to iterate over all snapshots
+        # and buses to encode the subproblem
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
                 self.encodeMarginalCosts(bus, time)
