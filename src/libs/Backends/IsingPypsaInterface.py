@@ -2,6 +2,8 @@ from collections import OrderedDict
 import numpy as np
 import typing
 
+import pypsa
+
 
 def fullsplit(capacity):
     return [1]*capacity + [-1]*capacity
@@ -406,6 +408,41 @@ class IsingBackbone:
             self.data[qubit] = weights[idx]
         
     # helper functions to set encoded values
+    def setOutputNetwork(self, solution: list) -> pypsa.Network:
+        outputNetwork = self.network.copy()
+        #get Generator/Line Status
+        generators = {}
+        lines = {}
+        generator_list = list(self.network.generators.index)
+        lines_list = list(self.network.lines.index)
+        for time in range(len(self.snapshots)):
+            for generator in generator_list:
+                generators[(generator, time)] = int(self.getGeneratorStatus(generator, solution, time))
+                generator_index = generator_list.index(generator)
+                try:
+                    outputNetwork.generators_t.status.iloc[time, generator_index] = generators[(generator, time)]
+                except IndexError:
+                    outputNetwork.generators_t.status[generator] = generators[(generator, time)]
+            for line in lines_list:
+                lines[(line, time)] = self.getEncodedValueOfComponent(line, solution, time)
+                line_index = lines_list.index(line)
+                # p0 - Active power at bus0 (positive if branch is withdrawing power from bus0).
+                # p1 - Active power at bus1 (positive if branch is withdrawing power from bus1).
+                if lines[(line, time)] < 0:
+                    p0 = abs(lines[(line, time)])
+                    p1 = lines[(line, time)]
+                else:
+                    p0 = -lines[(line, time)]
+                    p1 = lines[(line, time)]
+                try:
+                    outputNetwork.lines_t.p0.iloc[time, line_index] = p0
+                    outputNetwork.lines_t.p0.iloc[time, line_index] = p1
+                except IndexError:
+                    outputNetwork.lines_t.p0[line] = p0
+                    outputNetwork.lines_t.p1[line] = p1
+
+        return outputNetwork
+
     # helper functions for getting encoded values
     def getData(self):
         return self.data
