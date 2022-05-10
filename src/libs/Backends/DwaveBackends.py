@@ -11,6 +11,7 @@ from .IsingPypsaInterface import IsingBackbone
 
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler, FixedEmbeddingComposite, EmbeddingComposite, DWaveCliqueSampler
+from tabu import TabuSampler
 
 from numpy import round as npround
 import networkx as nx
@@ -29,21 +30,40 @@ from pandas import value_counts
 class DwaveTabuSampler(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
-        # TODO instert correct call for sampler
-        self.sampler = None
-        self.time = 0.0
+        self.getSampler()
 
-    def processSolution(self, network, transformedProblem, solution):
-        """
-        gets and writes info about the solution and returns it as a dictionary.
-        Does not improve the solution, instead override this method in child class
-        for postprocessing.
-        """
-        bestSample = self.choose_sample(transformedProblem,
-                                        solution,
-                                        strategy=self.config["BackendConfig"]["strategy"]
-                                        )
+    def getSampler(self):
+        self.sampler = TabuSampler()
+        return self.sampler
 
+    def processSamples(self, transformedProblem, sampleset):
+        processedSamples_df = sampleset.to_pandas_dataframe()
+        processedSamples_df['isingCost'] = processedSamples_df.apply(
+            lambda row: transformedProblem.calcCost(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
+        processedSamples_df['marginalCost'] = processedSamples_df.apply(
+            lambda row: transformedProblem.calcMarginalCost(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
+        processedSamples_df['totalPower'] = processedSamples_df.apply(
+            lambda row: transformedProblem.calcTotalPowerGenerated(
+                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
+            ),
+            axis=1
+        )
+        return processedSamples_df
+
+
+    def processSolution(self, network, transformedProblem, sample_df):
+        """
+        gets and writes info about the sample_df and returns it as a dictionary.
+        """
+        bestSample = self.choose_sample(strategy=self.config["BackendConfig"]["strategy"])
         resultInfo = transformedProblem.generateReport([
                 id for id, value in bestSample.items() if value == -1
                 ])
@@ -86,40 +106,9 @@ class DwaveTabuSampler(BackendBase):
     def getSampleDataframe(self):
         return self.sample_df
 
-    def choose_sample(self,
-                transformedProblem,
-                solution,
-                strategy="LowestEnergy"):
-        df = self.getSampleDataframe()
-        if strategy == 'LowestEnergy':
-            return solution.first.sample
-
-        # requires postprocessing because in order to match total power output
-        # local knapsack problems are usually solved worsed compared to
-        # the lowest energy sample
-        if strategy == 'ClosestSample':
-            totalLoad = 0.0
-            for idx, _ in enumerate(self.network.snapshots):
-                totalLoad += transformedProblem.getTotalLoad(idx)
-            df['deviation_from_opt_load'] = df.apply(
-                lambda row: abs(
-                        totalLoad - \
-                        transformedProblem.calcTotalPowerGenerated(
-                        [id for id, value in row.items() if value == -1])
-                        ),
-                axis=1
-            )
-            min_deviation = df['deviation_from_opt_load'].min()
-            ClosestSamples = df[df['deviation_from_opt_load'] == min_deviation]
-            result_row = ClosestSamples.loc[ClosestSamples['energy'].idxmin()]
-            return result_row[:-4].to_dict()
-
-        # interpret strategy as index in sample df
-        try:
-            return df.iloc[strategy][:-4].to_dict()
-        except TypeError:
-            raise ValueError("The chosen strategy for picking a sample is not supported")
-
+    def choose_sample(self):
+        return self.getSampleDataframe().iloc[0]
+#
     def transformSolutionToNetwork(self, network, transformedProblem, solution):
         self.printReport()
         # network = transformedProblem.addSQASolutionToNetwork(
@@ -130,15 +119,17 @@ class DwaveTabuSampler(BackendBase):
     def optimize(self, transformedProblem):
         print("starting optimization...")
         sampleset = self.getSampleSet(transformedProblem)
+        self.sample_df = self.processSamples(transformedProblem, sampleset)
         self.saveSample(sampleset)
         print("done")
-        return sampleset
+        return self.sample_df
 
     def getSampleSet(self, transformedProblem):
         return self.sampler.sample(self.getDimodModel(transformedProblem))
 
     def saveSample(self, sampleset):
-        self.sample_df = sampleset.to_pandas_dataframe()
+        if not hasattr(self, "sample_df"):
+            self.sample_df = sampleset.to_pandas_dataframe()
         self.output["results"]["sample_df"] = self.sample_df.to_dict('split')
         self.output["results"]["serial"] = sampleset.to_serializable()
 
@@ -154,15 +145,12 @@ class DwaveCloud(DwaveTabuSampler):
 
 
 class DwaveCloudHybrid(DwaveCloud):
-    def __init__(self, reader: InputReader):
-        super().__init__(reader=reader)
-        #self.token = self.envMgr["dwaveAPIToken"]
-        self.token = self.config["APItoken"]["dWave_API_token"]
-        self.solver = "hybrid_binary_quadratic_model_version2"
-        self.sampler = LeapHybridSampler(solver=self.solver,
-                                         token=self.token)
-        self.output["results"]["solver_id"] = self.solver
-        self.time = 0.0
+    def getSampler(self):
+            self.token = self.config["APItoken"]["dWave_API_token"]
+            self.solver = "hybrid_binary_quadratic_model_version2"
+            self.sampler = LeapHybridSampler(solver=self.solver,
+                                             token=self.token)
+            self.output["results"]["solver_id"] = self.solver
 
     def getSampleSet(self, transformedProblem):
         sampleset = super().getSampleSet(transformedProblem)
@@ -180,16 +168,20 @@ class DwaveCloudHybrid(DwaveCloud):
 
 class DwaveCloudDirectQPU(DwaveCloud):
 
+    def __init__(self, reader: InputReader):
+        super().__init__(reader=reader)
+        if self.config["BackendConfig"]["timeout"] < 0:
+            self.config["BackendConfig"]["timeout"] = 3600
+
     @staticmethod
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
-    def validateInput(self, path, network):
+    def validateInput(self, path):
         return
-
-        # TODO implement file validation
+        # TODO fix file validation
         self.path = path
-        self.networkName = network
+        self.networkName = ""
 
         blacklists = self.get_filepaths(path, "*_qpu_blacklist")
         filteredByTimeout = []
@@ -202,12 +194,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for blacklist in filteredByTimeout:
             with open(blacklist) as f:
                 s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-                if s.find(bytes(network, 'utf-8')) != -1:
+                if s.find(bytes(networkName, 'utf-8')) != -1:
                     raise ValueError("network found in blacklist")
 
         embeddingPath = f'{path}/embedding_' \
                         f'rep_{self.config["IsingInterface"]["problemFormulation"]}_' \
-                        f'{network}.json'
+                        f'{networkName}.json'
         if path.isfile(embeddingPath):
             print("found previous embedding")
             with open(embeddingPath) as embeddingFile:
@@ -232,6 +224,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
         return
 
     def getSampler(self):
+        self.validateInput(path="Problemset")
+        self.token = self.config["APItoken"]["dWave_API_token"]
+        # pegasus topology corresponds to Advantage 4.1
         DirectSampler = DWaveSampler(solver={
                                     'qpu': True,
                                     'topology__type': 'pegasus'
@@ -255,7 +250,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         if hasattr(self, 'embedding'):
             sampleArguments["embedding_parameters"] = dict(timeout=self.config["BackendConfig"]["timeout"])
             sampleArguments["return_embedding"] = True
-
         try:
             sampleset = self.sampler.sample(**sampleArguments)
         except ValueError:
@@ -267,16 +261,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 break
             time.sleep(1)
         return sampleset
-
-    def __init__(self, reader: InputReader):
-        super().__init__(reader=reader)
-        #self.token = self.envMgr["dwaveAPIToken"]
-        self.token = self.config["APItoken"]["dWave_API_token"]
-        # pegasus topology corresponds to Advantage 4.1
-        self.getSampler()
-        # additional info
-        if self.config["BackendConfig"]["timeout"] < 0:
-            self.config["BackendConfig"]["timeout"] = 3600
 
     def optimizeSampleFlow(self, sample):
         generatorState = [
@@ -291,28 +275,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
 
     def processSamples(self, transformedProblem, sampleset):
-        processedSamples_df = sampleset.to_pandas_dataframe()
-        processedSamples_df['quantumCost'] = processedSamples_df.apply(
-            lambda row: transformedProblem.calcCost(
-                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
-            ),
-            axis=1
-        )
+        processedSamples_df = super().processSamples(transformedProblem, sampleset)
         processedSamples_df['optimizedCost'] = processedSamples_df.apply(
             lambda row: self.optimizeSampleFlow(
                 row[:-3],
-            ),
-            axis=1
-        )
-        processedSamples_df['marginalCost'] = processedSamples_df.apply(
-            lambda row: transformedProblem.calcMarginalCost(
-                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
-            ),
-            axis=1
-        )
-        processedSamples_df['totalPower'] = processedSamples_df.apply(
-            lambda row: transformedProblem.calcTotalPowerGenerated(
-                    [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
         )
@@ -327,35 +293,27 @@ class DwaveCloudDirectQPU(DwaveCloud):
                                 ),
                 axis=1
         )
-        return processedSamples_df[["energy",
-                                    "quantumCost",
-                                    "optimizedCost",
-                                    "marginalCost",
-                                    "totalPower",
-                                    "deviation_from_opt_load"
-                                    ]]
-
-
-    def processSolution(self, network, transformedProblem, solution, sample=None):
+        return processedSamples_df
+    
+    def processSolution(self, network, transformedProblem, sample_df):
         tic = time.perf_counter()
         resultDict = super().processSolution(
             network,
             transformedProblem,
-            solution,
+            sample_df,
         )
-        processedSamples_df = self.processSamples(transformedProblem, solution)
-        lowestEnergyIndex = processedSamples_df["energy"].idxmin()
-        self.output["results"]["LowestEnergy"] = processedSamples_df.iloc[lowestEnergyIndex]["quantumCost"]
-        closestSamples = processedSamples_df[
-                processedSamples_df['deviation_from_opt_load'] == \
-                processedSamples_df['deviation_from_opt_load'].min()
+        lowestEnergyIndex = sample_df["energy"].idxmin()
+        self.output["results"]["LowestEnergy"] = sample_df.iloc[lowestEnergyIndex]["isingCost"]
+        closestSamples = sample_df[
+                sample_df['deviation_from_opt_load'] == \
+                sample_df['deviation_from_opt_load'].min()
                 ]
         closestTotalPowerIndex = closestSamples['energy'].idxmin()
-        self.output["samples_df"] = processedSamples_df.to_dict('index')
-        self.output["results"]["lowestEnergy"] = processedSamples_df.iloc[lowestEnergyIndex]["quantumCost"]
-        self.output["results"]["lowestEnergyProcessedFlow"] = processedSamples_df.iloc[lowestEnergyIndex]["optimizedCost"]
-        self.output["results"]["closestPowerProcessedFlow"] = processedSamples_df.iloc[closestTotalPowerIndex]["optimizedCost"]
-        self.output["results"]["bestProcessedFlow"] = processedSamples_df["optimizedCost"].min()
+        self.output["samples_df"] = sample_df.to_dict('index')
+        self.output["results"]["lowestEnergy"] = sample_df.iloc[lowestEnergyIndex]["isingCost"]
+        self.output["results"]["lowestEnergyProcessedFlow"] = sample_df.iloc[lowestEnergyIndex]["optimizedCost"]
+        self.output["results"]["closestPowerProcessedFlow"] = sample_df.iloc[closestTotalPowerIndex]["optimizedCost"]
+        self.output["results"]["bestProcessedFlow"] = sample_df["optimizedCost"].min()
         self.output["results"]["postprocessingTime"] = time.perf_counter() - tic
         return resultDict
 
@@ -370,12 +328,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         The cost is written to the field in results["results"]. Flow solutions don't spread
         imbalances across all buses so they can still be improved. 
         """
-
-        tic = time.perf_counter()
         FlowSolution = edmonds_karp(graph, "superSource", "superSink")
-        toc = time.perf_counter()
-        self.time += toc - tic
-
         # key errors occur iff there is no power generated or no load at a bus.
         # Power can still flow through the bus, but no cost is incurred
         totalCost = 0
@@ -390,7 +343,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
                               FlowSolution[bus]['superSink']['flow']) ** 2
             except KeyError:
                 pass
-
         return totalCost
 
     # quantum computation struggles with finetuning powerflow to match
@@ -467,25 +419,20 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
                 graph["superSource"][bus]['flow'] = min(generatedPower, generatedPower - netPower)
                 graph[bus]["superSink"]['flow'] = min(load, load + netPower)
-
         return graph
 
-    def optimize(self, transformedProblem):
-        print("optimize")
-        sampleset = self.getSampleSet(transformedProblem)
-        self.sample_df = sampleset.to_pandas_dataframe()
-        self.output["results"]["serial"] = sampleset.to_serializable()
-        
-        # TODO fix reusing embeddings
-#        if not hasattr(self, 'embedding'):
-#            embeddingPath = f'/energy/Problemset/embedding_' \
-#                            f'{self.networkName}.json'
-#
-#            embeddingDict = self.output["results"]["serial"]["info"]["embedding_context"]["embedding"]
-#            with open(embeddingPath, "w") as write_embedding:
-#                json.dump(
-#                    embeddingDict, write_embedding, indent=2
-#                )
+    def choose_sample(self, **kwargs):
+        sample_df = self.getSampleDataframe()
+        if kwargs['strategy'] == 'LowestEnergy':
+            return sample_df.loc[sample_df['energy'].idxmin()]
+        if kwargs['strategy'] == 'ClosestSample':
+            closestSamples = sample_df[
+                    sample_df['deviation_from_opt_load'] == sample_df['deviation_from_opt_load'].min()
+                    ]
+            return closestSamples.loc[closestSamples['optimizedCost'].idxmin()]
+    
+    def saveSample(self, sampleset):
+        super().saveSample(sampleset)
         self.output["results"]["optimizationTime"] = self.output["results"]["serial"]["info"]["timing"]["qpu_access_time"] / (10.0 ** 6)
         self.output["results"]["annealReadRatio"] = float(self.config["BackendConfig"]["annealing_time"]) / \
                                                     float(self.config["BackendConfig"]["num_reads"])
@@ -494,7 +441,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # intentionally round totalAnnealTime so computations with similar anneal time
         # can ge grouped together
         self.output["results"]["mangledTotalAnnealTime"] = int(self.output["results"]["totalAnnealTime"] / 1000.0)
-        return sampleset
 
 
 class DwaveReadQPU(DwaveCloudDirectQPU):
@@ -505,6 +451,8 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
     def getSampler(self):
         self.inputFilePath =  "/energy/results_qpu/" +  self.config["BackendConfig"]["sampleOrigin"]
+        self.sampler = self.inputFilePath
+        return None
 
     def getSampleSet(self, transformedProblem):
         print(f"reading from {self.inputFilePath}")

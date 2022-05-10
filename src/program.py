@@ -48,9 +48,6 @@ def run(
         # set up optimizer with input data
         OptimizerClass = ganBackends[inputReader.config["Backend"]]
         optimizer = OptimizerClass(reader=inputReader)
-        # validate input in case there are restrictions like limited computation time
-        # TODO: implement checks for different backends or maybe remove and use internal function in DWave
-        # optimizer.validateInput(path="Problemset", network=network)
 
         # run optimization
         optimizer.transformProblemForOptimizer()
