@@ -155,6 +155,7 @@ class IsingBackbone:
         Returns:
             (callable) the corresponding method of an ising subproblem
         """
+        method = None
         uniqueResolution = True 
         for subproblem, subproblemInstance in self._subproblems.items():
             if hasattr(subproblemInstance, method_name):
@@ -163,7 +164,10 @@ class IsingBackbone:
                     method = getattr(subproblemInstance, method_name)
                 else:
                     raise AttributeError(f"{method_name} didn't resolve to unique subproblem")
-        return method
+        if method:
+            return method
+        else:
+            raise AttributeError(f"{method_name} was not found in any stored subproblem")
 
     # obtain config file using an reader
     @classmethod
@@ -493,22 +497,25 @@ class IsingBackbone:
                 result[str((generator, time))] = int(self.getGeneratorStatus(generator, solution, time))
         return result
 
-    def getFlowDictionary(self, solution):
+    def getFlowDictionary(self, solution, stringify=False):
         """
         builds a dictionary containing all power flows at all time slices for a given
         solution of qubit spins
 
-        @param solution: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            @key: (str,int)
-                label of line and index of time slice
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution 
+            stringify: (bool) if this is true, dictionary are cast to strings for json
+        Returns:
+            (dict) dictionary with keys as labels of lines and time steps and flow as value
         """
         solution = set(solution)
         result = {}
         for lineId in self.network.lines.index:
             for time in range(len(self.snapshots)):
-                result[str((lineId, time))] = self.getEncodedValueOfComponent(lineId, solution, time)
+                key = (lineId, time)
+                if stringify:
+                    key = str(key)
+                result[key] = self.getEncodedValueOfComponent(lineId, solution, time)
         return result
 
     def getLineValues(self, solution):
