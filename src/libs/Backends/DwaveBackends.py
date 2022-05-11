@@ -109,12 +109,22 @@ class DwaveTabuSampler(BackendBase):
     def choose_sample(self):
         return self.getSampleDataframe().iloc[0]
 #
-    def transformSolutionToNetwork(self, network, transformedProblem, solution):
+    def transformSolutionToNetwork(self):
+        """
+        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network. It reads
+        the solution stored in the optimizer instance, prints some information about it and then writes it to the
+        network.
+
+        Returns:
+            (None) Stores the outputNetwork as dicitonary in the self.output dictionary
+        """
         self.printReport()
-        # network = transformedProblem.addSQASolutionToNetwork(
-        #      network, solutionState
-        # )
-        return network
+
+        # TODO: pass solution to setOutputNetwork
+        outputNetwork = self.transformedProblem.setOutputNetwork(solution=[0, 1, 2])
+        outputDataset = outputNetwork.export_to_netcdf()
+        self.output["network"] = outputDataset.to_dict()
+
 
     def optimize(self, transformedProblem):
         print("starting optimization...")
