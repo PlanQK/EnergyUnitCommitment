@@ -188,15 +188,22 @@ class QaoaQiskit(BackendBase):
 
         self.output["results"]["statistics"] = self.statistics
 
-    def transformSolutionToNetwork(self) -> pypsa.Network:
+    def transformSolutionToNetwork(self) -> None:
         """
         Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network.
 
         Returns:
-            (pypsa.Network) The optimized network.
+            (None) Stores the outputNetwork
         """
         self.printReport()
-        return self.network
+        bestBitstring = self.output["results"]["statistics"]["bestBitstring"]
+        solution = []
+        for idx, bit in enumerate(bestBitstring):
+            if bit == "1":
+                solution.append(idx)
+        outputNetwork = self.transformedProblem.setOutputNetwork(solution=solution)
+        outputDataset = outputNetwork.export_to_netcdf()
+        self.output["network"] = outputDataset.to_dict()
 
     def addResultsDict(self) -> None:
         """

@@ -27,7 +27,7 @@ class BackendBase(abc.ABC):
         self.output["results"]["postprocessingTime"] = 0.0
 
     @abc.abstractmethod
-    def transformSolutionToNetwork(self) -> pypsa.Network:
+    def transformSolutionToNetwork(self):
         pass
 
     @abc.abstractmethod

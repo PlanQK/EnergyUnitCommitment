@@ -49,6 +49,8 @@ def main():
 
     qaoa.processSolution()
 
+    qaoa.transformSolutionToNetwork()
+
     output = qaoa.getOutput()
 
     filename = qaoa.output["file_name"]

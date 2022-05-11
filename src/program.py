@@ -55,9 +55,9 @@ def run(
 
         # hook for potential post processing like flow optimization for dwave solutions
         optimizer.processSolution()
-        # return results
-        # TODO: implement saving solution in Network and store in output dict.
-        outputNetwork = optimizer.transformSolutionToNetwork()
+
+        optimizer.transformSolutionToNetwork()
+
         output = optimizer.getOutput()
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)
