@@ -450,8 +450,8 @@ class IsingBackbone:
                 encoded_val = self.getEncodedValueOfComponent(line, solution, time)
                 # p0 - Active power at bus0 (positive if branch is withdrawing power from bus0).
                 # p1 - Active power at bus1 (positive if branch is withdrawing power from bus1).
-                p0 = -encoded_val
-                p1 = encoded_val
+                p0 = encoded_val
+                p1 = -encoded_val
 
                 columns_p0 = list(outputNetwork.lines_t.p0.columns)
                 if line in columns_p0:
@@ -486,10 +486,9 @@ class IsingBackbone:
             @key 'generators'
                 list of labels of generators that are at the bus
             @key 'positiveLines'
-                list of labels of lines that start in this bus
-            @key 'negativeLines'
                 list of labels of lines that end in this bus
-         - end in this bus
+            @key 'negativeLines'
+                list of labels of lines that start in this bus
         """
         if bus not in self.network.buses.index:
             raise ValueError("the bus " + bus + "doesn't exist")
@@ -500,11 +499,11 @@ class IsingBackbone:
                         ].index),
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index),
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index),
                 }
         return result
