@@ -419,10 +419,18 @@ class IsingBackbone:
             for generator in generator_list:
                 generators[(generator, time)] = int(self.getGeneratorStatus(generator, solution, time))
                 generator_index = generator_list.index(generator)
+                p = self.getEncodedValueOfComponent(generator, solution, time)
+                p_nom = outputNetwork.generators.loc[generator, "p_nom"]
+                if p == 0:
+                    p_max_pu = 0.0
+                else:
+                    p_max_pu = p_nom / p
                 try:
+                    outputNetwork.generators_t.p_max_pu.iloc[time, generator_index] = p_max_pu
                     outputNetwork.generators_t.status.iloc[time, generator_index] = generators[(generator, time)]
                 except IndexError:
                     outputNetwork.generators_t.status[generator] = generators[(generator, time)]
+                    outputNetwork.generators_t.p_max_pu[generator] = p_max_pu
             for line in lines_list:
                 lines[(line, time)] = self.getEncodedValueOfComponent(line, solution, time)
                 line_index = lines_list.index(line)
