@@ -559,6 +559,7 @@ class IsingBackbone:
                 result[key] = self.getEncodedValueOfComponent(lineId, solution, time)
         return result
 
+    # TODO remove need for wrapper by updating other code with new func
     def getLineValues(self, solution):
         """
         wrapper for calling getFlowDictionary. It builds a dictionary that contains

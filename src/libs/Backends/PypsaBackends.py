@@ -42,6 +42,14 @@ class PypsaBackend(BackendBase):
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
 
     def transformSolutionToNetwork(self):
+        """
+        A method to write an optimization result into a pypsa network
+    
+        If a solution is found, this also prints information about the solution. 
+
+        Returns:
+            (pypsa.Network) returns a pypsa network which solves the unit commitment problem
+        """
         # TODO implement write from pyomo
         print("Writing from pyoyo model to network is not implemented")
 
@@ -52,6 +60,14 @@ class PypsaBackend(BackendBase):
         return self.network
 
     def writeResultToOutput(self, solverstring):
+        """
+        Write solution and info about it into the the `output["results"]` dictionary
+    
+        Args:
+            solverstring: (str) the string that the used solver of the linear program uses returns
+        Returns:
+            (None) modifies `output["results"]`
+        """
         self.output["results"]["optimizationTime"] = solverstring.splitlines()[-1].split()[1]
         self.output["results"]["terminationCondition"] = solverstring.splitlines()[-7].split()[2]
         if self.output["results"]["terminationCondition"] != "infeasible":
