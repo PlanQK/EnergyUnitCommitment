@@ -411,42 +411,60 @@ class IsingBackbone:
     def setOutputNetwork(self, solution: list) -> pypsa.Network:
         outputNetwork = self.network.copy()
         #get Generator/Line Status
-        generators = {}
         lines = {}
-        generator_list = list(self.network.generators.index)
-        lines_list = list(self.network.lines.index)
         for time in range(len(self.snapshots)):
-            for generator in generator_list:
-                generators[(generator, time)] = int(self.getGeneratorStatus(generator, solution, time))
-                generator_index = generator_list.index(generator)
+            for generator in outputNetwork.generators.index:
+                # set value in status-dataframe in generators_t dictionary
+                status = int(self.getGeneratorStatus(generator, solution, time))
+                column_status = list(outputNetwork.generators_t.status.columns)
+                if generator in column_status:
+                    index_generator = column_status.index(generator)
+                    outputNetwork.generators_t.status.iloc[time, index_generator] = status
+                else:
+                    outputNetwork.generators_t.status[generator] = status
+
+                # set value in p-dataframe in generators_t dictionary
                 p = self.getEncodedValueOfComponent(generator, solution, time)
+                columns_p = list(outputNetwork.generators_t.p.columns)
+                if generator in columns_p:
+                    index_generator = columns_p.index(generator)
+                    outputNetwork.generators_t.p.iloc[time, index_generator] = p
+                else:
+                    outputNetwork.generators_t.p[generator] = p
+
+                # set value in p_max_pu-dataframe in generators_t dictionary
+                columns_p_max_pu = list(outputNetwork.generators_t.p_max_pu.columns)
                 p_nom = outputNetwork.generators.loc[generator, "p_nom"]
                 if p == 0:
                     p_max_pu = 0.0
                 else:
                     p_max_pu = p_nom / p
-                try:
-                    outputNetwork.generators_t.p_max_pu.iloc[time, generator_index] = p_max_pu
-                    outputNetwork.generators_t.status.iloc[time, generator_index] = generators[(generator, time)]
-                except IndexError:
-                    outputNetwork.generators_t.status[generator] = generators[(generator, time)]
+                if generator in columns_p_max_pu:
+                    index_generator = columns_p_max_pu.index(generator)
+                    outputNetwork.generators_t.p_max_pu.iloc[time, index_generator] = p_max_pu
+                else:
                     outputNetwork.generators_t.p_max_pu[generator] = p_max_pu
-            for line in lines_list:
+
+            for line in outputNetwork.lines.index:
                 lines[(line, time)] = self.getEncodedValueOfComponent(line, solution, time)
-                line_index = lines_list.index(line)
+                encoded_val = self.getEncodedValueOfComponent(line, solution, time)
                 # p0 - Active power at bus0 (positive if branch is withdrawing power from bus0).
                 # p1 - Active power at bus1 (positive if branch is withdrawing power from bus1).
-                if lines[(line, time)] < 0:
-                    p0 = abs(lines[(line, time)])
-                    p1 = lines[(line, time)]
+                p0 = -encoded_val
+                p1 = encoded_val
+
+                columns_p0 = list(outputNetwork.lines_t.p0.columns)
+                if line in columns_p0:
+                    index_line = columns_p0.index(line)
+                    outputNetwork.lines_t.p0.iloc[time, index_line] = p0
                 else:
-                    p0 = -lines[(line, time)]
-                    p1 = lines[(line, time)]
-                try:
-                    outputNetwork.lines_t.p0.iloc[time, line_index] = p0
-                    outputNetwork.lines_t.p0.iloc[time, line_index] = p1
-                except IndexError:
                     outputNetwork.lines_t.p0[line] = p0
+
+                columns_p1 = list(outputNetwork.lines_t.p1.columns)
+                if line in columns_p1:
+                    index_line = columns_p1.index(line)
+                    outputNetwork.lines_t.p1.iloc[time, index_line] = p1
+                else:
                     outputNetwork.lines_t.p1[line] = p1
 
         return outputNetwork
