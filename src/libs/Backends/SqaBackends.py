@@ -38,23 +38,21 @@ class ClassicalBackend(BackendBase):
                         config=self.config["IsingInterface"]
                         )
         return self.transformedProblem
-    def transformSolutionToNetwork(self) -> pypsa.Network:
-        """
-        Encodes the optimal solution found during optimization and stored in self.output 
-        into a pypsa.Network. 
 
-        It reads the solution stored in the optimizer instance and prints some information
-        about it. Then it writes to the netowrk
+    def transformSolutionToNetwork(self) -> None:
+        """
+        Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network. It reads
+        the solution stored in the optimizer instance, prints some information about it and then writes it to the
+        network.
 
         Returns:
-            (pypsa.Network) The optimized network.
+            (None) Stores the outputNetwork as dicitonary in the self.output dictionary
         """
         self.printReport()
-        # self.transformedProblem.addSQASolutionToNetwork(
-        #     network, solution["state"]
-        # )
 
-        return self.network
+        outputNetwork = self.transformedProblem.setOutputNetwork(solution=self.output["results"]["state"])
+        outputDataset = outputNetwork.export_to_netcdf()
+        self.output["network"] = outputDataset.to_dict()
 
     def optimize(self) -> None:
         """
