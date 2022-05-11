@@ -409,6 +409,17 @@ class IsingBackbone:
         
     # helper functions to set encoded values
     def setOutputNetwork(self, solution: list) -> pypsa.Network:
+        """
+        Writes the status, p and p_max_pu values of generators, and the p0 and p1 values of lines according to the
+        provided solution in a copy self.network. This copy is then returned.
+
+        Args:
+            solution: (list) list of all qubits which have spin -1 in the solution
+
+        Returns:
+            (pypsa.Network) A copy of self.network in which time-dependant values for the generators and lines are set,
+                            according to the given solution.
+        """
         outputNetwork = self.network.copy()
         #get Generator/Line Status
         lines = {}
