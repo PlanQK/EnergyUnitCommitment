@@ -188,6 +188,8 @@ class QaoaQiskit(BackendBase):
 
         self.output["results"]["statistics"] = self.statistics
 
+        self.writeReportToOutput(bestBitstring=self.statistics["bestBitstring"])
+
     def transformSolutionToNetwork(self) -> None:
         """
         Encodes the optimal solution found during optimization and stored in self.output into a pypsa.Network. It reads
@@ -636,3 +638,22 @@ class QaoaQiskit(BackendBase):
             if not broken:
                 self.statistics["confidence"] = 1 - alpha
                 break
+
+    def writeReportToOutput(self, bestBitstring: str):
+        """
+        Writes solution specific values of the optimizer result and the ising spin glass problem solution to the output
+        dictionary.
+
+        Args:
+            bestBitstring: (str) The bitstring representing the best solution found during optimization.
+
+        Returns:
+            (None) Modifies self.output with solution specific parameters and values.
+        """
+        solution = []
+        for idx, bit in enumerate(bestBitstring):
+            if bit == "1":
+                solution.append(idx)
+        report = self.transformedProblem.generateReport(solution=solution)
+        for key in report:
+            self.output["results"][key] = report[key]
