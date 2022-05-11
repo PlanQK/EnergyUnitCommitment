@@ -120,8 +120,11 @@ class DwaveTabuSampler(BackendBase):
         """
         self.printReport()
 
-        # TODO: pass solution to setOutputNetwork
-        outputNetwork = self.transformedProblem.setOutputNetwork(solution=[0, 1, 2])
+        # TODO: check choose_sample function
+        bestSample = self.choose_sample(strategy=self.config["BackendConfig"]["strategy"])
+
+        outputNetwork = self.transformedProblem.setOutputNetwork(solution=[
+            id for id, value in bestSample.items() if value == -1])
         outputDataset = outputNetwork.export_to_netcdf()
         self.output["network"] = outputDataset.to_dict()
 
