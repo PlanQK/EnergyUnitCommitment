@@ -103,10 +103,6 @@ class IsingBackbone:
             "binarysplit" : binarysplit,
             "customsplit" : customsplit,
     } 
-    subproblemTable = {
-        "kirchhoff" : KirchhoffSubproblem,
-        "marginalCost" : MarginalCostSubproblem
-    }
 
     def __init__(self, network, linesplitName, configuration):
         """
@@ -122,6 +118,10 @@ class IsingBackbone:
         Returns:
             (IsingBackbone) An IsingBackbone instance with complete ising formulation as in the configuration
         """
+        self.subproblemTable = {
+            "kirchhoff" : KirchhoffSubproblem,
+            "marginalCost" : MarginalCostSubproblem
+        }
         if "kirchhoff" not in configuration:
             print("No Kirchhoff configuration found, adding Kirchhoff constraint with Factor 1.0")
             configuration["kirchhoff"] = {"scaleFactor": 1.0}
@@ -156,7 +156,7 @@ class IsingBackbone:
             if not subproblemConfiguration:
                 print(f"Subproblem {subproblem} has no configuration data, skipping encoding")
                 continue
-            subproblemInstance = subproblemTable[subproblem].buildSubproblem(
+            subproblemInstance = self.subproblemTable[subproblem].buildSubproblem(
                     self, subproblemConfiguration
             )
             self._subproblems[subproblem] = subproblemInstance
@@ -482,11 +482,11 @@ class IsingBackbone:
                         ].index),
                 "positiveLines" :
                         list(self.network.lines[
-                                self.network.lines.bus0 == bus
+                                self.network.lines.bus1 == bus
                         ].index),
                 "negativeLines" :
                         list(self.network.lines[
-                                self.network.lines.bus1 == bus
+                                self.network.lines.bus0 == bus
                         ].index),
                 }
         return result
@@ -538,7 +538,7 @@ class IsingBackbone:
                 result[str((generator, time))] = int(self.getGeneratorStatus(generator, solution, time))
         return result
 
-    def getFlowDictionary(self, solution, stringify=False):
+    def getFlowDictionary(self, solution, stringify=True):
         """
         builds a dictionary containing all power flows at all time slices for a given
         solution of qubit spins
@@ -1152,7 +1152,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
         print(f"--- Estimation Parameters at timestep {time} ---")
         print(f"Absolute offset: {offset}")
         print(f"Minimal estimated Cost (with offset): {estimatedCost}")
-        print(f"Load at time step {time}: {load}")
         print(f"Current total estimation at {time}: {offset * self.backbone.getTotalLoad(time)}")
         print("---")
 
@@ -1223,13 +1222,11 @@ class GlobalCostSquare(MarginalCostSubproblem):
             modifies self.problem. Adds to previously written interaction cofficient 
         """
         # TODO make this more readable
-        estimatedCost , offset = self.estimateGlobalMarginalCost(time, expectedAdditonalCost=0)
+        estimatedCost, offset = self.estimateGlobalMarginalCost(time, expectedAdditonalCost=0)
         self.printEstimationReport(estimatedCost, offset, time)
         generators = self.network.generators.index
         # estimation of marginal costs is a global estimation. Calculate total power needed
-        load = 0.0
-        for bus in self.network.buses.index:
-            load += self.backbone.getLoad(bus, time)
+        load = self.backbone.getTotalLoad(time)
         # offset the marginal costs per energy produces and encode problem into backbone
         for gen1 in generators:
             marginalCostGen1 = self.network.generators["marginal_cost"].loc[gen1] - offset
