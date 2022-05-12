@@ -11,7 +11,6 @@ try:
 except ImportError:
     import siquan
 
-
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 from .BackendBase import BackendBase
@@ -20,6 +19,11 @@ import random
 
 
 class ClassicalBackend(BackendBase):
+    """
+    A class for solving the unit commitment problem using classical annealing.
+    This is done using the SiQuAn solver and setting the transverse Field
+    to zero
+    """
     def __init__(self, reader: InputReader):
         super().__init__(reader=reader)
         self.solver = siquan.DTSQA()
@@ -83,7 +87,7 @@ class ClassicalBackend(BackendBase):
 
         For classical annealing, there is no transverse field, so it always return
         the same config string. Overwriting this method can be used to get non-zero
-        transverse fields
+        transverse field
         
         Returns:
             (str) the configuration string of the siquan solver according to the config dict
@@ -108,7 +112,6 @@ class ClassicalBackend(BackendBase):
         self.solver.setTSchedule(siquanConfig.get("temperatureSchedule", "[0.1,iF,0.0001]"))
         self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices", 32)))
         self.solver.setSteps(int(siquanConfig.get("optimizationCycles", 16)))
-
     
     def printSolverspecificReport(self):
         """
@@ -120,7 +123,6 @@ class ClassicalBackend(BackendBase):
         Returns:
             (None) no side effects other than printing
         """
-        
         print(
             f"Total energy cost of QUBO (with constant terms): {self.output['results']['totalCost']}"
         )
