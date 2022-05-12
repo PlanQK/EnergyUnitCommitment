@@ -20,7 +20,7 @@ def main():
     # different config parameters are seperated using '--'
     # the keys of the different levels of one parameters are seperated using '-'
     # for each parameter, the last value is the value of the config, and the rest are keys of the nesting
-    # any value found in extraParams will overwrite a value found in params
+    # any value found in extraParams will overwrite a value found in inputConfig
     if len(sys.argv) <= 3 or sys.argv[3] == "":
         extraParams = []
     else:
