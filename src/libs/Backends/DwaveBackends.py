@@ -105,7 +105,7 @@ class DwaveTabuSampler(BackendBase):
         """
         print("transforming Problem...")
         self.isingBackbone = IsingBackbone.buildIsingProblem(
-                network,
+                network=self.network,
                 config=self.config["IsingInterface"]
                 )
         return self.isingBackbone
@@ -184,15 +184,6 @@ class DwaveTabuSampler(BackendBase):
             id for id, value in bestSample.items() if value == -1])
         outputDataset = outputNetwork.export_to_netcdf()
         self.output["network"] = outputDataset.to_dict()
-
-        Returns:
-            (pypsa.Network) The optimized network.
-        """
-        self.printReport()
-        # network = transformedProblem.addSQASolutionToNetwork(
-        #      network, solutionState
-        # )
-        return self.network
 
     def optimize(self):
         """
