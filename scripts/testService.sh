@@ -24,7 +24,7 @@ done
 echo "using ${file} as input"
 
 data=`cat $file | jq '.data' | base64`
-inputConfig=`cat $file | jq '.inputConfig' | base64`
+params=`cat $file | jq '.params' | base64`
 
 echo "jq done"
 
@@ -32,10 +32,10 @@ unameOut=$(uname -s)
 
 case $unameOut in
     Linux)
-        docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${inputConfig}" planqk-service
+        docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${params}" planqk-service
         ;;
     *)
-        winpty docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${inputConfig}" planqk-service
+        winpty docker run -it -e INPUT_DATA="${data}" -e INPUT_PARAMS="${params}" planqk-service
         ;;
 esac
 
