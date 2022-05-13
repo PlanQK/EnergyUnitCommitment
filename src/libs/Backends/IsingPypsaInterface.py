@@ -275,9 +275,8 @@ class IsingBackbone:
             args[-1]: (float)
                 The basic interaction strength before applying qubit
                 weights.
-            args[:-1]: (list)
-                List of all qubits that are involved in this
-                interaction.
+            args[:-1]: (int)
+                All qubits that are involved in this interaction.
         Returns:
             (None)
                 Modifies self.problem by adding the strength of the
@@ -341,62 +340,85 @@ class IsingBackbone:
     # TODO add a method to conveniently encode the squared distance to a fixed
     #  value into an ising
 
-    def coupleComponents(self, firstComponent, secondComponent,
-                         couplingStrength=1, time=0, additionalTime=None):
+    def coupleComponents(self,
+                         firstComponent: str,
+                         secondComponent: str,
+                         couplingStrength: float = 1,
+                         time: int = 0,
+                         additionalTime: int = None
+                         ) -> None:
         """
-        This method couples two labeled groups of qubits as a product according to their weight 
-        and the selected time step
-
-        It performs a QUBO multiplication involving exactly two components on all qubits which are logically
-        grouped to represent these components at a given time slice. This QUBO multiplication is
-        translated into Ising interactions, scaled by the couplingStrength and the respective weihgts of the
-        qubits and then added to the currently stored ising spin glass problem
+        This method couples two labeled groups of qubits as a product
+        according to their weight and the selected time step.
+        It performs a QUBO multiplication involving exactly two
+        components on all qubits which are logically grouped to
+        represent these components at a given time slice. This QUBO
+        multiplication is translated into Ising interactions, scaled by
+        the couplingStrength and the respective weights of the qubits
+        and then added to the currently stored Ising spin glass problem.
 
         Args:
-            firstComponent: (str) label of the first network component
-            secondComponent: (str) label of the second network component
-            couplingStrength: (float) cofficient of QUBO multiplication by which 
-                                to scale all interactions. 
-            time: (int) index of time slice of the first component for which to couple 
-                                qubits representing it
-            additionalTime: (int) index of time slice of the second component for which 
-                            to couple qubits representing it. The default parameter None 
-                            is used if the time slices of both components are the same 
+            firstComponent: (str)
+                Label of the first network component.
+            secondComponent: (str)
+                Label of the second network component.
+            couplingStrength: (float)
+                Coefficient of QUBO multiplication by which to scale all
+                interactions.
+            time: (int)
+                Index of time slice of the first component for which to
+                couple qubits representing it.
+            additionalTime: (int)
+                Index of time slice of the second component for which
+                to couple qubits representing it. The default parameter
+                'None' is used if the time slices of both components
+                are the same.
         Returns:
-            (None) modifies `self.problem`. Adds to previously written interaction cofficient
+            (None)
+                Modifies `self.problem`. Adds to previously written
+                interaction coefficient.
 
-        example:
-            Let X_1, X_2 be the qubits representing firstComponent and Y_1, Y_2 the qubits representing
-            secondComponent. The QUBO product the method translates into ising spin glass coefficients is:
-            (X_1 + X_2) (Y_1 + Y_2) = X_1 Y_1 + X_1 Y_2 + X_2 Y_1 + X_2 Y_2
+        Example:
+            Let X_1, X_2 be the qubits representing firstComponent and
+            Y_1, Y_2 the qubits representing secondComponent. The QUBO
+            product the method translates into Ising spin glass
+            coefficients is:
+            (X_1 + X_2) * (Y_1 + Y_2) = X_1 * Y_1 + X_1 * Y_2
+                                        + X_2 * Y_1 + X_2 * Y_2
         """
-        # Replace None default values with their intended network component and then figure out
-        # which qubits we want to couple based on the component name and chosen time step
+        # Replace None default values with their intended network component and
+        # then figure out which qubits we want to couple based on the
+        # component name and chosen time step
         if additionalTime is None:
             additionalTime = time
         firstComponentAdress = self.getRepresentingQubits(firstComponent, time)
         secondComponentAdress = self.getRepresentingQubits(secondComponent,
                                                            additionalTime)
-        # components with 0 weight (power, capacity) vanish in the QUBO formulation
+        # components with 0 weight (power, capacity) vanish in the QUBO
+        # formulation
         if (not firstComponentAdress) or (not secondComponentAdress):
             return
-        # retrieving corresponding qubits is done. Now perform qubo multiplication by expanding the
-        # product and add each summand invididually. 
+        # retrieving corresponding qubits is done. Now perform qubo
+        # multiplication by expanding the product and add each summand
+        # invididually.
         for first in range(len(firstComponentAdress)):
             for second in range(len(secondComponentAdress)):
-                # The body of this loop corresponds to the multiplication of two QUBO 
-                # variables. According to the QUBO - Ising translation rule x = (sigma+1)/2
-                # one QUBO multiplication results in 4 ising interactions including constants
+                # The body of this loop corresponds to the multiplication of
+                # two QUBO variables. According to the QUBO - Ising
+                # translation rule x = (sigma+1)/2 one QUBO multiplication
+                # results in 4 ising interactions, including constants
 
-                # term with two spins after applying QUBO to Ising transformation
-                # if both spin id's are the same, this will add a constant cost.
+                # term with two spins after applying QUBO to Ising
+                # transformation if both spin id's are the same, this will
+                # add a constant cost.
                 # addInteraction performs substitution of spin with a constant
                 self.addInteraction(
                     firstComponentAdress[first],
                     secondComponentAdress[second],
                     couplingStrength * 0.25
                 )
-                # terms with single spins after applying QUBO to Ising transformation
+                # terms with single spins after applying QUBO to Ising
+                # transformation
                 self.addInteraction(
                     firstComponentAdress[first],
                     couplingStrength * self.data[secondComponent]['weights'][
@@ -407,84 +429,102 @@ class IsingBackbone:
                     couplingStrength * self.data[firstComponent]['weights'][
                         first] * 0.25
                 )
-                # term with constant cost constribution after applying QUBO to Ising transformation
+                # term with constant cost constribution after applying QUBO to
+                # Ising transformation
                 self.addInteraction(
-                    self.data[firstComponent]['weights'][first] * \
-                    self.data[secondComponent]['weights'][second] * \
-                    couplingStrength * 0.25
+                    self.data[firstComponent]['weights'][first]
+                    * self.data[secondComponent]['weights'][second]
+                    * couplingStrength * 0.25
                 )
 
     # end of coupling functions
 
-    def numVariables(self, ):
+    def numVariables(self) -> int:
         """
-        Returns how many qubits have already been used to model problem components
-
-        When allocating qubits for a new component, those qubits will start at the value
-        that this method returns and later updated
+        Returns how many qubits have already been used to model the
+        problem components.
+        When allocating qubits for a new component, those qubits will
+        start at the value returned by this method and later updated.
 
         Returns:
-            (int) description
+            (int)
+                The number of qubits already allocated.
         """
         return self.allocatedQubits
 
     # create qubits for generators and lines
-    def storeGenerators(self):
+    def storeGenerators(self) -> None:
         """
-        Assigns qubits (int) to each generator in self.network. For each generator it writes
-        generator specific parameters(power, corresponding qubits, size of encoding) into 
-        the dictionary self.data. At last it updates object specific parameters
+        Assigns qubits to each generator in self.network. For each
+        generator it writes generator specific parameters (i.e. power,
+        corresponding qubits, size of encoding) into the dictionary
+        self.data. At last it updates object specific parameters.
 
-        @return: None
-            modifies self.data and self.allocatedQubits
+        Returns:
+            (None)
+                Modifies self.data and self.allocatedQubits
         """
         timesteps = len(self.snapshots)
         for generator in self.network.generators.index:
             self.createQubitEntriesForComponent(
-                generator,
-                timesteps,
+                componentName=generator,
+                numQubits=timesteps,
                 weights=[self.getNominalPower(generator, time) for time in
                          range(len(self.snapshots))],
                 encodingLength=1,
             )
         return
 
-    def storeLines(self):
+    def storeLines(self) -> None:
         """
-        wrapper for calling encodeLine to store a qubit representation
-        on all lines at each time slice
+        Assigns a number of qubits, according to the option set in
+        self.config, to each line in self.network. For each line, line
+        specific parameters (i.e. power, corresponding qubits, size of
+        encoding) are as well written into the dictionary self.data. At
+        last it updates object specific parameters.
         
-        @return: None
-            modifies self.data and self.allocatedQubits
+        Returns:
+            (None)
+                Modifies self.data and self.allocatedQubits
         """
         timesteps = len(self.snapshots)
         for line in self.network.lines.index:
             singleTimestepSplit = self.splitCapacity(
                 int(self.network.lines.loc[line].s_nom))
             self.createQubitEntriesForComponent(
-                line,
+                componentName=line,
                 weights=singleTimestepSplit * timesteps,
                 encodingLength=len(singleTimestepSplit),
             )
 
     def createQubitEntriesForComponent(self,
-                                       componentName,
-                                       numQubits=None,
-                                       weights=None,
-                                       encodingLength=None):
+                                       componentName: str,
+                                       numQubits: int = None,
+                                       weights: int = None,
+                                       encodingLength: int = None
+                                       ) -> None:
         """
-        a function to create qubits in the data dictionary that represent some network component
-        The qubits can be accessed using the componentName
-        
-        The method places several restriction on what it accepts in order to generate a valid QUBO later on.
-        The checks are intended to prevent name or qubit collision.
+        A function to create qubits in the self.data dictionary that
+        represent some network components. The qubits can be accessed
+        using the componentName.
+        The method places several restriction on what it accepts in
+        order to generate a valid QUBO later on. The checks are intended
+        to prevent name or qubit collision.
+
         Args:
-            componentName: (str) the string used to couple the component with qubits
-            numQubits: (int) number of qubits necessary to encode the component
-            weights: (int) weight for each qubit which to use whenever it gets coupled with other qubits
-            encodingLength: (int) number of qubits used for encoding during one time step
+            componentName: (str)
+                The string used to couple the component with qubits.
+            numQubits: (int)
+                Number of qubits necessary to encode the component.
+            weights: (int)
+                Weight for each qubit which to use whenever it gets
+                coupled with other qubits.
+            encodingLength: (int)
+                Number of qubits used for encoding during one time step
+
         Returns:
-            (None) modifies the self.data and self.allocatedQubits attributes
+            (None)
+                Modifies self.data and self.allocatedQubits
         """
         if isinstance(componentName, int):
             raise ValueError("Component names mustn't be of type int")
@@ -497,8 +537,8 @@ class IsingBackbone:
         if numQubits * len(self.snapshots) != len(weights):
             raise ValueError("Assigned qubits don't match number of weights")
         if len(self.snapshots) * encodingLength != numQubits:
-            raise ValueError(
-                "total number of qubits, numer of snapshots and qubits per snapshot is not consistent")
+            raise ValueError("total number of qubits, numer of snapshots and "
+                             "qubits per snapshot is not consistent")
         indices = range(self.allocatedQubits, self.allocatedQubits + numQubits)
         self.allocatedQubits += numQubits
         self.data[componentName] = {
@@ -512,15 +552,19 @@ class IsingBackbone:
     # helper functions to set encoded values
     def setOutputNetwork(self, solution: list) -> pypsa.Network:
         """
-        Writes the status, p and p_max_pu values of generators, and the p0 and p1 values of lines according to the
-        provided solution in a copy self.network. This copy is then returned.
+        Writes the status, p and p_max_pu values of generators, and the
+        p0 and p1 values of lines according to the provided solution in
+        a copy of self.network. This copy is then returned.
 
         Args:
-            solution: (list) list of all qubits which have spin -1 in the solution
+            solution: (list)
+                List of all qubits which have spin -1 in the solution.
 
         Returns:
-            (pypsa.Network) A copy of self.network in which time-dependant values for the generators and lines are set,
-                            according to the given solution.
+            (pypsa.Network)
+                A copy of self.network in which time-dependant values
+                for the generators and lines are set according to the
+                given solution.
         """
         outputNetwork = self.network.copy()
         # get Generator/Line Status
@@ -529,7 +573,9 @@ class IsingBackbone:
             for generator in outputNetwork.generators.index:
                 # set value in status-dataframe in generators_t dictionary
                 status = int(
-                    self.getGeneratorStatus(generator, solution, time))
+                    self.getGeneratorStatus(gen=generator,
+                                            solution=solution,
+                                            time=time))
                 column_status = list(outputNetwork.generators_t.status.columns)
                 if generator in column_status:
                     index_generator = column_status.index(generator)
@@ -539,7 +585,9 @@ class IsingBackbone:
                     outputNetwork.generators_t.status[generator] = status
 
                 # set value in p-dataframe in generators_t dictionary
-                p = self.getEncodedValueOfComponent(generator, solution, time)
+                p = self.getEncodedValueOfComponent(component=generator,
+                                                    solution=solution,
+                                                    time=time)
                 columns_p = list(outputNetwork.generators_t.p.columns)
                 if generator in columns_p:
                     index_generator = columns_p.index(generator)
@@ -564,13 +612,14 @@ class IsingBackbone:
                     outputNetwork.generators_t.p_max_pu[generator] = p_max_pu
 
             for line in outputNetwork.lines.index:
-                lines[(line, time)] = self.getEncodedValueOfComponent(line,
-                                                                      solution,
-                                                                      time)
-                encoded_val = self.getEncodedValueOfComponent(line, solution,
-                                                              time)
-                # p0 - Active power at bus0 (positive if branch is withdrawing power from bus0).
-                # p1 - Active power at bus1 (positive if branch is withdrawing power from bus1).
+                encoded_val = self.getEncodedValueOfComponent(
+                    component=line,
+                    solution=solution,
+                    time=time)
+                # p0 - Active power at bus0 (positive if branch is withdrawing
+                # power from bus0).
+                # p1 - Active power at bus1 (positive if branch is withdrawing
+                # power from bus1).
                 p0 = encoded_val
                 p1 = -encoded_val
 
@@ -591,32 +640,39 @@ class IsingBackbone:
         return outputNetwork
 
     # helper functions for getting encoded values
-    def getData(self):
+    def getData(self) -> dict:
         """
-        returns the dictionary that holds information on the encoding
-        of the network into qubits
+        Returns the dictionary that holds information on the encoding
+        of the network into qubits.
         
         Returns:
-            (dict) the dictionary with network component as keys and qubit information as values
+            (dict)
+                The dictionary with network component as keys and qubit
+                information as values
         """
         return self.data
 
-    def getBusComponents(self, bus):
+    def getBusComponents(self, bus: str) -> dict:
         """
-        Returns all labels of components that connect to a bus as a dictionary. 
-        For lines that end in this bus, positive power flow is interpreted as
-        increasing available power at the bus. For Lines that start in this bus
-        positive power flow is interpreted as decreasing available power at the bus.
+        Returns all labels of components that connect to a bus as a
+        dictionary. For lines that end in this bus, positive power flow
+        is interpreted as increasing available power at the bus. For
+        lines that start in this bus positive power flow is interpreted
+        as decreasing available power at the bus.
 
-        @param bus: str
-            label of the bus
-        @return: dict
-            @key 'generators'
-                list of labels of generators that are at the bus
-            @key 'positiveLines'
-                list of labels of lines that end in this bus
-            @key 'negativeLines'
-                list of labels of lines that start in this bus
+        Args:
+            bus: (str)
+                Label of the bus.
+
+        Returns:
+            (dict)
+                A dictionary with the three following keys:
+                'generators':       A list of labels of generators that
+                                    are at the bus.
+                'positiveLines':    A list of labels of lines that end
+                                    in this bus.
+                'negativeLines':    A list of labels of lines that start
+                                    in this bus.
         """
         if bus not in self.network.buses.index:
             raise ValueError("the bus " + bus + " doesn't exist")
@@ -636,15 +692,21 @@ class IsingBackbone:
         }
         return result
 
-    def getNominalPower(self, generator, time=0, ):
+    def getNominalPower(self, generator: str, time: int = 0) -> float:
         """
-        returns the nominal power at a time step saved in the network
+        Returns the nominal power of a generator at a time step saved
+        in the network.
         
         Args:
-            generator: (str) generator label
-            time: (int) index of time slice for which to get nominal power
+            generator: (str)
+                The generator label.
+            time: (int)
+                Index of time slice for which to get nominal power
+
         Returns:
-            (float) maximum power available at generator in time slice at time
+            (float)
+                Nominal power available at 'generator' at time slice
+                'time'
         """
         try:
             p_max_pu = self.network.generators_t.p_max_pu[generator].iloc[time]
@@ -652,82 +714,101 @@ class IsingBackbone:
             p_max_pu = 1.0
         return self.network.generators.p_nom[generator] * p_max_pu
 
-    def getGeneratorStatus(self, gen, solution, time=0):
+    def getGeneratorStatus(self, gen: str, solution: list, time: int = 0
+                           ) -> bool:
         """
-        return the status of a generator(on, off) in a given solution
+        Returns the status of a generator 'gen' (i.e. on or off) at a
+        time slice 'time' in a given solution.
 
-        @param gen: str
-            label of the generator
-        @param solution: list
-            list of all qubits which have spin -1 in the solution
-        @param time: time
-            index of time slice for which to get the generator status
+        Args:
+            gen: (str)
+                The label of the generator.
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+            time: (int)
+                Index of time slice for which to get the generator
+                status.
         """
         return self.data[gen]['indices'][time] in solution
 
-    def getGeneratorDictionary(self, solution):
+    def getGeneratorDictionary(self, solution: list,
+                               stringify: bool = True) -> dict:
         """
-        builds a dictionary containing the status of all generators at all time 
-        slices for a given solution of qubit spins
+        Builds a dictionary containing the status of all generators at
+        all time slices for a given solution of qubit spins.
 
-        @param solution: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            @key: (str,int)
-                label of generator and index of time slice
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+            stringify: (bool)
+                If this is true, dictionary keys are cast to strings, so
+                they can for json
+
+        Returns:
+            (dict)
+                A dictionary containing the status of all generators at
+                all time slices. The keys are either tuples of the
+                label of the generator and the index of the time slice,
+                or these tuples typecast to strings, depending on the
+                'stringify' argument. The values are booleans, encoding
+                the status of the generators at the time slice.
         """
-        solution = set(solution)
         result = {}
         for generator in self.network.generators.index:
             for time in range(len(self.snapshots)):
-                result[str((generator, time))] = int(
-                    self.getGeneratorStatus(generator, solution, time))
+                key = (generator, time)
+                if stringify:
+                    key = str(key)
+                result[key] = int(
+                    self.getGeneratorStatus(gen=generator, solution=solution,
+                                            time=time))
         return result
 
-    def getFlowDictionary(self, solution, stringify=True):
+    def getFlowDictionary(self, solution: list,
+                          stringify: bool = True) -> dict:
         """
-        builds a dictionary containing all power flows at all time slices for a given
-        solution of qubit spins
+        Builds a dictionary containing all power flows at all time
+        slices for a given solution of qubit spins.
 
         Args:
-            solution: (list) list of all qubits which have spin -1 in the solution 
-            stringify: (bool) if this is true, dictionary are cast to strings for json
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+            stringify: (bool)
+                If this is true, dictionary keys are cast to strings, so
+                they can for json
+
         Returns:
-            (dict) dictionary with keys as labels of lines and time steps and flow as value
+            (dict)
+                A dictionary containing the flow of all lines at
+                all time slices. The keys are either tuples of the
+                label of the generator and the index of the time slice,
+                or these tuples typecast to strings, depending on the
+                'stringify' argument. The values are floats,
+                representing the flow of the lines at the time slice.
         """
-        solution = set(solution)
         result = {}
         for lineId in self.network.lines.index:
             for time in range(len(self.snapshots)):
                 key = (lineId, time)
                 if stringify:
                     key = str(key)
-                result[key] = self.getEncodedValueOfComponent(lineId, solution,
-                                                              time)
+                result[key] = self.getEncodedValueOfComponent(
+                    component=lineId, solution=solution, time=time)
         return result
 
-    # TODO remove need for wrapper by updating other code with new func
-    def getLineValues(self, solution):
+    def getLoad(self, bus: str, time: int = 0, silent: bool = True) -> float:
         """
-        wrapper for calling getFlowDictionary. It builds a dictionary that contains
-        all power flows at all time slices for a given solution of qubit spins
+        Returns the total load at a bus at a given time slice.
 
-        @param solution: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            @key: (str,int)
-                label of line and index of time slice
-        """
-        return self.getFlowDictionary(solution)
+        Args:
+            bus: (str)
+                Label of bus at which to calculate the total load.
+            time: (int)
+                Index of time slice for which to get the total load.
 
-    def getLoad(self, bus, time=0, silent=True):
-        """
-        returns the total load at a bus at a given time slice
-
-        @param bus: str
-            label of bus at which to calculate the total load
-        @param time: int
-            index of time slice for which to get the total load
+        Returns:
+            (float)
+                The total load at 'bus' at time slice 'time'.
         """
         loadsAtCurrentBus = self.network.loads[
             self.network.loads.bus == bus
@@ -736,90 +817,112 @@ class IsingBackbone:
         result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result == 0:
             if not silent:
-                print(
-                    f"Warning: No load at {bus} at timestep {time}.\nFalling back to constant load")
+                print(f"Warning: No load at {bus} at timestep {time}.\n"
+                      f"Falling back to constant load")
             allLoads = self.network.loads['p_set']
             result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
         if result < 0:
-            raise ValueError(
-                "negative Load at current Bus"
-            )
+            raise ValueError("negative Load at current Bus")
         return result
 
-    def getTotalLoad(self, time):
+    def getTotalLoad(self, time: int) -> float:
         """
-        Returns the total load over all buses at one time step
+        Returns the total load over all buses at one time slice.
 
         Args:
-            time: (int) index of time step at which to return the load
+            time: (int)
+                Index of time slice at which to return the load.
         Returns:
-            (float) the total load of the network at timestep `time`
+            (float)
+                The total load of the network at time slice `time`.
         """
         load = 0.0
         for bus in self.network.buses.index:
             load += self.getLoad(bus, time)
         return load
 
-    def getRepresentingQubits(self, component, time=0):
+    def getRepresentingQubits(self, component: str, time: int = 0) -> list:
         """
-        Returns a list of all qubits that are used to encode a network component
-        at a given time slice.
+        Returns a list of all qubits that are used to encode a network
+        component at a given time slice.
+        A component is identified by a string assumed to be encoded in
+        one block with constant encoding size per time slice and order
+        of time slices being respected in the encoding.
 
-        A component is identified by a string assumed to be encoded in one block
-        with constant encoding size per time slice and order of time slices
-        being respected in the encoding.
+        Args:
+            component: (str)
+                Label of the network component.
+            time: (int)
+                Index of time slice for which to get representing
+                qubits.
 
-        @param component: str
-            label of the network component
-        @param time: int
-            index of time slice for which to get representing qubits
-        @return: list
-            list of integers which are qubits that represent the component
+        Returns:
+            (list)
+                List of integers which are qubits that represent the
+                component.
         """
         encodingLength = self.data[component]["encodingLength"]
         return self.data[component]["indices"][
                time * encodingLength: (time + 1) * encodingLength]
 
-    def getQubitMapping(self, time=0):
+    def getQubitMapping(self, time: int = 0) -> dict:
         """
-        returns a dictionary on which qubits which network components were mapped for
-        representation in an ising spin glass problem
+        Returns a dictionary with all network components and which
+        qubits were used for representation in an Ising spin glass
+        problem.
         
         Args:
-            time: (int) index of time slice for which to get qubit map
+            time: (int)
+                Index of time slice for which to get qubit map
+
         Returns:
-            (dict) dictionary with network labels as keys and qubit lists as values
+            (dict)
+                Dictionary of all network components and their qubits.
+                Network components labels are the keys and the values
+                are the ranges of qubits used for their encoding.
         """
-        return {component: self.getRepresentingQubits(component, time)
+        return {component: self.getRepresentingQubits(component=component,
+                                                      time=time)
                 for component in self.data.keys()
                 if isinstance(component, str)}
 
-    def getInteraction(self, *args):
+    def getInteraction(self, *args) -> float:
         """
-        returns the interaction coeffiecient of a list of qubits
+        Returns the interaction coefficient of a list of qubits.
         
         Args:
-            *args: (list) a list of integers representing qubits
+            args: (int)
+                All qubits that are involved in this interaction.
+
         Returns:
-            (float) the interaction strength between all qubits in args
+            (float)
+                The interaction strength between all qubits in args.
         """
         sortedUniqueArguments = tuple(sorted(set(args)))
         return self.problem.get(sortedUniqueArguments, 0.0)
 
-    def getEncodedValueOfComponent(self, component, solution, time=0):
+    def getEncodedValueOfComponent(self, component: str, solution: list,
+                                   time: int = 0) -> float:
         """
-        Returns the encoded value of a component according to the spin configuration in solution
-        at a given time slice
-
-        A component is represented by a list of weighted qubits. The encoded value is the 
-        weighted sum of all active qubits.
+        Returns the encoded value of a component according to the spin
+        configuration in solution at a given time slice.
+        A component is represented by a list of weighted qubits. The
+        encoded value is the weighted sum of all active qubits.
 
         Args:
-            component: (str) label of the network component for which to retrieve encoded value
-            solution: (list) list of all qubits which have spin -1 in the solution
-            time: (int) index of time slice for which to retrieve encoded value
+            component: (str)
+                Label of the network component for which to retrieve the
+                encoded value.
+            solution: (list)
+                List of all qubits which have spin -1 in the solution.
+            time: (int)
+                Index of time slice for which to retrieve the encoded
+                value.
+
         Returns:
-            (float) value of component encoded in the spin configuration of solution
+            (float)
+                Value of the component encoded in the spin configuration
+                of solution.
         """
         value = 0.0
         encodingLength = self.data[component]["encodingLength"]
@@ -829,41 +932,55 @@ class IsingBackbone:
                 value += self.data[component]['weights'][idx]
         return value
 
-    def generateReport(self, solution):
+    def generateReport(self, solution: list) -> dict:
         """
-        For the given solution, calculates various properties of the solution
+        For the given solution, calculates various properties of the
+        solution.
 
         Args:
-            solution: (list) list of all qubits that have spin -1 in a solution
+            solution: (list)
+                List of all qubits that have spin -1 in a solution.
         Returns:
-            (dict) a dicitionary containing information about the solution
+            (dict)
+                A dicitionary containing general information about the
+                solution.
         """
         return {
-            "totalCost": self.calcCost(solution),
-            "kirchhoffCost": self.calcKirchhoffCost(solution),
-            "powerImbalance": self.calcPowerImbalance(solution),
-            "totalPower": self.calcTotalPowerGenerated(solution),
-            "marginalCost": self.calcMarginalCost(solution),
+            "totalCost": self.calcCost(solution=solution),
+            "kirchhoffCost": self.calcKirchhoffCost(solution=solution),
+            "powerImbalance": self.calcPowerImbalance(solution=solution),
+            "totalPower": self.calcTotalPowerGenerated(solution=solution),
+            "marginalCost": self.calcMarginalCost(solution=solution),
             "individualKirchhoffCost": self.individualCostContribution(
-                solution),
-            "unitCommitment": self.getGeneratorDictionary(solution),
-            "powerflow": self.getFlowDictionary(solution),
+                solution=solution),
+            "unitCommitment": self.getGeneratorDictionary(solution=solution,
+                                                          stringify=True),
+            "powerflow": self.getFlowDictionary(solution=solution,
+                                                stringify=True),
             "hamiltonian": self.getHamiltonianMatrix()
         }
 
-    def calcCost(self, solution, isingInteractions=None):
+    def calcCost(self, solution: list,
+                 isingInteractions: dict = None) -> float:
         """
-        calculates the energy of a spin state including the constant energy contribution
-        
-        The default Ising spin glass state that is used to calculate the energy of a
-        solution is the full problem stored in the IsingBackbone. Ising subproblems can
-        overwrite which ising interactions are used to calculate the energy to get subproblem
-        specific information. The assignemt of qubits to the network is still fixed.
+        Calculates the energy of a spin state including the constant
+        energy contribution.
+        The default Ising spin glass state that is used to calculate
+        the energy of a solution is the full problem stored in the
+        IsingBackbone. Ising subproblems can overwrite which Ising
+        interactions are used to calculate the energy to get subproblem
+        specific information. The assignemt of qubits to the network is
+        still fixed.
 
-        @param solution: list
-            list of all qubits which have spin -1 in the solution 
-        @return: float
-            the energy of the spin glass state in solution
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+            isingInteractions: (dict)
+                The Ising problem to be used to calculate the energy.
+
+        Returns:
+            (float)
+                The energy of the spin glass state in solution.
         """
         solution = set(solution)
         if isingInteractions is None:
@@ -880,31 +997,48 @@ class IsingBackbone:
             totalCost += factor * weight
         return totalCost
 
-    def individualMarginalCost(self, solution):
+    def individualMarginalCost(self, solution: list) -> dict:
         """
-        returns a dictionary which contains the marginal cost incurred at every bus 'bus' at
-        every time slice 'time' as {(bus,time) : value} 
+        Returns a dictionary which contains the marginal cost incurred
+        at every bus at every time slice.
 
-        @param solution: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the type (str,int) over all busses and time slices
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+
+        Returns:
+            (dict)
+                A dictionary containing the marginal costs incurred at
+                every bus at every time slice. The keys are tuples of
+                the bus name and the index of the time slice and the
+                values are the marginal costs at this bus at this time
+                slice.
         """
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcMarginalCostAtBus(bus, solution)}
+            contrib = {**contrib,
+                       **self.calcMarginalCostAtBus(bus=bus,
+                                                    solution=solution)
+                       }
         return contrib
 
-    def calcMarginalCostAtBus(self, bus, solution):
+    def calcMarginalCostAtBus(self, bus: str, solution: list) -> dict:
         """
-        returns a dictionary which contains the marginal cost the specified bus 'bus' at
-        every time slice 'time' as {(bus,time) : value} 
+        Returns a dictionary which contains the marginal cost incurred
+        at 'bus' at every time slice.
 
-        @param solution: list
-           list of all qubits which have spin -1 in the solution 
-        @return: dict
-            dictionary with keys of the type (str,int) over all  time slices and the string 
-            alwyays being the chosen bus
+        Args:
+            bus: (str)
+                Label of the bus.
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+
+        Returns:
+            (dict)
+                A dictionary containing the marginal costs incurred at
+                'bus' at every time slice. The keys are tuples of the
+                'bus' and the index of the time slice and the values
+                are the marginal costs at this bus at this time slice.
         """
         contrib = {}
         for time in range(len(self.snapshots)):
@@ -912,9 +1046,10 @@ class IsingBackbone:
             components = self.getBusComponents(bus)
             for generator in components['generators']:
                 if self.getGeneratorStatus(generator, solution, time):
-                    marginalCost += \
-                    self.network.generators["marginal_cost"].loc[generator] * \
-                    self.data[generator]['weights'][0]
+                    marginalCost \
+                        += self.network.generators["marginal_cost"].loc[
+                               generator] \
+                           * self.data[generator]['weights'][0]
             contrib[str((bus, time))] = marginalCost
         return contrib
 
@@ -1015,7 +1150,7 @@ class AbstractIsingSubproblem:
         """
         raise NotImplementedError
 
-    def calcCost(self, result):
+    def calcCost(self, solution: list) -> float:
         """
         calculates the energy of a spin state including the constant energy contribution
         by delegating it to the IsingBackbone
@@ -1025,7 +1160,8 @@ class AbstractIsingSubproblem:
         @return: float
             the energy of the spin glass state in result
         """
-        return self.isingBackbone.calcCost(result, self.problem)
+        return self.isingBackbone.calcCost(solution=solution,
+                                           isingInteractions=self.problem)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem):
@@ -1608,7 +1744,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             self.calcPowerImbalanceAtBus(bus, result, silent=silent).items()
         }
 
-    def calcKirchhoffCost(self, solution):
+    def calcKirchhoffCost(self, solution: list):
         """
         calculate the total unscaled kirchhoffcost incurred by a solution
         
@@ -1624,19 +1760,19 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 kirchhoffCost += val ** 2
         return kirchhoffCost
 
-    def individualCostContribution(self, result, silent=True):
+    def individualCostContribution(self, solution, silent=True):
         """
         returns a dictionary which contains the kirchhoff cost incurred at every bus at
         every time slice scaled by the KirchhoffFactor
 
-        @param result: list
+        @param solution: list
            list of all qubits which have spin -1 in the solution 
         @return: dict
             dictionary with keys of the form (str,int) over all busses and time slices
         """
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, result,
+            contrib = {**contrib, **self.calcKirchhoffCostAtBus(bus, solution,
                                                                 silent=silent)}
         return contrib
 
