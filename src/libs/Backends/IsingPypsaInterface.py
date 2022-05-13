@@ -1037,15 +1037,18 @@ class IsingBackbone:
             (dict)
                 A dictionary containing the marginal costs incurred at
                 'bus' at every time slice. The keys are tuples of the
-                'bus' and the index of the time slice and the values
-                are the marginal costs at this bus at this time slice.
+                'bus' and the index of the time slice, typecast to
+                strings, and the values are the marginal costs at this
+                bus at this time slice.
         """
         contrib = {}
         for time in range(len(self.snapshots)):
             marginalCost = 0.0
             components = self.getBusComponents(bus)
             for generator in components['generators']:
-                if self.getGeneratorStatus(generator, solution, time):
+                if self.getGeneratorStatus(gen=generator,
+                                           solution=solution,
+                                           time=time):
                     marginalCost \
                         += self.network.generators["marginal_cost"].loc[
                                generator] \
@@ -1053,37 +1056,45 @@ class IsingBackbone:
             contrib[str((bus, time))] = marginalCost
         return contrib
 
-    def calcMarginalCost(self, solution):
+    def calcMarginalCost(self, solution: list) -> float:
         """
-        calculate the total marginal cost incurred by a solution
+        Calculate the total marginal cost incurred by a solution.
 
-        @param solution: list
-            list of all qubits which have spin -1 in the solution
-        @return: float
-            total marginal cost incurred without monetaryFactor scaling
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+
+        Returns:
+            (float)
+                The total marginal cost incurred without monetaryFactor
+                scaling.
         """
         marginalCost = 0.0
-        for key, val in self.individualMarginalCost(solution).items():
+        for key, val in self.individualMarginalCost(solution=solution).items():
             marginalCost += val
         return marginalCost
 
     # getter for encoded ising problem parameters
-    def siquanFormat(self):
+    def siquanFormat(self) -> list:
         """
-        Return the complete problem in the format for the siquan solver
-        
-        @return: list
-            list of tuples of the form (interaction-coefficient, list(qubits))
+        Returns the complete problem in the format required by the
+        siquan solver.
+
+        Returns:
+            (list)
+                A list of tuples of the form (interaction-coefficient,
+                list(qubits)).
         """
         return [(v, list(k)) for k, v in self.problem.items() if
                 v != 0 and len(k) > 0]
 
-    def getHamiltonianMatrix(self, ):
+    def getHamiltonianMatrix(self) -> list:
         """
-        returns a matrix containing the ising hamiltonian
+        Returns a matrix containing the Ising hamiltonian
         
         Returns:
-            (list) a list of list representing the hamiltonian matrix
+            (list)
+                A list of lists representing the hamiltonian matrix.
         """
         qubits = range(self.allocatedQubits)
         hamiltonian = [
@@ -1091,39 +1102,45 @@ class IsingBackbone:
         ]
         return hamiltonian
 
-    def getHamiltonianEigenvalues(self, ):
+    def getHamiltonianEigenvalues(self) -> np.ndarray:
         """
-        returns the eigenvalues and normalized eigenvectors of the hamiltonian matrix
+        Returns the eigenvalues and normalized eigenvectors of the
+        hamiltonian matrix.
         
         Returns:
-            (np.ndarray) a numpy array containing all eigenvalues
+            (np.ndarray)
+                A numpy array containing all eigenvalues.
         """
         return np.linalg.eigh(self.getHamiltonianMatrix())
 
 
 class AbstractIsingSubproblem:
     """
-    An interface for classes that model the ising formulation of subproblem 
-    of an unit commitment problem
-
-    Classes that model a subproblem/constraint are subclasses of this class and 
-    adhere to the following structure. Each subproblem/constraint corresponds to one class
-    This class has a factory method which chooses the correct subclass of itself. Any
-    of those has a method that accepts an IsingBackbone as the argument and encodes 
+    An interface for classes that model the Ising formulation
+    subproblem of an unit commitment problem.
+    Classes that model a subproblem/constraint are subclasses of this
+    class and adhere to the following structure. Each subproblem/
+    constraint corresponds to one class. This class has a factory method
+    which chooses the correct subclass of itself. Any of those have a
+    method that accepts an IsingBackbone as the argument and encodes
     it's problem onto that object.
     """
 
-    def __init__(self, backbone, config):
+    def __init__(self, backbone: IsingBackbone, config: dict):
         """
-        The constructor for a subproblem to be encode into the ising subproblem. 
-
-        Different formulations of the same subproblems use a (factory) classmethod to choose
-        the correct subclass and call this constructor. The attributes set here are
-        the minimal attributes that are expected
+        The constructor for a subproblem to be encode into the Ising
+        subproblem.
+        Different formulations of the same subproblems use a (factory)
+        classmethod to choose the correct subclass and call this
+        constructor. The attributes set here are the minimal attributes
+        that are expected.
         
         Args:
-            backbone: (IsingBackbone) The backbone on which's qubits to encode the problem
-            config: (dict) a dict containing all necessary configurations to construct an instance
+            backbone: (IsingBackbone)
+                The backbone on which to encode the problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance.
         """
         self.problem = {}
         self.scaleFactor = config["scaleFactor"]
@@ -1131,51 +1148,79 @@ class AbstractIsingSubproblem:
         self.network = backbone.network
 
     @classmethod
-    def buildSubproblem(cls, backbone,
-                        configuration) -> 'AbstractIsingSubproblem':
+    def buildSubproblem(cls, backbone: IsingBackbone,
+                        configuration: dict) -> 'AbstractIsingSubproblem':
         """
-        returns an instance of the class set up according to the configuration.
+        Returns an instance of the class set up according to the
+        configuration.
+        This is done by choosing the corresponding subclass of the
+        configuration. After initialization, the instance can encode
+        this subproblem into the isingBackbone by calling the
+        encodeSubproblem method.
 
-        This is done by choosing the corresponding subclass of the configuration.
-        After initialization, the instance can encode this subproblem into an isingBackbone by calling
-        the encodeSubproblem method
+        Args:
+            backbone: (IsingBackbone)
+                The isingBackbone used to encode the subproblem.
+            configuration: (dict)
+                The configuration dictionary, containing all data
+                necessary to initalize.
+
+        Returns:
+            (AbstractIsingSubproblem)
+                The constructed Ising subproblem.
         """
         raise NotImplementedError
 
-    # TODO remove backbone because it is already saved in self
-    def encodeSubproblem(self, isingBackbone: IsingBackbone):
+    def encodeSubproblem(self):
         """
-        This encodes the problem an instance of a subclass is describing into the isingBackbone instance
-        After this call, the corresponding QUBO is stored in the isingBackbone
+        This encodes the problem an instance of a subclass is describing
+        into the isingBackbone instance. After this call, the
+        corresponding QUBO is stored in the isingBackbone.
         """
         raise NotImplementedError
 
     def calcCost(self, solution: list) -> float:
         """
-        calculates the energy of a spin state including the constant energy contribution
-        by delegating it to the IsingBackbone
+        Calculates the energy of a spin state including the constant
+        energy contribution by delegating it to the IsingBackbone.
 
-        @param result: list
-            list of all qubits which have spin -1 in the solution 
-        @return: float
-            the energy of the spin glass state in result
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+
+        Returns:
+            (float)
+                The energy of the spin glass state.
         """
-        return self.isingBackbone.calcCost(solution=solution,
-                                           isingInteractions=self.problem)
+        return self.backbone.calcCost(solution=solution,
+                                      isingInteractions=self.problem)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem):
     @classmethod
-    def buildSubproblem(cls, backbone,
-                        configuration) -> 'AbstractIsingSubproblem':
+    def buildSubproblem(cls, backbone: IsingBackbone,
+                        configuration: dict) -> 'MarginalCostSubproblem':
         """
-        a factory method for obtaining the marginal cost model specified in the config
-    
+        A factory method for obtaining the marginal cost model specified
+        in configuration.
+        Returns an instance of the class set up according to the
+        configuration.
+        This is done by choosing the corresponding subclass of the
+        configuration. After initialization, the instance can encode
+        this subproblem into the isingBackbone by calling the
+        encodeSubproblem method.
+
         Args:
-            backbone: (IsingBackbone) The backbone to use for encoding network components with qubits
-            configuration: (dict) A dictionary containing all data necessary to initalize
+            backbone: (IsingBackbone)
+                The isingBackbone used to encode the subproblem.
+            configuration: (dict)
+                The configuration dictionary, containing all data
+                necessary to initalize.
+
         Returns:
-            (MarginalCostSubproblem) An SubProblem instance ready to encode on the backbone
+            (MarginalCostSubproblem)
+                The constructed Ising instance ready to encode into the
+                backbone.
         """
         subclassTable = {
             "GlobalCostSquare": GlobalCostSquare,
@@ -1183,65 +1228,79 @@ class MarginalCostSubproblem(AbstractIsingSubproblem):
             "MarginalAsPenalty": MarginalAsPenalty,
             "LocalMarginalEstimation": LocalMarginalEstimation,
         }
-        return subclassTable[configuration.pop("formulation")](backbone,
-                                                               configuration)
+        return subclassTable[configuration.pop("formulation")](
+            backbone=backbone, config=configuration)
 
 
 class MarginalAsPenalty(MarginalCostSubproblem):
     """
-    A subproblem class that models the minimization of the marginal costs. It does this
-    by adding a penalty to each qubit of a generator with the value being the marginal
-    costs incurred by commiting that generator. This linear penalty can be slightly changed
+    A subproblem class that models the minimization of the marginal
+    costs. It does this by adding a penalty to each qubit of a generator
+    with the value being the marginal costs incurred by committing that
+    generator. This linear penalty can be slightly changed.
     """
 
-    def __init__(self, backbone, config):
+    def __init__(self, backbone: IsingBackbone, config: dict):
         """
-        A constructor for encoding marginal cost as linear penalties
-    
-        This sets three additional parameters which slightly change how the penalty is applied
-        `offsetEstimationFactor`: sets an offset across all generators by the cost of the most
-                                efficient generator scaled by this factor
-        `estimatedCostFactor`: is going to be removed
-        `offsetBuildFactor`: is going to be removed
+        The constructor for encoding marginal cost as linear penalties.
+        It inherits its functionality from the AbstractIsingSubproblem
+        constructor. Additionally it sets three more parameters which
+        slightly change how the penalty is applied:
+            `offsetEstimationFactor`: sets an offset across all generators
+                by the cost of the most efficient generator scaled by this
+                factor
+            `estimatedCostFactor`: is going to be removed
+            `offsetBuildFactor`: is going to be removed
+
         Args:
-            backbone: (IsingBackbone) The backbone to use for encoding network components with qubits
-            configuration: (dict) A dictionary containing all data necessary to initalize
+            backbone: (IsingBackbone)
+                The backbone on which to encode the problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance.
         """
         super().__init__(backbone, config)
-        # factor which in conjuction with the minimal cost per energy produced describes
-        # by how much each marginal cost per unit procuded is offset in all generators to bring
-        # the average cost of a generator closer to zero
+        # factor which in conjuction with the minimal cost per energy produced
+        # describes by how much each marginal cost per unit procuded is offset
+        # in all generators to bring the average cost of a generator closer to
+        # zero
         self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
         # factor to scale estimated cost at a bus after calculation
         self.estimatedCostFactor = float(config["estimatedCostFactor"])
-        # factor to scale marginal cost of a generator when constructing ising interactions
+        # factor to scale marginal cost of a generator when constructing ising
+        # interactions
         self.offsetBuildFactor = float(config["offsetBuildFactor"])
 
-    def encodeSubproblem(self, isingBackbone: IsingBackbone, ):
+    def encodeSubproblem(self) -> None:
         """
-        Encodes the minimization of the marginal cost by applying a penalty at each qubit of
-        a generator equal to the cost it would incurr if committed
+        Encodes the minimization of the marginal cost by applying a
+        penalty at each qubit of a generator equal to the cost it would
+        incur if committed.
 
-        Args:
-            isingBackbone: (IsingBackbone) isingBackbone on which qubits the marginal 
-                                            cost will be encoded
         Returns:
-            (None) modifies `isingBackone`
+            (None)
+                Modifies self.backbone.
         """
-        # Marginal costs are only modelled as linear penalty. Thus, it suffices to iterate over
-        # all time steps and all buses to get all generators
+        # Marginal costs are only modelled as linear penalty. Thus, it
+        # suffices to iterate over all time steps and all buses to get all
+        # generators
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
-                self.encodeMarginalCosts(bus, time)
+                self.encodeMarginalCosts(bus=bus, time=time)
 
-    def marginalCostOffset(self, ):
+    def marginalCostOffset(self) -> float:
         """
-        returns a float by which all generator marginal costs per power will be offset.
-        Since every generator will be offset, this will not change relative costs between them
-        It changes the range of energy contributions this constraint provides. Adding marginal
-        costs as a cost to the QUBO formulation will penalize all generator configurations. The offset
-        shifts it so that the cheapest generator doesn't get any penalty
-        
+        Returns a float by which all generator marginal costs per power
+        will be offset. Since every generator will be offset, this will
+        not change relative costs between them. It changes the range of
+        energy contributions this constraint provides. Adding marginal
+        costs as a cost to the QUBO formulation will penalize all
+        generator configurations. The offset shifts it, so that the
+        cheapest generator doesn't get any penalty.
+
+        Returns:
+            (float)
+
         @return: float
             a float that in is in the range of generator marginal costs
         """
