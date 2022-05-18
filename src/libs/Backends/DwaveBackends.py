@@ -1,6 +1,7 @@
 import time
 
 # importing dwave packages
+import networkx
 import pandas
 from dwave.cloud import Client
 import dimod
@@ -38,7 +39,7 @@ class DwaveTabuSampler(BackendBase):
         super().__init__(reader=reader)
         self.getSampler()
 
-    def getSampler(self):
+    def getSampler(self) -> dimod.Sampler:
         """
         Returns the D-Wave sampler and stores it as the attribute
         sampler.
@@ -46,13 +47,13 @@ class DwaveTabuSampler(BackendBase):
         different samplers.
 
         Returns:
-            (Sampler)
+            (dimod.Sampler)
                 The optimizer that generates samples of solutions.
         """
         self.sampler = TabuSampler()
         return self.sampler
 
-    def processSamples(self, sampleset) -> pandas.Dataframe:
+    def processSamples(self, sampleset: dimod.SampleSet) -> pandas.Dataframe:
         """
         processes a returned sample set and constructs a pandas
         dataframe with all available information of that set.
@@ -60,7 +61,7 @@ class DwaveTabuSampler(BackendBase):
         containing derived values.
 
         Args:
-            sampleset:
+            sampleset: (dimod.SampleSet)
                 The sampleset that is returned by the D-Wave solver.
         Returns:
             (pandas.DataFrame)
@@ -87,10 +88,14 @@ class DwaveTabuSampler(BackendBase):
         )
         return processedSamples_df
 
-    def processSolution(self):
+    def processSolution(self) -> None:
         """
-        Gets and writes info about the sample_df and returns it as a
-        dictionary.
+        Gets and writes info about the sample_df and writes it in the
+        self.output dictionary.
+
+        Returns:
+            (None)
+                Modifies self.output.
         """
         bestSample = self.choose_sample()
         resultInfo = self.transformedProblem.generateReport([
@@ -98,7 +103,7 @@ class DwaveTabuSampler(BackendBase):
         ])
         self.output["results"] = {**self.output["results"], **resultInfo}
 
-    def transformProblemForOptimizer(self):
+    def transformProblemForOptimizer(self) -> IsingBackbone:
         """
         Initializes an IsingInterface-instance, which encodes the Ising
         Spin Glass Problem, using the network to be optimized.
@@ -156,7 +161,7 @@ class DwaveTabuSampler(BackendBase):
             )
             return self.dimodModel
 
-    def getSampleDataframe(self):
+    def getSampleDataframe(self) -> pandas.DataFrame:
         """
         Returns the data frame containing the data of the samples and
         their derived data.
@@ -167,7 +172,7 @@ class DwaveTabuSampler(BackendBase):
         """
         return self.sample_df
 
-    def choose_sample(self):
+    def choose_sample(self) -> pandas.Series:
         """
         After sampling a QUBO this function chooses one sample to be
         returned as the solution.
@@ -219,7 +224,7 @@ class DwaveTabuSampler(BackendBase):
         self.saveSample(sampleset)
         print("done")
 
-    def getSampleSet(self):
+    def getSampleSet(self) -> dimod.SampleSet:
         """
         Queries the sampler to sample the problem and return all
         solutions.
@@ -228,21 +233,21 @@ class DwaveTabuSampler(BackendBase):
         serialized samples from disk.
 
         Returns:
-            (SampleSet)
+            (dimod.SampleSet)
                 A record of the samples and any data returned by the
                 sampler.
 
         """
         return self.sampler.sample(self.getDimodModel(self.transformedProblem))
 
-    def saveSample(self, sampleset):
+    def saveSample(self, sampleset: dimod.SampleSet) -> None:
         """
         Saves the sampleset as a data frame to be used by other methods
         and in the output dictionary since it contains all solutions
         found by the solve.
     
         Args:
-            sampleset: (SampleSet)
+            sampleset: (dimod.SampleSet)
                 Record of all samples and additional data on them.
         Returns:
             (None)
@@ -269,7 +274,7 @@ class DwaveCloud(DwaveTabuSampler):
 
 
 class DwaveCloudHybrid(DwaveCloud):
-    def getSampler(self):
+    def getSampler(self) -> None:
         """
         Returns a D-Wave sampler that will query the hybrid solver for
         solving the Ising problem.
@@ -278,8 +283,8 @@ class DwaveCloudHybrid(DwaveCloud):
         attributes.
 
         Returns:
-            (Sampler)
-                The optimizer that generates samples of solutions.
+            (None)
+                Initializes various attributes.
         """
         self.token = self.config["APItoken"]["dWave_API_token"]
         self.solver = "hybrid_binary_quadratic_model_version2"
@@ -287,7 +292,7 @@ class DwaveCloudHybrid(DwaveCloud):
                                          token=self.token)
         self.output["results"]["solver_id"] = self.solver
 
-    def getSampleSet(self):
+    def getSampleSet(self) -> dimod.SampleSet:
         """
         A method for obtaining a solution from d-wave using their hybrid
         solver.
@@ -296,7 +301,7 @@ class DwaveCloudHybrid(DwaveCloud):
         the response takes too long.
 
         Returns:
-            (SampleSet)
+            (dimod.SampleSet)
                 The sampleset containing a solution.
         """
         sampleset = super().getSampleSet()
@@ -321,6 +326,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
     def get_filepaths(root_path: str, file_regex: str):
         return glob(path.join(root_path, file_regex))
 
+    #TODO: remove?
     def validateInput(self, path):
         return
 
@@ -356,6 +362,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             }
         return
 
+    # TODO: remove?
     def handleOptimizationStop(self, path):
         """
         If a network raises an error during optimization, add this
@@ -371,7 +378,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         #    f.write(network + '\n')
         return
 
-    def getSampler(self):
+    def getSampler(self) -> dimod.Sampler:
         """
         Returns a D-Wave sampler that will query the quantum annealer
         (pegasus topology) for solving the ising problem.
@@ -381,7 +388,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         to embed the problem onto the hardware.
 
         Returns:
-            (Sampler)
+            (dimod.Sampler)
                 The optimizer that generates samples of quantum
                 annealing runs.
         """
@@ -399,7 +406,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             self.sampler = EmbeddingComposite(DirectSampler)
         return self.sampler
 
-    def getSampleSet(self):
+    def getSampleSet(self) -> dimod.SampleSet:
         """
         Queries the quantum annealer to sample the problem and return
         all solutions.
@@ -407,7 +414,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         the `config` attribute.
 
         Returns:
-            (SampleSet)
+            (dimod.SampleSet)
                 A record of the quantum annealing samples returned by
                 the sampler.
         """
@@ -437,7 +444,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             time.sleep(1)
         return sampleset
 
-    def optimizeSampleFlow(self, sample):
+    def optimizeSampleFlow(self, sample: pandas.Series) -> int:
         """
         A method for postprocessing a quantum annealing sample.
         Since current quantum annealers are very noisy and chains make
@@ -466,7 +473,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             generatorState,
         )
 
-    def processSamples(self, sampleset):
+    def processSamples(self, sampleset: dimod.SampleSet) -> pandas.DataFrame:
         """
         A method for turning a sampleset into a data frame and add
         additional data.
@@ -476,7 +483,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         about each sample.
 
         Args:
-            sampleset: (SampleSet)
+            sampleset: (dimod.SampleSet)
                 A d-wave sampleset containing the annealing data.
         Returns:
             (pandas.DataFrame)
@@ -529,7 +536,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.output["results"]["postprocessingTime"] = time.perf_counter() \
                                                        - tic
 
-    def solveFlowproblem(self, graph, generatorState):
+    def solveFlowproblem(self, graph, generatorState) -> int:
         """
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor
@@ -562,7 +569,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
     # demand exactly. Using a classical approach to tune power flow can
     # archieved in polynomial time
     # TODO refactor this method
-    def buildFlowproblem(self, generatorState, lineValues=None):
+    def buildFlowproblem(self,
+                         generatorState: list,
+                         lineValues: dict = None
+                         ) -> networkx.DiGraph:
         """
         Build a self.networkx model to further optimise power flow.
         If using a warmstart, it uses the solution of the quantum
@@ -653,7 +663,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 graph[bus]["superSink"]['flow'] = min(load, load + netPower)
         return graph
 
-    def choose_sample(self, **kwargs):
+    def choose_sample(self, **kwargs) -> pandas.Series:
         """
         After sampling a QUBO this chooses one sample to be returned as
         the solution.
@@ -677,7 +687,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 ]
             return closestSamples.loc[closestSamples['optimizedCost'].idxmin()]
 
-    def saveSample(self, sampleset):
+    def saveSample(self, sampleset: dimod.SampleSet) -> None:
         """
         Saves the sampleset as a data frame to be used by other methods
         and in the output dictionary since it contains all solutions
@@ -714,7 +724,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     that it got that from the cloud
     """
 
-    def getSampler(self):
+    def getSampler(self) -> None:
         """
         This function returs nothing, but sets the path to the file that 
         contains the sample data to be returned when a sample request is
@@ -729,13 +739,13 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
         self.sampler = self.inputFilePath
         return None
 
-    def getSampleSet(self):
+    def getSampleSet(self) -> dimod.SampleSet:
         """
         Returns the sample set saved in the file which path is stored
         in `self.sampler`.
     
         Returns:
-            (SampleSet)
+            (dimod.SampleSet)
                 The d-wave sample read from the given filepath.
         """
         print(f"reading from {self.inputFilePath}")
