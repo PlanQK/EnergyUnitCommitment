@@ -1560,9 +1560,9 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
 
 class GlobalCostSquare(MarginalCostSubproblem):
     """
-    A subproblem class that models the square of the marginal costs. It
-    does this by estimating the cost at each bus and encodes the square
-    of the marginal costs into the energy, thus minimizing it.
+    A subproblem class that models the minimization of the marginal
+    costs. It does this by estimating it and then modelling the squared
+    distance of the actual cost to the estimated cost.
     """
     def __init__(self, backbone: IsingBackbone, config: dict):
         """
@@ -2153,22 +2153,38 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
 class GlobalCostSquareWithSlack(GlobalCostSquare):
     """
-    A subproblem class that models the minimization of the marginal costs. It does this
-    by estimating it and then modelling the squared distance of the actual cost to the
-    estimated cost. It also adds a slack term to the estimation which is independent
-    of the network and serves to slightly adjust the estimation during the optimization
+    A subproblem class that models the minimization of the marginal
+    costs. It does this by estimating it and then modelling the squared
+    distance of the actual cost to the estimated cost. It also adds a
+    slack term to the estimation which is independent of the network and
+    serves to slightly adjust the estimation during the optimization.
     """
-    # a dict to map config strings to functions which are used creating lists of numbers, which
-    # can be used for weights of slack variables
+    # a dict to map config strings to functions which are used creating lists
+    # of numbers, which can be used for weights of slack variables
     slackRepresentationDict = {
         "binaryPower": binaryPower,
     }
 
-    def __init__(self, backbone, config):
-        super().__init__(backbone, config)
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        """
+        A constructor for encoding marginal cost as quadratic penalties,
+        incvluding as well a slack variable.
+        It inherits its functionality from the GlobalCostSquare
+        constructor. Additionally it adds slack qubits to the
+        IsingBackbone.
+
+        Args:
+            backbone: (IsingBackbone)
+                The backbone on which to encode the problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance.
+        """
+        super().__init__(backbone=backbone, config=config)
         slackWeightGenerator = self.slackRepresentationDict[
             config.get("slackType", "binaryPower")]
-        # an additional factor for scaling the weights of the qubits acting as slack variables
+        # an additional factor for scaling the weights of the qubits acting as
+        # slack variables
         slackScale = config.get("slackScale", 1.0)
         # number of slack qubits used
         slackSize = config.get("slackSize", 7)
@@ -2176,28 +2192,33 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                         slackWeightGenerator(slackSize)]
         # adding slack qubits with the label `slackMarginalCost`
         self.backbone.createQubitEntriesForComponent(
-            "slackMarginalCost",
+            componentName="slackMarginalCost",
             weights=slackWeights * len(backbone.snapshots),
             encodingLength=len(slackWeights)
         )
 
     # TODO refactor using a isingbackbone function for encoding squared distances
-    def encodeMarginalCosts(self, time):
+    def encodeMarginalCosts(self, time: int) -> None:
         """
-        The marginal costs of using generators
-        are considered one single global constraint. The square of marginal costs is encoded
-        into the energy and thus minimized
+        The marginal costs of using generators are considered one single
+        global constraint. The square of marginal costs is encoded
+        into the energy and thus minimized.
 
-        @param time: int
-            index of time slice for which to estimate marginal costs
-        @param expectedAdditonalCost: float
-            float by which lower estimate off marginal cost is offset
-        @return: None 
-            modifies self.problem. Adds to previously written interaction cofficient 
+        Args:
+            time: (int)
+                Index of time slice for which to estimate the marginal
+                cost.
+
+        Returns:
+            (None)
+                Modifies self.problem. Adds to previously written
+                interaction coefficient.
         """
-        estimatedCost, offset = self.estimateGlobalMarginalCost(time,
-                                                                expectedAdditonalCost=0)
-        self.printEstimationReport(estimatedCost, offset, time)
+        estimatedCost, offset = self.estimateGlobalMarginalCost(
+            time=time, expectedAdditonalCost=0)
+        self.printEstimationReport(estimatedCost=estimatedCost,
+                                   offset=offset,
+                                   time=time)
         generators = self.network.generators.index
         generators = list(generators) + ["slackMarginalCost"]
         load = 0.0
@@ -2219,8 +2240,8 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                             marginalCostGen1 * \
                             marginalCostGen2
                 self.backbone.coupleComponents(
-                    gen1,
-                    gen2,
+                    firstComponent=gen1,
+                    secondComponent=gen2,
                     couplingStrength=curFactor
                 )
 
