@@ -639,13 +639,14 @@ class QaoaQiskit(BackendBase):
                 self.statistics["confidence"] = 1 - alpha
                 break
 
-    def writeReportToOutput(self, bestBitstring: str):
+    def writeReportToOutput(self, bestBitstring: str) -> None:
         """
         Writes solution specific values of the optimizer result and the ising spin glass problem solution to the output
         dictionary.
 
         Args:
-            bestBitstring: (str) The bitstring representing the best solution found during optimization.
+            bestBitstring: (str)
+                The bitstring representing the best solution found during optimization.
 
         Returns:
             (None) Modifies self.output with solution specific parameters and values.
