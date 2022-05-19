@@ -3,14 +3,11 @@ import time
 # importing dwave packages
 import networkx
 import pandas
-from dwave.cloud import Client
 import dimod
-import tabu
 import greedy
 
-from dwave.system import LeapHybridSampler
-from dwave.system import DWaveSampler, FixedEmbeddingComposite, \
-    EmbeddingComposite, DWaveCliqueSampler
+from dwave.system import LeapHybridSampler, DWaveSampler
+from dwave.system import FixedEmbeddingComposite, EmbeddingComposite
 from tabu import TabuSampler
 
 # importing local QUBO modelling packages
@@ -19,19 +16,14 @@ from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
 # import packages for flow optimization
-from numpy import round as npround
 import networkx as nx
 from networkx.algorithms.flow import edmonds_karp
-from networkx.algorithms.flow import build_residual_network
-from networkx.classes.function import set_edge_attributes
 
 # import packages for reading files
 from os import path
 from glob import glob
 import mmap
 import json
-
-from pandas import value_counts
 
 
 class DwaveTabuSampler(BackendBase):
