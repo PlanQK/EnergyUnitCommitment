@@ -27,7 +27,21 @@ import json
 
 
 class DwaveTabuSampler(BackendBase):
+    """
+    A base class for solving the unit commitment problem using the
+    D-Wave server. This is done using D-Wave's dimod package.
+    """
     def __init__(self, reader: InputReader):
+        """
+        Constructor for the DwaveTabuSampler. It requires an
+        InputReader, which handles the loading of the network and
+        configuration file.
+
+        Args:
+            reader: (InputReader)
+                 Instance of an InputReader, which handled the loading
+                 of the network and configuration file.
+        """
         super().__init__(reader=reader)
         self.getSampler()
 
@@ -252,20 +266,41 @@ class DwaveTabuSampler(BackendBase):
 
 
 class DwaveSteepestDescent(DwaveTabuSampler):
+    """
+    A class inheriting from DwaveTabuSampler, but choosing the
+    SteepestDescentSolver as solver.
+    """
     # TODO test if this actually runs
     def __init__(self, reader: InputReader):
+        """
+        Constructor for the DwaveTabuSampler. It requires an
+        InputReader, which handles the loading of the network and
+        configuration file. In addition self.solver is set to be
+        the SteepestDescentSolver.
+
+        Args:
+            reader: (InputReader)
+                 Instance of an InputReader, which handled the loading
+                 of the network and configuration file.
+        """
         super().__init__(reader=reader)
         self.solver = greedy.SteepestDescentSolver()
 
 
+#TODO: Why inherit from this class? It doesn´t add anything, right?
 class DwaveCloud(DwaveTabuSampler):
     """
-    Class for structuring the class hierachy. Any class that use results
-    obtained by querying D-Wave servers should inherit from this class.
+    Class for structuring the class hierachy. Inherits from
+    DwaveTabuSampler. Any class that use results obtained by querying
+    D-Wave servers should inherit from this class.
     """
 
 
 class DwaveCloudHybrid(DwaveCloud):
+    """
+    Class inheriting from DwaveCloud. It will use a hybrid solver to
+    solve the given Ising spin glass problem.
+    """
     def getSampler(self) -> None:
         """
         Returns a D-Wave sampler that will query the hybrid solver for
@@ -308,14 +343,41 @@ class DwaveCloudHybrid(DwaveCloud):
 
 
 class DwaveCloudDirectQPU(DwaveCloud):
-
+    """
+    Class inheriting from DwaveCloud. It will try to solve the given
+    Ising spin glass problem on the D-Wave's cloud based QPU.
+    """
     def __init__(self, reader: InputReader):
+        """
+        Constructor for the DwaveCloudDirectQPU. It requires an
+        InputReader, which handles the loading of the network and
+        configuration file. In addition it is made sure, that the
+        timeout is set correctly in self.config.
+
+        Args:
+            reader: (InputReader)
+                 Instance of an InputReader, which handled the loading
+                 of the network and configuration file.
+        """
         super().__init__(reader=reader)
         if self.config["BackendConfig"]["timeout"] < 0:
             self.config["BackendConfig"]["timeout"] = 3600
 
     @staticmethod
-    def get_filepaths(root_path: str, file_regex: str):
+    def get_filepaths(root_path: str, file_regex: str) -> str:
+        """
+        Returns the filepath composed of 'root_path' and 'file_regex'.
+
+        Args:
+            root_path: (str)
+                The root path.
+            file_regex: (str)
+                An addition to add to 'root_path'.
+
+        Returns:
+            (str)
+                The combined filepath.
+        """
         return glob(path.join(root_path, file_regex))
 
     #TODO: remove?
@@ -502,28 +564,34 @@ class DwaveCloudDirectQPU(DwaveCloud):
             )
         return processedSamples_df
 
-    def processSolution(self, network, sample_df):
+    def processSolution(self):
+        """
+        Gets and writes info about the sample_df and writes it in the
+        self.output dictionary. Inherits from its parent class and sets
+        additional values in self.output.
+
+        Returns:
+            (None)
+                Modifies self.output.
+        """
         tic = time.perf_counter()
-        super().processSolution(
-            network,
-            sample_df,
-        )
-        lowestEnergyIndex = sample_df["energy"].idxmin()
-        self.output["results"]["LowestEnergy"] = sample_df.iloc[
+        super().processSolution()
+        lowestEnergyIndex = self.sample_df["energy"].idxmin()
+        self.output["results"]["LowestEnergy"] = self.sample_df.iloc[
             lowestEnergyIndex]["isingCost"]
-        closestSamples = sample_df[
-            sample_df['deviation_from_opt_load'] == \
-            sample_df['deviation_from_opt_load'].min()
+        closestSamples = self.sample_df[
+            self.sample_df['deviation_from_opt_load'] == \
+            self.sample_df['deviation_from_opt_load'].min()
             ]
         closestTotalPowerIndex = closestSamples['energy'].idxmin()
-        self.output["samples_df"] = sample_df.to_dict('index')
-        self.output["results"]["lowestEnergy"] = sample_df.iloc[
+        self.output["samples_df"] = self.sample_df.to_dict('index')
+        self.output["results"]["lowestEnergy"] = self.sample_df.iloc[
             lowestEnergyIndex]["isingCost"]
-        self.output["results"]["lowestEnergyProcessedFlow"] = sample_df.iloc[
+        self.output["results"]["lowestEnergyProcessedFlow"] = self.sample_df.iloc[
             lowestEnergyIndex]["optimizedCost"]
-        self.output["results"]["closestPowerProcessedFlow"] = sample_df.iloc[
+        self.output["results"]["closestPowerProcessedFlow"] = self.sample_df.iloc[
             closestTotalPowerIndex]["optimizedCost"]
-        self.output["results"]["bestProcessedFlow"] = sample_df[
+        self.output["results"]["bestProcessedFlow"] = self.sample_df[
             "optimizedCost"].min()
         self.output["results"]["postprocessingTime"] = time.perf_counter() \
                                                        - tic
@@ -713,7 +781,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
     """
     This class behaves like it's parent except it doesn't
     use the Cloud. Instead it reads a serialized Sample and pretends
-    that it got that from the cloud
+    that it got that from the cloud.
     """
 
     def getSampler(self) -> None:
