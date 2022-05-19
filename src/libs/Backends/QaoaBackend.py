@@ -1,21 +1,10 @@
 import copy
 import math
-from typing import Tuple
-
 import numpy as np
-import pypsa
 import qiskit
-from numpy import median
-from scipy import stats
 
-try:
-    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
-    from .BackendBase import BackendBase  # import for Docker run
-except ImportError:
-    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
-    from BackendBase import BackendBase  # import for local/debug run
-from .InputReader import InputReader
 from datetime import datetime
+from numpy import median
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
 from qiskit.providers.aer.noise import NoiseModel
@@ -24,6 +13,15 @@ from qiskit.tools.monitor import job_monitor
 from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
 from qiskit.circuit import Parameter, ParameterVector
+from scipy import stats
+
+from .InputReader import InputReader
+try:
+    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
+    from .BackendBase import BackendBase  # import for Docker run
+except ImportError:
+    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
+    from BackendBase import BackendBase  # import for local/debug run
 
 
 class QaoaQiskit(BackendBase):
