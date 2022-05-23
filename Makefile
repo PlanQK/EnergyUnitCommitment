@@ -3,30 +3,34 @@ DOCKERCOMMAND := docker
 #DOCKERFILE = PlanQK_Dockerfile
 DOCKERFILE = Dockerfile
 DOCKERTAG = energy:1.0
-REPETITIONS := 1
 
+###### set problem directory ######
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
 #PROBLEMDIRECTORY := $(shell pwd)
+
+###### set mount paths ######
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
-MOUNTCONFIGPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs/config.yaml,target=/energy/config.yaml
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
 MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
-PREFIX := infoNocostFixed
 
-###### general parameters ######
-NUMBERS = $(shell seq 1 ${REPETITIONS})
-TIME := $(shell date +"%Y-%m-%d_%H-%M-%S")
+###### define save folder ######
+# choose a folder where the results should be saved to. If the folder
+# doesn't exist, it will be created. Common choices are:
+# results_classical_sweep, results_sqa_sweep, results_qpu_sweep,
+# results_qpu_read_sweep, results_pypsa_glpk_sweep, results_qaoa_sweep
+# DON'T forget the "/" after the folder name
+SAVE_FOLDER := "results_qaoa_sweep/"
 
 ###### define config file ######
 CONFIGFILES = "config.yaml"
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-# SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
 
@@ -118,96 +122,27 @@ EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
 
 ###### result files of computations ######
 
-CLASSICAL_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
+GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_classical_parameter_sweep/${filename}_${config}_${extraparam})))
-
-SIQUAN_PARAMETER_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_sqa_sweep/${filename}_${config}_${extraparam})))
-
-QUANTUM_ANNEALING_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_qpu_sweep/${filename}_${config}_${extraparam})))
+		${SAVE_FOLDER}${filename}_${config}_${extraparam})))
 
 QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_qpu_read_sweep/${filename}_${config}_${extraparam})))
-
-GLPK_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_pypsa_glpk_sweep/${filename}_${config}_${extraparam})))
-
-QAOA_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		results_qaoa_sweep/${filename}_${config}_${extraparam})))
-
+		${SAVE_FOLDER}${filename}_${config}_${extraparam})))
 
 ###### creating rules for result files ######
-
-# define classical parameter sweep targets
-
-define classicalParameterSweep
-results_classical_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
-	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_classical_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_classical* results_classical_sweep/
-
-endef
-
-$(foreach filename, $(SWEEPFILES), \
-	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call classicalParameterSweep, ${filename}, ${config}, ${extraparam})))))
-
-# define siquan sweep targets
-
-define sqaParameterSweep
-results_sqa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
-	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_sqa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_sqa* results_sqa_sweep/
-
-endef
-
-$(foreach filename, $(SWEEPFILES), \
-	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call sqaParameterSweep, ${filename}, ${config}, ${extraparam})))))
-
-#define D-Wave qpu targets
-
-define qpuParameterSweep
-results_qpu_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
-	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_qpu_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-qpu* results_qpu_sweep/
-
-endef
-
-$(foreach filename, $(SWEEPFILES), \
-	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call qpuParameterSweep, ${filename}, ${config}, ${extraparam})))))
 
 # define targets for old sample data
 
 define qpuReadSweep
-results_qpu_read_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_qpu_read_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* results_qpu_read_sweep/
+	mkdir -p ${SAVE_FOLDER}
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* ${SAVE_FOLDER}
 
 endef
 
@@ -216,37 +151,21 @@ $(foreach filename, $(SWEEPFILES), \
 	$(foreach extraparam, ${EXTRAPARAM}, \
 	$(eval $(call qpuReadSweep, ${filename}, ${config}, ${extraparam})))))
 
-# define glpk targets
+# define general target
 
-define pypsa-glpk
-results_pypsa_glpk_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+define general
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_pypsa_glpk_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_pypsa-glpk* results_pypsa_glpk_sweep/
+	mkdir -p ${SAVE_FOLDER}
+	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_* ${SAVE_FOLDER}
 
 endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
 	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call pypsa-glpk, ${filename}, ${config}, ${extraparam})))))
-
-# define qaoa target
-
-define qaoa
-results_qaoa_sweep/$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
-	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p results_qaoa_sweep
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_qaoa* results_qaoa_sweep/
-
-endef
-
-$(foreach filename, $(SWEEPFILES), \
-	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call qaoa, ${filename}, ${config}, ${extraparam})))))
+	$(eval $(call general, ${filename}, ${config}, ${extraparam})))))
 
 # end of creating rules for results
 
@@ -266,27 +185,16 @@ plt: venv/bin/activate
 	mkdir -p plots && source venv/bin/activate && python makePlots.py
 
 venv/bin/activate:
-	python3 -m venv venv && pip install -r requirements.txt && pip install 
+	python3 -m venv venv && pip install -r requirements.txt && pip install
 
 # rules for making a sweep for a particular solver
 
-.PHONY: all clean classicalParSweep siquanParSweep quantumAnnealParSweep plots pypsa-glpk quantumReadSweep
+.PHONY: general clean plots quantumReadSweep
 
-all: classicalParSweep siquanParSweep quantumAnnealParSweep pypsa-glpk qaoa
-
-classicalParSweep: $(CLASSICAL_PARAMETER_SWEEP_FILES)
-
-siquanParSweep: $(SIQUAN_PARAMETER_SWEEP_FILES)
-
-# requires a dWaveAPIToken
-quantumAnnealParSweep: $(QUANTUM_ANNEALING_SWEEP_FILES)
+general: $(GENERAL_SWEEP_FILES)
 
 # requires old data to be reused or dwaveAPIToken
 quantumReadSweep: $(QUANTUM_ANNEALING_READ_RESULTS)
-
-pypsa-glpk: $(GLPK_SWEEP_FILES)
-
-qaoa: $(QAOA_SWEEP_FILES)
 
 clean:
 	rm -rf Problemset/info*
