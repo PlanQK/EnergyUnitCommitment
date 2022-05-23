@@ -27,7 +27,7 @@ def main():
         extraParams = [keyChain.split("-") for keyChain in sys.argv[3].split("--")]
     # run optimization
     response = run(data=network, params=params, extraParams=extraParams)
-    # save reusults
+    # save results
     response.save_to_json_local_docker()
 
 

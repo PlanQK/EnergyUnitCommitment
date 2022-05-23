@@ -186,7 +186,7 @@ class IsingBackbone:
                 subproblem].buildSubproblem(self, subproblemConfiguration)
             self._subproblems[subproblem] = subproblemInstance
             self.flushCachedProblem()
-            subproblemInstance.encodeSubproblem(self)
+            subproblemInstance.encodeSubproblem()
 
     def __getattr__(self, method_name: str) -> callable:
         """

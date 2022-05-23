@@ -59,7 +59,7 @@ class DwaveTabuSampler(BackendBase):
         self.sampler = TabuSampler()
         return self.sampler
 
-    def processSamples(self, sampleset: dimod.SampleSet) -> pandas.Dataframe:
+    def processSamples(self, sampleset: dimod.SampleSet) -> pandas:
         """
         processes a returned sample set and constructs a pandas
         dataframe with all available information of that set.
@@ -70,7 +70,7 @@ class DwaveTabuSampler(BackendBase):
             sampleset: (dimod.SampleSet)
                 The sampleset that is returned by the D-Wave solver.
         Returns:
-            (pandas.DataFrame)
+            (pandas)
                 A DataFrame containing all relevant data of the samples.
         """
         processedSamples_df = sampleset.to_pandas_dataframe()
