@@ -77,23 +77,16 @@ class QaoaAngleSupervisor:
         
 
 class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
-    """a class for choosing qaoa paramter. The strategy is given by a list. Either an angle parameter
+    """a class for choosing intial qaoa angles. The strategy is given by a list. Either an angle parameter
     is fixed based on the list entry, or chosen randomly
     """
 
     def __init__(self, qaoaOptimizer):
         """
-        Since this list doesn't try some form of grid search, no internal state to track already
-        returned parameters is needed. We keep a reference to the Qaoa optimizer so we can start 
-        a second run if at least one angle was initilized randomly
+        Initializes all attributes necessary to build the iterator that the qaoaOptimizer can consume.
     
         Args:
-            parameter_problem_range: (float) 
-                the maximal returned random parameter value for the angle of a problem hamiltonian
-                sub-circuit scaled by pi. If this value is 1, the range will be (-pi, pi)
-            parameter_mixing_range: (float) 
-                the maximal returned random parameter value for the angle of the mixing hamiltonian
-                sub-circuit scaled by pi. If this value is 1, the range will be (-pi, pi)
+            qaoaOptimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
         Returns:
             (list) a list of float values to be used as angles in a qaoa circuit
         """
@@ -106,9 +99,19 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
         self.repetitions = self.config_qaoa["repetitions"]
 
     def getNumAngles(self):
+        """This returns how many different angles are used for parametrization of the quantum circuit.
+        This is necessary for correctly binding the constructed circuit to the angles"""
         return self.numAngles
 
     def getBestInitialAngles(self):
+        """
+        When calling this method, it searches the results of the stored qaoaOptimizer for the best result
+        so far. Then it uses those values to construct an inital angle guess by substituting all angles
+        that are set randomly according to the configuration with the best results.
+    
+        Returns:
+            (np.array) an np array of values to be used as angles
+        """
         minCFvars = self.qaoaOptimizer.getMinCFvars()
         self.qaoaOptimizer.output["results"]["initial_guesses"]["refined"] = minCFvars
         bestInitialGuess = self.config_guess
@@ -118,6 +121,15 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
         return bestInitialGuess
 
     def getInitialAngleIterator(self):
+        """
+        returns an iterator that returns inital angle guesses to be consumed by the qaoa optimizer. 
+        These are constructed according to the self.config_guess list. If this list contains at least
+        one random initialization, it will choose the best angle result so far and return those to be 
+        used for more qaoa repetitions.
+    
+        Returns:
+            (iterator[np.array])) description
+        """
         for idx in range(self.repetitions):
             yield self.chooseInitialAngles()
 
@@ -131,7 +143,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
 
     def chooseInitialAngles(self):
         """
-        Method for returning the list of angles to be used
+        Method for returning an np.array of angles to be used for each layer in the qaoa circuit
     
         Returns:
             (np.array) an np.array of floats
@@ -151,7 +163,6 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
                 next_angle = current_guess
             initial_angles.append(next_angle)
         return np.array(initial_angles)
-
     
 
 class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
@@ -194,9 +205,18 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         self.numAngles = len(self.gridsByLayer)
 
     def getNumAngles(self):
+        """This returns how many different angles are used for parametrization of the quantum circuit.
+        This is necessary for correctly binding the constructed circuit to the angles"""
         return self.numAngles
     
     def getInitialAngleIterator(self):
+        """
+        returns an iterator that returns inital angle guesses to be consumed by the qaoa optimizer. 
+        Together, these inital angles form a grid on the angle space 
+   
+        Returns:
+            (Iterator[np.array]) An iterator which yields intial angle values for the optimizer
+        """
         for angleList in product(*self.gridsByLayer):
             yield np.array(angleList)
 
@@ -220,7 +240,6 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
                     "upperBoundMixing" : defaultGrid.get("upperBoundMixing" , math.pi),
                     "numGridpointsMixing" :defaultGrid.get("numGridpointsMixing" , 3),
         }
-    
 
     def transformToGridpoints(self, gridDict):
         """
