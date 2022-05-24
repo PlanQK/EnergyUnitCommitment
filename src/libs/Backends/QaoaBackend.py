@@ -29,68 +29,63 @@ from qiskit.circuit import Parameter, ParameterVector
 
 
 
-class QaoaParameterSupervisor:
-    """a class for choosing qaoa parameters when making (multiple) runs in order to get
-    well distributed samples
+class QaoaAngleSupervisor:
+    """a class for choosing qaoa angles when making (multiple) runs in order to get
+    well distributed samples. It does so by provding an iterator of parameter initilization.
+    This iterator has a reference to the qaoa optimizer instance so it can inspect it
+    to update which parameter to get next and get the configuration info.
     """
-
     @classmethod
-    def makeParameterSupervisior(self, **kwargs):
+    def makeAngleSupervisior(self, qaoaOptimizer):
         """
-        A factory method for returning the correct supervision for the chosen strategy.
+        A factory method for returning the correct supervisior for the chosen strategy.
+
         The "RandomOrFixed" supervision will choose, based on a config list either a fixed
-        float value or a random parameter.
+        float value or a random angle. After a set of repetitions, it will do so again
+        but replace random initilizations with the best angle intialization found so far
+
         The "GridSearch" will use a grid to evenly distribute intial parameters across the
         parameter space.
     
         Args:
-            *args: (list) 
-                all the paramters needed to choose and initilize the correct supervisor
+            qaoaOptimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
         Returns:
-            (QaoaParameterSupervisor) An instance of subclass of a QaoaParameterSupervisor
+            (QaoaAngleSupervisor) An instance of subclass of a QaoaAngleSupervisor
         """
-        supervisior_type = kwargs.pop("supervisior_type")
+        supervisior_type = qaoaOptimizer.config_qaoa["supervisior_type"]
         if supervisior_type == "RandomOrFixed":
-            return QaoaParameterSupervisorRandomOrFixed(**kwargs)
+            return QaoaAngleSupervisorRandomOrFixed(qaoaOptimizer)
         if supervisior_type == "GridSearch":
-            return QaoaParameterSupervisorGridSearch(**kwargs)
+            return QaoaAngleSupervisorGridSearch(qaoaOptimizer)
 
-
-    def chooseInitalParameters(self):
-        """
-        For a given qaoa run, returns a list of angle parameters that will be used to start
-        a run.
-
-        This method does not accept any parameters. The idea is that calling this method and
-        optimizing a circuit will mutate the internal state of this object. The returned value
-        will only depend on the state of this object, whose job is to track wich parameters have
-        already been chosen to get a good coverage of the parameter space
-    
-        Returns:
-            (list) 
-                a list of angle parameters with problem angles on even indices and mixing angles
-                at odd indices. The list follows the circuit direction (left to right, counting up)
-        """
-        raise NotImplementedError
 
     def getInitialAngleIterator(self):
+        """
+        This returns an iterator for initial angle intialization. Iterating using this is the main
+        way of using this class. By storing a reference to the executing qaoa optimizer, this class
+        can adjust which parameters to use next based on qaoa results.
+    
+        Returns:
+            (Iterator[np.array]) An iterator which yields intial angle values for the optimizer
+        """
         raise NotImplementedError
     
     def getNumAngles(self):
+        """This returns how many different angles are used for parametrization of the quantum circuit.
+        This is necessary for correctly binding the constructed circuit to the angles"""
         raise NotImplementedError
         
-    def getNumRepetitions(self):
-        raise NotImplementedError
 
-class QaoaParameterSupervisorRandomOrFixed(QaoaParameterSupervisor):
+class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
     """a class for choosing qaoa paramter. The strategy is given by a list. Either an angle parameter
     is fixed based on the list entry, or chosen randomly
     """
 
-    def __init__(self, qaoaOptimizer, param_problem_range=2, param_mixing_range=1):
+    def __init__(self, qaoaOptimizer):
         """
         Since this list doesn't try some form of grid search, no internal state to track already
-        returned parameters is needed.
+        returned parameters is needed. We keep a reference to the Qaoa optimizer so we can start 
+        a second run if at least one angle was initilized randomly
     
         Args:
             parameter_problem_range: (float) 
@@ -102,74 +97,68 @@ class QaoaParameterSupervisorRandomOrFixed(QaoaParameterSupervisor):
         Returns:
             (list) a list of float values to be used as angles in a qaoa circuit
         """
-        self.param_problem_range = param_problem_range
-        self.param_mixing_range = param_mixing_range
         self.qaoaOptimizer = qaoaOptimizer
-        self.config_guess = qaoaOptimizer.config_qaoa["initial_guess"]
-        self.num_vars = len(self.config_guess)
-        self.repetitions = self.qaoaOptimizer.config_qaoa["repetitions"]
-
-
-    def getNumRepetitions(self):
-        return self.repetitions 
-    
+        self.config_qaoa = qaoaOptimizer.config_qaoa
+        self.problemRange = self.config_qaoa.get("problemRange", 2)
+        self.mixingRange = self.config_qaoa.get("mixingRange", 1)
+        self.config_guess = self.config_qaoa["initial_guess"]
+        self.numAngles = len(self.config_guess)
+        self.repetitions = self.config_qaoa["repetitions"]
 
     def getNumAngles(self):
-        return self.num_vars
+        return self.numAngles
 
-
-    def getBestInitalParameters(self):
+    def getBestInitialAngles(self):
         minCFvars = self.qaoaOptimizer.getMinCFvars()
         self.qaoaOptimizer.output["results"]["initial_guesses"]["refined"] = minCFvars
         bestInitialGuess = self.config_guess
-        for j in range(self.num_vars):
+        for j in range(self.numAngles):
             if bestInitialGuess[j] == "rand":
                 bestInitialGuess[j] = minCFvars[j]
         return bestInitialGuess
 
-
     def getInitialAngleIterator(self):
         for idx in range(self.repetitions):
-            yield self.chooseInitalParameters()
+            yield self.chooseInitialAngles()
 
         if "rand" not in self.config_guess:
             return
 
-        self.config_guess = self.getBestInitalParameters()
+        self.config_guess = self.getBestInitialAngles()
         for idx in range(self.repetitions):
-            yield self.chooseInitalParameters()
+            yield self.chooseInitialAngles()
 
 
-    def chooseInitalParameters(self):
+    def chooseInitialAngles(self):
         """
-        Method for return the list of angles to be used
+        Method for returning the list of angles to be used
     
         Returns:
             (np.array) an np.array of floats
         """
-        inital_angles = []
+        initial_angles = []
         for idx, current_guess in enumerate(self.config_guess):
             # if chosen randomly, choose a random angle and scale based on wether it is the angle
             # of a problem hamiltonian sub circuit or mixing hamiltonian sub circuit
             if current_guess == "rand":
                 next_angle = 2 * math.pi * (0.5 - np.random.rand()) 
                 if idx % 2 == 0:
-                    next_angle *= self.param_problem_range
+                    next_angle *= self.problemRange
                 else:
-                    next_angle *= self.param_mixing_range
+                    next_angle *= self.mixingRange
             # The angle is fixed for all repetitions
             else:
                 next_angle = current_guess
-            inital_angles.append(next_angle)
-        return np.array(inital_angles)
+            initial_angles.append(next_angle)
+        return np.array(initial_angles)
 
     
 
-class QaoaParameterSupervisorGridSearch(QaoaParameterSupervisor):
+class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
     """a class for choosing qaoa parameters by searching using a grid on the given parameter space
     """
 
-    def __init__(self, **args):
+    def __init__(self,  qaoaOptimizer):
         """
         first calculates the grid that is going to be searched and then sets up the data structures
         necessary to keep track which grid points have already been tried output
@@ -196,23 +185,20 @@ class QaoaParameterSupervisorGridSearch(QaoaParameterSupervisor):
             gridList: list
                 a list of dictionaries. The i-th dicitonary contains the grid values of the i-th layer
         """
-        self.setDefaultGrid(args.get('defaultGrid',{}))
-        self.config_qaoa = args['qaoaOptimizer'].config_qaoa
+        self.qaoaOptimizer = qaoaOptimizer
+        self.config_qaoa = qaoaOptimizer.config_qaoa
+
+        self.setDefaultGrid(self.config_qaoa.get('defaultGrid',{}))
         self.gridsByLayer = [grid for layer in self.config_qaoa['initial_guess'] 
                                   for grid in self.transformToGridpoints(layer)]
-        self.currentGuessIndex = -1
-        self.intialGuessList = product(*self.gridsByLayer)
-        self.num_vars = 2 * len(self.config_qaoa['initial_guess'])
-
+        self.numAngles = len(self.gridsByLayer)
 
     def getNumAngles(self):
-        return self.num_vars
-
+        return self.numAngles
     
     def getInitialAngleIterator(self):
         for angleList in product(*self.gridsByLayer):
             yield np.array(angleList)
-            
 
     def setDefaultGrid(self, defaultGrid: dict):
         """
@@ -226,7 +212,7 @@ class QaoaParameterSupervisorGridSearch(QaoaParameterSupervisor):
         Returns:
             (None) modifies the attribute self.default
         """
-        self.default = {
+        self.defaultGrid = {
                     "lowerBoundProblem" : defaultGrid.get("lowerBoundProblem" , - math.pi ),
                     "upperBoundProblem" :defaultGrid.get("upperBoundProblem" , math.pi),
                     "numGridpointsProblem" : defaultGrid.get("numGridpointsProblem" , 3),
@@ -252,21 +238,23 @@ class QaoaParameterSupervisorGridSearch(QaoaParameterSupervisor):
             (list, list) returns two lists with float values
         """
         problemGrid = self.makeGridList(
-                lowerBound = gridDict.get('lowerBoundProblem', self.default['lowerBoundProblem']),
-                upperBound = gridDict.get('upperBoundProblem', self.default['upperBoundProblem']),
-                numGridpoints = gridDict.get('numGridpointsProblem', self.default['numGridpointsProblem']),
+                lowerBound = gridDict.get('lowerBoundProblem', self.defaultGrid['lowerBoundProblem']),
+                upperBound = gridDict.get('upperBoundProblem', self.defaultGrid['upperBoundProblem']),
+                numGridpoints = gridDict.get('numGridpointsProblem', self.defaultGrid['numGridpointsProblem']),
         )
         mixingGrid = self.makeGridList(
-                lowerBound = gridDict.get('lowerBoundMixing', self.default['lowerBoundMixing']),
-                upperBound = gridDict.get('upperBoundMixing', self.default['upperBoundMixing']),
-                numGridpoints = gridDict.get('numGridpointsMixing', self.default['numGridpointsMixing']),
+                lowerBound = gridDict.get('lowerBoundMixing', self.defaultGrid['lowerBoundMixing']),
+                upperBound = gridDict.get('upperBoundMixing', self.defaultGrid['upperBoundMixing']),
+                numGridpoints = gridDict.get('numGridpointsMixing', self.defaultGrid['numGridpointsMixing']),
         )
         return problemGrid, mixingGrid
 
     def makeGridList(self, lowerBound, upperBound, numGridpoints):
         """
         takes lower and upper bound and returns a list of equidistant points in that interval
-        with length equal the specified grid points. 
+        with length equal the specified grid points. a non positive number of grid points will raise an exception.
+        If exactly one gridpoint is specified, the returned list will only contain the lower bound as the
+        singe point.
     
         Args:
             lowerBound: (float) the minimal grid point
@@ -275,31 +263,25 @@ class QaoaParameterSupervisorGridSearch(QaoaParameterSupervisor):
         Returns:
             (list) a list of floating values which form a grid on the given intervall
         """
-        if numGridpoints == 0:
+        if numGridpoints <= 0:
             raise ValueError("trying to construct an empty grid set, which vanishes in the product of grids")
-        stepSize = float(upperBound - lowerBound) / (numGridpoints-1)
+        try:
+            stepSize = float(upperBound - lowerBound) / (numGridpoints-1)
+        except ZeroDivisionError:
+            return [lowerBound]
         return [lowerBound + idx * stepSize for idx in range(numGridpoints)]
-    
-
-    def chooseInitalParameters(self):
-        res =  np.array(next(self.intialGuessList))
-        return res
-
-    
 
 
 class QaoaQiskit(BackendBase):
     def __init__(self, reader: InputReader):
         super().__init__(reader)
-
         # copy relevant config to make code more readable
         self.config_qaoa = self.config["QaoaBackend"]
         self.addResultsDict()
-        self.parameterSupervisior = QaoaParameterSupervisor.makeParameterSupervisior(
-                    supervisior_type = self.config_qaoa.get('supervisior_type', 'RandomOrFixed'),
+        self.angleSupervisior = QaoaAngleSupervisor.makeAngleSupervisior(
                     qaoaOptimizer = self
         )
-        self.numAngles = self.parameterSupervisior.getNumAngles()
+        self.numAngles = self.angleSupervisior.getNumAngles()
 
         # initiate local parameters
         self.iterationCounter = None
@@ -346,7 +328,7 @@ class QaoaQiskit(BackendBase):
         simulator = self.config_qaoa["simulator"]
         simulate = self.config_qaoa["simulate"]
         noise = self.config_qaoa["noise"]
-        initial_guess_original = np.array([0 for i in range(self.parameterSupervisior.getNumAngles())])
+        initial_guess_original = np.array([0 for i in range(self.angleSupervisior.getNumAngles())])
         num_vars = self.numAngles
         max_iter = self.config_qaoa["max_iter"]
         repetitions = self.config_qaoa["repetitions"]
@@ -364,7 +346,6 @@ class QaoaQiskit(BackendBase):
         self.qc = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
         # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
         drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        print(drawTheta)
         qcDraw = self.qc.bind_parameters({self.paramVector: drawTheta})
         self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
 
@@ -375,7 +356,7 @@ class QaoaQiskit(BackendBase):
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
         curRepetition = 1
-        for initial_guess in self.parameterSupervisior.getInitialAngleIterator():
+        for initial_guess in self.angleSupervisior.getInitialAngleIterator():
             time_start = datetime.timestamp(datetime.now())
             totalRepetition = curRepetition
             print(
