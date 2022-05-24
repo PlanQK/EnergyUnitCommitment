@@ -126,6 +126,10 @@ class ClassicalBackend(BackendBase):
         print(
             f"Total energy cost of QUBO (with constant terms): {self.output['results']['totalCost']}"
         )
+        print("---")
+        print(f"Sqa runtime: {self.output['results']['runtime_sec']}")
+        print(f"Sqa runtime cycles: {self.output['results']['runtime_cycles']}")
+        print(f"Ising Interactions: {len(self.transformedProblem.problem)}")
     
 
     def writeResultsToOutput(self, result):

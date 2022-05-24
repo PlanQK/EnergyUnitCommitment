@@ -906,3 +906,35 @@ class QaoaQiskit(BackendBase):
         report = self.transformedProblem.generateReport(solution=solution)
         for key in report:
             self.output["results"][key] = report[key]
+
+    def printSolverspecificReport(self):
+        """
+        Prints a table containing information about all qaoa optimziation repetitions that were performed.
+        This consists of the repetition number, the score of that repetition and which angles lead to that
+        score. The table is sorted by scored and rounded to two decimal places
+    
+        Returns:
+            (None) prints qaoa repetition information
+        """
+        print("\n--- Table of Results ---")
+        repetitions = self.output["results"]["repetitions"]
+        repetitionIndexSortedByScore = sorted(
+                                        list(range(1,len(repetitions)+1)) ,
+                                        key=lambda x: repetitions[x]['optimizedResult']['fun']
+                                        )
+        currentScoreBracket = 0
+        horizontalBreak = "------------+---------+--" + self.numAngles * "------"
+
+        # table header
+        print(" Repetition |  Score  |"+ self.numAngles * "  " + "Solution ")
+
+        for repetition in repetitionIndexSortedByScore:
+            repetitionResult = self.output["results"]["repetitions"][repetition]
+            roundedAngleSolution = [round(angle, 2) for angle in repetitionResult['optimizedResult']['x']]
+            score = repetitionResult['optimizedResult']['fun']
+            # print breaks every integer step
+            if score > currentScoreBracket:
+                print(horizontalBreak)
+                currentScoreBracket = int(score) + 1
+            scoreStr = str(round(score, 2))
+            print(f"     {repetition: <7}|  {scoreStr: <7}|  {roundedAngleSolution}")
