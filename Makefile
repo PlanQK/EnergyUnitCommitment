@@ -34,6 +34,45 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Q
 
 ###### define extra parameter ######
 
+### general parameters
+PARAMETER_BACKEND = "Backend"
+PARAMETER_BACKEND_VAL = "qaoa"
+
+### Ising Model Parameters.
+# Determines how network, constraints, and optimization goals are encoded
+# Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
+# TODO: add comments for options that exist
+
+# network representation:
+# 	line encoding
+# constraints:
+# 	kirchhoff
+# 	minUpDownTime
+# optimization goals
+# 	marginalCost
+
+PARAMETER_FORMULATION = "IsingInterface_formulation"
+PARAMETER_FORMULATION_VAL = "binarysplit"
+
+MONETARYCOSTFACTOR = "monetaryCostFactor"
+MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
+
+# only relevant for problem formulation using an estimation-of-marginal-costs ansatz
+OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
+OFFSETESTIMATIONFACTOR_VAL = 1.1 1.2 1.3
+
+ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
+ESTIMATEDCOSTFACTOR_VAL = 1.0
+
+OFFSETBUILDFACTOR = "offsetBuildFactor"
+OFFSETBUILDFACTOR_VAL = 1.0
+
+PARAMETER_SCALEFACTOR = "IsingInterface_kirchhoff_scaleFactor"
+PARAMETER_SCALEFACTOR_VAL = 2.0
+
+PARAMETER_KIRCHFACTOR = "IsingInterface_kirchhoff_kirchhoffFactor"
+PARAMETER_KIRCHFACTOR_VAL = 1.5
+
 ### sqa parameters
 SIQUAN_TEMP = ""
 SIQUAN_TEMP_VAL = $(shell seq 0.1 1 0.1)
@@ -65,37 +104,6 @@ CHAINSTRENGTH_VAL = 60
 SAMPLECUTSIZE = "sampleCutSize"
 SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
 
-## Ising Model Parameters. Determines how network, constraints, and optimization goals are encoded
-# Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
-# TODO: add comments for options that exist
-
-# network representation:
-# 	line encoding
-# constraints:
-# 	kirchhoff
-# 	minUpDownTime
-# optimization goals
-# 	marginalCost
-
-
-MONETARYCOSTFACTOR = "monetaryCostFactor"
-MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
-
-# only relevant for problem formulation using an estimation-of-marginal-costs ansatz
-OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
-OFFSETESTIMATIONFACTOR_VAL = 1.1 1.2 1.3
-
-ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
-ESTIMATEDCOSTFACTOR_VAL = 1.0
-
-OFFSETBUILDFACTOR = "offsetBuildFactor"
-OFFSETBUILDFACTOR_VAL = 1.0
-
-SCALEFACTOR = "scaleFactor"
-SCALEFACTOR_VAL = 2.0
-
-KIRCHFACTOR = "kirchhoffFactor"
-KIRCHFACTOR_VAL = 1.5
 
 ### glpk parameter
 TIMEOUT = "timeout"
@@ -113,9 +121,9 @@ EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
 				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
 
 ### extra parameter generation
-EXTRAPARAM = 	$(foreach value1, $(SCALEFACTOR_VAL), \
-				$(foreach value2, $(KIRCHFACTOR_VAL), \
-				${SCALEFACTOR}-${value1}_${KIRCHFACTOR}-${value2}))
+EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
+				$(foreach value2, $(PARAMETER_KIRCHFACTOR_VAL), \
+				${PARAMETER_SCALEFACTOR}-${value1}_${PARAMETER_KIRCHFACTOR}-${value2}))
 
 #BACKEND = sqa
 #EXTRAPARAM = Backend-$(strip $(BACKEND))
