@@ -32,7 +32,8 @@ class InputReader:
     def __init__(self,
                  network: Union[str, dict, pypsa.Network],
                  config: Union[str, dict],
-                 extraParams: list = []
+                 extraParams: list = [],
+                 extraParamValues: list = []
                  ):
         """
         Obtain the configuration dictionary and pypsa.Network,
@@ -53,7 +54,9 @@ class InputReader:
         """
         self.network, self.networkName = self.makeNetwork(network)
         self.config = self.makeConfig(config)
-        self.addExtraParameters(extraParams)
+        print(f"CONFIG SET")
+        self.addExtraParameters(extraParams=extraParams,
+                                extraParamValues=extraParamValues)
         self.copyToBackendConfig()
         # print final config, but hide api tokens
         configWithoutToken = copy.deepcopy(self.config)
@@ -160,7 +163,10 @@ class InputReader:
             result["BackendConfig"] = {}
         return result
 
-    def addExtraParameters(self, extraParams: list) -> None:
+    def addExtraParameters(self,
+                           extraParams: list,
+                           extraParamValues: list
+                           ) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
@@ -169,20 +175,37 @@ class InputReader:
             extraParams: (list)
                 A list of the extra parameters to be added to the
                 config dictionary.
+            extraParamValues: (list)
+                A list of values of the extra parameters to be added to
+                the config dictionary.
 
         Returns:
             (None)
                 The self.config dictionary is modified.
         """
-        for keyChain in extraParams:
-            descentInConfig = self.config
-            for key in keyChain[:-2]:
-                try:
-                    descentInConfig = descentInConfig[key]
-                except KeyError:
-                    descentInConfig[key] = {}
-                    descentInConfig = descentInConfig[key]
-            descentInConfig[keyChain[-2]] = keyChain[-1]
+        print("adding extra parameters")
+        print(f"  {extraParams}")
+        print("  with")
+        print(f"  {extraParamValues}")
+        for values in extraParamValues:
+            print(f"current values: {values}")
+            for value in values:
+                i = 0
+                while i < len(values)-1:
+                    keyChain = extraParams[i]
+                    print(f"  key chain: {keyChain}")
+                    descentInConfig = self.config
+                    for key in keyChain:
+                        try:
+                            descentInConfig = descentInConfig[key]
+                        except KeyError:
+                            descentInConfig[key] = {}
+                            descentInConfig = descentInConfig[key]
+                    print(f"  descentInConfig old: {descentInConfig}")
+                    print(f"  to assign: {value}")
+                    descentInConfig[extraParams[i][len(keyChain)-1]] = value
+                    print(f"  descentInConfig new: {descentInConfig}")
+                    i += 1
 
     def getConfig(self) -> dict:
         """

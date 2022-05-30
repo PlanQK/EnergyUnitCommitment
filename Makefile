@@ -36,7 +36,7 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Q
 
 ### general parameters
 PARAMETER_BACKEND = "Backend"
-PARAMETER_BACKEND_VAL = "qaoa"
+VAL_PARAMETER_BACKEND = "qaoa"
 
 ### Ising Model Parameters.
 # Determines how network, constraints, and optimization goals are encoded
@@ -52,7 +52,7 @@ PARAMETER_BACKEND_VAL = "qaoa"
 # 	marginalCost
 
 PARAMETER_FORMULATION = "IsingInterface_formulation"
-PARAMETER_FORMULATION_VAL = "binarysplit"
+VAL_PARAMETER_FORMULATION = "binarysplit"
 
 MONETARYCOSTFACTOR = "monetaryCostFactor"
 MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
@@ -68,10 +68,12 @@ OFFSETBUILDFACTOR = "offsetBuildFactor"
 OFFSETBUILDFACTOR_VAL = 1.0
 
 PARAMETER_SCALEFACTOR = "IsingInterface_kirchhoff_scaleFactor"
-PARAMETER_SCALEFACTOR_VAL = 2.0
+#PARAMETER_SCALEFACTOR_VAL = 1.5
+VAL_PARAMETER_SCALEFACTOR = "0_5_10"
 
 PARAMETER_KIRCHFACTOR = "IsingInterface_kirchhoff_kirchhoffFactor"
-PARAMETER_KIRCHFACTOR_VAL = 1.5
+#PARAMETER_KIRCHFACTOR_VAL = 1.5
+VAL_PARAMETER_KIRCHFACTOR = "1.0_1.1"
 
 ### sqa parameters
 SIQUAN_TEMP = ""
@@ -125,15 +127,23 @@ EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
 				$(foreach value2, $(PARAMETER_KIRCHFACTOR_VAL), \
 				${PARAMETER_SCALEFACTOR}-${value1}_${PARAMETER_KIRCHFACTOR}-${value2}))
 
+EXTRAPARAMVARS = $(subst " ","__",$(foreach param, $(filter PARAMETER_%, $(.VARIABLES)),$($(param))))
+
+EXTRAPARAMVALUES = $(subst " ","__",$(foreach value, $(filter VAL_PARAMETER_%, $(.VARIABLES)),$($(value))))
+
 #BACKEND = sqa
 #EXTRAPARAM = Backend-$(strip $(BACKEND))
 
 ###### result files of computations ######
 
-GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
+#GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		$(foreach extraparam, ${EXTRAPARAM}, \
 		${SAVE_FOLDER}${filename}_${config}_${extraparam})))
+
+GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
+		$(foreach config, ${CONFIGFILES}, \
+		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAMVARS}__${EXTRAPARAMVALUES}))
 
 QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
@@ -162,9 +172,9 @@ $(foreach filename, $(SWEEPFILES), \
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3))__$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3)) $(strip $(4))
 	mkdir -p ${SAVE_FOLDER}
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_* ${SAVE_FOLDER}
 
@@ -172,8 +182,9 @@ endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call general, ${filename}, ${config}, ${extraparam})))))
+	$(foreach extranames, ${EXTRAPARAMVARS}, \
+	$(foreach extravalues, ${EXTRAPARAMVALUES}, \
+	$(eval $(call general, ${filename}, ${config}, ${extranames}, ${extravalues}))))))
 
 # end of creating rules for results
 
@@ -197,7 +208,9 @@ venv/bin/activate:
 
 # rules for making a sweep for a particular solver
 
-.PHONY: general clean plots quantumReadSweep
+.PHONY: all clean plots quantumReadSweep general
+
+all: quantumReadSweep general
 
 general: $(GENERAL_SWEEP_FILES)
 

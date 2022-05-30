@@ -37,12 +37,15 @@ def run(
     data: Union[pypsa.Network, str] = None,
     params: Union[dict, str] = None,
     extraParams: list = [],
+    extraParamValues: list = [],
 ) -> Response:
 
     response: Response
     try:
         # load all relevant data and parameters
-        inputReader = InputReader(network=data, config=params, extraParams=extraParams)
+        inputReader = InputReader(network=data, config=params,
+                                  extraParams=extraParams,
+                                  extraParamValues=extraParamValues)
         network = inputReader.getNetwork()
 
         # set up optimizer with input data
