@@ -118,24 +118,21 @@ TEST_PARAM_VAL = $(shell seq 5 5 10) # parameter1 values
 ANOTHER_TEST_PARAM = "test2" # parameter2 name
 ANOTHER_TEST_PARAM_VAL = 1.0 1.1 # parameter2 values
 # create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
-EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
+#EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
 				$(foreach value2, $(ANOTHER_TEST_PARAM_VAL), \
 				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
 
 ### extra parameter generation
-EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
+#EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
 				$(foreach value2, $(PARAMETER_KIRCHFACTOR_VAL), \
 				${PARAMETER_SCALEFACTOR}-${value1}_${PARAMETER_KIRCHFACTOR}-${value2}))
 
-EXTRAPARAM2 = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
-				$(foreach value, ${VAL_${name}}, \
-				${${name}}__${value}))
+EXTRAPARAMSEPARATE = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
+						$(foreach value, ${VAL_${name}}, \
+						${${name}}__${value}))
 
-EXTRAPARAM21 = $(subst " ","___",$(foreach param, ${EXTRAPARAM2},$(param)))
-
-EXTRAPARAMVARS = $(subst " ","__",$(foreach param, $(filter PARAMETER_%, $(.VARIABLES)),$($(param))))
-
-EXTRAPARAMVALUES = $(subst " ","__",$(foreach value, $(filter VAL_PARAMETER_%, $(.VARIABLES)),$($(value))))
+EXTRAPARAM = 	$(subst " ","___",$(foreach param, ${EXTRAPARAMSEPARATE},\
+				$(param)))
 
 #BACKEND = sqa
 #EXTRAPARAM = Backend-$(strip $(BACKEND))
@@ -149,7 +146,7 @@ EXTRAPARAMVALUES = $(subst " ","__",$(foreach value, $(filter VAL_PARAMETER_%, $
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
-		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM21}))
+		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM}))
 
 QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
@@ -188,7 +185,7 @@ endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extranames, ${EXTRAPARAM21}, \
+	$(foreach extranames, ${EXTRAPARAM}, \
 	$(eval $(call general, ${filename}, ${config}, ${extranames})))))
 
 # end of creating rules for results
