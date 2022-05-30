@@ -26,24 +26,30 @@ def main():
     extraParams = []
     extraParamsValues = []
     if len(sys.argv) >= 3 and sys.argv[3] != "":
-        argumentSplit = [x.split("__") for x in sys.argv[3].split("___")]
+        argumentSplit = [x.split("___") for x in sys.argv[3].split("____")]
         for [name, value] in argumentSplit:
-            extraParams.append(name.split("_"))
+            extraParams.append(name.split("__"))
             extraParamsValues.append(value)
         extraParamsValues = expandValueList(extraParamsValues)
         extraParamsValues = typecastValues(extraParamsValues)
     # run optimization
-    response = run(data=network, params=params,
-                   extraParams=extraParams,
-                   extraParamValues=extraParamsValues[0])
-    # save results
-    response.save_to_json_local_docker()
+    if extraParamsValues:
+        for values in extraParamsValues:
+            response = run(data=network, params=params,
+                           extraParams=extraParams,
+                           extraParamValues=values)
+            # save results
+            response.save_to_json_local_docker()
+    else:
+        response = run(data=network, params=params)
+        # save results
+        response.save_to_json_local_docker()
 
 
 def expandValueList(ValuesToExpand: list) -> list:
-    valueLists = [[x] for x in ValuesToExpand[0].split("_")]
+    valueLists = [[x] for x in ValuesToExpand[0].split("__")]
     for item in ValuesToExpand[1:]:
-        itemList = item.split("_")
+        itemList = item.split("__")
         if len(itemList) > 1:
             j = 0
             while j < len(valueLists):
@@ -66,13 +72,18 @@ def typecastValues(values: list) -> list:
     for valueList in values:
         newValueList = []
         for value in valueList:
-            try:
-                newValueList.append(int(value))
-            except ValueError:
+            if "[" in value:
+                value = value.replace("[", "")
+                value = value.replace("]", "")
+                newValueList.append(list(value.split(" ")))
+            else:
                 try:
-                    newValueList.append(float(value))
+                    newValueList.append(int(value))
                 except ValueError:
-                    newValueList.append(value)
+                    try:
+                        newValueList.append(float(value))
+                    except ValueError:
+                        newValueList.append(value)
         newValues.append(newValueList)
     return newValues
 

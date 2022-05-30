@@ -33,47 +33,104 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4Q
 #SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
+# Please check the current config-all.yaml for a list and description of all
+# possible options.
+# The name of the parameter has to be stored in a variable with the
+# PARAMETER_ prefix and the values for it in a variable with the
+# VAL_PARAMETER_ prefix.
+# Since there are multiple levels in the config dictionary the name has to
+# have the following pattern, indicating all levels:
+# "level1__level2__parameterName". The value(s) on the other hand should be given
+# as a string separated by a "__".
+# E.g.	PARAMETER_KIRCHSCALEFACTOR = "IsingInterface__kirchhoff__scaleFactor"
+# 		VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
+# Comment out any parameters not currently in use.
 
-### general parameters
-PARAMETER_BACKEND = "Backend"
+
+### General Parameters
+#PARAMETER_BACKEND = "Backend"
 VAL_PARAMETER_BACKEND = "qaoa"
 
-### Ising Model Parameters.
+
+### Ising Model Parameters
 # Determines how network, constraints, and optimization goals are encoded
 # Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
-# TODO: add comments for options that exist
 
-# network representation:
-# 	line encoding
-# constraints:
-# 	kirchhoff
-# 	minUpDownTime
-# optimization goals
-# 	marginalCost
-
-PARAMETER_FORMULATION = "IsingInterface_formulation"
+#PARAMETER_FORMULATION = \
+	"IsingInterface__formulation"
 VAL_PARAMETER_FORMULATION = "binarysplit"
 
-MONETARYCOSTFACTOR = "monetaryCostFactor"
-MONETARYCOSTFACTOR_VAL = 0.2 0.3 0.4
+PARAMETER_KIRCHSCALEFACTOR = \
+	"IsingInterface__kirchhoff__scaleFactor"
+VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
 
-# only relevant for problem formulation using an estimation-of-marginal-costs ansatz
-OFFSETESTIMATIONFACTOR = "offsetEstimationFactor"
-OFFSETESTIMATIONFACTOR_VAL = 1.1 1.2 1.3
+#PARAMETER_KIRCHFACTOR = \
+	"IsingInterface__kirchhoff__kirchhoffFactor"
+VAL_PARAMETER_KIRCHFACTOR = "1.0__1.1"
 
-ESTIMATEDCOSTFACTOR = "estimatedCostFactor"
-ESTIMATEDCOSTFACTOR_VAL = 1.0
+#PARAMETER_MARGINALFORMULATION = \
+	"IsingInterface__marginalCost__formulation"
+VAL_PARAMETER_MARGINALFORMULATION = "binarysplit"
 
-OFFSETBUILDFACTOR = "offsetBuildFactor"
-OFFSETBUILDFACTOR_VAL = 1.0
+#PARAMETER_MONETARYCOSTFACTOR = \
+	"IsingInterface__marginalCost__monetaryCostFactor"
+VAL_PARAMETER_MONETARYCOSTFACTOR = "0.2__0.3__0.4"
 
-PARAMETER_SCALEFACTOR = "IsingInterface_kirchhoff_scaleFactor"
-#PARAMETER_SCALEFACTOR_VAL = 1.5
-VAL_PARAMETER_SCALEFACTOR = "1.0_5.0_10.0"
+#PARAMETER_MONETARYSCALEFACTOR = \
+	"IsingInterface__marginalCost__scaleFactor"
+VAL_PARAMETER_MONETARYSCALEFACTOR = "1.0__5.0__10.0"
 
-PARAMETER_KIRCHFACTOR = "IsingInterface_kirchhoff_kirchhoffFactor"
-#PARAMETER_KIRCHFACTOR_VAL = 1.5
-VAL_PARAMETER_KIRCHFACTOR = "1.0_1.1"
+#PARAMETER_OFFSETESTIMATIONFACTOR = \
+	"IsingInterface__marginalCost__offsetEstimationFactor"
+VAL_PARAMETER_OFFSETESTIMATIONFACTOR_VAL = "1.1__1.2__1.3"
+
+#PARAMETER_ESTIMATEDCOSTFACTOR = \
+	"IsingInterface__marginalCost__estimatedCostFactor"
+VAL_PARAMETER_ESTIMATEDCOSTFACTOR_VAL = "1.0"
+
+#PARAMETER_OFFSETBUILDFACTOR = \
+	"IsingInterface__marginalCost__offsetBuildFactor"
+VAL_PARAMETER_OFFSETBUILDFACTOR_VAL = "1.0"
+
+#PARAMETER_MINUPDOWNFACTOR = \
+	"IsingInterface__minUpDownTime__minUpDownFactor"
+VAL_PARAMETER_MINUPDOWNFACTOR = "1.0"
+
+
+### QAOA Parameters
+#PARAMETER_QAOASHOTS = \
+	"QaoaBackend__shots"
+VAL_PARAMETER_QAOASHOTS = "500"
+
+#PARAMETER_QAOASIMULATE = \
+	"QaoaBackend__simulate"
+VAL_PARAMETER_QAOASIMULATE = "True"
+
+#PARAMETER_QAOANOISE = \
+	"QaoaBackend__noise"
+VAL_PARAMETER_QAOANOISE = "True"
+
+#PARAMETER_QAOASIMULATOR = \
+	"QaoaBackend__simulator"
+VAL_PARAMETER_QAOASIMULATOR = "aer_simulator"
+
+#PARAMETER_QAOAINITGUESS = \
+	"QaoaBackend__initial_guess"
+#TODO: Parse a list to run.py
+VAL_PARAMETER_QAOAINITGUESS = "[rand rand]"
+
+#PARAMETER_QAOAMAXITER = \
+	"QaoaBackend__max_iter"
+VAL_PARAMETER_QAOAMAXITER = "100"
+
+#PARAMETER_QAOAREPS = \
+	"QaoaBackend__repetitions"
+VAL_PARAMETER_QAOAREPS = "50"
+
+#PARAMETER_QAOACLASSICALOPT = \
+	"QaoaBackend__classical_optimizer"
+VAL_PARAMETER_QAOACLASSICALOPT = "COBYLA"
+
 
 ### sqa parameters
 SIQUAN_TEMP = ""
@@ -111,38 +168,19 @@ SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
 TIMEOUT = "timeout"
 TIMEOUT_VAL = 60
 
-
-### Example extra parameter string generation
-TEST_PARAM = "test" # parameter1 name
-TEST_PARAM_VAL = $(shell seq 5 5 10) # parameter1 values
-ANOTHER_TEST_PARAM = "test2" # parameter2 name
-ANOTHER_TEST_PARAM_VAL = 1.0 1.1 # parameter2 values
-# create single string from all extra parameters ('_' between parameters & '-' between parameter name and its value)
-#EXTRAPARAM = 	$(foreach value1, $(TEST_PARAM_VAL), \
-				$(foreach value2, $(ANOTHER_TEST_PARAM_VAL), \
-				${TEST_PARAM}-${value1}_${ANOTHER_TEST_PARAM}-${value2}))
-
-### extra parameter generation
-#EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
-				$(foreach value2, $(PARAMETER_KIRCHFACTOR_VAL), \
-				${PARAMETER_SCALEFACTOR}-${value1}_${PARAMETER_KIRCHFACTOR}-${value2}))
+###### extra parameter string generation ######
 
 EXTRAPARAMSEPARATE = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
 						$(foreach value, ${VAL_${name}}, \
-						${${name}}__${value}))
+						${${name}}___${value}))
 
-EXTRAPARAM = 	$(subst " ","___",$(foreach param, ${EXTRAPARAMSEPARATE},\
-				$(param)))
+EXTRAPARAM = 	$(subst " ","____",$(foreach param, \
+				${EXTRAPARAMSEPARATE},$(param)))
 
-#BACKEND = sqa
-#EXTRAPARAM = Backend-$(strip $(BACKEND))
-
+ifeq ($(EXTRAPARAM),)
+EXTRAPARAM = ""
+endif
 ###### result files of computations ######
-
-#GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		${SAVE_FOLDER}${filename}_${config}_${extraparam})))
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
@@ -177,7 +215,7 @@ $(foreach filename, $(SWEEPFILES), \
 define general
 ${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3)) $(strip $(4))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p ${SAVE_FOLDER}
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_* ${SAVE_FOLDER}
 
@@ -185,8 +223,8 @@ endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extranames, ${EXTRAPARAM}, \
-	$(eval $(call general, ${filename}, ${config}, ${extranames})))))
+	$(foreach extra, ${EXTRAPARAM}, \
+	$(eval $(call general, ${filename}, ${config}, ${extra})))))
 
 # end of creating rules for results
 

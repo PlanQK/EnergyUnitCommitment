@@ -70,9 +70,6 @@ QaoaBackend:
     classical_optimizer: "COBYLA"
         # (string) the classical optimizer to be used
         # choose between "SPSA", "COBYLA" and "ADAM"
-    qcGeneration: "IterationMatrix"
-        # (string) the method for the generation of the quantum circuit
-        # choose between "Ising", "Iteration" and "IterationMatrix"
 
 SqaBackend:
     # seed: 10
