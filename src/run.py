@@ -23,21 +23,19 @@ def main():
     # the keys of the different levels of one parameters are seperated using '-'
     # for each parameter, the last value is the value of the config, and the rest are keys of the nesting
     # any value found in extraParams will overwrite a value found in params
-    if len(sys.argv) <= 4 or sys.argv[3] == "" or sys.argv[4] == "":
-        extraParams = []
-        extraParamsValues = []
-    else:
-        print(f"Extra Parameters raw: {sys.argv[3]}")
-        extraParams = [x.split("_") for x in sys.argv[3].split("__")]
-        print(f"Extra Parameter Values raw: {sys.argv[4]}")
-        extraParamsValues = expandValueList(sys.argv[4].split("__"))
-        print(f"Extra Parameter Values preTypeCast: {extraParamsValues}")
-        extraParamsValues = typecastValues(values=extraParamsValues)
+    extraParams = []
+    extraParamsValues = []
+    if len(sys.argv) >= 3 and sys.argv[3] != "":
+        argumentSplit = [x.split("__") for x in sys.argv[3].split("___")]
+        for [name, value] in argumentSplit:
+            extraParams.append(name.split("_"))
+            extraParamsValues.append(value)
+        extraParamsValues = expandValueList(extraParamsValues)
+        extraParamsValues = typecastValues(extraParamsValues)
     # run optimization
-    print(f"Extra Parameter: {extraParams}")
-    print(f"Extra Parameter Values: {extraParamsValues}")
     response = run(data=network, params=params,
-                   extraParams=extraParams, extraParamValues=extraParamsValues)
+                   extraParams=extraParams,
+                   extraParamValues=extraParamsValues[0])
     # save results
     response.save_to_json_local_docker()
 

@@ -54,7 +54,6 @@ class InputReader:
         """
         self.network, self.networkName = self.makeNetwork(network)
         self.config = self.makeConfig(config)
-        print(f"CONFIG SET")
         self.addExtraParameters(extraParams=extraParams,
                                 extraParamValues=extraParamValues)
         self.copyToBackendConfig()
@@ -183,29 +182,16 @@ class InputReader:
             (None)
                 The self.config dictionary is modified.
         """
-        print("adding extra parameters")
-        print(f"  {extraParams}")
-        print("  with")
-        print(f"  {extraParamValues}")
-        for values in extraParamValues:
-            print(f"current values: {values}")
-            for value in values:
-                i = 0
-                while i < len(values)-1:
-                    keyChain = extraParams[i]
-                    print(f"  key chain: {keyChain}")
-                    descentInConfig = self.config
-                    for key in keyChain:
-                        try:
-                            descentInConfig = descentInConfig[key]
-                        except KeyError:
-                            descentInConfig[key] = {}
-                            descentInConfig = descentInConfig[key]
-                    print(f"  descentInConfig old: {descentInConfig}")
-                    print(f"  to assign: {value}")
-                    descentInConfig[extraParams[i][len(keyChain)-1]] = value
-                    print(f"  descentInConfig new: {descentInConfig}")
-                    i += 1
+        for index, value in enumerate(extraParamValues):
+            keyChain = extraParams[index]
+            descentInConfig = self.config
+            for key in keyChain[:-1]:
+                try:
+                    descentInConfig = descentInConfig[key]
+                except KeyError:
+                    descentInConfig[key] = {}
+                    descentInConfig = descentInConfig[key]
+            descentInConfig[extraParams[index][len(keyChain)-1]] = value
 
     def getConfig(self) -> dict:
         """

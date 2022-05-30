@@ -241,7 +241,7 @@ class IsingBackbone:
                 An IsingBackbone that models the unit commitment problem
                 of the network.
         """
-        linesplitFunction = config.pop("formulation")
+        linesplitFunction = config["formulation"]
         return IsingBackbone(network, linesplitFunction, config)
 
     def flushCachedProblem(self) -> None:
@@ -1234,7 +1234,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem):
             "MarginalAsPenalty": MarginalAsPenalty,
             "LocalMarginalEstimation": LocalMarginalEstimation,
         }
-        return subclassTable[configuration.pop("formulation")](
+        return subclassTable[configuration["formulation"]](
             backbone=backbone, config=configuration)
 
 

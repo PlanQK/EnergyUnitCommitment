@@ -69,7 +69,7 @@ OFFSETBUILDFACTOR_VAL = 1.0
 
 PARAMETER_SCALEFACTOR = "IsingInterface_kirchhoff_scaleFactor"
 #PARAMETER_SCALEFACTOR_VAL = 1.5
-VAL_PARAMETER_SCALEFACTOR = "0_5_10"
+VAL_PARAMETER_SCALEFACTOR = "1.0_5.0_10.0"
 
 PARAMETER_KIRCHFACTOR = "IsingInterface_kirchhoff_kirchhoffFactor"
 #PARAMETER_KIRCHFACTOR_VAL = 1.5
@@ -127,6 +127,12 @@ EXTRAPARAM = 	$(foreach value1, $(PARAMETER_SCALEFACTOR_VAL), \
 				$(foreach value2, $(PARAMETER_KIRCHFACTOR_VAL), \
 				${PARAMETER_SCALEFACTOR}-${value1}_${PARAMETER_KIRCHFACTOR}-${value2}))
 
+EXTRAPARAM2 = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
+				$(foreach value, ${VAL_${name}}, \
+				${${name}}__${value}))
+
+EXTRAPARAM21 = $(subst " ","___",$(foreach param, ${EXTRAPARAM2},$(param)))
+
 EXTRAPARAMVARS = $(subst " ","__",$(foreach param, $(filter PARAMETER_%, $(.VARIABLES)),$($(param))))
 
 EXTRAPARAMVALUES = $(subst " ","__",$(foreach value, $(filter VAL_PARAMETER_%, $(.VARIABLES)),$($(value))))
@@ -143,7 +149,7 @@ EXTRAPARAMVALUES = $(subst " ","__",$(foreach value, $(filter VAL_PARAMETER_%, $
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
-		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAMVARS}__${EXTRAPARAMVALUES}))
+		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM21}))
 
 QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
@@ -172,7 +178,7 @@ $(foreach filename, $(SWEEPFILES), \
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3))__$(strip $(4)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3)) $(strip $(4))
 	mkdir -p ${SAVE_FOLDER}
@@ -182,9 +188,8 @@ endef
 
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extranames, ${EXTRAPARAMVARS}, \
-	$(foreach extravalues, ${EXTRAPARAMVALUES}, \
-	$(eval $(call general, ${filename}, ${config}, ${extranames}, ${extravalues}))))))
+	$(foreach extranames, ${EXTRAPARAM21}, \
+	$(eval $(call general, ${filename}, ${config}, ${extranames})))))
 
 # end of creating rules for results
 
