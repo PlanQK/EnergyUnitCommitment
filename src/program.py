@@ -2,7 +2,7 @@
 The docker container loads the pypsa model and performs the optimization
 of the unit commitment problem.
 """
-from typing import Dict, Any, Optional, Union
+from typing import Union
 
 import pypsa
 from loguru import logger
