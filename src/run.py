@@ -18,13 +18,14 @@ def main():
     # reading input
     network = sys.argv[1]
     params = sys.argv[2]
-    # the extraParams string contains entries of a nested dictionary according to this rule
-    # different config parameters are seperated using '--'
-    # the keys of the different levels of one parameters are seperated using '-'
-    # for each parameter, the last value is the value of the config, and the rest are keys of the nesting
-    # any value found in extraParams will overwrite a value found in params
+    # the sys.argv[3] string contains entries of a nested dictionary,
+    # where for each parameter its name and nested levels are separated by
+    # "__", as well as all desired values for this parameter are separated
+    # by "__". The names and values for parameters are separated by "___"
+    # and between all name-value pairs a separator of "____" was inserted.
     extraParams = []
     extraParamsValues = []
+    # split up extra parameter string if parsed by Makefile
     if len(sys.argv) >= 3 and sys.argv[3] != "":
         argumentSplit = [x.split("___") for x in sys.argv[3].split("____")]
         for [name, value] in argumentSplit:
@@ -32,17 +33,15 @@ def main():
             extraParamsValues.append(value)
         extraParamsValues = expandValueList(extraParamsValues)
         extraParamsValues = typecastValues(extraParamsValues)
-    # run optimization
+    # run optimization and save results
     if extraParamsValues:
         for values in extraParamsValues:
             response = run(data=network, params=params,
                            extraParams=extraParams,
                            extraParamValues=values)
-            # save results
             response.save_to_json_local_docker()
     else:
         response = run(data=network, params=params)
-        # save results
         response.save_to_json_local_docker()
 
 
