@@ -1,5 +1,6 @@
 """This file is the entrypoint for the docker run command.
-The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
+The docker container loads the pypsa model and performs the optimization
+of the unit commitment problem.
 """
 from typing import Dict, Any, Optional, Union
 
@@ -56,7 +57,8 @@ def run(
         optimizer.transformProblemForOptimizer()
         optimizer.optimize()
 
-        # hook for potential post processing like flow optimization for dwave solutions
+        # hook for potential post processing like flow optimization for dwave
+        # solutions
         optimizer.processSolution()
 
         optimizer.transformSolutionToNetwork()
