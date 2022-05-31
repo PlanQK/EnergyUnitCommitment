@@ -60,11 +60,11 @@ VAL_PARAMETER_BACKEND = "qaoa"
 	"IsingInterface__formulation"
 VAL_PARAMETER_FORMULATION = "binarysplit"
 
-PARAMETER_KIRCHSCALEFACTOR = \
+#PARAMETER_KIRCHSCALEFACTOR = \
 	"IsingInterface__kirchhoff__scaleFactor"
 VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
 
-#PARAMETER_KIRCHFACTOR = \
+PARAMETER_KIRCHFACTOR = \
 	"IsingInterface__kirchhoff__kirchhoffFactor"
 VAL_PARAMETER_KIRCHFACTOR = "1.0__1.1"
 
@@ -132,84 +132,103 @@ VAL_PARAMETER_QAOAREPS = "50"
 VAL_PARAMETER_QAOACLASSICALOPT = "COBYLA"
 
 
-### sqa parameters
-SIQUAN_TEMP = ""
-SIQUAN_TEMP_VAL = $(shell seq 0.1 1 0.1)
-TRANSVERSE_HIGH = ""
-TRANSVERSE_HIGH_VAL = $(shell seq 8.0 1.0 8)
-OPTIMIZATIONCYCLES = "optimizationCycles"
-OPTIMIZATIONCYCLES_VAL = $(shell seq 5 5 20)
-OPTIMIZATIONCYCLES_VAL = 100
-#OPTIMIZATIONCYCLES_VAL = 10 30 77 215 599 1668 4641 12915
-TROTTERSLICES = "trotterSlices"
-TROTTERSLICES_VAL = $(shell seq 10 10 100)
-TROTTERSLICES_VAL = 500
+### SQA Parameters
+#PARAMETER_TRANSVERSEFIELD = \
+	"SqaBackend__transverseFieldSchedule"
+VAL_PARAMETER_TRANSVERSEFIELD = "8.0"
 
-### classical parameters. reuses OPTIMIZATIONCYCLES
-CLASSICAL_HIGH_TEMP = ""
-CLASSICAL_HIGH_TEMP_VAL = $(shell seq 10.0 10.0 10)
-CLASSICAL_LOW_TEMP = ""
-CLASSICAL_LOW_TEMP_VAL = $(shell seq 0.5 0.5 0.5)
+#PARAMETER_SIQUAN_TEMP = \
+	"SqaBackend__temperatureSchedule"
+VAL_PARAMETER_SIQUAN_TEMP = "0.1"
 
-### dwave quantum annealer parameters. Requires an APIToken as an environmentvariabale with name
-### dwaveAPIToken
-ANNEAL_TIME = "annealing_time"
-ANNEAL_TIME_VAL = $(shell seq 100 50 100)
-NUM_READS = "num_reads"
-NUM_READS_VAL = $(shell seq 200 20 200)
-CHAINSTRENGTH = "chain_strength"
-#CHAINSTRENGTH_VAL = $(shell seq 60 30 60)
-CHAINSTRENGTH_VAL = 60
-SAMPLECUTSIZE = "sampleCutSize"
-SAMPLECUTSIZE_VAL = $(shell seq 200 4 200)
+#PARAMETER_TROTTERSLICES = \
+	"SqaBackend__trotterSlices"
+VAL_PARAMETER_TROTTERSLICES = "10__20__30__40__50__60__70__80__90__100"
+
+#PARAMETER_OPTIMIZATIONCYCLES = \
+	"SqaBackend__optimizationCycles"
+VAL_PARAMETER_OPTIMIZATIONCYCLES = "5__10__15__20"
 
 
-### glpk parameter
-TIMEOUT = "timeout"
-TIMEOUT_VAL = 60
+### D-Wave Quantum Annealer Parameters.
+# Requires an APIToken set in the config
+#PARAMETER_ANNEAL_TIME = \
+	"DWaveBackend__annealing_time"
+VAL_PARAMETER_ANNEAL_TIME = "100"
+
+#PARAMETER_NUM_READS = \
+	"DWaveBackend__num_reads"
+VAL_PARAMETER_NUM_READS = "200"
+
+#PARAMETER_CHAINSTRENGTH = \
+	"DWaveBackend__chain_strength"
+VAL_PARAMETER_CHAINSTRENGTH = "60"
+
+#PARAMETER_PROGTHERMALIZATION = \
+	"DWaveBackend__programming_thermalization"
+VAL_PARAMETER_PROGTHERMALIZATION = "1"
+
+#PARAMETER_READTHERMALIZATION = \
+	"DWaveBackend__readout_thermalization"
+VAL_PARAMETER_READTHERMALIZATION = "1"
+
+#PARAMETER_SAMPLECUTSIZE = \
+	"DWaveBackend__sampleCutSize"
+VAL_PARAMETER_SAMPLECUTSIZE = "200"
+
+#PARAMETER_STRATEGY = \
+	"DWaveBackend__strategy"
+VAL_PARAMETER_STRATEGY = "LowestEnergy"
+
+#PARAMETER_POSTPROCESS = \
+	"DWaveBackend__postprocess"
+VAL_PARAMETER_POSTPROCESS = "flow"
+
+#PARAMETER_DWAVETIMEOUT = \
+	"DWaveBackend__timeout"
+VAL_PARAMETER_DWAVETIMEOUT = "100"
+
+#PARAMETER_SAMPLEORIGIN = \
+	"DWaveBackend__sampleOrigin"
+VAL_PARAMETER_SAMPLEORIGIN = \
+	"infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+
+
+### GLPK Parameter
+#PARAMETER_PYPSASOLVERNAME = \
+	"PypsaBackend__solver_name"
+VAL_PARAMETER_PYPSASOLVERNAME = "glpk"
+
+#PARAMETER_PYPSATIMEOUT = \
+	"PypsaBackend__timeout"
+VAL_PARAMETER_PYPSATIMEOUT = "60"
 
 ###### extra parameter string generation ######
 
+# combine each parameter name with its values, if it is not commented out
 EXTRAPARAMSEPARATE = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
 						$(foreach value, ${VAL_${name}}, \
 						${${name}}___${value}))
 
+# join all separate parameter___value pairs
 EXTRAPARAM = 	$(subst " ","____",$(foreach param, \
 				${EXTRAPARAMSEPARATE},$(param)))
 
+# if no Parameters are declared in the Makefile, the string will be set to an
+# empty string
 ifeq ($(EXTRAPARAM),)
 EXTRAPARAM = ""
 endif
+
+
 ###### result files of computations ######
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM}))
 
-QUANTUM_ANNEALING_READ_RESULTS = $(foreach filename, $(SWEEPFILES), \
-		$(foreach config, ${CONFIGFILES}, \
-		$(foreach extraparam, ${EXTRAPARAM}, \
-		${SAVE_FOLDER}${filename}_${config}_${extraparam})))
 
 ###### creating rules for result files ######
-
-# define targets for old sample data
-
-define qpuReadSweep
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
-	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	--mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
-	mkdir -p ${SAVE_FOLDER}
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_dwave-read-qpu* ${SAVE_FOLDER}
-
-endef
-
-$(foreach filename, $(SWEEPFILES), \
-	$(foreach config, ${CONFIGFILES}, \
-	$(foreach extraparam, ${EXTRAPARAM}, \
-	$(eval $(call qpuReadSweep, ${filename}, ${config}, ${extraparam})))))
-
 # define general target
 
 define general
@@ -253,9 +272,6 @@ venv/bin/activate:
 all: quantumReadSweep general
 
 general: $(GENERAL_SWEEP_FILES)
-
-# requires old data to be reused or dwaveAPIToken
-quantumReadSweep: $(QUANTUM_ANNEALING_READ_RESULTS)
 
 clean:
 	rm -rf Problemset/info*
