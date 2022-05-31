@@ -47,6 +47,27 @@ def main():
 
 
 def expandValueList(ValuesToExpand: list) -> list:
+    """
+    Takes a list of values for extra parameters, where each element in
+    the list can represent multiple values for this parameter, and
+    expands this list to return an list of list, where each possible
+    combination of the input values is stored.
+    E.g.:   Input:  ["1.0__2.0", "10__5__0"]
+            Output: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
+                     ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
+    Args:
+        ValuesToExpand: (list)
+            A list of values for all extra parameters. The values for
+            parameters have to be separated by "__".
+            E.g.: ["1.0__2.0", "10__5__0"]
+
+    Returns:
+        (list)
+            The expanded list of values. A list of lists with all
+            possible combinations of the input values.
+            E.g.: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
+                   ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
+    """
     valueLists = [[x] for x in ValuesToExpand[0].split("__")]
     for item in ValuesToExpand[1:]:
         itemList = item.split("__")
@@ -68,6 +89,21 @@ def expandValueList(ValuesToExpand: list) -> list:
 
 
 def typecastValues(values: list) -> list:
+    """
+    Analyzes a list of list of strings and typecasts them into floats,
+    ints or list, if necessary.
+    Args:
+        values: (list)
+            A list of lists of strings (returned by expandValueList)
+            which should be typecast.
+            E.g.: [["1.0", "10", "test"], ["1.0", "5", "test"],
+                   ["2.0", "10", "test"], ["2.0", "5", "test"]]
+    Returns:
+        (list)
+            A list of lists with the typecast values.
+            E.g.: [[1.0, 10, "test"], [1.0, 5, "test"],
+                   [2.0, 10, "test"], [2.0, 5, "test"]]
+    """
     newValues = []
     for valueList in values:
         newValueList = []
