@@ -1142,7 +1142,11 @@ class AbstractIsingSubproblem:
                 construct an instance.
         """
         self.problem = {}
-        self.scaleFactor = config["scaleFactor"]
+        try:
+            self.scaleFactor = config["scaleFactor"]
+        except KeyError:
+            print("Can't find value for 'scaleFactor', fallback to '1.0'")
+            self.scaleFactor = 1.0
         self.backbone = backbone
         self.network = backbone.network
 
