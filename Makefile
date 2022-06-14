@@ -56,11 +56,13 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NET
 # E.g.	PARAMETER_KIRCHSCALEFACTOR = "IsingInterface__kirchhoff__scaleFactor"
 # 		VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
 # Comment out any parameters not currently in use.
-
+# 
 
 ### General Parameters
-#PARAMETER_BACKEND = "Backend"
-VAL_PARAMETER_BACKEND = "qaoa"
+
+# a parameter for setting the solver.
+#PARAMETER_BACKEND = Backend
+VAL_PARAMETER_BACKEND = sqa 
 
 
 ### Ising Model Parameters
@@ -68,158 +70,158 @@ VAL_PARAMETER_BACKEND = "qaoa"
 # Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
 
 #PARAMETER_FORMULATION = \
-	"IsingInterface__formulation"
-VAL_PARAMETER_FORMULATION = "binarysplit"
+	IsingInterface__formulation
+VAL_PARAMETER_FORMULATION = binarysplit
 
 #PARAMETER_KIRCHSCALEFACTOR = \
-	"IsingInterface__kirchhoff__scaleFactor"
-VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
+	IsingInterface__kirchhoff__scaleFactor
+VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__5.0__10.0
 
 PARAMETER_KIRCHFACTOR = \
-	"IsingInterface__kirchhoff__kirchhoffFactor"
-VAL_PARAMETER_KIRCHFACTOR = "1.0__1.1"
+	IsingInterface__kirchhoff__scaleFactor
+VAL_PARAMETER_KIRCHFACTOR = 1.0
 
 #PARAMETER_MARGINALFORMULATION = \
-	"IsingInterface__marginalCost__formulation"
-VAL_PARAMETER_MARGINALFORMULATION = "binarysplit"
+	IsingInterface__marginalCost__formulation
+VAL_PARAMETER_MARGINALFORMULATION = binarysplit
 
 #PARAMETER_MONETARYCOSTFACTOR = \
 	"IsingInterface__marginalCost__monetaryCostFactor"
-VAL_PARAMETER_MONETARYCOSTFACTOR = "0.2__0.3__0.4"
+VAL_PARAMETER_MONETARYCOSTFACTOR = 0.2__0.3__0.4
 
 #PARAMETER_MONETARYSCALEFACTOR = \
 	"IsingInterface__marginalCost__scaleFactor"
-VAL_PARAMETER_MONETARYSCALEFACTOR = "1.0__5.0__10.0"
+VAL_PARAMETER_MONETARYSCALEFACTOR = 1.0__5.0__10.0
 
 #PARAMETER_OFFSETESTIMATIONFACTOR = \
-	"IsingInterface__marginalCost__offsetEstimationFactor"
-VAL_PARAMETER_OFFSETESTIMATIONFACTOR_VAL = "1.1__1.2__1.3"
+	IsingInterface__marginalCost__offsetEstimationFactor
+VAL_PARAMETER_OFFSETESTIMATIONFACTOR_VAL = 1.1__1.2__1.3
 
 #PARAMETER_ESTIMATEDCOSTFACTOR = \
-	"IsingInterface__marginalCost__estimatedCostFactor"
-VAL_PARAMETER_ESTIMATEDCOSTFACTOR_VAL = "1.0"
+	IsingInterface__marginalCost__estimatedCostFactor
+VAL_PARAMETER_ESTIMATEDCOSTFACTOR_VAL = 1.0
 
 #PARAMETER_OFFSETBUILDFACTOR = \
-	"IsingInterface__marginalCost__offsetBuildFactor"
-VAL_PARAMETER_OFFSETBUILDFACTOR_VAL = "1.0"
+	IsingInterface__marginalCost__offsetBuildFactor
+VAL_PARAMETER_OFFSETBUILDFACTOR_VAL = 1.0
 
 #PARAMETER_MINUPDOWNFACTOR = \
-	"IsingInterface__minUpDownTime__minUpDownFactor"
-VAL_PARAMETER_MINUPDOWNFACTOR = "1.0"
+	IsingInterface__minUpDownTime__minUpDownFactor
+VAL_PARAMETER_MINUPDOWNFACTOR = 1.0
 
 
 ### QAOA Parameters
 #PARAMETER_QAOASHOTS = \
-	"QaoaBackend__shots"
-VAL_PARAMETER_QAOASHOTS = "500"
+	QaoaBackend__shots
+VAL_PARAMETER_QAOASHOTS = 500
 
 #PARAMETER_QAOASIMULATE = \
-	"QaoaBackend__simulate"
-VAL_PARAMETER_QAOASIMULATE = "True"
+	QaoaBackend__simulate
+VAL_PARAMETER_QAOASIMULATE = True
 
 #PARAMETER_QAOANOISE = \
-	"QaoaBackend__noise"
-VAL_PARAMETER_QAOANOISE = "True"
+	QaoaBackend__noise
+VAL_PARAMETER_QAOANOISE = True
 
 #PARAMETER_QAOASIMULATOR = \
-	"QaoaBackend__simulator"
-VAL_PARAMETER_QAOASIMULATOR = "aer_simulator"
+	QaoaBackend__simulator
+VAL_PARAMETER_QAOASIMULATOR = aer_simulator
 
 #PARAMETER_QAOAINITGUESS = \
-	"QaoaBackend__initial_guess"
+	QaoaBackend__initial_guess
 #TODO: Parse a list to run.py
-VAL_PARAMETER_QAOAINITGUESS = "[rand rand]"
+VAL_PARAMETER_QAOAINITGUESS = [rand rand]
 
 #PARAMETER_QAOAMAXITER = \
-	"QaoaBackend__max_iter"
-VAL_PARAMETER_QAOAMAXITER = "100"
+	QaoaBackend__max_iter
+VAL_PARAMETER_QAOAMAXITER = 100
 
 #PARAMETER_QAOAREPS = \
-	"QaoaBackend__repetitions"
-VAL_PARAMETER_QAOAREPS = "50"
+	QaoaBackend__repetitions
+VAL_PARAMETER_QAOAREPS = 50
 
 #PARAMETER_QAOACLASSICALOPT = \
-	"QaoaBackend__classical_optimizer"
-VAL_PARAMETER_QAOACLASSICALOPT = "COBYLA"
+	QaoaBackend__classical_optimizer
+VAL_PARAMETER_QAOACLASSICALOPT = COBYLA
 
 
 ### SQA Parameters
 #PARAMETER_TRANSVERSEFIELD = \
-	"SqaBackend__transverseFieldSchedule"
-VAL_PARAMETER_TRANSVERSEFIELD = "8.0"
+	SqaBackend__transverseFieldSchedule
+VAL_PARAMETER_TRANSVERSEFIELD = 8.0
 
 #PARAMETER_SIQUAN_TEMP = \
-	"SqaBackend__temperatureSchedule"
-VAL_PARAMETER_SIQUAN_TEMP = "0.1"
+	SqaBackend__temperatureSchedule
+VAL_PARAMETER_SIQUAN_TEMP = 0.1
 
 #PARAMETER_TROTTERSLICES = \
-	"SqaBackend__trotterSlices"
-VAL_PARAMETER_TROTTERSLICES = "10__20__30__40__50__60__70__80__90__100"
+	SqaBackend__trotterSlices
+VAL_PARAMETER_TROTTERSLICES = 20__40__60__80__100
 
 #PARAMETER_OPTIMIZATIONCYCLES = \
-	"SqaBackend__optimizationCycles"
-VAL_PARAMETER_OPTIMIZATIONCYCLES = "5__10__15__20"
+	SqaBackend__optimizationCycles
+VAL_PARAMETER_OPTIMIZATIONCYCLES = 10__20
 
 
 ### D-Wave Quantum Annealer Parameters.
 # Requires an APIToken set in the config
 #PARAMETER_ANNEAL_TIME = \
-	"DWaveBackend__annealing_time"
-VAL_PARAMETER_ANNEAL_TIME = "100"
+	DWaveBackend__annealing_time
+VAL_PARAMETER_ANNEAL_TIME = 100
 
 #PARAMETER_NUM_READS = \
-	"DWaveBackend__num_reads"
-VAL_PARAMETER_NUM_READS = "200"
+	DWaveBackend__num_reads
+VAL_PARAMETER_NUM_READS = 200
 
 #PARAMETER_CHAINSTRENGTH = \
-	"DWaveBackend__chain_strength"
-VAL_PARAMETER_CHAINSTRENGTH = "60"
+	DWaveBackend__chain_strength
+VAL_PARAMETER_CHAINSTRENGTH = 60
 
 #PARAMETER_PROGTHERMALIZATION = \
-	"DWaveBackend__programming_thermalization"
-VAL_PARAMETER_PROGTHERMALIZATION = "1"
+	DWaveBackend__programming_thermalization
+VAL_PARAMETER_PROGTHERMALIZATION = 1
 
 #PARAMETER_READTHERMALIZATION = \
-	"DWaveBackend__readout_thermalization"
-VAL_PARAMETER_READTHERMALIZATION = "1"
+	DWaveBackend__readout_thermalization
+VAL_PARAMETER_READTHERMALIZATION = 1
 
 #PARAMETER_SAMPLECUTSIZE = \
-	"DWaveBackend__sampleCutSize"
-VAL_PARAMETER_SAMPLECUTSIZE = "200"
+	DWaveBackend__sampleCutSize
+VAL_PARAMETER_SAMPLECUTSIZE = 200
 
 #PARAMETER_STRATEGY = \
-	"DWaveBackend__strategy"
-VAL_PARAMETER_STRATEGY = "LowestEnergy"
+	DWaveBackend__strategy
+VAL_PARAMETER_STRATEGY = LowestEnergy
 
 #PARAMETER_POSTPROCESS = \
-	"DWaveBackend__postprocess"
-VAL_PARAMETER_POSTPROCESS = "flow"
+	DWaveBackend__postprocess
+VAL_PARAMETER_POSTPROCESS = flow
 
 #PARAMETER_DWAVETIMEOUT = \
-	"DWaveBackend__timeout"
-VAL_PARAMETER_DWAVETIMEOUT = "100"
+	DWaveBackend__timeout
+VAL_PARAMETER_DWAVETIMEOUT = 100
 
 #PARAMETER_SAMPLEORIGIN = \
-	"DWaveBackend__sampleOrigin"
+	DWaveBackend__sampleOrigin
 VAL_PARAMETER_SAMPLEORIGIN = \
-	"infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+	infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1
 
 
 ### GLPK Parameter
 #PARAMETER_PYPSASOLVERNAME = \
-	"PypsaBackend__solver_name"
-VAL_PARAMETER_PYPSASOLVERNAME = "glpk"
+	PypsaBackend__solver_name
+VAL_PARAMETER_PYPSASOLVERNAME = glpk
 
 #PARAMETER_PYPSATIMEOUT = \
-	"PypsaBackend__timeout"
-VAL_PARAMETER_PYPSATIMEOUT = "60"
+	PypsaBackend__timeout
+VAL_PARAMETER_PYPSATIMEOUT = 60
 
 ###### extra parameter string generation ######
 
 # combine each parameter name with its values, if it is not commented out
-EXTRAPARAMSEPARATE = 	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
+EXTRAPARAMSEPARATE =	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
 						$(foreach value, ${VAL_${name}}, \
-						${${name}}___${value}))
+						$(strip ${${name}}___${value})))
 
 # join all separate parameter___value pairs
 EXTRAPARAM = 	$(subst " ","____",$(foreach param, \
