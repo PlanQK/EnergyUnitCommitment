@@ -10,41 +10,53 @@ Backend: "sqa"
     # (string) the backend algorithm to be used. options are:
     # "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
     # "pypsa-glpk", "pypsa-fico", "qaoa"
-    #
+
+# all configuration data of the QUBO model of the network
 IsingInterface:
+    # values for specifiying network to qubit abstraction
     formulation: "customsplit"
-        # (string) name of the function to split lines
+        # (string) name of the function how to model lines with qubits
         # choose between binarysplit, fullsplit, customsplit
-#    kirchhoff:
-#        # Adding Kirchhoff subproblem to QUBO
-#        scaleFactor: 1.0
-#        # (float) weight of the kirchhoff subproblem in the QUBO
-    marginalCost:
-#        # Adding Marginal cost optimization in the QUBO
-        formulation: "GlobalCostSquareWithSlack"
-        slackType: "binaryPower"
-        slackScale: 0.1
-        slackSize: 12
-#            # (string) name of the method how to encode the marginal cost optimization
-#            # choose between GlobalCostSquare, GlobalCostSquareWithSlack, MarginalAsPenalty, LocalMarginalEstimationDistance
+        #
+    # each followung entry is the configuration data for one QUBI subproblem
+    kirchhoff:
+        # Adding Kirchhoff subproblem to QUBO
         scaleFactor: 1.0
-#            # (float) weight of the marginal cost optimization in the QUBO
+        # (float) weight of the kirchhoff subproblem in the QUBO
+    marginalCost:
+        # Adding Marginal cost optimization in the QUBO
+        formulation: "GlobalCostSquare"
+            # (string) name of the class/procedure how to encode the marginal cost optimization
+            # choose between GlobalCostSquare, GlobalCostSquareWithSlack, MarginalAsPenalty, LocalMarginalEstimationDistance
+        ### these values only pertain the formulation *WithSlack
+        slackType: "binaryPower"
+            # this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
+        slackScale: 0.1
+            # (float) scalar factor for all slack variable weights
+        slackSize: 4
+            # (int) number of slack variables to be used
+        ### end *WithSlack
+        ### these values specifiy how costs are estimated if a formulation needs it (all but MarginalAsPenalty)
+        scaleFactor: 0.6
+             # (float) weight of the marginal cost optimization in the QUBO
         offsetEstimationFactor: 1.225
-        offsetEstimationFactor: 1.22
-#            # (float)
+             # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
+             # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
+             # this method disregerads the topology of the network and is a lower boundary of the cost
         estimatedCostFactor: 1.0
-#            # (float)
+             # (float) TODO: remove this option in code
         offsetBuildFactor: 1.0
-#            # (float)
-        slackRange: 7
-            # (int)
-#
-#    minUpDownTime:
-#        minUpDownFactor: 1.0
-#
+             # (float) TODO: remove this option in code
+        ### end estimation config
+
+    # TODO not implemented in code yey
+    # 
+    minUpDownTime:
+        minUpDownFactor: 1.0
+
 
 QaoaBackend:
-    shots: 500
+    shots: 200
         # (int) the number of shots
         # max 20,000
     simulate: True
@@ -57,33 +69,96 @@ QaoaBackend:
         # if False: use simulator without noise model
     simulator: "aer_simulator"
         # (string) the qiskit simulator to be used (only used, when simulate is True)
-        # choose between "qasm_simulator", "aer_simulator", "statevector_simulator" and "aer_simulator_statevector"
-    initial_guess: ["rand", "rand"]
-        # (list of float or "rand") the initial guess for the classical optimizer
-        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
-        # use "rand" if a random initial guess should be used for this parameter. For beta between 0 and 2Pi and for
-        # gamma between 0 and Pi
+        # choose between "qasm_simulator", "aer_simulator", "statevector_simulator" 
+        # and "aer_simulator_statevector"
+        
+    # supervisior determines how angles are chosen at the beginning of one experiment
+    supervisior_type: "RandomOrFixed"
+        # (string) how to choose inital angles
+        # choose between "RandomOrFixed" and "GridSearch"
     max_iter: 10
         # (int) maximum number iterations of the classical optimizer
-    repetitions: 10
+    repetitions: 5
         # (int) number of experiment repetitions
     classical_optimizer: "COBYLA"
         # (string) the classical optimizer to be used
         # choose between "SPSA", "COBYLA" and "ADAM"
+    problemRange: 2
+        # (float) range of a random guess for the angle of a problem hamiltonian. A value of 1 will permit
+        # random guesses in the intervall (-pi , pi)
+    mixingRange: 1
+        # (float) range of a random guess for the angle of a mixing hamiltonian. A value of 1 will permit
+        # random guesses in the intervall (-pi , pi)
+
+    ### "RandomOrFixed" config guess
+    # uses a list to initializes angles in one experiment, substituting the string "rand" by a random number
+    initial_guess: ["rand", "rand"]
+        # (list of float or "rand") the initial guess for the classical optimizer and "RandomOrFixed" supervisor
+        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
+        # use "rand" if a random initial guess should be used for this parameter. 
+        
+    # TODO decouple data of problem+mixing layers into two layers with lowerBound, upperBound, numGridpoints
+    # as values
+#   ### "GridSearch" config guess
+#   # GridSearch takes a list of grids which are dictionary that describe the grid for one mixing 
+#   # and problem hamiltonian. A grid dictionary has the form
+#        lowerBoundProblem: -3
+#           # (float) lowest point of the angles for the problem hamiltonian
+#        upperBoundProblem: 3
+#           # (float)  highest point of angles for the problem hamiltonian
+#        numGridpointsProblem: 1
+#           # (int) number of angles to try for the problem hamiltonian
+#        lowerBoundMixing: -1
+#           # (float)  lowest point of the angles for the mixing hamiltonian
+#        upperBoundMixing: 1
+#           # (float)  highest point of angles for the mixing hamiltonian
+#        numGridpointsMixing: 1
+#           # (int) number of angles to try for the mixing hamiltonian
+#
+#   It also supports default values for all grids given in the dictionary which are used as fallback values
+#   if it hasn't been set in the grid dict that describes one layer
+#     defaultGrid:
+#        lowerBoundProblem: -3
+#        upperBoundProblem: 3
+#        numGridpointsProblem: 1
+#        lowerBoundMixing: -1
+#        upperBoundMixing: 1
+#        numGridpointsMixing: 1
+
 
 SqaBackend:
     # seed: 10
         # (int)
+    # schedule rules can be read in the platform description/sqa repo
     transverseFieldSchedule: "[8.0,0.0]"
-        # (string)
+        # (string) transvere field schedule of the simulation
     temperatureSchedule: "[0.1,iF,0.0001]"
-        # (string)
-    trotterSlices: 300
-        # (int)
-    optimizationCycles: 200
-        # (int)
+        # (string) temperature schedule of the simultion
+    trotterSlices: 500
+        # (int) number of trotter slices to be used.
+        # more trotter slices make a more precies discretization of the quantum state and
+        # increases solution quality and run time
+    optimizationCycles: 300
+        # (int) number of discrete time steps to model continous evolution
+        # more cycles improve quality of solution and run time. This falls off rather quickly
+
 
 DWaveBackend:
+    strategy: "LowestEnergy"
+        # (string)
+        # choose between "LowestEnergy and "ClosestSample"
+    postprocess: "flow"
+        # (string) determines how to improve qpu result. only flow optimization
+        # is possible
+    timeout: 100
+        # (int) number of seconds that an embedding into working graph can be calculated
+       
+    ### only necessary for solver dwave-qpu 
+    sampleOrigin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+        # (string) filename of the saved sample result file if old result is reused
+        # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
+
+    # D-Wave annealer config, see https://docs.ocean.dwavesys.com/en/stable/overview/qpu.html
     annealing_time: 1
         # (int)
     num_reads: 1
@@ -94,24 +169,17 @@ DWaveBackend:
         # (int)
     readout_thermalization: 1
         # (int)
-    sampleCutSize: 1
-        # (int)
-    strategy: "LowestEnergy"
-        # (string)
-        # choose between "LowestEnergy", "MajorityVote", "PercentageVote" and "ClosestSample"
-    postprocess: "flow"
-        # (string)
-    timeout: 100
-        # (int)
-    sampleOrigin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
-        # (string) where the sample comes from
-        # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
+
 
 PypsaBackend:
     solver_name: "glpk"
-        # (string)
+        # (string) name of the MILP solver
+        # no other solver support yet
     timeout: 10
-        # (int)
+        # (int) how many second the MILP is allowed to calculate a solution. after this time, an (non-optimal) solution
+        # will be returned
         
+# This can also hold any of the above information. Solver specific configuration data in ${SOLVER}Backend
+# will be copied into this field and then be used
 BackendConfig:
     #
