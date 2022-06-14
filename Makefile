@@ -17,27 +17,38 @@ MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 
 ###### define save folder ######
 # choose a folder where the results should be saved to. If the folder
-# doesn't exist, it will be created. Common choices are:
-# results_classical_sweep, results_sqa_sweep, results_qpu_sweep,
-# results_qpu_read_sweep, results_pypsa_glpk_sweep, results_qaoa_sweep
-# DON'T forget the "/" after the folder name
-SAVE_FOLDER := "results_qaoa_sweep/"
+# doesn't exist, it will be created. If no folder is specified, one will 
+# be created using the solver name as 'results_SOLVER_sweep/'
+# If specifiying your own folder, DON'T forget '/' for a valid folder name
+SAVE_FOLDER := 
 
 ###### define config file ######
-CONFIGFILES = "config.yaml"
+# this file is the default file which contains values for all valid configurations of all solvers.
+# Making will generate a run for each config file specified here. Other config files can be saved
+# in /src/Configs
+CONFIGFILES = config-all.yaml
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "220124cost5input_[1]0_[0]_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork4QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
-#SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "testNetwork5QubitIsing_2_0_20.nc" | sed 's!.*/!!' | sed 's!.po!!')
+# Choose a regex that will be used to search the sweepNetworks folder for networks. 
+# The default network is a randomly generated network containing 10 buses with 
+# generators that produce integer valued power and a total load of 100
+NETWORKNAME = defaultnetwork.nc
+# NETWORKNAME = testNetwork4QubitIsing_2_0_20.nc 
+# NETWORKNAME = testNetwork5QubitIsing_2_0_20.nc 
+# NETWORKNAME = 220124cost5input_[1]0_[0]_20.nc
+
+# lists networks to be used using NETWORKNAME
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
-# possible options.
+# possible options in src/Configs.
 # The name of the parameter has to be stored in a variable with the
 # PARAMETER_ prefix and the values for it in a variable with the
-# VAL_PARAMETER_ prefix.
+# VAL_PARAMETER_ prefix. Only Parameters which have a name with the PARAMETER_ prefix
+# will be read and added to the config. You can enable/disable them by uncommenting them.
+#
 # Since there are multiple levels in the config dictionary the name has to
 # have the following pattern, indicating all levels:
 # "level1__level2__parameterName". The value(s) on the other hand should be given
@@ -221,6 +232,11 @@ EXTRAPARAM = ""
 endif
 
 
+###### generate default SAVE_FOLDER path for current solver if no path is specified
+ifeq ($(SAVE_FOLDER),)
+SAVE_FOLDER = results_$(strip $(VAL_PARAMETER_BACKEND))_sweep/
+endif
+
 ###### result files of computations ######
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
@@ -237,7 +253,6 @@ ${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/swe
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p ${SAVE_FOLDER}
 	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_* ${SAVE_FOLDER}
-
 endef
 
 $(foreach filename, $(SWEEPFILES), \
@@ -275,3 +290,7 @@ general: $(GENERAL_SWEEP_FILES)
 
 clean:
 	rm -rf Problemset/info*
+
+# create rules for make using a specific solver and setting the corresponding SAVE_FOLDER
+SOLVERS = classical sqa qpu qpu_read pypsa_glpk qaoa
+#TODO make rules
