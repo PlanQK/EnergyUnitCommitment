@@ -58,7 +58,7 @@ class QaoaAngleSupervisor:
         Returns:
             (QaoaAngleSupervisor) An instance of subclass of a QaoaAngleSupervisor
         """
-        supervisior_type = qaoaOptimizer.config_qaoa["supervisior_type"]
+        supervisior_type = qaoaOptimizer.config_qaoa.get("supervisior_type","RandomOrFixed")
         if supervisior_type == "RandomOrFixed":
             return QaoaAngleSupervisorRandomOrFixed(qaoaOptimizer)
         if supervisior_type == "GridSearch":
