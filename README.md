@@ -1,17 +1,67 @@
-TODO -> 
+## About
 
-## Build the container
-```
-docker build . -t energy:0.1
-```
+The problem at hand to be solved is optimizing the dispatch and transmission flow over time in an energy grid. We focus on a simplified version
+and to decide which generators to commit to meet the demand. This repository provides classical and quantum-based containerized solvers in python to
+solve the unit commitment problem given by a [PyPSA](https://github.com/PyPSA/PyPSA) network. It also contains the code to provide it as service on 
+the [PlanQK platform](https://platform.planqk.de). 
 
-## Run the container
-```
-docker run --mount type=bind,source=/path/to/Problemset,target=/energy/Problemset energy:0.1 dwave-tabu
-```
 
-## Parameters
-Using environment variables. For the possibilities see `run.py`.
-```
-docker run --mount type=bind,source=/path/to/Problemset,target=/energy/Problemset --env trotterSlices=32 energy:0.1 sqa
-```
+## How to use
+
+You can use this repository by making various recipes in the makefile. An optimization run can be started by making the recipe `make general`, which will 
+start a docker container. Various settings can be adjusted in either the Makefile or by providing a config file. We provide an example network and config 
+file which can be used right away. The recipe will start an optimization run for every combination of network, config file and setting found by in the makefile. 
+The result of the optimization will be saved as a JSON file.
+
+
+### Available solvers
+Currently, we support the following solvers for the unit commitment problem:
+
+1. Mixed Integer Linear Programming using GLPK. The linear programm is obtained via PyPSA.
+2. Simulated Quantum Annealing. More information on this solver can be found [here](https://github.com/PlanQK/SimulatedQuantumAnnealing)
+3. QAOA via IBM's [Qiskit](https://qiskit.org) runtime. This is extremly limited in problemsize. Some parts require an API-Token
+4. D-Wave's cloud solvers. These require an API-Token and support quantum annealing, their hybrid solver and tabu search.
+
+
+### Adjusting the Makefile
+
+The makefile contains variables that specify where the PyPSA network to be solved is stored, which config file to use, and can
+also be used to overwrite values in the config file. A brief overview of the parameters you can adjust are the following
+
+1. `CONFIGFILES` : This contains a glob which will be used to search the folder `./src/Configs/` for config files.
+2. `NETWORKNAME` : This contains a glob which will be used to search the folder `./sweepNetworks/` for PyPSA networks.
+3. `SAVE_FOLDER` : This specifies a path relative to the repo's root where the results will be saved to.
+
+Overwriting values of the config files is further explained in the Makefile. Additional information on the above variables can also be found in the Makefile.
+When cloning the repositiory, they are set up to point to an example network, the template for new config files, using the simulated quatum annealing solver
+and save it to `results_sqa_sweep`
+
+### Configuring a solver
+
+Which solver and which settings are used can be specified in a yaml file. The file `./src/Configs/config-all.yaml` contains information on all possible
+parameters that can be set for the various solvers, the structure that the config file has to have and the possibe values for each parameter. 
+
+
+## Additional uses
+### Plotting results
+We also provide some functionality to aggregate result saved in json files as Pandas data frames and generate plots. You can do so by using the `PlotAgent`
+to read results, and `makeFigure` to generate a plot based on that data. Further information can be found in the doc strings and `makePlotsExample.py` provides
+a few examples. You can also run the recipe `make plt` to execute the script `makePlots.py` which will be ignored by git.
+
+For qaoa results, `statAnalysis.py` provides methods to aggregate the results of runs (TODO: Unify modules that aggregate results).
+
+
+### Generating test networks
+The script `problemGenerator.py` generates random problem instances of the unit commitment problem. You can speficy the number of busses and the average capacity
+of a transmission line when calling it.
+
+## Documentation
+You can find documentation for D-Waves cloud solvers [here](https://docs.ocean.dwavesys.com/en/stable/index.html). For QAOA, you can find the algorithm 
+[here](https://qiskit.org/textbook/ch-applications/qaoa.html) and the documentation for qiskit [here](https://qiskit.org/documentation).
+You can find further information on the PlanQK platform and [PyPSA](https://github.com/PyPSA/PyPSA) github page.
+
+You can generate further documentation using the doc strings. (TODO: generate documentation for the siquan module)
+
+## Contributing
+When contributing to this repository, please first discuss the change you wish to make via issue, email, or any other method with the owners of this repository before making a change.
+
