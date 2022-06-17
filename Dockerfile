@@ -4,6 +4,7 @@ FROM herrd1/siquan:latest
 WORKDIR /energy
 COPY requirements.txt /energy/requirements.txt
 COPY pypsa-0.19.3.zip /energy/pypsa-0.19.3.zip
+RUN pip install "pyomo>=5.7,<=6.0"
 RUN pip install pypsa-0.19.3.zip
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 

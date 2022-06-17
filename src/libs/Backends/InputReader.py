@@ -74,6 +74,7 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
+        self.config["Backend"] = self.config["Backend"].replace('_','-')
         for BackendType, solverList in self.BackendToSolver.items():
             if self.config["Backend"] in solverList:
                 sourceKey = BackendType
