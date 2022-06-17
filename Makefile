@@ -1,3 +1,12 @@
+# This makefile is used for starting otpimization runs. Using various parameters that can be set, it will generate
+# rules for the result files, and then generates them by starting a docker container. The possible recipes to me 
+# made can be found at the bottom of the file. 
+#
+# The optimization runs for which the rules are created by searching /sweepNetworks for pypsa networks and /src/Config
+# for config files. They can be specified using a glob expression. The result files will then consist of all combinations
+# networks and configs, and a  string which indicates which parameters are overwritten by the makefile and the date when
+# the rule was created.
+
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
 #DOCKERFILE = PlanQK_Dockerfile
@@ -10,6 +19,8 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 #PROBLEMDIRECTORY := $(shell pwd)
 
 ###### set mount paths ######
+# for development purposes, we don't build the entire image, but mount the the code that is changed often.
+# We also mount the folder containing the networks and the config files
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
@@ -18,7 +29,7 @@ MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
 ###### define save folder ######
 # choose a folder where the results should be saved to. If the folder
 # doesn't exist, it will be created. If no folder is specified, one will 
-# be created using the solver name as 'results_SOLVER_sweep/'
+# be created using the name `results_general_sweep`
 # If specifiying your own folder, DON'T forget '/' for a valid folder name
 SAVE_FOLDER := 
 
@@ -59,8 +70,10 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NET
 # 
 
 ### General Parameters
+# Uncommenting a line of the form #PARMETER_* will overwrite the value in the config
+# with the value below it.
 
-# a parameter for setting the solver.
+### A parameter for setting the solver.
 #PARAMETER_BACKEND = Backend
 VAL_PARAMETER_BACKEND = sqa 
 
@@ -236,7 +249,7 @@ endif
 
 ###### generate default SAVE_FOLDER path for current solver if no path is specified
 ifeq ($(SAVE_FOLDER),)
-SAVE_FOLDER = results_$(strip $(VAL_PARAMETER_BACKEND))_sweep/
+SAVE_FOLDER = results_general_sweep/
 endif
 
 ###### result files of computations ######
