@@ -1,4 +1,4 @@
-./pypsa-0.19.3.zip
+/app/user_code/pypsa-0.19.3.zip
 dwave-ocean-sdk
 xarray
 netcdf4

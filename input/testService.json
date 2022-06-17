@@ -234,9 +234,9 @@
 		}
 	  },
 	  "QaoaBackend": {
-		"shots": 20000,
+		"shots": 2000,
 		"simulate": true,
-		"noise": true,
+		"noise": false,
 		"simulator": "aer_simulator",
 		"initial_guess": [
 		  "rand",
@@ -244,15 +244,13 @@
 		  "rand",
 		  "rand"
 		],
-		"max_iter": 100,
+		"max_iter": 50,
 		"repetitions": 1,
 		"classical_optimizer": "COBYLA",
 		"qcGeneration": "Ising"
 	  },
 	  "SqaBackend": {
 		"seed": 10,
-		"transverseFieldSchedule": "",
-		"temperatureSchedule": "",
 		"trotterSlices": 10,
 		"optimizationCycles": 2
 	  },
@@ -273,6 +271,8 @@
 		"solver_name": "glpk",
 		"timeout": 100,
 		"terminationCondition": "infeasible"
-	  }
+	  },
+          "BackendConfig": {
+          }
 	}
 }

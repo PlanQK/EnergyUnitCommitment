@@ -79,7 +79,7 @@ class InputReader:
                 sourceKey = BackendType
                 break
         self.config["BackendConfig"] = {
-            **self.config["BackendConfig"],
+            **self.config.get("BackendConfig",{}),
             **self.config[sourceKey],
         }
 
@@ -158,7 +158,7 @@ class InputReader:
                             "dictionary or a string with the name of the "
                             "config file, which has to be stored in the "
                             "Configs folder.")
-        if result["BackendConfig"] is None:
+        if "BackendConfig" not in result:
             result["BackendConfig"] = {}
         return result
 

@@ -55,6 +55,13 @@ For qaoa results, `statAnalysis.py` provides methods to aggregate the results of
 The script `problemGenerator.py` generates random problem instances of the unit commitment problem. You can speficy the number of busses and the average capacity
 of a transmission line when calling it.
 
+### Testing PlankQK services
+The folder `scripts` contains two short scripts to build the image similar to the one build by the platform. Further information can be found in these scripts. In order to
+build the service on the platform, you have to use `PlanQK_requirements.txt` and rename it as `requirements.txt`. You also have to include the pypsa zip file
+because the version on pip doesn't have the patch for reading jsons yet. When testing it with qaoa, keep in mind that it will take forever if the network is not tiny.
+Right now, testing it with qaoa doesn't write the result properly. The result that is returned by the service will be written to the file `JobResponse` at the top level
+of the repository.
+
 ## Documentation
 You can find documentation for D-Waves cloud solvers [here](https://docs.ocean.dwavesys.com/en/stable/index.html). For QAOA, you can find the algorithm 
 [here](https://qiskit.org/textbook/ch-applications/qaoa.html) and the documentation for qiskit [here](https://qiskit.org/documentation).

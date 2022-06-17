@@ -2,6 +2,18 @@ FROM ghcr.io/planqk/job-template:latest-base-1.0.0
 
 ENV ENTRY_POINT app.user_code.src.program:run
 
+RUN pip install numpy
+RUN pip install scipy
+RUN pip install pandas
+RUN pip install matplotlib
+RUN pip install pyomo
+RUN pip install dimod
+RUN pip install qiskit
+RUN pip install networkx
+RUN pip install tables
+RUN pip install minorminer
+
+
 COPY . ${USER_CODE_DIR}
-RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
-RUN pip install -r ${USER_CODE_DIR}/requirements.txt
+# RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
+RUN pip install -r ${USER_CODE_DIR}/PlanQK_requirements.txt
