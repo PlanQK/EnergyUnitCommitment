@@ -28,6 +28,10 @@ class InputReader:
         "SqaBackend": ["sqa", "classical"],
         "QaoaBackend": ["qaoa"],
     }
+    loaders = {
+        "json": json.load,
+        "yaml": yaml.safe_load
+    }
 
     def __init__(self,
                  network: Union[str, dict, pypsa.Network],
@@ -107,13 +111,13 @@ class InputReader:
         """
         if isinstance(network, str):
             return pypsa.Network(f"Problemset/" + network), network
-        if isinstance(network, dict):
+        elif isinstance(network, dict):
             loadedDataset = xarray.Dataset.from_dict(network)
             loadedNet = pypsa.Network(name="")
             pypsa.Network.import_from_netcdf(network=loadedNet,
                                              path=loadedDataset)
             return loadedNet, "network_from_dict"
-        if isinstance(network, pypsa.Network):
+        elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
         raise TypeError("The network has to be given as a dictionary, "
                         "representing the netCDF format of a pypsa.Network, "
@@ -141,23 +145,16 @@ class InputReader:
         """
         if isinstance(inputConfig, dict):
             result = inputConfig
-        elif isinstance(inputConfig, str):
-            filetype = inputConfig[-4:]
-            if filetype == "json":
-                with open("Configs/" + inputConfig) as file:
-                    result = json.load(file)
-            elif filetype == "yaml":
-                with open("Configs/" + inputConfig) as file:
-                    result = yaml.safe_load(file)
-            else:
-                raise ValueError("The given file format is not supported. "
-                                 "Only .json and .yaml files are supported "
-                                 "as configuration files.")
         else:
-            raise TypeError("The configuration has to be given as a "
-                            "dictionary or a string with the name of the "
-                            "config file, which has to be stored in the "
-                            "Configs folder.")
+            try:
+                # inputConfig is assumed to be the path if it is not a dict
+                filetype = inputConfig.split(".")[-1]
+                loader = self.loaders[filetype]
+            except KeyError:
+                raise KeyError(f"The file format {filetype} doesn't match any supported "
+                               f"format. The supported formats are {list(self.loaders.keys())}")
+            with open("Configs/" + inputConfig) as file:
+                result = loader(file)
         if not isinstance(result.get("BackendConfig", None), dict):
             result["BackendConfig"] = {}
         return result
@@ -183,15 +180,11 @@ class InputReader:
                 The self.config dictionary is modified.
         """
         for index, value in enumerate(extraParamValues):
-            keyChain = extraParams[index]
-            descentInConfig = self.config
-            for key in keyChain[:-1]:
-                try:
-                    descentInConfig = descentInConfig[key]
-                except KeyError:
-                    descentInConfig[key] = {}
-                    descentInConfig = descentInConfig[key]
-            descentInConfig[extraParams[index][len(keyChain) - 1]] = value
+            nested_keys = extraParams[index]
+            current_level = self.config
+            for key in nested_keys[:-1]:
+                current_level = current_level.setdefault(key, {})
+            current_level[nested_keys[-1]] = value
 
     def getConfig(self) -> dict:
         """
