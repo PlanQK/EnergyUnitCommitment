@@ -754,7 +754,6 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
         self.inputFilePath = "/energy/results_qpu/" + \
                              self.config["BackendConfig"]["sampleOrigin"]
         self.sampler = self.inputFilePath
-        return None
 
     def getSampleSet(self) -> dimod.SampleSet:
         """

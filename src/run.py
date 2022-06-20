@@ -13,6 +13,8 @@ from copy import deepcopy
 
 from program import run
 
+from itertools import product
+import ast
 
 def main():
     # reading input
@@ -34,13 +36,12 @@ def main():
         extraParamsValues = expandValueList(extraParamsValues)
         extraParamsValues = typecastValues(extraParamsValues)
     # run optimization and save results
-    if extraParamsValues:
-        for values in extraParamsValues:
-            response = run(data=network, params=params,
-                           extraParams=extraParams,
-                           extraParamValues=values)
-            response.save_to_json_local_docker()
-    else:
+    for values in extraParamsValues:
+        response = run(data=network, params=params,
+                       extraParams=extraParams,
+                       extraParamValues=values)
+        response.save_to_json_local_docker()
+    if not extraParamsValues:
         response = run(data=network, params=params)
         response.save_to_json_local_docker()
 
@@ -68,23 +69,7 @@ def expandValueList(ValuesToExpand: list) -> list:
                    ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
     """
     valueLists = [[x] for x in ValuesToExpand[0].split("__")]
-    for item in ValuesToExpand[1:]:
-        itemList = item.split("__")
-        if len(itemList) > 1:
-            j = 0
-            while j < len(valueLists):
-                for i in range(len(itemList)-1):
-                    valueLists.insert(valueLists.index(valueLists[j]),
-                                      deepcopy(valueLists[j]))
-                j += len(itemList)
-        i = 0
-        while i < len(itemList):
-            j = i
-            while j < len(valueLists):
-                valueLists[j].append(itemList[i])
-                j += len(itemList)
-            i += 1
-    return valueLists
+    return list(product(*valueLists))
 
 
 def typecastValues(values: list) -> list:
@@ -103,24 +88,7 @@ def typecastValues(values: list) -> list:
             E.g.: [[1.0, 10, "test"], [1.0, 5, "test"],
                    [2.0, 10, "test"], [2.0, 5, "test"]]
     """
-    newValues = []
-    for valueList in values:
-        newValueList = []
-        for value in valueList:
-            if "[" in value:
-                value = value.replace("[", "")
-                value = value.replace("]", "")
-                newValueList.append(list(value.split(" ")))
-            else:
-                try:
-                    newValueList.append(int(value))
-                except ValueError:
-                    try:
-                        newValueList.append(float(value))
-                    except ValueError:
-                        newValueList.append(value)
-        newValues.append(newValueList)
-    return newValues
+    return [ast.literal_eval(literal) for literal in values]
 
 
 if __name__ == "__main__":
