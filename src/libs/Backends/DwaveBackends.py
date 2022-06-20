@@ -1,11 +1,11 @@
 import time
 
-# importing dwave packages
 import networkx
 import pandas
 import dimod
 import greedy
 
+# importing d-wave packages
 from dwave.system import LeapHybridSampler, DWaveSampler
 from dwave.system import FixedEmbeddingComposite, EmbeddingComposite
 from tabu import TabuSampler
@@ -22,7 +22,6 @@ from networkx.algorithms.flow import edmonds_karp
 # import packages for reading files
 from os import path
 from glob import glob
-import mmap
 import json
 
 
@@ -31,9 +30,10 @@ class DwaveTabuSampler(BackendBase):
     A base class for solving the unit commitment problem using the
     D-Wave server. This is done using D-Wave's dimod package.
     """
+
     def __init__(self, reader: InputReader):
         """
-        Constructor for the DwaveTabuSampler. It requires an
+        Constructor for the D-WaveTabuSampler. It requires an
         InputReader, which handles the loading of the network and
         configuration file.
 
@@ -43,13 +43,16 @@ class DwaveTabuSampler(BackendBase):
                  of the network and configuration file.
         """
         super().__init__(reader=reader)
+        self.sample_df = None
+        self.isingBackbone = None
+        self.sampler = None
         self.getSampler()
 
     def getSampler(self) -> dimod.Sampler:
         """
         Returns the D-Wave sampler and stores it as the attribute
         sampler.
-        This method will be overridden in subclasses by chooosing
+        This method will be overridden in subclasses by choosing
         different samplers.
 
         Returns:
@@ -63,7 +66,7 @@ class DwaveTabuSampler(BackendBase):
         """
         processes a returned sample set and constructs a pandas
         dataframe with all available information of that set.
-        If necessary, this method will also add additonal columns
+        If necessary, this method will also add additional columns
         containing derived values.
 
         Args:
@@ -96,8 +99,8 @@ class DwaveTabuSampler(BackendBase):
 
     def processSolution(self) -> None:
         """
-        Gets and writes info about the sample_df and writes it in the
-        self.output dictionary.
+        Gets and writes info about the sample_df containing all samples and
+        writes it in the self.output dictionary.
 
         Returns:
             (None)
@@ -105,7 +108,7 @@ class DwaveTabuSampler(BackendBase):
         """
         bestSample = self.choose_sample()
         resultInfo = self.transformedProblem.generateReport([
-            id for id, value in bestSample.items() if value == -1
+            qubit for qubit, qubit_spin in bestSample.items() if qubit_spin == -1
         ])
         self.output["results"] = {**self.output["results"], **resultInfo}
 
@@ -126,17 +129,12 @@ class DwaveTabuSampler(BackendBase):
         )
         return self.isingBackbone
 
-    def getDimodModel(self, isingProblem: IsingBackbone) \
+    def getDimodModel(self) \
             -> dimod.BinaryQuadraticModel:
         """
-        For a ising spin glass model given through an IsingBackbone
-        object, returns the corresponding D-Wave
-        dimod.BinaryQuadraticModel.
-    
-        Args:
-            isingProblem: (IsingBackbone)
-                The IsingBackbone that contains the problem that is to
-                be transformed into a D-Wave BinaryQuadraticModel.
+        Returns the corresponding D-Wave dimod.BinaryQuadraticModel to the
+        model stored in self.isingProblem as an IsingBackbone object
+
         Returns:
             (dimod.BinaryQuadraticModel)
                 The equivalent D-Wave model of the IsingBackbone.
@@ -144,28 +142,24 @@ class DwaveTabuSampler(BackendBase):
         """
         # store the directional qubits first, then the line's binary
         # representations
-        try:
-            return self.dimodModel
-        except AttributeError:
-            linear = {
-                spins[0]: strength
-                for spins, strength in isingProblem.problem.items()
-                if len(spins) == 1
-            }
-            # the convention is different to the sqa solver:
-            # need to add a minus to the couplings
-            quadratic = {
-                spins: -strength
-                for spins, strength in isingProblem.problem.items()
-                if len(spins) == 2
-            }
-            self.dimodModel = dimod.BinaryQuadraticModel(
-                linear,
-                quadratic,
-                0,
-                dimod.Vartype.SPIN
-            )
-            return self.dimodModel
+        linear = {
+            spins[0]: strength
+            for spins, strength in self.isingProblem.problem.items()
+            if len(spins) == 1
+        }
+        # the convention is different to the sqa solver:
+        # need to add a minus to the couplings
+        quadratic = {
+            spins: -strength
+            for spins, strength in self.isingProblem.problem.items()
+            if len(spins) == 2
+        }
+        return dimod.BinaryQuadraticModel(
+            linear,
+            quadratic,
+            0,
+            dimod.Vartype.SPIN
+        )
 
     def getSampleDataframe(self) -> pandas.DataFrame:
         """
@@ -182,14 +176,13 @@ class DwaveTabuSampler(BackendBase):
         """
         After sampling a QUBO this function chooses one sample to be
         returned as the solution.
-        Since the sampler of this class only returns one sample,
-        choosing a solution is trivial. This function is overwritten in
-        subclasses that return more than one sample.
+        Because the sampler of this class only returns one sample,
+        there is only one sample to choose from. This function is
+        overwritten in subclasses that return more than one sample.
 
         Returns:
             (pandas.Series)
                 The chosen row to be used as the solution
-
         """
         return self.getSampleDataframe().iloc[0]
 
@@ -203,7 +196,7 @@ class DwaveTabuSampler(BackendBase):
 
         Returns:
             (None)
-                Stores the outputNetwork as dicitonary in self.output.
+                Stores the outputNetwork as dictionary in self.output.
         """
         self.printReport()
 
@@ -211,7 +204,7 @@ class DwaveTabuSampler(BackendBase):
         bestSample = self.choose_sample()
 
         outputNetwork = self.transformedProblem.setOutputNetwork(solution=[
-            id for id, value in bestSample.items() if value == -1])
+            qubit for qubit, qubit_spin in bestSample.items() if qubit_spin == -1])
         outputDataset = outputNetwork.export_to_netcdf()
         self.output["network"] = outputDataset.to_dict()
 
@@ -250,7 +243,7 @@ class DwaveTabuSampler(BackendBase):
         """
         Saves the sampleset as a data frame to be used by other methods
         and in the output dictionary since it contains all solutions
-        found by the solve.
+        found by the solver.
     
         Args:
             sampleset: (dimod.SampleSet)
@@ -270,10 +263,11 @@ class DwaveSteepestDescent(DwaveTabuSampler):
     A class inheriting from DwaveTabuSampler, but choosing the
     SteepestDescentSolver as solver.
     """
+
     # TODO test if this actually runs
     def __init__(self, reader: InputReader):
         """
-        Constructor for the DwaveTabuSampler. It requires an
+        A constructor for the DwaveTabuSampler. It requires an
         InputReader, which handles the loading of the network and
         configuration file. In addition self.solver is set to be
         the SteepestDescentSolver.
@@ -287,10 +281,10 @@ class DwaveSteepestDescent(DwaveTabuSampler):
         self.solver = greedy.SteepestDescentSolver()
 
 
-#TODO: Why inherit from this class? It doesn´t add anything, right?
+# TODO: Why inherit from this class? It doesn't add anything, right?
 class DwaveCloud(DwaveTabuSampler):
     """
-    Class for structuring the class hierachy. Inherits from
+    Class for structuring the class hierarchy. Inherits from
     DwaveTabuSampler. Any class that use results obtained by querying
     D-Wave servers should inherit from this class.
     """
@@ -301,6 +295,7 @@ class DwaveCloudHybrid(DwaveCloud):
     Class inheriting from DwaveCloud. It will use a hybrid solver to
     solve the given Ising spin glass problem.
     """
+
     def getSampler(self) -> None:
         """
         Returns a D-Wave sampler that will query the hybrid solver for
@@ -334,7 +329,6 @@ class DwaveCloudHybrid(DwaveCloud):
         sampleset = super().getSampleSet()
         print("Waiting for server response...")
         # wait for response, no safeguard for endless looping
-        watchdog = 0
         while True:
             if sampleset.done():
                 break
@@ -347,11 +341,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
     Class inheriting from DwaveCloud. It will try to solve the given
     Ising spin glass problem on the D-Wave's cloud based QPU.
     """
+
     def __init__(self, reader: InputReader):
         """
         Constructor for the DwaveCloudDirectQPU. It requires an
         InputReader, which handles the loading of the network and
-        configuration file. In addition it is made sure, that the
+        configuration file. In addition, it is made sure, that the
         timeout is set correctly in self.config.
 
         Args:
@@ -364,7 +359,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             self.config["BackendConfig"]["timeout"] = 3600
 
     @staticmethod
-    def get_filepaths(root_path: str, file_regex: str) -> str:
+    def get_filepaths(root_path: str, file_regex: str) -> list[str]:
         """
         Returns the filepath composed of 'root_path' and 'file_regex'.
 
@@ -481,14 +476,13 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 generators committed according to the given sample.
         """
         generatorState = [
-            id for id, value in sample.items() if value == -1
+            qubit for qubit, qubit_spin in sample.items() if qubit_spin == -1
         ]
-        graph = self.buildFlowproblem(
+        graph = self.buildFlowProblem(
             generatorState
         )
-        return self.solveFlowproblem(
+        return self.solveFlowProblem(
             graph,
-            generatorState,
         )
 
     def processSamples(self, sampleset: dimod.SampleSet) -> pandas.DataFrame:
@@ -522,7 +516,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 lambda row: abs(
                     totalLoad
                     - self.transformedProblem.calcTotalPowerGenerated(
-                        [id for id, value in row.items() if value == -1]
+                        [qubit for qubit, qubit_spin in row.items() if qubit_spin == -1]
                     )
                 ), axis=1
             )
@@ -544,7 +538,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         self.output["results"]["LowestEnergy"] = self.sample_df.iloc[
             lowestEnergyIndex]["isingCost"]
         closestSamples = self.sample_df[
-            self.sample_df['deviation_from_opt_load'] == \
+            self.sample_df['deviation_from_opt_load'] ==
             self.sample_df['deviation_from_opt_load'].min()
             ]
         closestTotalPowerIndex = closestSamples['energy'].idxmin()
@@ -557,10 +551,9 @@ class DwaveCloudDirectQPU(DwaveCloud):
             closestTotalPowerIndex]["optimizedCost"]
         self.output["results"]["bestProcessedFlow"] = self.sample_df[
             "optimizedCost"].min()
-        self.output["results"]["postprocessingTime"] = time.perf_counter() \
-                                                       - tic
+        self.output["results"]["postprocessingTime"] = time.perf_counter() - tic
 
-    def solveFlowproblem(self, graph, generatorState) -> int:
+    def solveFlowProblem(self, graph) -> int:
         """
         solves the flow problem given in graph that corresponds to the
         generatorState in network. Calculates cost for a kirchhoffFactor
@@ -570,7 +563,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         given, the function only returns a dictionary of the values it
         computes for an optimal flow. The cost is written to the field
         in results["results"]. Flow solutions don't spread imbalances
-        across all buses so they can still be improved.
+        across all buses, so they can still be improved.
         """
         FlowSolution = edmonds_karp(graph, "superSource", "superSink")
         # key errors occur iff there is no power generated or no load at a bus.
@@ -589,11 +582,11 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 pass
         return totalCost
 
-    # quantum computation struggles with finetuning powerflow to match
+    # quantum computation struggles with fine tuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
-    # archieved in polynomial time
+    # achieved in polynomial time
     # TODO refactor this method
-    def buildFlowproblem(self,
+    def buildFlowProblem(self,
                          generatorState: list,
                          lineValues: dict = None
                          ) -> networkx.DiGraph:
@@ -601,7 +594,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         Build a self.networkx model to further optimise power flow.
         If using a warmstart, it uses the solution of the quantum
         computer encoded in generatorState to initialize a residual
-        self.network. If the intial solution is good, a warmstart can
+        self.network. If the initial solution is good, a warmstart can
         speed up flow optimization by about 30%, but if it was bad, a
         warmstart makes it slower. warmstart is used if lineValues is
         not None.
@@ -610,7 +603,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
             generatorState: (list)
                 List of all qubits with spin -1 in the solution.
             lineValues: (dict)
-                Dictionary containing inital values for power flow.
+                Dictionary containing initial values for power flow.
         Returns:
             (networkx.DiGraph)
                 The networkx formulation of the power flow problem.
@@ -648,7 +641,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 "superSink",
                 capacity=self.network.loads_t['p_set'].iloc[0][load],
             )
-        # done building nx.DiGrpah
+        # done building nx.DiGraph
 
         if lineValues is not None:
             # generate flow for self.network lines
@@ -727,8 +720,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         super().saveSample(sampleset)
         self.output["results"]["optimizationTime"] = \
-        self.output["results"]["serial"]["info"]["timing"][
-            "qpu_access_time"] / (10.0 ** 6)
+            self.output["results"]["serial"]["info"]["timing"][
+                "qpu_access_time"] / (10.0 ** 6)
         self.output["results"]["annealReadRatio"] = float(
             self.config["BackendConfig"]["annealing_time"]) / float(
             self.config["BackendConfig"]["num_reads"])
@@ -750,7 +743,7 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
 
     def getSampler(self) -> None:
         """
-        This function returs nothing, but sets the path to the file that 
+        This function returns nothing, but sets the path to the file that
         contains the sample data to be returned when a sample request is
         made.
 

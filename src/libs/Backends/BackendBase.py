@@ -6,6 +6,7 @@ from datetime import datetime
 
 class BackendBase(abc.ABC):
     def __init__(self, reader: InputReader):
+        self.output = None
         self.reader = reader
         self.network = reader.getNetwork()
         self.networkName = reader.getNetworkName()
@@ -39,16 +40,17 @@ class BackendBase(abc.ABC):
 
     def getConfig(self) -> dict:
         """
-        Getter function for the config-dictionary.
+        A getter for the config-dictionary.
 
         Returns:
             (dict) The config used for the current problem.
         """
         return self.config
 
-    def getTime(self) -> str:
+    @staticmethod
+    def getTime() -> str:
         """
-        Getter function for the current time.
+        A getter for the current time.
 
         Returns:
             (str) The current time in the format YYYY-MM-DD_hh-mm-ss
@@ -59,7 +61,7 @@ class BackendBase(abc.ABC):
 
     def getOutput(self) -> dict:
         """
-        Getter function for the output-dictionary. Before returning the
+        A getter for the output-dictionary. Before returning the
         dictionary the end time is added to it.
 
         Returns:
@@ -68,7 +70,7 @@ class BackendBase(abc.ABC):
         self.output["end_time"] = self.getTime()
         return self.output
 
-    def printSolverspecificReport(self):
+    def print_solver_specific_report(self):
         pass
 
     def printReport(self) -> None:
@@ -90,7 +92,7 @@ class BackendBase(abc.ABC):
               f'{self.output["results"].get("totalPower","N/A")}')
         print(f'Total marginal cost: '
               f'{self.output["results"].get("marginalCost","N/A")}')
-        self.printSolverspecificReport()
+        self.print_solver_specific_report()
         print("---")
 
     def setupOutputDict(self) -> None:

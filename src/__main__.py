@@ -18,5 +18,3 @@ params = conf
 response = run(data, params)
 
 response.save_to_json_local_docker(folder="../results_test_sweep/")
-#print()
-#print(response.to_json())

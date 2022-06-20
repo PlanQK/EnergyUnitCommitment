@@ -10,6 +10,7 @@ class PypsaBackend(BackendBase):
     optimization algorithms. This is done using the solver shipped with the
     Pypsa package.
     """
+
     def __init__(self, reader: InputReader):
         """
         Constructor for a PypsaBackend. It requires an InputReader,
@@ -35,22 +36,22 @@ class PypsaBackend(BackendBase):
             (None)
                 Modifies `self.opt` and `self.transformedProblem`.
         """
-        print("transforming problem...") 
-        #TODO: maybe deepcopy before setting things in network.
+        print("transforming problem...")
+        # TODO: maybe deepcopy before setting things in network.
         self.network.generators.committable = True
         self.network.generators.p_nom_extendable = False
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
         self.transformedProblem = pypsa.opf.network_lopf_build_model(
-                network=self.network,
-                snapshots=self.network.snapshots,
-                formulation="kirchhoff"
+            network=self.network,
+            snapshots=self.network.snapshots,
+            formulation="kirchhoff"
         )
         self.opt = pypsa.opf.network_lopf_prepare_solver(
-                                    network = self.network,
-                                    solver_name = self.config[
-                                        "BackendConfig"]["solver_name"])
+            network=self.network,
+            solver_name=self.config[
+                "BackendConfig"]["solver_name"])
         self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
 
     def transformSolutionToNetwork(self) -> pypsa.Network:
@@ -102,7 +103,7 @@ class PypsaBackend(BackendBase):
                 totalPower += self.network.generators.p_nom.loc[key[0]] * val
             self.output["results"]["marginalCost"] = totalCost
             self.output["results"]["totalPower"] = totalPower
-        
+
             self.output["results"]["unitCommitment"] = {
                 gen[0]: value for gen, value in
                 self.transformedProblem.generator_status.get_values().items()
@@ -138,7 +139,7 @@ class PypsaBackend(BackendBase):
         print("done")
 
 
-#TODO: Are they necesary? the solver is chosen in the config-file, isn´t it?
+# TODO: Are they necessary? the solver is chosen in the config-file, isn´t it?
 class PypsaFico(PypsaBackend):
     pass
 

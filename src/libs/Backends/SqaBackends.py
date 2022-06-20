@@ -6,9 +6,11 @@ from ast import literal_eval
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 from .BackendBase import BackendBase
+
 # try import from local .so
 # Error message for image: herrd1/siquan:latest
-# /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
+# /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found
+# (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
     from . import siquan
 # try import from installed module siquan
@@ -22,6 +24,7 @@ class ClassicalBackend(BackendBase):
     annealing. This is done using the SiQuAn solver and setting the
     transverse Field to zero.
     """
+
     def __init__(self, reader: InputReader):
         """
         Constructor for the ClassicalBackend class. It requires an
@@ -48,9 +51,9 @@ class ClassicalBackend(BackendBase):
         """
         print("transforming problem...")
         self.transformedProblem = IsingBackbone.buildIsingProblem(
-                        network=self.network,
-                        config=self.config["IsingInterface"]
-                        )
+            network=self.network,
+            config=self.config["IsingInterface"]
+        )
 
     def transformSolutionToNetwork(self) -> None:
         """
@@ -100,7 +103,7 @@ class ClassicalBackend(BackendBase):
         """
         A method for getting the transverse field schedule in the
         configuration. For classical annealing, there is no transverse
-        field, so it always return the same config string. Overwriting
+        field, so it always returns the same config string. Overwriting
         this method can be used to get non-zero transverse field.
         
         Returns:
@@ -133,8 +136,8 @@ class ClassicalBackend(BackendBase):
         self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices",
                                                           32)))
         self.solver.setSteps(int(siquanConfig.get("optimizationCycles", 16)))
-    
-    def printSolverspecificReport(self) -> None:
+
+    def print_solver_specific_report(self) -> None:
         """
         Prints additional information about the solution that is solver
         specific.
@@ -153,7 +156,6 @@ class ClassicalBackend(BackendBase):
         print(f"Sqa runtime: {self.output['results']['runtime_sec']}")
         print(f"Sqa runtime cycles: {self.output['results']['runtime_cycles']}")
         print(f"Ising Interactions: {len(self.transformedProblem.problem)}")
-    
 
     def writeResultsToOutput(self, result: dict) -> None:
         """
@@ -174,11 +176,11 @@ class ClassicalBackend(BackendBase):
         for key in result:
             self.output["results"][key] = result[key]
         self.output["results"] = {
-                        **self.output["results"],
-                        **self.transformedProblem.generateReport(
-                            result["state"]
-                        )
-                    }
+            **self.output["results"],
+            **self.transformedProblem.generateReport(
+                result["state"]
+            )
+        }
 
 
 class SqaBackend(ClassicalBackend):
@@ -189,6 +191,7 @@ class SqaBackend(ClassicalBackend):
     inherits from ClassicalBackend and only overwrites the method
     getHSchedule.
     """
+
     def getHSchedule(self) -> str:
         """
         A method for getting the transverse field schedule from the

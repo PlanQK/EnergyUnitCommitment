@@ -9,7 +9,7 @@ from typing import Union
 
 class InputReader:
     """
-    This class is an reader to obtain the configuration dictionary and
+    This class is a reader to obtain the configuration dictionary and
     pypsa.Network, dependent on the input format.
     """
 
@@ -74,15 +74,14 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
-        self.config["Backend"] = self.config["Backend"].replace('_','-')
+        self.config["Backend"] = self.config["Backend"].replace('_', '-')
         for BackendType, solverList in self.BackendToSolver.items():
             if self.config["Backend"] in solverList:
-                sourceKey = BackendType
-                break
-        self.config["BackendConfig"] = {
-            **self.config.get("BackendConfig",{}),
-            **self.config[sourceKey],
-        }
+                self.config["BackendConfig"] = {
+                    **self.config.get("BackendConfig", {}),
+                    **self.config[BackendType],
+                }
+                return
 
     def makeNetwork(self, network: Union[str, dict, pypsa.Network]) \
             -> [pypsa.Network, str]:
@@ -159,7 +158,7 @@ class InputReader:
                             "dictionary or a string with the name of the "
                             "config file, which has to be stored in the "
                             "Configs folder.")
-        if "BackendConfig" not in result:
+        if not isinstance(result.get("BackendConfig", None), dict):
             result["BackendConfig"] = {}
         return result
 
@@ -192,11 +191,11 @@ class InputReader:
                 except KeyError:
                     descentInConfig[key] = {}
                     descentInConfig = descentInConfig[key]
-            descentInConfig[extraParams[index][len(keyChain)-1]] = value
+            descentInConfig[extraParams[index][len(keyChain) - 1]] = value
 
     def getConfig(self) -> dict:
         """
-        Getter function for the config dictionary.
+        A getter for the config dictionary.
 
         Returns:
             (dict)
@@ -206,7 +205,7 @@ class InputReader:
 
     def getNetwork(self) -> pypsa.Network:
         """
-        Getter function for the pypsa.Network.
+        A getter for the pypsa.Network.
 
         Returns:
             (pypsa.Network)
@@ -216,7 +215,7 @@ class InputReader:
 
     def getNetworkName(self) -> str:
         """
-        Getter function for the network name.
+        A getter for the network name.
 
         Returns:
             (str)

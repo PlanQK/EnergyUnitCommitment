@@ -1,5 +1,5 @@
 """This file is the entrypoint for the docker run command for the image build from the Dockerfile.
-The bas image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
+The base image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
 optimization of the unit commitment problem.
 
 For this the docker run needs at least 2 and up to 3 arguments.
@@ -49,7 +49,7 @@ def expandValueList(ValuesToExpand: list) -> list:
     """
     Takes a list of values for extra parameters, where each element in
     the list can represent multiple values for this parameter, and
-    expands this list to return an list of list, where each possible
+    expands this list to return a list of list, where each possible
     combination of the input values is stored.
     E.g.:   Input:  ["1.0__2.0", "10__5__0"]
             Output: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],

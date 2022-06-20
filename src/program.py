@@ -7,7 +7,6 @@ from typing import Union
 import pypsa
 from loguru import logger
 
-
 try:
     # import when building image for local use
     import libs.Backends as Backends
@@ -19,7 +18,7 @@ except ImportError:
     from .libs.Backends.InputReader import InputReader
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
-# TODO elimate ${solver}Backend strings
+# TODO eliminate ${solver}Backend strings
 ganBackends = {
     "classical": Backends.ClassicalBackend,
     "sqa": Backends.SqaBackend,
@@ -35,19 +34,17 @@ ganBackends = {
 
 
 def run(
-    data: Union[pypsa.Network, str] = None,
-    params: Union[dict, str] = None,
-    extraParams: list = [],
-    extraParamValues: list = [],
+        data: Union[pypsa.Network, str] = None,
+        params: Union[dict, str] = None,
+        extraParams: list = [],
+        extraParamValues: list = [],
 ) -> Response:
-
     response: Response
     try:
         # load all relevant data and parameters
         inputReader = InputReader(network=data, config=params,
                                   extraParams=extraParams,
                                   extraParamValues=extraParamValues)
-        network = inputReader.getNetwork()
 
         # set up optimizer with input data
         OptimizerClass = ganBackends[inputReader.config["Backend"]]
@@ -57,7 +54,7 @@ def run(
         optimizer.transformProblemForOptimizer()
         optimizer.optimize()
 
-        # hook for potential post processing like flow optimization for dwave
+        # hook for potential post-processing like flow optimization for dwave
         # solutions
         optimizer.processSolution()
 

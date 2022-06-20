@@ -40,9 +40,9 @@ def main():
     qaoa_result = qiskitOpt.solve(qp)
 
     cobyla = COBYLA(maxiter=100)
-    #qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
-    #qaoa_result = qaoaQiskit.find_minimum()
-    #qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
+    # qaoaQiskit = QAOA(optimizer=cobyla,reps=10,initial_state=qaoa.config["QaoaBackend"]["initial_guess"],quantum_instance=quantum_instance)
+    # qaoa_result = qaoaQiskit.find_minimum()
+    # qaoa_result = qaoaQiskit.find_minimum(cost_fn=qaoa.get_expectation_QaoaQiskit(counts=20000, components=components, filename="testQaoaQiskit"))
     """
 
     qaoa.optimize()
