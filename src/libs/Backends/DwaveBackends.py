@@ -380,42 +380,6 @@ class DwaveCloudDirectQPU(DwaveCloud):
         """
         return glob(path.join(root_path, file_regex))
 
-    #TODO: remove?
-    def validateInput(self, path):
-        return
-
-        self.path = path
-        self.networkName = ""
-
-        blacklists = self.get_filepaths(path, "*_qpu_blacklist")
-        filteredByTimeout = []
-        for blacklist in blacklists:
-            blacklist_name = blacklist[len(path + "/"):]
-            blacklisted_timeout = int(blacklist_name.split("_")[0])
-            if blacklisted_timeout <= self.config["BackendConfig"]["timeout"]:
-                filteredByTimeout.append(blacklist)
-
-        for blacklist in filteredByTimeout:
-            with open(blacklist) as f:
-                s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-                if s.find(bytes(networkName, 'utf-8')) != -1:
-                    raise ValueError("network found in blacklist")
-
-        embeddingPath = (
-            f'{path}/embedding_rep_'
-            f'{self.config["IsingInterface"]["problemFormulation"]}_'
-            f'{networkName}.json')
-        if path.isfile(embeddingPath):
-            print("found previous embedding")
-            with open(embeddingPath) as embeddingFile:
-                embedding = json.load(embeddingFile)
-
-            self.embedding = {
-                int(key): tuple(value)
-                for key, value in embedding.items()
-            }
-        return
-
     # TODO: remove?
     def handleOptimizationStop(self, path):
         """
