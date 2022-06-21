@@ -89,8 +89,8 @@ def typecast_values(values: list) -> list:
             E.g.: [[1.0, 10, "test"], [1.0, 5, "test"],
                    [2.0, 10, "test"], [2.0, 5, "test"]]
     """
-    return [[ast.literal_eval(literal) 
-                for literal in cross_product_element] 
+    return [[ast.literal_eval(literal)
+                for literal in cross_product_element]
             for cross_product_element in values]
 
 

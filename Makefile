@@ -24,7 +24,8 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
-MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH)
+MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
+MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURESULTPATH)
 
 ###### define save folder ######
 # choose a folder where the results should be saved to. If the folder
@@ -64,7 +65,7 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NET
 # have the following pattern, indicating all levels:
 # "level1__level2__parameterName". The value(s) on the other hand should be given
 # as a string separated by a "__".
-# E.g.	PARAMETER_KIRCHSCALEFACTOR = "IsingInterface__kirchhoff__scaleFactor"
+# E.g.	PARAMETER_KIRCHSCALEFACTOR = "ising_interface__kirchhoff__scaleFactor"
 # 		VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
 # Comment out any parameters not currently in use.
 # 
@@ -83,43 +84,43 @@ VAL_PARAMETER_BACKEND = sqa
 # Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
 
 #PARAMETER_FORMULATION = \
-	IsingInterface__formulation
+	ising_interface__formulation
 VAL_PARAMETER_FORMULATION = binarysplit
 
 #PARAMETER_KIRCHSCALEFACTOR = \
-	IsingInterface__kirchhoff__scaleFactor
+	ising_interface__kirchhoff__scaleFactor
 VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__5.0__10.0
 
 PARAMETER_KIRCHFACTOR = \
-	IsingInterface__kirchhoff__scaleFactor
+	ising_interface__kirchhoff__scaleFactor
 VAL_PARAMETER_KIRCHFACTOR = 1.0
 
 #PARAMETER_MARGINALFORMULATION = \
-	IsingInterface__marginalCost__formulation
+	ising_interface__marginalCost__formulation
 VAL_PARAMETER_MARGINALFORMULATION = binarysplit
 
 #PARAMETER_MONETARYCOSTFACTOR = \
-	"IsingInterface__marginalCost__monetaryCostFactor"
+	"ising_interface__marginalCost__monetaryCostFactor"
 VAL_PARAMETER_MONETARYCOSTFACTOR = 0.2__0.3__0.4
 
 #PARAMETER_MONETARYSCALEFACTOR = \
-	"IsingInterface__marginalCost__scaleFactor"
+	"ising_interface__marginalCost__scaleFactor"
 VAL_PARAMETER_MONETARYSCALEFACTOR = 1.0__5.0__10.0
 
 #PARAMETER_OFFSETESTIMATIONFACTOR = \
-	IsingInterface__marginalCost__offsetEstimationFactor
+	ising_interface__marginalCost__offsetEstimationFactor
 VAL_PARAMETER_OFFSETESTIMATIONFACTOR_VAL = 1.1__1.2__1.3
 
 #PARAMETER_ESTIMATEDCOSTFACTOR = \
-	IsingInterface__marginalCost__estimatedCostFactor
+	ising_interface__marginalCost__estimatedCostFactor
 VAL_PARAMETER_ESTIMATEDCOSTFACTOR_VAL = 1.0
 
 #PARAMETER_OFFSETBUILDFACTOR = \
-	IsingInterface__marginalCost__offsetBuildFactor
+	ising_interface__marginalCost__offsetBuildFactor
 VAL_PARAMETER_OFFSETBUILDFACTOR_VAL = 1.0
 
 #PARAMETER_MINUPDOWNFACTOR = \
-	IsingInterface__minUpDownTime__minUpDownFactor
+	ising_interface__minUpDownTime__minUpDownFactor
 VAL_PARAMETER_MINUPDOWNFACTOR = 1.0
 
 
@@ -160,19 +161,19 @@ VAL_PARAMETER_QAOACLASSICALOPT = COBYLA
 
 ### SQA Parameters
 #PARAMETER_TRANSVERSEFIELD = \
-	SqaBackend__transverseFieldSchedule
+	sqa_backend__transverseFieldSchedule
 VAL_PARAMETER_TRANSVERSEFIELD = 8.0
 
 #PARAMETER_SIQUAN_TEMP = \
-	SqaBackend__temperatureSchedule
+	sqa_backend__temperatureSchedule
 VAL_PARAMETER_SIQUAN_TEMP = 0.1
 
 #PARAMETER_TROTTERSLICES = \
-	SqaBackend__trotterSlices
+	sqa_backend__trotterSlices
 VAL_PARAMETER_TROTTERSLICES = 20__40__60__80__100
 
 #PARAMETER_OPTIMIZATIONCYCLES = \
-	SqaBackend__optimizationCycles
+	sqa_backend__optimizationCycles
 VAL_PARAMETER_OPTIMIZATIONCYCLES = 10__20
 
 

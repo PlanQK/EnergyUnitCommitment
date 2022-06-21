@@ -4,7 +4,7 @@ from .InputReader import InputReader
 from datetime import datetime
 
 
-class backendBase(abc.ABC):
+class BackendBase(abc.ABC):
     def __init__(self, reader: InputReader):
         self.output = None
         self.reader = reader

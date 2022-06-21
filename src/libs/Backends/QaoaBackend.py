@@ -172,7 +172,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
     """a class for choosing qaoa parameters by searching using a grid on the given parameter space
     """
 
-    def __init__(self, qaoa_optimizer: QaoaQiskit):
+    def __init__(self, qaoa_optimizer):
         """
         first calculates the grid that is going to be searched and then sets up the data structures
         necessary to keep track which grid points have already been tried output

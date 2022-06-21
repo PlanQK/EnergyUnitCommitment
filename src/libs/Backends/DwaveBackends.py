@@ -11,7 +11,7 @@ from dwave.system import FixedEmbeddingComposite, EmbeddingComposite
 from tabu import TabuSampler
 
 # importing local QUBO modelling packages
-from .backendBase import backendBase
+from .BackendBase import BackendBase
 from .InputReader import InputReader
 from .IsingPypsaInterface import IsingBackbone
 
@@ -25,7 +25,7 @@ from glob import glob
 import json
 
 
-class DwaveTabuSampler(backendBase):
+class DwaveTabuSampler(BackendBase):
     """
     A base class for solving the unit commitment problem using the
     D-Wave server. This is done using D-Wave's dimod package.
@@ -78,19 +78,19 @@ class DwaveTabuSampler(backendBase):
         """
         processed_samples_df = sampleset.to_pandas_dataframe()
         processed_samples_df['ising_cost'] = processed_samples_df.apply(
-            lambda row: self.transformed_problem.calc_cost(
+            lambda row: self.ising_backbone.calc_cost(
                 [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
         )
         processed_samples_df['marginal_cost'] = processed_samples_df.apply(
-            lambda row: self.transformed_problem.calc_marginal_cost(
+            lambda row: self.ising_backbone.calc_marginal_cost(
                 [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
         )
         processed_samples_df['total_power'] = processed_samples_df.apply(
-            lambda row: self.transformed_problem.calc_total_power_generated(
+            lambda row: self.ising_backbone.calc_total_power_generated(
                 [idx for idx in range(len(row)) if row.iloc[idx] == -1]
             ),
             axis=1
@@ -107,7 +107,7 @@ class DwaveTabuSampler(backendBase):
                 Modifies self.output.
         """
         best_sample = self.choose_sample()
-        result_info = self.transformed_problem.generate_report([
+        result_info = self.ising_backbone.generate_report([
             qubit for qubit, qubit_spin in best_sample.items() if qubit_spin == -1
         ])
         self.output["results"] = {**self.output["results"], **result_info}
@@ -203,7 +203,7 @@ class DwaveTabuSampler(backendBase):
         # TODO: check choose_sample function
         best_sample = self.choose_sample()
 
-        output_network = self.transformed_problem.set_output_network(solution=[
+        output_network = self.ising_backbone.set_output_network(solution=[
             qubit for qubit, qubit_spin in best_sample.items() if qubit_spin == -1])
         output_dataset = output_network.export_to_netcdf()
         self.output["network"] = output_dataset.to_dict()
@@ -510,12 +510,12 @@ class DwaveCloudDirectQPU(DwaveCloud):
         )
         total_load = 0.0
         for idx, _ in enumerate(self.network.snapshots):
-            total_load += self.transformed_problem.get_total_load(idx)
+            total_load += self.ising_backbone.get_total_load(idx)
         processed_samples_df['deviation_from_opt_load'] = \
             processed_samples_df.apply(
                 lambda row: abs(
                     total_load
-                    - self.transformed_problem.calc_total_power_generated(
+                    - self.ising_backbone.calc_total_power_generated(
                         [qubit for qubit, qubit_spin in row.items() if qubit_spin == -1]
                     )
                 ), axis=1
@@ -535,7 +535,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         tic = time.perf_counter()
         super().process_solution()
         lowest_energy_index = self.sample_df["energy"].idxmin()
-        self.output["results"]["LowestEnergy"] = self.sample_df.iloc[
+        self.output["results"]["lowest_energy"] = self.sample_df.iloc[
             lowest_energy_index]["ising_cost"]
         closest_samples = self.sample_df[
             self.sample_df['deviation_from_opt_load'] ==
@@ -543,15 +543,15 @@ class DwaveCloudDirectQPU(DwaveCloud):
             ]
         closest_total_power_index = closest_samples['energy'].idxmin()
         self.output["samples_df"] = self.sample_df.to_dict('index')
-        self.output["results"]["lowestEnergy"] = self.sample_df.iloc[
+        self.output["results"]["lowest_energy"] = self.sample_df.iloc[
             lowest_energy_index]["ising_cost"]
-        self.output["results"]["lowestEnergyProcessedFlow"] = self.sample_df.iloc[
+        self.output["results"]["lowest_energy_processed_flow"] = self.sample_df.iloc[
             lowest_energy_index]["optimized_cost"]
-        self.output["results"]["closestPowerProcessedFlow"] = self.sample_df.iloc[
+        self.output["results"]["closest_power_processed_flow"] = self.sample_df.iloc[
             closest_total_power_index]["optimized_cost"]
-        self.output["results"]["bestProcessedFlow"] = self.sample_df[
+        self.output["results"]["best_processed_flow"] = self.sample_df[
             "optimized_cost"].min()
-        self.output["results"]["postprocessingTime"] = time.perf_counter() - tic
+        self.output["results"]["postprocessing_time"] = time.perf_counter() - tic
 
     def solve_flow_problem(self, graph) -> int:
         """
@@ -565,19 +565,19 @@ class DwaveCloudDirectQPU(DwaveCloud):
         in results["results"]. Flow solutions don't spread imbalances
         across all buses, so they can still be improved.
         """
-        flow_solution = edmonds_karp(graph, "superSource", "superSink")
+        flow_solution = edmonds_karp(graph, "super_source", "super_sink")
         # key errors occur iff there is no power generated or no load at a bus.
         # Power can still flow through the bus, but no cost is incurred
         total_cost = 0
         for bus in self.network.buses.index:
             try:
-                total_cost += (flow_solution['superSource'][bus]['capacity']
-                               - flow_solution['superSource'][bus]['flow']) ** 2
+                total_cost += (flow_solution['super_source'][bus]['capacity']
+                               - flow_solution['super_source'][bus]['flow']) ** 2
             except KeyError:
                 pass
             try:
-                total_cost += (flow_solution[bus]['superSink']['capacity']
-                               - flow_solution[bus]['superSink']['flow']) ** 2
+                total_cost += (flow_solution[bus]['super_sink']['capacity']
+                               - flow_solution[bus]['super_sink']['flow']) ** 2
             except KeyError:
                 pass
         return total_cost
@@ -613,7 +613,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         # source/super sink
         graph = nx.DiGraph()
         graph.add_nodes_from(self.network.buses.index)
-        graph.add_nodes_from(["superSource", "superSink"])
+        graph.add_nodes_from(["super_source", "super_sink"])
 
         for line in self.network.lines.index:
             bus0 = self.network.lines.loc[line].bus0
@@ -630,7 +630,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
 
         for bus in self.network.buses.index:
             graph.add_edge(
-                "superSource",
+                "super_source",
                 bus,
                 capacity=self.ising_backbone.calc_total_power_generated_at_bus(
                     bus, generator_state)
@@ -638,7 +638,7 @@ class DwaveCloudDirectQPU(DwaveCloud):
         for load in self.network.loads.index:
             graph.add_edge(
                 self.network.loads.loc[load].bus,
-                "superSink",
+                "super_sink",
                 capacity=self.network.loads_t['p_set'].iloc[0][load],
             )
         # done building nx.DiGraph
@@ -674,10 +674,10 @@ class DwaveCloudDirectQPU(DwaveCloud):
                     net_flow_through_bus -= line_values[(line, 0)]
                 net_power = generated_power - load + net_flow_through_bus
 
-                graph["superSource"][bus]['flow'] = min(generated_power,
+                graph["super_source"][bus]['flow'] = min(generated_power,
                                                         generated_power
                                                         - net_power)
-                graph[bus]["superSink"]['flow'] = min(load, load + net_power)
+                graph[bus]["super_sink"]['flow'] = min(load, load + net_power)
         return graph
 
     def choose_sample(self, **kwargs) -> pandas.Series:
@@ -686,8 +686,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
         the solution.
         The sampleset has to be processed before to add additional
         information that will be used by a strategy of picking sample.
-        So far, two strategies are supported 'LowestEnergy' returns the
-        sample with the lowest energy state 'ClosestSample' returns the
+        So far, two strategies are supported 'lowest_energy' returns the
+        sample with the lowest energy state 'closest_sample' returns the
         sample with the closes total power output to the total load.
 
         Returns:
@@ -695,14 +695,16 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 The chosen row to be used as the solution.
         """
         sample_df = self.get_sample_dataframe()
-        if kwargs['strategy'] == 'LowestEnergy':
+        strategy = kwargs.get('strategy', "lowest_energy")
+        if strategy == 'lowest_energy':
             return sample_df.loc[sample_df['energy'].idxmin()]
-        if kwargs['strategy'] == 'ClosestSample':
+        elif strategy == 'closest_sample':
             closest_samples = sample_df[
                 sample_df['deviation_from_opt_load'] == sample_df[
                     'deviation_from_opt_load'].min()
                 ]
             return closest_samples.loc[closest_samples['optimized_cost'].idxmin()]
+        raise ValueError(f"The strategy {strategy} is not valid for choosing a sample")
 
     def save_sample(self, sampleset: dimod.SampleSet) -> None:
         """
@@ -765,6 +767,6 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
                 The d-wave sample read from the given filepath.
         """
         print(f"reading from {self.input_file_path}")
-        with open(self.input_file_path) as inputFile:
-            self.inputData = json.load(inputFile)
-        return dimod.SampleSet.from_serializable(self.inputData["serial"])
+        with open(self.input_file_path) as input_file:
+            self.input_data = json.load(input_file)
+        return dimod.SampleSet.from_serializable(self.input_data["serial"])

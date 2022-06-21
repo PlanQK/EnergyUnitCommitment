@@ -144,7 +144,7 @@ class IsingBackbone:
         """
         self.subproblem_table = {
             "kirchhoff": KirchhoffSubproblem,
-            "marginalCost": MarginalCostSubproblem
+            "marginal_cost": MarginalCostSubproblem
         }
         if "kirchhoff" not in configuration:
             print("No Kirchhoff configuration found, "

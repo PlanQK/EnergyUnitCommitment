@@ -146,7 +146,7 @@ sqa_backend:
 dwave_backend:
     strategy: "lowest_energy"
         # (string)
-        # choose between "LowestEnergy and "ClosestSample"
+        # choose between "lowest_energy and "closest_sample"
     postprocess: "flow"
         # (string) determines how to improve qpu result. only flow optimization
         # is possible

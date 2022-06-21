@@ -67,7 +67,7 @@ def run(
                                    extra_param_values=extra_param_values)
 
         # set up optimizer with input data
-        optimizer_class = gan_backends[input_reader.config["Backend"]]
+        optimizer_class = gan_backends[input_reader.config["backend"]]
         optimizer = optimizer_class(reader=input_reader)
 
         # run optimization
