@@ -5,6 +5,12 @@ from datetime import datetime
 
 class Response:
     def to_json(self):
+        """
+        Converts the data of the response into json format and returns it as a string
+    
+        Returns:
+            (str) The serialized response as a string
+        """
         return json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)), sort_keys=True)
 
     @abstractmethod

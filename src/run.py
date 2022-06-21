@@ -1,6 +1,7 @@
 """This file is the entrypoint for the docker run command for the image build from the Dockerfile.
 The base image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
-optimization of the unit commitment problem.
+optimization of the unit commitment problem. The result will be written to a json file  in a location
+that the Makefile will mount to the host's drive.
 
 For this the docker run needs at least 2 and up to 3 arguments.
         sys.argv[1]: (str) path of the network file

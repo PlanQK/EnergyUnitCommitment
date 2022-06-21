@@ -39,6 +39,26 @@ def run(
         extraParams: list = [],
         extraParamValues: list = [],
 ) -> Response:
+    """
+    This is the entrypoint for starting an optimization run. data is used to provide
+    the network and params the default way to give solver parameterns. These are used
+    by the PlanQK service. The other parameters are hooks for the Makefile to change
+    config entries of the config file on the fly.
+
+    Args:
+        data: (pypsa.Network|str) the network to be optimized. This is either
+                a pypsa network, a dict containing a serialized pypsa network
+                or the path to a netcdf file containing the network
+        params: (dict|str) The default argument for giving optimizer parameters.
+                They are either given directly as a dict, or a path to a config file
+        extraParams: (list) a list containing parameter names of params to be overwritten
+                This is exclusively used by the Makefile.
+        extraParamValues: (list) a list containing the values of the parameters to
+                be overwritten as specified by extraParams
+    Returns:
+        (ResultResponse) The response that contains the meta data
+                         and results of the optimization
+    """
     response: Response
     try:
         # load all relevant data and parameters
