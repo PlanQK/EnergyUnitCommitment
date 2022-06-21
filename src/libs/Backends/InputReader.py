@@ -16,17 +16,17 @@ class InputReader:
     # dictionary which solver has which backend specific extra data where.
     # Keys are broader categories of backends and values are a list of solvers
     # that use that key to store additional config info.
-    BackendToSolver = {
-        "DWaveBackend": [
+    backend_to_solver = {
+        "dwave_backend": [
             "dwave-tabu",
             "dwave-greedy",
             "dwave-hybrid",
             "dwave-qpu",
             "dwave-read-qpu",
         ],
-        "PypsaBackend": ["pypsa-glpk", "pypsa-fico"],
-        "SqaBackend": ["sqa", "classical"],
-        "QaoaBackend": ["qaoa"],
+        "pypsa_backend": ["pypsa-glpk", "pypsa-fico"],
+        "sqa_backend": ["sqa", "classical"],
+        "qaoa_backend": ["qaoa"],
     }
     loaders = {
         "json": json.load,
@@ -36,14 +36,14 @@ class InputReader:
     def __init__(self,
                  network: Union[str, dict, pypsa.Network],
                  config: Union[str, dict],
-                 extraParams: list = [],
-                 extraParamValues: list = []
+                 extra_params: list = [],
+                 extra_param_values: list = []
                  ):
         """
         Obtain the configuration dictionary and pypsa.Network,
         dependent on the input format of network and config. The
         obtained configuration dictionary is then amended with the
-        extraParams, if provided.
+        extra_params, if provided.
 
         Args:
             network: (Union[str, dict, pypsa.Network])
@@ -52,42 +52,42 @@ class InputReader:
             config: (Union[str, dict])
                 A string or dictionary to be used to obtain the
                 configuration for the problem instances.
-            extraParams: (list)
+            extra_params: (list)
                 A list of the extra parameters to be added to the
                 config dictionary.
         """
-        self.network, self.networkName = self.makeNetwork(network)
-        self.config = self.makeConfig(config)
-        self.addExtraParameters(extraParams=extraParams,
-                                extraParamValues=extraParamValues)
-        self.copyToBackendConfig()
+        self.network, self.networkName = self.make_network(network)
+        self.config = self.make_config(config)
+        self.add_extra_parameters(extra_params=extra_params,
+                                  extra_param_values=extra_param_values)
+        self.copy_to_backend_config()
         # print final config, but hide api tokens
-        configWithoutToken = copy.deepcopy(self.config)
-        for provider, token in self.config["APItoken"].items():
+        config_without_token = copy.deepcopy(self.config)
+        for provider, token in self.config["API_token"].items():
             if token != "":
-                configWithoutToken["APItoken"][provider] = "*****"
-        print(f"running with the following configuration {configWithoutToken}")
+                config_without_token["API_token"][provider] = "*****"
+        print(f"running with the following configuration {config_without_token}")
 
-    def copyToBackendConfig(self) -> None:
+    def copy_to_backend_config(self) -> None:
         """
-        Copies the Backend specific configuration to the Backend
-        agnostic key "BackendConfig" where it is merged with any already
+        Copies the backend specific configuration to the backend
+        agnostic key "backend_config" where it is merged with any already
         present dictionary entries.
 
         Returns:
             (None)
                 Modifies self.config.
         """
-        self.config["Backend"] = self.config["Backend"].replace('_', '-')
-        for BackendType, solverList in self.BackendToSolver.items():
-            if self.config["Backend"] in solverList:
-                self.config["BackendConfig"] = {
-                    **self.config.get("BackendConfig", {}),
-                    **self.config[BackendType],
+        self.config["backend"] = self.config["backend"].replace('_', '-')
+        for backendType, solver_list in self.backend_to_solver.items():
+            if self.config["backend"] in solver_list:
+                self.config["backend_config"] = {
+                    **self.config.get("backend_config", {}),
+                    **self.config[backendType],
                 }
                 return
 
-    def makeNetwork(self, network: Union[str, dict, pypsa.Network]) \
+    def make_network(self, network: Union[str, dict, pypsa.Network]) \
             -> [pypsa.Network, str]:
         """
         Opens a pypsa.Network using the provided network argument. If a
@@ -112,11 +112,11 @@ class InputReader:
         if isinstance(network, str):
             return pypsa.Network(f"Problemset/" + network), network
         elif isinstance(network, dict):
-            loadedDataset = xarray.Dataset.from_dict(network)
-            loadedNet = pypsa.Network(name="")
-            pypsa.Network.import_from_netcdf(network=loadedNet,
-                                             path=loadedDataset)
-            return loadedNet, "network_from_dict"
+            loaded_dataset = xarray.Dataset.from_dict(network)
+            loaded_net = pypsa.Network(name="")
+            pypsa.Network.import_from_netcdf(network=loaded_net,
+                                             path=loaded_dataset)
+            return loaded_net, "network_from_dict"
         elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
         raise TypeError("The network has to be given as a dictionary, "
@@ -125,17 +125,17 @@ class InputReader:
                         "of the pypsa.Network, which has to be stored in the "
                         "Problemset folder.")
 
-    def makeConfig(self, inputConfig: Union[str, dict]) -> dict:
+    def make_config(self, input_config: Union[str, dict]) -> dict:
         """
         Converts an inputConfig file into a dictionary. If the input is
         a dictionary it will be passed through to the output. If it is
         a string, the filetype will be determined, the file opened and
         stored in a dictionary. Currently .json and .yaml files are
         supported. Before being returned, it is checked if the key
-        "BackendConfig" is present, if not it will be created.
+        "backend_config" is present, if not it will be created.
 
         Args:
-            inputConfig: (Union[str, dict])
+            input_config: (Union[str, dict])
                 A string or dictionary to be used to obtain the
                 configuration for the problem instances.
 
@@ -143,35 +143,35 @@ class InputReader:
             (dict)
                 The config stored in a dictionary.
         """
-        if isinstance(inputConfig, dict):
-            result = inputConfig
+        if isinstance(input_config, dict):
+            result = input_config
         else:
+            filetype = input_config.split(".")[-1]
             try:
-                # inputConfig is assumed to be the path if it is not a dict
-                filetype = inputConfig.split(".")[-1]
+                # input_config is assumed to be the path if it is not a dict
                 loader = self.loaders[filetype]
             except KeyError:
                 raise KeyError(f"The file format {filetype} doesn't match any supported "
                                f"format. The supported formats are {list(self.loaders.keys())}")
-            with open("Configs/" + inputConfig) as file:
+            with open("Configs/" + input_config) as file:
                 result = loader(file)
-        if not isinstance(result.get("BackendConfig", None), dict):
-            result["BackendConfig"] = {}
+        if not isinstance(result.get("backend_config", None), dict):
+            result["backend_config"] = {}
         return result
 
-    def addExtraParameters(self,
-                           extraParams: list,
-                           extraParamValues: list
-                           ) -> None:
+    def add_extra_parameters(self,
+                             extra_params: list,
+                             extra_param_values: list
+                             ) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
 
         Args:
-            extraParams: (list)
+            extra_params: (list)
                 A list of the extra parameters to be added to the
                 config dictionary.
-            extraParamValues: (list)
+            extra_param_values: (list)
                 A list of values of the extra parameters to be added to
                 the config dictionary.
 
@@ -179,14 +179,14 @@ class InputReader:
             (None)
                 The self.config dictionary is modified.
         """
-        for index, value in enumerate(extraParamValues):
-            nested_keys = extraParams[index]
+        for index, value in enumerate(extra_param_values):
+            nested_keys = extra_params[index]
             current_level = self.config
             for key in nested_keys[:-1]:
                 current_level = current_level.setdefault(key, {})
             current_level[nested_keys[-1]] = value
 
-    def getConfig(self) -> dict:
+    def get_config(self) -> dict:
         """
         A getter for the config dictionary.
 
@@ -196,7 +196,7 @@ class InputReader:
         """
         return self.config
 
-    def getNetwork(self) -> pypsa.Network:
+    def get_network(self) -> pypsa.Network:
         """
         A getter for the pypsa.Network.
 
@@ -206,7 +206,7 @@ class InputReader:
         """
         return self.network
 
-    def getNetworkName(self) -> str:
+    def get_network_name(self) -> str:
         """
         A getter for the network name.
 

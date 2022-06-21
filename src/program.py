@@ -19,7 +19,7 @@ except ImportError:
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
 # TODO eliminate ${solver}Backend strings
-ganBackends = {
+gan_backends = {
     "classical": Backends.ClassicalBackend,
     "sqa": Backends.SqaBackend,
     "dwave-tabu": Backends.DwaveTabuSampler,
@@ -36,8 +36,8 @@ ganBackends = {
 def run(
         data: Union[pypsa.Network, str] = None,
         params: Union[dict, str] = None,
-        extraParams: list = [],
-        extraParamValues: list = [],
+        extra_params: list = [],
+        extra_param_values: list = [],
 ) -> Response:
     """
     This is the entrypoint for starting an optimization run. data is used to provide
@@ -51,10 +51,10 @@ def run(
                 or the path to a netcdf file containing the network
         params: (dict|str) The default argument for giving optimizer parameters.
                 They are either given directly as a dict, or a path to a config file
-        extraParams: (list) a list containing parameter names of params to be overwritten
+        extra_params: (list) a list containing parameter names of params to be overwritten
                 This is exclusively used by the Makefile.
-        extraParamValues: (list) a list containing the values of the parameters to
-                be overwritten as specified by extraParams
+        extra_param_values: (list) a list containing the values of the parameters to
+                be overwritten as specified by extra_params
     Returns:
         (ResultResponse) The response that contains the meta data
                          and results of the optimization
@@ -62,25 +62,25 @@ def run(
     response: Response
     try:
         # load all relevant data and parameters
-        inputReader = InputReader(network=data, config=params,
-                                  extraParams=extraParams,
-                                  extraParamValues=extraParamValues)
+        input_reader = InputReader(network=data, config=params,
+                                   extra_params=extra_params,
+                                   extra_param_values=extra_param_values)
 
         # set up optimizer with input data
-        OptimizerClass = ganBackends[inputReader.config["Backend"]]
-        optimizer = OptimizerClass(reader=inputReader)
+        optimizer_class = gan_backends[input_reader.config["Backend"]]
+        optimizer = optimizer_class(reader=input_reader)
 
         # run optimization
-        optimizer.transformProblemForOptimizer()
+        optimizer.transform_problem_for_optimizer()
         optimizer.optimize()
 
         # hook for potential post-processing like flow optimization for dwave
         # solutions
-        optimizer.processSolution()
+        optimizer.process_solution()
 
-        optimizer.transformSolutionToNetwork()
+        optimizer.transform_solution_to_network()
 
-        output = optimizer.getOutput()
+        output = optimizer.get_output()
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)
     except Exception as e:

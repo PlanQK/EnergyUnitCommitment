@@ -8,20 +8,20 @@ from libs.Backends.QaoaBackend import QaoaQiskit
 
 
 def main():
-    inputNet = "testNetwork4QubitIsing_2_0_20.nc"
-    configFile = "config.yaml"
+    input_net = "testNetwork4QubitIsing_2_0_20.nc"
+    config_file = "config.yaml"
 
-    netImport = pypsa.Network(
-        os.path.dirname(__file__) + "../../sweepNetworks/" + inputNet
+    net_import = pypsa.Network(
+        os.path.dirname(__file__) + "../../sweepNetworks/" + input_net
     )
 
-    with open(os.path.dirname(__file__) + "/Configs/" + configFile) as file:
+    with open(os.path.dirname(__file__) + "/Configs/" + config_file) as file:
         config = yaml.safe_load(file)
 
-    inputReader = InputReader(network=netImport, config=config)
+    input_reader = InputReader(network=net_import, config=config)
 
-    qaoa = QaoaQiskit(reader=inputReader)
-    qaoa.transformProblemForOptimizer()
+    qaoa = QaoaQiskit(reader=input_reader)
+    qaoa.transform_problem_for_optimizer()
 
     """
     # https://qiskit.org/documentation/stubs/qiskit.algorithms.QAOA.html
@@ -47,11 +47,11 @@ def main():
 
     qaoa.optimize()
 
-    qaoa.processSolution()
+    qaoa.process_solution()
 
-    qaoa.transformSolutionToNetwork()
+    qaoa.transform_solution_to_network()
 
-    output = qaoa.getOutput()
+    output = qaoa.get_output()
 
     filename = qaoa.output["file_name"]
     with open(

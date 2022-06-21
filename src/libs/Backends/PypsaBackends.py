@@ -22,19 +22,19 @@ class PypsaBackend(BackendBase):
                  of the network and configuration file.
         """
         super().__init__(reader=reader)
-        if self.config["BackendConfig"].get("timeout", -1) < 0:
-            self.config["BackendConfig"]["timeout"] = 3600
+        if self.config["backend_config"].get("timeout", -1) < 0:
+            self.config["backend_config"]["timeout"] = 3600
 
-    def transformProblemForOptimizer(self) -> None:
+    def transform_problem_for_optimizer(self) -> None:
         """
         Sets up the linear programming optimizer and the linear
         programming formulation.
         The optimizer can be accessed at `self.opt` and then linear
-        program can be accessed at `self.transformedProblem`.
+        program can be accessed at `self.transformed_problem`.
         
         Returns:
             (None)
-                Modifies `self.opt` and `self.transformedProblem`.
+                Modifies `self.opt` and `self.transformed_problem`.
         """
         print("transforming problem...")
         # TODO: maybe deepcopy before setting things in network.
@@ -43,7 +43,7 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
-        self.transformedProblem = pypsa.opf.network_lopf_build_model(
+        self.transformed_problem = pypsa.opf.network_lopf_build_model(
             network=self.network,
             snapshots=self.network.snapshots,
             formulation="kirchhoff"
@@ -51,10 +51,10 @@ class PypsaBackend(BackendBase):
         self.opt = pypsa.opf.network_lopf_prepare_solver(
             network=self.network,
             solver_name=self.config[
-                "BackendConfig"]["solver_name"])
-        self.opt.options["tmlim"] = self.config["BackendConfig"]["timeout"]
+                "backend_config"]["solver_name"])
+        self.opt.options["tmlim"] = self.config["backend_config"]["timeout"]
 
-    def transformSolutionToNetwork(self) -> pypsa.Network:
+    def transform_solution_to_network(self) -> pypsa.Network:
         """
         (Not implemented yet) A method to write an optimization result
         into a pypsa network.
@@ -67,15 +67,15 @@ class PypsaBackend(BackendBase):
                 problem.
         """
         # TODO implement write from pyomo
-        print("Writing from pyoyo model to network is not implemented")
+        print("Writing from pyomo model to network is not implemented")
 
-        if self.output["results"]["terminationCondition"] == "infeasible":
+        if self.output["results"]["termination_condition"] == "infeasible":
             print("no feasible solution was found, stop writing to network")
         else:
-            self.printReport()
+            self.print_report()
         return self.network
 
-    def writeResultToOutput(self, solverstring: str) -> None:
+    def write_result_to_output(self, solverstring: str) -> None:
         """
         Write the solution and information about it into the self.output
         dictionary.
@@ -90,37 +90,37 @@ class PypsaBackend(BackendBase):
         """
         self.output["results"]["optimizationTime"] \
             = solverstring.splitlines()[-1].split()[1]
-        self.output["results"]["terminationCondition"] \
+        self.output["results"]["termination_condition"] \
             = solverstring.splitlines()[-7].split()[2]
-        if self.output["results"]["terminationCondition"] != "infeasible":
+        if self.output["results"]["termination_condition"] != "infeasible":
             # TODO get result better out of model?
-            totalCost = 0
-            totalPower = 0
-            for key, val in self.transformedProblem.generator_p.get_values(
+            total_cost = 0
+            total_power = 0
+            for key, val in self.transformed_problem.generator_p.get_values(
             ).items():
-                totalCost += self.network.generators["marginal_cost"].loc[
+                total_cost += self.network.generators["marginal_cost"].loc[
                                  key[0]] * val
-                totalPower += self.network.generators.p_nom.loc[key[0]] * val
-            self.output["results"]["marginalCost"] = totalCost
-            self.output["results"]["totalPower"] = totalPower
+                total_power += self.network.generators.p_nom.loc[key[0]] * val
+            self.output["results"]["marginal_cost"] = total_cost
+            self.output["results"]["total_power"] = total_power
 
-            self.output["results"]["unitCommitment"] = {
+            self.output["results"]["unit_commitment"] = {
                 gen[0]: value for gen, value in
-                self.transformedProblem.generator_status.get_values().items()
+                self.transformed_problem.generator_status.get_values().items()
             }
             # list of indices of active generators
             self.output["results"]["state"] = [
                 idx for idx in range(len(self.network.generators))
-                if self.output["results"]["unitCommitment"][
+                if self.output["results"]["unit_commitment"][
                        self.network.generators.index[idx]] == 1.0
             ]
             self.output["results"]["powerflow"] = {
                 line[1]: value for line, value in
-                self.transformedProblem.passive_branch_p.get_values().items()
+                self.transformed_problem.passive_branch_p.get_values().items()
             }
             # solver only allows feasible solutions 
-            self.output["results"]["kirchhoffCost"] = 0
-            self.output["results"]["powerImbalance"] = 0
+            self.output["results"]["kirchhoff_cost"] = 0
+            self.output["results"]["power_imbalance"] = 0
 
     def optimize(self) -> None:
         """
@@ -132,10 +132,10 @@ class PypsaBackend(BackendBase):
                 Writes the solution into self.output["results"].
         """
         print("starting optimization...")
-        solution = self.opt.solve(self.transformedProblem)
+        solution = self.opt.solve(self.transformed_problem)
         solution.write()
-        solverstring = str(solution["Solver"])
-        self.writeResultToOutput(solverstring=solverstring)
+        solverstring = str(solution["solver"])
+        self.write_result_to_output(solverstring=solverstring)
         print("done")
 
 

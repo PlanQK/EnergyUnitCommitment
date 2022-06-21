@@ -204,7 +204,7 @@ class PlottingAgent:
         @return: dict
              a dictonary over groupby indices with values being dictionaries over yField labels
         """
-        dataFrame = self.dataExtractionAgent.getData(constraints)[[xField] + yFieldList + splittingFields]
+        dataFrame = self.dataExtractionAgent.get_data(constraints)[[xField] + yFieldList + splittingFields]
         result = {}
         if splittingFields:
             groupedDataFrame = dataFrame.groupby(splittingFields, dropna=False).agg(list)

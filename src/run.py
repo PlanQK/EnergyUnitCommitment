@@ -10,12 +10,12 @@ For this the docker run needs at least 2 and up to 3 arguments.
 """
 
 import sys
-from copy import deepcopy
 
 from program import run
 
 from itertools import product
 import ast
+
 
 def main():
     # reading input
@@ -26,28 +26,28 @@ def main():
     # "__", as well as all desired values for this parameter are separated
     # by "__". The names and values for parameters are separated by "___"
     # and between all name-value pairs a separator of "____" was inserted.
-    extraParams = []
-    extraParamsValues = []
+    extra_params = []
+    extra_params_values = []
     # split up extra parameter string if parsed by Makefile
     if len(sys.argv) >= 3 and sys.argv[3] != "":
-        argumentSplit = [x.split("___") for x in sys.argv[3].split("____")]
-        for [name, value] in argumentSplit:
-            extraParams.append(name.split("__"))
-            extraParamsValues.append(value)
-        extraParamsValues = expandValueList(extraParamsValues)
-        extraParamsValues = typecastValues(extraParamsValues)
+        argument_split = [x.split("___") for x in sys.argv[3].split("____")]
+        for [name, value] in argument_split:
+            extra_params.append(name.split("__"))
+            extra_params_values.append(value)
+        extra_params_values = expand_value_list(extra_params_values)
+        extra_params_values = typecast_values(extra_params_values)
     # run optimization and save results
-    for values in extraParamsValues:
+    for values in extra_params_values:
         response = run(data=network, params=params,
-                       extraParams=extraParams,
-                       extraParamValues=values)
+                       extra_params=extra_params,
+                       extra_param_values=values)
         response.save_to_json_local_docker()
-    if not extraParamsValues:
+    if not extra_params_values:
         response = run(data=network, params=params)
         response.save_to_json_local_docker()
 
 
-def expandValueList(ValuesToExpand: list) -> list:
+def expand_value_list(values_to_expand: list) -> list:
     """
     Takes a list of values for extra parameters, where each element in
     the list can represent multiple values for this parameter, and
@@ -57,7 +57,7 @@ def expandValueList(ValuesToExpand: list) -> list:
             Output: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
                      ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
     Args:
-        ValuesToExpand: (list)
+        values_to_expand: (list)
             A list of values for all extra parameters. The values for
             parameters have to be separated by "__".
             E.g.: ["1.0__2.0", "10__5__0"]
@@ -69,17 +69,17 @@ def expandValueList(ValuesToExpand: list) -> list:
             E.g.: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
                    ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
     """
-    valueLists = [[x] for x in ValuesToExpand[0].split("__")]
-    return list(product(*valueLists))
+    value_lists = [[x] for x in values_to_expand[0].split("__")]
+    return list(product(*value_lists))
 
 
-def typecastValues(values: list) -> list:
+def typecast_values(values: list) -> list:
     """
-    Analyzes a list of list of strings and typecasts them into floats,
+    Analyzes a of list of strings and typecasts them into floats,
     ints or list, if necessary.
     Args:
         values: (list)
-            A list of lists of strings (returned by expandValueList)
+            A list of lists of strings (returned by expand_value_list)
             which should be typecast.
             E.g.: [["1.0", "10", "test"], ["1.0", "5", "test"],
                    ["2.0", "10", "test"], ["2.0", "5", "test"]]

@@ -72,7 +72,7 @@ def customsplit(capacity: int) -> list:
     raise ValueError("Capacity is too big to be decomposed")
 
 
-def binaryPower(number: int) -> list:
+def binary_power(number: int) -> list:
     """
     return a cut-off binary representation of the argument. It is a list
     of powers of two and a rest such that the sum over the list is equal
@@ -118,13 +118,13 @@ class IsingBackbone:
     """
     # dictionary that maps config strings to the corresponding classes and
     # methods
-    linesplitDict = {
+    linesplit_dict = {
         "fullsplit": fullsplit,
         "binarysplit": binarysplit,
         "customsplit": customsplit,
     }
 
-    def __init__(self, network: pypsa.Network, linesplitName: str,
+    def __init__(self, network: pypsa.Network, linesplit_name: str,
                  configuration: dict):
         """
         Constructor for an Ising Backbone. It requires a network and
@@ -135,25 +135,25 @@ class IsingBackbone:
         Args:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
-            linesplitName: (str)
+            linesplit_name: (str)
                 The name of the linesplit function as given in
-                linesplitDict.
+                linesplit_dict.
             configuration: (dict)
                 A dictionary containing all subproblems to be encoded
                 into an ising problem.
         """
-        self.subproblemTable = {
+        self.subproblem_table = {
             "kirchhoff": KirchhoffSubproblem,
             "marginalCost": MarginalCostSubproblem
         }
         if "kirchhoff" not in configuration:
             print("No Kirchhoff configuration found, "
                   "adding Kirchhoff constraint with Factor 1.0")
-            configuration["kirchhoff"] = {"scaleFactor": 1.0}
+            configuration["kirchhoff"] = {"scale_factor": 1.0}
 
         # resolve string for splitting line capacty to function
-        self._linesplitName = linesplitName
-        self.splitCapacity = IsingBackbone.linesplitDict[linesplitName]
+        self._linesplitName = linesplit_name
+        self.splitCapacity = IsingBackbone.linesplit_dict[linesplit_name]
 
         # network to be solved
         self.network = network
@@ -163,31 +163,31 @@ class IsingBackbone:
         self.problem = {}
         # mirrors encodings of `self.problem`, but is reset after encoding a
         # subproblem to get ising formulations of subproblems
-        self.cachedProblem = {}
+        self.cached_problem = {}
 
         # initializing data structures that encode the network into qubits
         self.data = {}
-        self.allocatedQubits = 0
-        self.storeGenerators()
-        self.storeLines()
+        self.allocated_qubits = 0
+        self.store_generators()
+        self.store_lines()
 
         # read configuration dict, store in _subproblems and apply encodings
         self._subproblems = {}
         # dictionary of all support subproblems
-        for subproblem, subproblemConfiguration in configuration.items():
-            if subproblem not in self.subproblemTable:
+        for subproblem, subproblem_configuration in configuration.items():
+            if subproblem not in self.subproblem_table:
                 print(f"{subproblem} is not a valid subproblem, skipping "
                       f"encoding")
                 continue
-            if not subproblemConfiguration:
+            if not subproblem_configuration:
                 print(f"Subproblem {subproblem} has no configuration data, "
                       f"skipping encoding")
                 continue
-            subproblemInstance = self.subproblemTable[
-                subproblem].buildSubproblem(self, subproblemConfiguration)
-            self._subproblems[subproblem] = subproblemInstance
-            self.flushCachedProblem()
-            subproblemInstance.encodeSubproblem()
+            subproblem_instance = self.subproblem_table[
+                subproblem].build_subproblem(self, subproblem_configuration)
+            self._subproblems[subproblem] = subproblem_instance
+            self.flush_cached_problem()
+            subproblem_instance.encode_subproblem()
 
     def __getattr__(self, method_name: str) -> callable:
         """
@@ -205,12 +205,12 @@ class IsingBackbone:
                 The corresponding method of an ising subproblem.
         """
         method = None
-        uniqueResolution = True
-        for subproblem, subproblemInstance in self._subproblems.items():
-            if hasattr(subproblemInstance, method_name):
-                if uniqueResolution:
-                    uniqueResolution = False
-                    method = getattr(subproblemInstance, method_name)
+        unique_resolution = True
+        for subproblem, subproblem_instance in self._subproblems.items():
+            if hasattr(subproblem_instance, method_name):
+                if unique_resolution:
+                    unique_resolution = False
+                    method = getattr(subproblem_instance, method_name)
                 else:
                     raise AttributeError(f"{method_name} didn't resolve to "
                                          f"unique subproblem")
@@ -222,7 +222,7 @@ class IsingBackbone:
 
     # obtain config file using a reader
     @classmethod
-    def buildIsingProblem(cls, network: pypsa.Network, config: dict):
+    def build_ising_problem(cls, network: pypsa.Network, config: dict):
         """
         This is a factory method for making an IsingBackbone that
         corresponds to the problem in the network.
@@ -242,22 +242,22 @@ class IsingBackbone:
                 An IsingBackbone that models the unit commitment problem
                 of the network.
         """
-        linesplitFunction = config.pop("formulation")
-        return IsingBackbone(network, linesplitFunction, config)
+        linesplit_function = config.pop("formulation")
+        return IsingBackbone(network, linesplit_function, config)
 
-    def flushCachedProblem(self) -> None:
+    def flush_cached_problem(self) -> None:
         """
         Resets the cached changes of interactions.
 
         Returns:
             (None)
         """
-        self.cachedProblem = {}
+        self.cached_problem = {}
 
     # functions to couple components. The couplings are interpreted as
     # multiplications of QUBO polynomials. The final interactions are
     # coefficients for an ising spin glass problem
-    def addInteraction(self, *args) -> None:
+    def add_interaction(self, *args) -> None:
         """
         This method is used for adding a new Ising interactions between
         multiple qubits to the problem.
@@ -287,10 +287,10 @@ class IsingBackbone:
             raise ValueError(
                 "Too many arguments for an interaction"
             )
-        *key, interactionStrength = args
+        *key, interaction_strength = args
         key = tuple(sorted(key))
         for qubit in key:
-            interactionStrength *= self.data[qubit]
+            interaction_strength *= self.data[qubit]
 
         # if we couple two spins, we check if they are different. If both spins
         # are the same, we substitute the product of spins with 1, since
@@ -299,13 +299,13 @@ class IsingBackbone:
         if len(key) == 2:
             if key[0] == key[1]:
                 key = tuple([])
-        self.problem[key] = self.problem.get(key, 0) - interactionStrength
-        self.cachedProblem[key] = self.cachedProblem.get(key, 0) - interactionStrength
+        self.problem[key] = self.problem.get(key, 0) - interaction_strength
+        self.cached_problem[key] = self.cached_problem.get(key, 0) - interaction_strength
 
-    # TODO unify coupleComponents and with Constant
-    def coupleComponentWithConstant(self, component: str,
-                                    couplingStrength: float = 1,
-                                    time: int = 0) -> None:
+    # TODO unify couple_components and with Constant
+    def couple_component_with_constant(self, component: str,
+                                       coupling_strength: float = 1,
+                                       time: int = 0) -> None:
         """
         Performs a QUBO multiplication involving a single variable on
         all qubits which are logically grouped to represent a component
@@ -316,7 +316,7 @@ class IsingBackbone:
         Args:
             component: (str)
                 Label of the network component.
-            couplingStrength: (float)
+            coupling_strength: (float)
                 Coefficient of QUBO multiplication by which to scale the
                 interaction. Does not contain qubit specific weight.
             time: (int)
@@ -328,24 +328,24 @@ class IsingBackbone:
                 Modifies self.problem. Adds to previously written
                 interaction coefficient.
         """
-        componentAdress = self.getRepresentingQubits(component, time)
-        for qubit in componentAdress:
+        component_adress = self.get_representing_qubits(component, time)
+        for qubit in component_adress:
             # term with single spin after applying QUBO to Ising transformation
-            self.addInteraction(qubit, 0.5 * couplingStrength)
+            self.add_interaction(qubit, 0.5 * coupling_strength)
             # term with constant cost contribution after applying QUBO to
             # Ising transformation
-            self.addInteraction(0.5 * couplingStrength * self.data[qubit])
+            self.add_interaction(0.5 * coupling_strength * self.data[qubit])
 
     # TODO add a method to conveniently encode the squared distance to a fixed
     #  value into an ising
 
-    def coupleComponents(self,
-                         firstComponent: str,
-                         secondComponent: str,
-                         couplingStrength: float = 1,
-                         time: int = 0,
-                         additionalTime: int = None
-                         ) -> None:
+    def couple_components(self,
+                          first_component: str,
+                          second_component: str,
+                          coupling_strength: float = 1,
+                          time: int = 0,
+                          additional_time: int = None
+                          ) -> None:
         """
         This method couples two labeled groups of qubits as a product
         according to their weight and the selected time step.
@@ -353,21 +353,21 @@ class IsingBackbone:
         components on all qubits which are logically grouped to
         represent these components at a given time slice. This QUBO
         multiplication is translated into Ising interactions, scaled by
-        the couplingStrength and the respective weights of the qubits
+        the coupling_strength and the respective weights of the qubits
         and then added to the currently stored Ising spin glass problem.
 
         Args:
-            firstComponent: (str)
+            first_component: (str)
                 Label of the first network component.
-            secondComponent: (str)
+            second_component: (str)
                 Label of the second network component.
-            couplingStrength: (float)
+            coupling_strength: (float)
                 Coefficient of QUBO multiplication by which to scale all
                 interactions.
             time: (int)
                 Index of time slice of the first component for which to
                 couple qubits representing it.
-            additionalTime: (int)
+            additional_time: (int)
                 Index of time slice of the second component for which
                 to couple qubits representing it. The default parameter
                 'None' is used if the time slices of both components
@@ -379,7 +379,7 @@ class IsingBackbone:
 
         Example:
             Let X_1, X_2 be the qubits representing firstComponent and
-            Y_1, Y_2 the qubits representing secondComponent. The QUBO
+            Y_1, Y_2 the qubits representing second_component. The QUBO
             product the method translates into Ising spin glass
             coefficients is:
             (X_1 + X_2) * (Y_1 + Y_2) = X_1 * Y_1 + X_1 * Y_2
@@ -388,20 +388,20 @@ class IsingBackbone:
         # Replace None default values with their intended network component and
         # then figure out which qubits we want to couple based on the
         # component name and chosen time step
-        if additionalTime is None:
-            additionalTime = time
-        firstComponentAdress = self.getRepresentingQubits(firstComponent, time)
-        secondComponentAdress = self.getRepresentingQubits(secondComponent,
-                                                           additionalTime)
+        if additional_time is None:
+            additional_time = time
+        first_component_adress = self.get_representing_qubits(first_component, time)
+        second_component_adress = self.get_representing_qubits(second_component,
+                                                               additional_time)
         # components with 0 weight (power, capacity) vanish in the QUBO
         # formulation
-        if (not firstComponentAdress) or (not secondComponentAdress):
+        if (not first_component_adress) or (not second_component_adress):
             return
         # retrieving corresponding qubits is done. Now perform qubo
         # multiplication by expanding the product and add each summand
         # individually.
-        for first in range(len(firstComponentAdress)):
-            for second in range(len(secondComponentAdress)):
+        for first in range(len(first_component_adress)):
+            for second in range(len(second_component_adress)):
                 # The body of this loop corresponds to the multiplication of
                 # two QUBO variables. According to the QUBO - Ising
                 # translation rule x = (sigma+1)/2 one QUBO multiplication
@@ -410,35 +410,35 @@ class IsingBackbone:
                 # term with two spins after applying QUBO to Ising
                 # transformation if both spin ids are the same, this will
                 # add a constant cost.
-                # addInteraction performs substitution of spin with a constant
-                self.addInteraction(
-                    firstComponentAdress[first],
-                    secondComponentAdress[second],
-                    couplingStrength * 0.25
+                # add_interaction performs substitution of spin with a constant
+                self.add_interaction(
+                    first_component_adress[first],
+                    second_component_adress[second],
+                    coupling_strength * 0.25
                 )
                 # terms with single spins after applying QUBO to Ising
                 # transformation
-                self.addInteraction(
-                    firstComponentAdress[first],
-                    couplingStrength * self.data[secondComponent]['weights'][
+                self.add_interaction(
+                    first_component_adress[first],
+                    coupling_strength * self.data[second_component]['weights'][
                         second] * 0.25
                 )
-                self.addInteraction(
-                    secondComponentAdress[second],
-                    couplingStrength * self.data[firstComponent]['weights'][
+                self.add_interaction(
+                    second_component_adress[second],
+                    coupling_strength * self.data[first_component]['weights'][
                         first] * 0.25
                 )
                 # term with constant cost contribution after applying QUBO to
                 # Ising transformation
-                self.addInteraction(
-                    self.data[firstComponent]['weights'][first]
-                    * self.data[secondComponent]['weights'][second]
-                    * couplingStrength * 0.25
+                self.add_interaction(
+                    self.data[first_component]['weights'][first]
+                    * self.data[second_component]['weights'][second]
+                    * coupling_strength * 0.25
                 )
 
     # end of coupling functions
 
-    def numVariables(self) -> int:
+    def num_variables(self) -> int:
         """
         Returns how many qubits have already been used to model the
         problem components.
@@ -449,10 +449,10 @@ class IsingBackbone:
             (int)
                 The number of qubits already allocated.
         """
-        return self.allocatedQubits
+        return self.allocated_qubits
 
     # create qubits for generators and lines
-    def storeGenerators(self) -> None:
+    def store_generators(self) -> None:
         """
         Assigns qubits to each generator in self.network. For each
         generator it writes generator specific parameters (i.e. power,
@@ -461,20 +461,20 @@ class IsingBackbone:
 
         Returns:
             (None)
-                Modifies self.data and self.allocatedQubits
+                Modifies self.data and self.allocated_qubits
         """
         timesteps = len(self.snapshots)
         for generator in self.network.generators.index:
-            self.createQubitEntriesForComponent(
-                componentName=generator,
-                numQubits=timesteps,
-                weights=[self.getNominalPower(generator, time) for time in
+            self.create_qubit_entries_for_component(
+                component_name=generator,
+                num_qubits=timesteps,
+                weights=[self.get_nominal_power(generator, time) for time in
                          range(len(self.snapshots))],
-                encodingLength=1,
+                encoding_length=1,
             )
         return
 
-    def storeLines(self) -> None:
+    def store_lines(self) -> None:
         """
         Assigns a number of qubits, according to the option set in
         self.config, to each line in self.network. For each line, line
@@ -484,24 +484,24 @@ class IsingBackbone:
         
         Returns:
             (None)
-                Modifies self.data and self.allocatedQubits
+                Modifies self.data and self.allocated_qubits
         """
         timesteps = len(self.snapshots)
         for line in self.network.lines.index:
-            singleTimestepSplit = self.splitCapacity(
+            single_timestep_split = self.splitCapacity(
                 int(self.network.lines.loc[line].s_nom))
-            self.createQubitEntriesForComponent(
-                componentName=line,
-                weights=singleTimestepSplit * timesteps,
-                encodingLength=len(singleTimestepSplit),
+            self.create_qubit_entries_for_component(
+                component_name=line,
+                weights=single_timestep_split * timesteps,
+                encoding_length=len(single_timestep_split),
             )
 
-    def createQubitEntriesForComponent(self,
-                                       componentName: str,
-                                       numQubits: int = None,
-                                       weights: list[float] = None,
-                                       encodingLength: int = None
-                                       ) -> None:
+    def create_qubit_entries_for_component(self,
+                                           component_name: str,
+                                           num_qubits: int = None,
+                                           weights: list[float] = None,
+                                           encoding_length: int = None
+                                           ) -> None:
         """
         A function to create qubits in the self.data dictionary that
         represent some network components. The qubits can be accessed
@@ -511,45 +511,45 @@ class IsingBackbone:
         to prevent name or qubit collision.
 
         Args:
-            componentName: (str)
+            component_name: (str)
                 The string used to couple the component with qubits.
-            numQubits: (int)
+            num_qubits: (int)
                 Number of qubits necessary to encode the component.
             weights: (int)
                 Weight for each qubit which to use whenever it gets
                 coupled with other qubits.
-            encodingLength: (int)
+            encoding_length: (int)
                 Number of qubits used for encoding during one time step
 
         Returns:
             (None)
-                Modifies self.data and self.allocatedQubits
+                Modifies self.data and self.allocated_qubits
         """
-        if isinstance(componentName, int):
+        if isinstance(component_name, int):
             raise ValueError("Component names mustn't be of type int")
-        if componentName in self.data:
+        if component_name in self.data:
             raise ValueError("Component name has already been used")
         if weights is None:
             raise ValueError("Assigned qubits don't have any weight")
-        if numQubits is None:
-            numQubits = len(weights) * len(self.snapshots)
-        if numQubits * len(self.snapshots) != len(weights):
+        if num_qubits is None:
+            num_qubits = len(weights) * len(self.snapshots)
+        if num_qubits * len(self.snapshots) != len(weights):
             raise ValueError("Assigned qubits don't match number of weights")
-        if len(self.snapshots) * encodingLength != numQubits:
+        if len(self.snapshots) * encoding_length != num_qubits:
             raise ValueError("total number of qubits, numer of snapshots and "
                              "qubits per snapshot is not consistent")
-        indices = range(self.allocatedQubits, self.allocatedQubits + numQubits)
-        self.allocatedQubits += numQubits
-        self.data[componentName] = {
+        indices = range(self.allocated_qubits, self.allocated_qubits + num_qubits)
+        self.allocated_qubits += num_qubits
+        self.data[component_name] = {
             'indices': indices,
             'weights': weights,
-            'encodingLength': encodingLength,
+            'encoding_length': encoding_length,
         }
         for idx, qubit in enumerate(indices):
             self.data[qubit] = weights[idx]
 
     # helper functions to set encoded values
-    def setOutputNetwork(self, solution: list) -> pypsa.Network:
+    def set_output_network(self, solution: list) -> pypsa.Network:
         """
         Writes the status, p and p_max_pu values of generators, and the
         p0 and p1 values of lines according to the provided solution in
@@ -565,52 +565,52 @@ class IsingBackbone:
                 for the generators and lines are set according to the
                 given solution.
         """
-        outputNetwork = self.network.copy()
+        output_network = self.network.copy()
         # get Generator/Line Status
         for time in range(len(self.snapshots)):
-            for generator in outputNetwork.generators.index:
+            for generator in output_network.generators.index:
                 # set value in status-dataframe in generators_t dictionary
                 status = int(
-                    self.getGeneratorStatus(gen=generator,
-                                            solution=solution,
-                                            time=time))
-                column_status = list(outputNetwork.generators_t.status.columns)
+                    self.get_generator_status(gen=generator,
+                                              solution=solution,
+                                              time=time))
+                column_status = list(output_network.generators_t.status.columns)
                 if generator in column_status:
                     index_generator = column_status.index(generator)
-                    outputNetwork.generators_t.status.iloc[
+                    output_network.generators_t.status.iloc[
                         time, index_generator] = status
                 else:
-                    outputNetwork.generators_t.status[generator] = status
+                    output_network.generators_t.status[generator] = status
 
                 # set value in p-dataframe in generators_t dictionary
-                p = self.getEncodedValueOfComponent(component=generator,
-                                                    solution=solution,
-                                                    time=time)
-                columns_p = list(outputNetwork.generators_t.p.columns)
+                p = self.get_encoded_value_of_component(component=generator,
+                                                        solution=solution,
+                                                        time=time)
+                columns_p = list(output_network.generators_t.p.columns)
                 if generator in columns_p:
                     index_generator = columns_p.index(generator)
-                    outputNetwork.generators_t.p.iloc[
+                    output_network.generators_t.p.iloc[
                         time, index_generator] = p
                 else:
-                    outputNetwork.generators_t.p[generator] = p
+                    output_network.generators_t.p[generator] = p
 
                 # set value in p_max_pu-dataframe in generators_t dictionary
                 columns_p_max_pu = list(
-                    outputNetwork.generators_t.p_max_pu.columns)
-                p_nom = outputNetwork.generators.loc[generator, "p_nom"]
+                    output_network.generators_t.p_max_pu.columns)
+                p_nom = output_network.generators.loc[generator, "p_nom"]
                 if p == 0:
                     p_max_pu = 0.0
                 else:
                     p_max_pu = p_nom / p
                 if generator in columns_p_max_pu:
                     index_generator = columns_p_max_pu.index(generator)
-                    outputNetwork.generators_t.p_max_pu.iloc[
+                    output_network.generators_t.p_max_pu.iloc[
                         time, index_generator] = p_max_pu
                 else:
-                    outputNetwork.generators_t.p_max_pu[generator] = p_max_pu
+                    output_network.generators_t.p_max_pu[generator] = p_max_pu
 
-            for line in outputNetwork.lines.index:
-                encoded_val = self.getEncodedValueOfComponent(
+            for line in output_network.lines.index:
+                encoded_val = self.get_encoded_value_of_component(
                     component=line,
                     solution=solution,
                     time=time)
@@ -621,24 +621,24 @@ class IsingBackbone:
                 p0 = encoded_val
                 p1 = -encoded_val
 
-                columns_p0 = list(outputNetwork.lines_t.p0.columns)
+                columns_p0 = list(output_network.lines_t.p0.columns)
                 if line in columns_p0:
                     index_line = columns_p0.index(line)
-                    outputNetwork.lines_t.p0.iloc[time, index_line] = p0
+                    output_network.lines_t.p0.iloc[time, index_line] = p0
                 else:
-                    outputNetwork.lines_t.p0[line] = p0
+                    output_network.lines_t.p0[line] = p0
 
-                columns_p1 = list(outputNetwork.lines_t.p1.columns)
+                columns_p1 = list(output_network.lines_t.p1.columns)
                 if line in columns_p1:
                     index_line = columns_p1.index(line)
-                    outputNetwork.lines_t.p1.iloc[time, index_line] = p1
+                    output_network.lines_t.p1.iloc[time, index_line] = p1
                 else:
-                    outputNetwork.lines_t.p1[line] = p1
+                    output_network.lines_t.p1[line] = p1
 
-        return outputNetwork
+        return output_network
 
     # helper functions for getting encoded values
-    def getData(self) -> dict:
+    def get_data(self) -> dict:
         """
         Returns the dictionary that holds information on the encoding
         of the network into qubits.
@@ -650,7 +650,7 @@ class IsingBackbone:
         """
         return self.data
 
-    def getBusComponents(self, bus: str) -> dict:
+    def get_bus_components(self, bus: str) -> dict:
         """
         Returns all labels of components that connect to a bus as a
         dictionary. For lines that end in this bus, positive power flow
@@ -667,9 +667,9 @@ class IsingBackbone:
                 A dictionary with the three following keys:
                 'generators':       A list of labels of generators that
                                     are at the bus.
-                'positiveLines':    A list of labels of lines that end
+                'positive_lines':    A list of labels of lines that end
                                     in this bus.
-                'negativeLines':    A list of labels of lines that start
+                'negative_lines':    A list of labels of lines that start
                                     in this bus.
         """
         if bus not in self.network.buses.index:
@@ -679,18 +679,18 @@ class IsingBackbone:
                 list(self.network.generators[
                          self.network.generators.bus == bus
                          ].index),
-            "positiveLines":
+            "positive_lines":
                 list(self.network.lines[
                          self.network.lines.bus1 == bus
                          ].index),
-            "negativeLines":
+            "negative_lines":
                 list(self.network.lines[
                          self.network.lines.bus0 == bus
                          ].index),
         }
         return result
 
-    def getNominalPower(self, generator: str, time: int = 0) -> float:
+    def get_nominal_power(self, generator: str, time: int = 0) -> float:
         """
         Returns the nominal power of a generator at a time step saved
         in the network.
@@ -712,8 +712,8 @@ class IsingBackbone:
             p_max_pu = 1.0
         return self.network.generators.p_nom[generator] * p_max_pu
 
-    def getGeneratorStatus(self, gen: str, solution: list, time: int = 0
-                           ) -> bool:
+    def get_generator_status(self, gen: str, solution: list, time: int = 0
+                             ) -> bool:
         """
         Returns the status of a generator 'gen' (i.e. on or off) at a
         time slice 'time' in a given solution.
@@ -729,8 +729,8 @@ class IsingBackbone:
         """
         return self.data[gen]['indices'][time] in solution
 
-    def getGeneratorDictionary(self, solution: list,
-                               stringify: bool = True) -> dict:
+    def get_generator_dictionary(self, solution: list,
+                                 stringify: bool = True) -> dict:
         """
         Builds a dictionary containing the status of all generators at
         all time slices for a given solution of qubit spins.
@@ -758,12 +758,12 @@ class IsingBackbone:
                 if stringify:
                     key = str(key)
                 result[key] = int(
-                    self.getGeneratorStatus(gen=generator, solution=solution,
-                                            time=time))
+                    self.get_generator_status(gen=generator, solution=solution,
+                                              time=time))
         return result
 
-    def getFlowDictionary(self, solution: list,
-                          stringify: bool = True) -> dict:
+    def get_flow_dictionary(self, solution: list,
+                            stringify: bool = True) -> dict:
         """
         Builds a dictionary containing all power flows at all time
         slices for a given solution of qubit spins.
@@ -790,11 +790,11 @@ class IsingBackbone:
                 key = (lineId, time)
                 if stringify:
                     key = str(key)
-                result[key] = self.getEncodedValueOfComponent(
+                result[key] = self.get_encoded_value_of_component(
                     component=lineId, solution=solution, time=time)
         return result
 
-    def getLoad(self, bus: str, time: int = 0, silent: bool = True) -> float:
+    def get_load(self, bus: str, time: int = 0, silent: bool = True) -> float:
         """
         Returns the total load at a bus at a given time slice.
 
@@ -810,22 +810,22 @@ class IsingBackbone:
             (float)
                 The total load at 'bus' at time slice 'time'.
         """
-        loadsAtCurrentBus = self.network.loads[
+        loads_at_current_bus = self.network.loads[
             self.network.loads.bus == bus
             ].index
-        allLoads = self.network.loads_t['p_set'].iloc[time]
-        result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
+        all_loads = self.network.loads_t['p_set'].iloc[time]
+        result = all_loads[all_loads.index.isin(loads_at_current_bus)].sum()
         if result == 0:
             if not silent:
                 print(f"Warning: No load at {bus} at timestep {time}.\n"
                       f"Falling back to constant load")
-            allLoads = self.network.loads['p_set']
-            result = allLoads[allLoads.index.isin(loadsAtCurrentBus)].sum()
+            all_loads = self.network.loads['p_set']
+            result = all_loads[all_loads.index.isin(loads_at_current_bus)].sum()
         if result < 0:
             raise ValueError("negative Load at current Bus")
         return result
 
-    def getTotalLoad(self, time: int) -> float:
+    def get_total_load(self, time: int) -> float:
         """
         Returns the total load over all buses at one time slice.
 
@@ -838,10 +838,10 @@ class IsingBackbone:
         """
         load = 0.0
         for bus in self.network.buses.index:
-            load += self.getLoad(bus, time)
+            load += self.get_load(bus, time)
         return load
 
-    def getRepresentingQubits(self, component: str, time: int = 0) -> list:
+    def get_representing_qubits(self, component: str, time: int = 0) -> list:
         """
         Returns a list of all qubits that are used to encode a network
         component at a given time slice.
@@ -861,11 +861,11 @@ class IsingBackbone:
                 List of integers which are qubits that represent the
                 component.
         """
-        encodingLength = self.data[component]["encodingLength"]
+        encoding_length = self.data[component]["encoding_length"]
         return self.data[component]["indices"][
-               time * encodingLength: (time + 1) * encodingLength]
+               time * encoding_length: (time + 1) * encoding_length]
 
-    def getQubitMapping(self, time: int = 0) -> dict:
+    def get_qubit_mapping(self, time: int = 0) -> dict:
         """
         Returns a dictionary with all network components and which
         qubits were used for representation in an Ising spin glass
@@ -881,12 +881,12 @@ class IsingBackbone:
                 Network components labels are the keys and the values
                 are the ranges of qubits used for their encoding.
         """
-        return {component: self.getRepresentingQubits(component=component,
-                                                      time=time)
+        return {component: self.get_representing_qubits(component=component,
+                                                        time=time)
                 for component in self.data.keys()
                 if isinstance(component, str)}
 
-    def getInteraction(self, *args) -> float:
+    def get_interaction(self, *args) -> float:
         """
         Returns the interaction coefficient of a list of qubits.
         
@@ -898,11 +898,11 @@ class IsingBackbone:
             (float)
                 The interaction strength between all qubits in args.
         """
-        sortedUniqueArguments = tuple(sorted(set(args)))
-        return self.problem.get(sortedUniqueArguments, 0.0)
+        sorted_unique_arguments = tuple(sorted(set(args)))
+        return self.problem.get(sorted_unique_arguments, 0.0)
 
-    def getEncodedValueOfComponent(self, component: str, solution: list,
-                                   time: int = 0) -> float:
+    def get_encoded_value_of_component(self, component: str, solution: list,
+                                       time: int = 0) -> float:
         """
         Returns the encoded value of a component according to the spin
         configuration in solution at a given time slice.
@@ -925,14 +925,14 @@ class IsingBackbone:
                 of solution.
         """
         value = 0.0
-        encodingLength = self.data[component]["encodingLength"]
-        for idx in range(time * encodingLength, (time + 1) * encodingLength,
+        encoding_length = self.data[component]["encoding_length"]
+        for idx in range(time * encoding_length, (time + 1) * encoding_length,
                          1):
             if self.data[component]['indices'][idx] in solution:
                 value += self.data[component]['weights'][idx]
         return value
 
-    def generateReport(self, solution: list) -> dict:
+    def generate_report(self, solution: list) -> dict:
         """
         For the given solution, calculates various properties of the
         solution.
@@ -946,22 +946,22 @@ class IsingBackbone:
                 solution.
         """
         return {
-            "totalCost": self.calcCost(solution=solution),
-            "kirchhoffCost": self.calcKirchhoffCost(solution=solution),
-            "powerImbalance": self.calcPowerImbalance(solution=solution),
-            "totalPower": self.calcTotalPowerGenerated(solution=solution),
-            "marginalCost": self.calcMarginalCost(solution=solution),
-            "individualKirchhoffCost": self.individualCostContribution(
+            "total_cost": self.calc_cost(solution=solution),
+            "kirchhoff_cost": self.calc_kirchhoff_cost(solution=solution),
+            "power_imbalance": self.calc_power_imbalance(solution=solution),
+            "total_power": self.calc_total_power_generated(solution=solution),
+            "marginal_cost": self.calc_marginal_cost(solution=solution),
+            "individual_kirchhoff_cost": self.individual_cost_contribution(
                 solution=solution),
-            "unitCommitment": self.getGeneratorDictionary(solution=solution,
-                                                          stringify=True),
-            "powerflow": self.getFlowDictionary(solution=solution,
-                                                stringify=True),
-            "hamiltonian": self.getHamiltonianMatrix()
+            "unit_commitment": self.get_generator_dictionary(solution=solution,
+                                                            stringify=True),
+            "powerflow": self.get_flow_dictionary(solution=solution,
+                                                  stringify=True),
+            "hamiltonian": self.get_hamiltonian_matrix()
         }
 
-    def calcCost(self, solution: list,
-                 isingInteractions: dict = None) -> float:
+    def calc_cost(self, solution: list,
+                  ising_interactions: dict = None) -> float:
         """
         Calculates the energy of a spin state including the constant
         energy contribution.
@@ -975,7 +975,7 @@ class IsingBackbone:
         Args:
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
-            isingInteractions: (dict)
+            ising_interactions: (dict)
                 The Ising problem to be used to calculate the energy.
 
         Returns:
@@ -983,10 +983,10 @@ class IsingBackbone:
                 The energy of the spin glass state in solution.
         """
         solution = set(solution)
-        if isingInteractions is None:
-            isingInteractions = self.problem
-        totalCost = 0.0
-        for spins, weight in isingInteractions.items():
+        if ising_interactions is None:
+            ising_interactions = self.problem
+        total_cost = 0.0
+        for spins, weight in ising_interactions.items():
             if len(spins) == 1:
                 factor = 1
             else:
@@ -994,10 +994,10 @@ class IsingBackbone:
             for spin in spins:
                 if spin in solution:
                     factor *= -1
-            totalCost += factor * weight
-        return totalCost
+            total_cost += factor * weight
+        return total_cost
 
-    def individualMarginalCost(self, solution: list) -> dict:
+    def individual_marginal_cost(self, solution: list) -> dict:
         """
         Returns a dictionary which contains the marginal cost incurred
         at every bus at every time slice.
@@ -1017,12 +1017,12 @@ class IsingBackbone:
         contrib = {}
         for bus in self.network.buses.index:
             contrib = {**contrib,
-                       **self.calcMarginalCostAtBus(bus=bus,
-                                                    solution=solution)
+                       **self.calc_marginal_cost_at_bus(bus=bus,
+                                                        solution=solution)
                        }
         return contrib
 
-    def calcMarginalCostAtBus(self, bus: str, solution: list) -> dict:
+    def calc_marginal_cost_at_bus(self, bus: str, solution: list) -> dict:
         """
         Returns a dictionary which contains the marginal cost incurred
         at 'bus' at every time slice.
@@ -1043,20 +1043,19 @@ class IsingBackbone:
         """
         contrib = {}
         for time in range(len(self.snapshots)):
-            marginalCost = 0.0
-            components = self.getBusComponents(bus)
+            marginal_cost = 0.0
+            components = self.get_bus_components(bus)
             for generator in components['generators']:
-                if self.getGeneratorStatus(gen=generator,
-                                           solution=solution,
-                                           time=time):
-                    marginalCost += self.network.generators["marginal_cost"].loc[
-                                        generator
-                                    ] * self.data[generator]['weights'][0]
-            contrib[str((bus, time))] = marginalCost
+                if self.get_generator_status(gen=generator,
+                                             solution=solution,
+                                             time=time):
+                    marginal_cost += self.network.generators["marginal_cost"].loc[
+                                         generator
+                                     ] * self.data[generator]['weights'][0]
+            contrib[str((bus, time))] = marginal_cost
         return contrib
 
-
-    def calcMarginalCost(self, solution: list) -> float:
+    def calc_marginal_cost(self, solution: list) -> float:
         """
         Calculate the total marginal cost incurred by a solution.
 
@@ -1069,14 +1068,13 @@ class IsingBackbone:
                 The total marginal cost incurred without monetaryFactor
                 scaling.
         """
-        marginalCost = 0.0
-        for key, val in self.individualMarginalCost(solution=solution).items():
-            marginalCost += val
-        return marginalCost
-
+        marginal_cost = 0.0
+        for key, val in self.individual_marginal_cost(solution=solution).items():
+            marginal_cost += val
+        return marginal_cost
 
     # getter for encoded ising problem parameters
-    def siquanFormat(self) -> list:
+    def siquan_format(self) -> list:
         """
         Returns the complete problem in the format required by the
         siquan solver.
@@ -1089,8 +1087,7 @@ class IsingBackbone:
         return [(v, list(k)) for k, v in self.problem.items() if
                 v != 0 and len(k) > 0]
 
-
-    def getHamiltonianMatrix(self) -> list:
+    def get_hamiltonian_matrix(self) -> list:
         """
         Returns a matrix containing the Ising hamiltonian
 
@@ -1098,14 +1095,13 @@ class IsingBackbone:
             (list)
                 A list of lists representing the hamiltonian matrix.
         """
-        qubits = range(self.allocatedQubits)
+        qubits = range(self.allocated_qubits)
         hamiltonian = [
-            [self.getInteraction(i, j) for i in qubits] for j in qubits
+            [self.get_interaction(i, j) for i in qubits] for j in qubits
         ]
         return hamiltonian
 
-
-    def getHamiltonianEigenvalues(self) -> np.ndarray:
+    def get_hamiltonian_eigenvalues(self) -> np.ndarray:
         """
         Returns the eigenvalues and normalized eigenvectors of the
         hamiltonian matrix.
@@ -1114,7 +1110,7 @@ class IsingBackbone:
             (np.ndarray)
                 A numpy array containing all eigenvalues.
         """
-        return np.linalg.eigh(self.getHamiltonianMatrix())
+        return np.linalg.eigh(self.get_hamiltonian_matrix())
 
 
 class AbstractIsingSubproblem:
@@ -1147,27 +1143,27 @@ class AbstractIsingSubproblem:
         """
         self.problem = {}
         try:
-            self.scaleFactor = config["scaleFactor"]
+            self.scale_factor = config["scale_factor"]
         except KeyError:
-            print("Can't find value for 'scaleFactor', fallback to '1.0'")
-            self.scaleFactor = 1.0
+            print("Can't find value for 'scale_factor', fallback to '1.0'")
+            self.scale_factor = 1.0
         self.backbone = backbone
         self.network = backbone.network
 
     @classmethod
-    def buildSubproblem(cls, backbone: IsingBackbone,
-                        configuration: dict) -> 'AbstractIsingSubproblem':
+    def build_subproblem(cls, backbone: IsingBackbone,
+                         configuration: dict) -> 'AbstractIsingSubproblem':
         """
         Returns an instance of the class set up according to the
         configuration.
         This is done by choosing the corresponding subclass of the
         configuration. After initialization, the instance can encode
-        this subproblem into the isingBackbone by calling the
-        encodeSubproblem method.
+        this subproblem into the ising_backbone by calling the
+        encode_subproblem method.
 
         Args:
             backbone: (IsingBackbone)
-                The isingBackbone used to encode the subproblem.
+                The ising_backbone used to encode the subproblem.
             configuration: (dict)
                 The configuration dictionary, containing all data
                 necessary to initialize.
@@ -1178,15 +1174,15 @@ class AbstractIsingSubproblem:
         """
         raise NotImplementedError
 
-    def encodeSubproblem(self):
+    def encode_subproblem(self):
         """
         This encodes the problem an instance of a subclass is describing
-        into the isingBackbone instance. After this call, the
-        corresponding QUBO is stored in the isingBackbone.
+        into the ising_backbone instance. After this call, the
+        corresponding QUBO is stored in the ising_backbone.
         """
         raise NotImplementedError
 
-    def calcCost(self, solution: list) -> float:
+    def calc_cost(self, solution: list) -> float:
         """
         Calculates the energy of a spin state including the constant
         energy contribution by delegating it to the IsingBackbone.
@@ -1199,8 +1195,8 @@ class AbstractIsingSubproblem:
             (float)
                 The energy of the spin glass state.
         """
-        return self.backbone.calcCost(solution=solution,
-                                      isingInteractions=self.problem)
+        return self.backbone.calc_cost(solution=solution,
+                                       ising_interactions=self.problem)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
@@ -1213,8 +1209,8 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
     """
 
     @classmethod
-    def buildSubproblem(cls, backbone: IsingBackbone,
-                        configuration: dict) -> 'MarginalCostSubproblem':
+    def build_subproblem(cls, backbone: IsingBackbone,
+                         configuration: dict) -> 'MarginalCostSubproblem':
         """
         A factory method for obtaining the marginal cost model specified
         in configuration.
@@ -1222,12 +1218,12 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         configuration.
         This is done by choosing the corresponding subclass of the
         configuration. After initialization, the instance can encode
-        this subproblem into the isingBackbone by calling the
-        encodeSubproblem method.
+        this subproblem into the ising_backbone by calling the
+        encode_subproblem method.
 
         Args:
             backbone: (IsingBackbone)
-                The isingBackbone used to encode the subproblem.
+                The ising_backbone used to encode the subproblem.
             configuration: (dict)
                 The configuration dictionary, containing all data
                 necessary to initialize.
@@ -1237,13 +1233,13 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 The constructed Ising instance ready to encode into the
                 backbone.
         """
-        subclassTable = {
+        subclass_table = {
             "GlobalCostSquare": GlobalCostSquare,
             "GlobalCostSquareWithSlack": GlobalCostSquareWithSlack,
             "MarginalAsPenalty": MarginalAsPenalty,
             "LocalMarginalEstimation": LocalMarginalEstimation,
         }
-        return subclassTable[configuration["formulation"]](
+        return subclass_table[configuration["formulation"]](
             backbone=backbone, config=configuration)
 
 
@@ -1261,11 +1257,11 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         It inherits its functionality from the AbstractIsingSubproblem
         constructor. Additionally, it sets three more parameters which
         slightly change how the penalty is applied:
-            `offsetEstimationFactor`: sets an offset across all
+            `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimatedCostFactor`: is going to be removed
-            `offsetBuildFactor`: is going to be removed
+            `estimated_cost_factor`: is going to be removed
+            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1279,14 +1275,14 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         # describes by how much each marginal cost per unit produced is offset
         # in all generators to bring the average cost of a generator closer to
         # zero
-        self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
+        self.offset_estimation_factor = float(config["offset_estimation_factor"])
         # factor to scale estimated cost at a bus after calculation
-        self.estimatedCostFactor = float(config["estimatedCostFactor"])
+        self.estimated_cost_factor = float(config["estimated_cost_factor"])
         # factor to scale marginal cost of a generator when constructing ising
         # interactions
-        self.offsetBuildFactor = float(config["offsetBuildFactor"])
+        self.offset_build_factor = float(config["offset_build_factor"])
 
-    def encodeSubproblem(self) -> None:
+    def encode_subproblem(self) -> None:
         """
         Encodes the minimization of the marginal cost by applying a
         penalty at each qubit of a generator equal to the cost it would
@@ -1301,9 +1297,9 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         # generators
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
-                self.encodeMarginalCosts(bus=bus, time=time)
+                self.encode_marginal_costs(bus=bus, time=time)
 
-    def marginalCostOffset(self) -> float:
+    def marginal_cost_offset(self) -> float:
         """
         Returns a float by which all generator marginal costs per power
         will be offset. Since every generator will be offset, this will
@@ -1318,13 +1314,13 @@ class MarginalAsPenalty(MarginalCostSubproblem):
                 The offset of all generator's marginal costs.
         """
         return 1.0 * min(self.network.generators[
-                             "marginal_cost"]) * self.offsetEstimationFactor
+                             "marginal_cost"]) * self.offset_estimation_factor
 
-    def encodeMarginalCosts(self, bus: str, time: int) -> None:
+    def encode_marginal_costs(self, bus: str, time: int) -> None:
         """
         Encodes marginal costs for running generators and transmission
         lines at a single bus.
-        This uses an offset calculated in ´marginalCostOffset´, which is
+        This uses an offset calculated in ´marginal_cost_offset´, which is
         dependent on all generators of the entire network for a single
         time slice.
 
@@ -1339,17 +1335,14 @@ class MarginalAsPenalty(MarginalCostSubproblem):
                 Modifies self.problem. Adds to previously written
                 interaction coefficient.
         """
-        generators = self.backbone.getBusComponents(bus)['generators']
-        costOffset = self.marginalCostOffset()
+        generators = self.backbone.get_bus_components(bus)['generators']
+        cost_offset = self.marginal_cost_offset()
         for generator in generators:
-            self.backbone.coupleComponentWithConstant(
+            self.backbone.couple_component_with_constant(
                 component=generator,
-                couplingStrength=self.scaleFactor
-                                 * (self.network.generators[
-                                        "marginal_cost"].loc[
-                                        generator]
-                                    - costOffset
-                                    ),
+                coupling_strength=self.scale_factor
+                                  * (self.network.generators["marginal_cost"].loc[generator]
+                                     - cost_offset),
                 time=time
             )
 
@@ -1369,11 +1362,11 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         It inherits its functionality from the AbstractIsingSubproblem
         constructor. Additionally, it sets three more parameters which
         slightly change how the penalty is applied:
-            `offsetEstimationFactor`: sets an offset across all
+            `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimatedCostFactor`: is going to be removed
-            `offsetBuildFactor`: is going to be removed
+            `estimated_cost_factor`: is going to be removed
+            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1383,14 +1376,14 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 construct an instance.
         """
         super().__init__(backbone, config)
-        self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
+        self.offset_estimation_factor = float(config["offset_estimation_factor"])
         # factor to scale estimated cost at a bus after calculation
-        self.estimatedCostFactor = float(config["estimatedCostFactor"])
+        self.estimated_cost_factor = float(config["estimated_cost_factor"])
         # factor to scale marginal cost of a generator when constructing ising
         # interactions
-        self.offsetBuildFactor = float(config["offsetBuildFactor"])
+        self.offset_build_factor = float(config["offset_build_factor"])
 
-    def encodeSubproblem(self) -> None:
+    def encode_subproblem(self) -> None:
         # TODO: check DocString
         """
         Encodes the minimization of the marginal cost by estimating the
@@ -1406,16 +1399,16 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         # iterate over all snapshots and buses to encode the subproblem
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
-                self.encodeMarginalCosts(bus=bus, time=time)
+                self.encode_marginal_costs(bus=bus, time=time)
 
-    def chooseOffset(self, sortedGenerators: list) -> float:
+    def choose_offset(self, sorted_generators: list) -> float:
         """
         Calculates a float by which to offset all marginal costs. The
         chosen offset is the minimal marginal cost of the generators in
         the provided list.
 
         Args:
-            sortedGenerators: (list)
+            sorted_generators: (list)
                 A list of generators already sorted by their minimal
                 cost in ascending order.
 
@@ -1428,14 +1421,14 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         # minimal cost is decent but for example choosing an offset slightly
         # over that seems to also produce good results. It is not clear how
         # important the same sign on all marginal costs is
-        marginalCostList = [self.network.generators["marginal_cost"].loc[gen]
-                            for gen in sortedGenerators]
-        return self.offsetEstimationFactor * np.min(marginalCostList)
+        marginal_cost_list = [self.network.generators["marginal_cost"].loc[gen]
+                              for gen in sorted_generators]
+        return self.offset_estimation_factor * np.min(marginal_cost_list)
 
-    def estimateMarginalCostAtBus(self,
-                                  bus: str,
-                                  time: int
-                                  ) -> [float, float]:
+    def estimate_marginal_cost_at_bus(self,
+                                      bus: str,
+                                      time: int
+                                      ) -> [float, float]:
         """
         Estimates a lower bound for marginal costs incurred by matching
         the load at the bus only with generators that are at this bus.
@@ -1456,48 +1449,48 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 The value by which to offset the marginal costs of all
                 generators.
         """
-        remainingLoad = self.backbone.getLoad(bus, time)
-        generators = self.backbone.getBusComponents(bus)['generators']
-        sortedGenerators = sorted(
+        remaining_load = self.backbone.get_load(bus, time)
+        generators = self.backbone.get_bus_components(bus)['generators']
+        sorted_generators = sorted(
             generators,
             key=lambda gen: self.network.generators["marginal_cost"].loc[gen]
         )
-        offset = self.chooseOffset(sortedGenerators)
-        costEstimation = 0.0
-        for generator in sortedGenerators:
-            if remainingLoad <= 0:
+        offset = self.choose_offset(sorted_generators)
+        cost_estimation = 0.0
+        for generator in sorted_generators:
+            if remaining_load <= 0:
                 break
-            suppliedPower = min(remainingLoad,
-                                self.backbone.data[generator]['weights'][0])
-            costEstimation += suppliedPower * (
+            supplied_power = min(remaining_load,
+                                 self.backbone.data[generator]['weights'][0])
+            cost_estimation += supplied_power * (
                     self.network.generators["marginal_cost"].loc[
                         generator] - offset)
-            remainingLoad -= suppliedPower
-        return costEstimation, offset
+            remaining_load -= supplied_power
+        return cost_estimation, offset
 
-    def calculateCost(self,
-                      componentToBeValued: str,
-                      allComponents: dict,
-                      offset: float,
-                      estimatedCost: float,
-                      load: float
-                      ) -> float:
+    def calculate_cost(self,
+                       component_to_be_valued: str,
+                       all_components: dict,
+                       offset: float,
+                       estimated_cost: float,
+                       load: float
+                       ) -> float:
         # TODO: check DocString
         """
         Calculates and returns the marginal costs of a component
         'componentToBeValued'.
 
         Args:
-            componentToBeValued: (str)
+            component_to_be_valued: (str)
                 Label of the component at which to estimate marginal
                 costs.
-            allComponents: (dict)
+            all_components: (dict)
                 All components connect to a specific bus, including
                 'componentToBeValued'.
             offset: (float)
                 The value by which to offset the marginal costs of all
                 generators.
-            estimatedCost: (float)
+            estimated_cost: (float)
                 An estimation of the incurred marginal cost.
             load: (float)
                 The load on the bus, to which all given components are
@@ -1507,15 +1500,15 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
             (float)
                 The marginal costs of the specified component.
         """
-        if componentToBeValued in allComponents["generators"]:
+        if component_to_be_valued in all_components["generators"]:
             return self.network.generators["marginal_cost"].loc[
-                       componentToBeValued] - offset
-        if componentToBeValued in allComponents["positiveLines"]:
-            return 0.5 * estimatedCost / load
-        if componentToBeValued in allComponents["negativeLines"]:
-            return 0.5 * - estimatedCost / load
+                       component_to_be_valued] - offset
+        if component_to_be_valued in all_components["positive_lines"]:
+            return 0.5 * estimated_cost / load
+        if component_to_be_valued in all_components["negative_lines"]:
+            return 0.5 * - estimated_cost / load
 
-    def encodeMarginalCosts(self, bus: str, time: int) -> None:
+    def encode_marginal_costs(self, bus: str, time: int) -> None:
         """
         Encodes marginal costs at a bus by first estimating a lower
         bound of unavoidable marginal costs, then deviations in the
@@ -1533,49 +1526,49 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 Modifies self.backbone. Adds to previously written
                 interaction coefficient
         """
-        components = self.backbone.getBusComponents(bus)
-        flattenedComponenents = components['generators'] + \
-                                components['positiveLines'] + \
-                                components['negativeLines']
+        components = self.backbone.get_bus_components(bus)
+        flattened_componenents = components['generators'] + \
+                                 components['positive_lines'] + \
+                                 components['negative_lines']
 
-        estimatedCost, offset = self.estimateMarginalCostAtBus(bus, time)
-        estimatedCost *= self.estimatedCostFactor
-        offset *= self.offsetBuildFactor
-        load = self.backbone.getLoad(bus, time)
+        estimated_cost, offset = self.estimate_marginal_cost_at_bus(bus, time)
+        estimated_cost *= self.estimated_cost_factor
+        offset *= self.offset_build_factor
+        load = self.backbone.get_load(bus, time)
 
-        self.backbone.addInteraction(0.25 * estimatedCost ** 2)
-        for firstComponent in flattenedComponenents:
-            self.backbone.coupleComponentWithConstant(
-                firstComponent,
-                - 2.0 * self.calculateCost(firstComponent,
-                                           components,
-                                           offset,
-                                           estimatedCost,
-                                           load,
-                                           ) \
-                * estimatedCost \
-                * self.scaleFactor
+        self.backbone.add_interaction(0.25 * estimated_cost ** 2)
+        for first_component in flattened_componenents:
+            self.backbone.couple_component_with_constant(
+                first_component,
+                - 2.0 * self.calculate_cost(first_component,
+                                            components,
+                                            offset,
+                                            estimated_cost,
+                                            load,
+                                            )
+                * estimated_cost
+                * self.scale_factor
             )
-            for secondComponent in flattenedComponenents:
-                curFactor = self.scaleFactor * \
-                            self.calculateCost(
-                                firstComponent,
-                                components,
-                                offset,
-                                estimatedCost,
-                                load,
-                            ) * \
-                            self.calculateCost(
-                                secondComponent,
-                                components,
-                                offset,
-                                estimatedCost,
-                                load,
-                            )
-                self.backbone.coupleComponents(
-                    firstComponent,
-                    secondComponent,
-                    couplingStrength=curFactor
+            for second_component in flattened_componenents:
+                current_factor = self.scale_factor * \
+                                 self.calculate_cost(
+                                     first_component,
+                                     components,
+                                     offset,
+                                     estimated_cost,
+                                     load,
+                                 ) * \
+                                 self.calculate_cost(
+                                     second_component,
+                                     components,
+                                     offset,
+                                     estimated_cost,
+                                     load,
+                                 )
+                self.backbone.couple_components(
+                    first_component,
+                    second_component,
+                    coupling_strength=current_factor
                 )
 
 
@@ -1592,11 +1585,11 @@ class GlobalCostSquare(MarginalCostSubproblem):
         It inherits its functionality from the AbstractIsingSubproblem
         constructor. Additionally, it sets three more parameters which
         slightly change how the penalty is applied:
-            `offsetEstimationFactor`: sets an offset across all
+            `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimatedCostFactor`: is going to be removed
-            `offsetBuildFactor`: is going to be removed
+            `estimated_cost_factor`: is going to be removed
+            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1606,24 +1599,24 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 construct an instance.
         """
         super().__init__(backbone, config)
-        self.offsetEstimationFactor = float(config["offsetEstimationFactor"])
+        self.offset_estimation_factor = float(config["offset_estimation_factor"])
         # factor to scale estimated cost at a bus after calculation
-        self.estimatedCostFactor = float(config["estimatedCostFactor"])
+        self.estimated_cost_factor = float(config["estimated_cost_factor"])
         # factor to scale marginal cost of a generator when constructing ising
         # interactions
-        self.offsetBuildFactor = float(config["offsetBuildFactor"])
+        self.offset_build_factor = float(config["offset_build_factor"])
 
-    def printEstimationReport(self,
-                              estimatedCost: float,
-                              offset: float,
-                              time: int
-                              ) -> None:
+    def print_estimation_report(self,
+                                estimated_cost: float,
+                                offset: float,
+                                time: int
+                                ) -> None:
         """
         Prints the estimated marginal cost and the offset of the cost
         per MW produced.
     
         Args:
-            estimatedCost: (float)
+            estimated_cost: (float)
                 An estimation of the incurred marginal cost.
             offset: (float)
                 The value by which to offset the marginal costs of all
@@ -1637,13 +1630,13 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         print(f"--- Estimation Parameters at timestep {time} ---")
         print(f"Absolute offset: {offset}")
-        print(f"Minimal estimated Cost (with offset): {estimatedCost}")
+        print(f"Minimal estimated Cost (with offset): {estimated_cost}")
         print(
             f"Current total estimation at {time}:"
-            f" {offset * self.backbone.getTotalLoad(time)}")
+            f" {offset * self.backbone.get_total_load(time)}")
         print("---")
 
-    def encodeSubproblem(self) -> None:
+    def encode_subproblem(self) -> None:
         """
         Encodes the square of the marginal cost onto the energy. This
         results in a minimization of the marginal costs.
@@ -1653,16 +1646,16 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 Modifies self.backbone.
         """
         for time in range(len(self.network.snapshots)):
-            self.encodeMarginalCosts(time=time)
+            self.encode_marginal_costs(time=time)
 
-    def chooseOffset(self, sortedGenerators: list) -> float:
+    def choose_offset(self, sorted_generators: list) -> float:
         """
         Calculates the offset, by which to offset all marginal costs.
         The chosen offset is the minimal marginal cost of a generator in
-        'sortedGenerators'.
+        'sorted_generators'.
 
         Args:
-            sortedGenerators: (list)
+            sorted_generators: (list)
                 A list of generators already sorted by their minimal
                 cost in ascending order.
 
@@ -1675,14 +1668,14 @@ class GlobalCostSquare(MarginalCostSubproblem):
         # minimal cost is decent but for example choosing an offset slightly
         # over that seems to also produce good results. It is not clear how
         # important the same sign on all marginal costs is
-        marginalCostList = [self.network.generators["marginal_cost"].loc[gen]
-                            for gen in sortedGenerators]
-        return self.offsetEstimationFactor * np.min(marginalCostList)
+        marginal_cost_list = [self.network.generators["marginal_cost"].loc[gen]
+                              for gen in sorted_generators]
+        return self.offset_estimation_factor * np.min(marginal_cost_list)
 
-    def estimateGlobalMarginalCost(self,
-                                   time: int,
-                                   expectedAdditonalCost: float = 0.0
-                                   ) -> [float, float]:
+    def estimate_global_marginal_cost(self,
+                                      time: int,
+                                      expected_additonal_cost: float = 0.0
+                                      ) -> [float, float]:
         """
         Estimates a lower bound of incurred marginal costs if locality
         of generators could be ignored at a given time slice.
@@ -1694,7 +1687,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
             time: (int)
                 Index of time slice for which to calculate the lower
                 bound of offset marginal cost.
-            expectedAdditonalCost: (float)
+            expected_additonal_cost: (float)
                 Constant by which to offset the returned marginal cost.
                 Default: 0.0
 
@@ -1709,27 +1702,27 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         load = 0.0
         for bus in self.network.buses.index:
-            load += self.backbone.getLoad(bus, time)
+            load += self.backbone.get_load(bus, time)
 
-        sortedGenerators = sorted(
+        sorted_generators = sorted(
             self.network.generators.index,
             key=lambda gen: self.network.generators["marginal_cost"].loc[gen]
         )
-        offset = self.chooseOffset(sortedGenerators)
-        costEstimation = 0.0
-        for generator in sortedGenerators:
+        offset = self.choose_offset(sorted_generators)
+        cost_estimation = 0.0
+        for generator in sorted_generators:
             if load <= 0:
                 break
-            suppliedPower = min(load,
-                                self.backbone.data[generator]['weights'][0])
-            costEstimation += suppliedPower * (
+            supplied_power = min(load,
+                                 self.backbone.data[generator]['weights'][0])
+            cost_estimation += supplied_power * (
                     self.network.generators["marginal_cost"].loc[
                         generator] - offset)
-            load -= suppliedPower
-        return costEstimation + expectedAdditonalCost, offset
+            load -= supplied_power
+        return cost_estimation + expected_additonal_cost, offset
 
     # TODO refactor using a isingbackbone function for encoding squared distances
-    def encodeMarginalCosts(self, time: int) -> None:
+    def encode_marginal_costs(self, time: int) -> None:
         """
         The marginal costs of using generators are considered one single
         global constraint. The square of marginal costs is encoded
@@ -1745,31 +1738,30 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 interaction coefficient.
         """
         # TODO make this more readable
-        estimatedCost, offset = \
-            self.estimateGlobalMarginalCost(time=time,
-                                            expectedAdditonalCost=0)
-        self.printEstimationReport(estimatedCost=estimatedCost,
-                                   offset=offset,
-                                   time=time)
+        estimated_cost, offset = \
+            self.estimate_global_marginal_cost(time=time,
+                                               expected_additonal_cost=0)
+        self.print_estimation_report(estimated_cost=estimated_cost,
+                                     offset=offset,
+                                     time=time)
         generators = self.network.generators.index
         # estimation of marginal costs is a global estimation.
         # Calculate total power needed
-        load = self.backbone.getTotalLoad(time=time)
         # offset the marginal costs per energy produces and encode problem
         # into backbone
-        for gen1 in generators:
-            marginalCostGen1 = self.network.generators["marginal_cost"].loc[
-                                   gen1] - offset
-            for gen2 in generators:
-                marginalCostGen2 = \
-                    self.network.generators["marginal_cost"].loc[gen2] - offset
-                curFactor = self.scaleFactor * \
-                            marginalCostGen1 * \
-                            marginalCostGen2
-                self.backbone.coupleComponents(
-                    firstComponent=gen1,
-                    secondComponent=gen2,
-                    couplingStrength=curFactor
+        for first_generator in generators:
+            marginal_cost_first_generator = self.network.generators["marginal_cost"].loc[
+                                                first_generator] - offset
+            for second_generator in generators:
+                marginal_cost_second_generator = \
+                    self.network.generators["marginal_cost"].loc[second_generator] - offset
+                current_factor = self.scale_factor * \
+                                 marginal_cost_first_generator * \
+                                 marginal_cost_second_generator
+                self.backbone.couple_components(
+                    first_component=first_generator,
+                    second_component=second_generator,
+                    coupling_strength=current_factor
                 )
 
 
@@ -1796,20 +1788,20 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         super().__init__(backbone=backbone, config=config)
 
     @classmethod
-    def buildSubproblem(cls,
-                        backbone: IsingBackbone,
-                        configuration: dict
-                        ) -> 'KirchhoffSubproblem':
+    def build_subproblem(cls,
+                         backbone: IsingBackbone,
+                         configuration: dict
+                         ) -> 'KirchhoffSubproblem':
         """
         A factory method for initializing the kirchhoff subproblem
         model.
         Returns an instance of the KirchhoffSubproblem class. This can
-        then be encoded onto the isingBackbone by calling the
-        encodeSubproblem method.
+        then be encoded onto the ising_backbone by calling the
+        encode_subproblem method.
 
         Args:
             backbone: (IsingBackbone)
-                The isingBackbone used to encode the subproblem.
+                The ising_backbone used to encode the subproblem.
             configuration: (dict)
                 The configuration dictionary, containing all data
                 necessary to initialize.
@@ -1821,7 +1813,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         """
         return KirchhoffSubproblem(backbone, configuration)
 
-    def encodeSubproblem(self) -> None:
+    def encode_subproblem(self) -> None:
         """
         Encodes the kirchhoff constraint at each bus.
 
@@ -1831,16 +1823,16 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         """
         for time in range(len(self.network.snapshots)):
             for bus in self.network.buses.index:
-                self.encodeKirchhoffConstraint(isingBackbone=self.backbone,
-                                               bus=bus,
-                                               time=time)
-        self.problem = self.backbone.cachedProblem
+                self.encode_kirchhoff_constraint(ising_backbone=self.backbone,
+                                                 bus=bus,
+                                                 time=time)
+        self.problem = self.backbone.cached_problem
 
-    def encodeKirchhoffConstraint(self,
-                                  isingBackbone: IsingBackbone,
-                                  bus: str,
-                                  time: int = 0
-                                  ) -> None:
+    def encode_kirchhoff_constraint(self,
+                                    ising_backbone: IsingBackbone,
+                                    bus: str,
+                                    time: int = 0
+                                    ) -> None:
         """
         Adds the kirchhoff constraint at a bus to the problem
         formulation.
@@ -1856,7 +1848,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         products of two components by looping over them.
 
         Args:
-            isingBackbone: (IsingBackbone)
+            ising_backbone: (IsingBackbone)
                 Ising backbone onto which the kirchhoff subproblem
                 is to be encoded.
             bus: (str)
@@ -1871,41 +1863,41 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Modifies self.problem. Adds to previously written
                 interaction coefficient.
         """
-        components = isingBackbone.getBusComponents(bus)
-        flattenedComponents = components['generators'] + \
-                              components['positiveLines'] + \
-                              components['negativeLines']
-        demand = isingBackbone.getLoad(bus, time=time)
+        components = ising_backbone.get_bus_components(bus)
+        flattened_components = components['generators'] + \
+                               components['positive_lines'] + \
+                               components['negative_lines']
+        demand = ising_backbone.get_load(bus, time=time)
 
         # constant load contribution to cost function so that a configuration
         # that fulfills the kirchhoff constraint has energy 0
-        isingBackbone.addInteraction(self.scaleFactor * demand ** 2)
-        for component1 in flattenedComponents:
+        ising_backbone.add_interaction(self.scale_factor * demand ** 2)
+        for first_component in flattened_components:
             # this factor sets the scale, as well as the sign to encode if
             # an active component acts a generator or a load
-            factor = self.scaleFactor
-            if component1 in components['negativeLines']:
+            factor = self.scale_factor
+            if first_component in components['negative_lines']:
                 factor *= -1.0
             # reward/penalty term for matching/adding load. Contains all
             # products with the Load
-            isingBackbone.coupleComponentWithConstant(component1,
-                                                      - 2.0 * factor * demand)
-            for component2 in flattenedComponents:
+            ising_backbone.couple_component_with_constant(first_component,
+                                                          - 2.0 * factor * demand)
+            for second_component in flattened_components:
                 # adjust sing for direction of flow at line
-                if component2 in components['negativeLines']:
-                    curFactor = -factor
+                if second_component in components['negative_lines']:
+                    current_factor = -factor
                 else:
-                    curFactor = factor
+                    current_factor = factor
                 # attraction/repulsion term for different/same sign of power
                 # at components
-                isingBackbone.coupleComponents(component1, component2,
-                                               couplingStrength=curFactor)
+                ising_backbone.couple_components(first_component, second_component,
+                                                 coupling_strength=current_factor)
 
-    def calcPowerImbalanceAtBus(self,
-                                bus: str,
-                                result: list,
-                                silent: bool = True
-                                ) -> dict:
+    def calc_power_imbalance_at_bus(self,
+                                    bus: str,
+                                    result: list,
+                                    silent: bool = True
+                                    ) -> dict:
         """
         Returns a dictionary containing the absolute values of the power
         imbalance/mismatch at a bus for each time step.
@@ -1932,29 +1924,29 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         contrib = {}
         # TODO option to take only some snapshots
         for t in range(len(self.network.snapshots)):
-            load = - self.backbone.getLoad(bus, t)
-            components = self.backbone.getBusComponents(bus)
+            load = - self.backbone.get_load(bus, t)
+            components = self.backbone.get_bus_components(bus)
             for gen in components['generators']:
-                load += self.backbone.getEncodedValueOfComponent(gen, result,
-                                                                 time=t)
-            for lineId in components['positiveLines']:
-                load += self.backbone.getEncodedValueOfComponent(lineId,
-                                                                 result,
-                                                                 time=t)
-            for lineId in components['negativeLines']:
-                load -= self.backbone.getEncodedValueOfComponent(lineId,
-                                                                 result,
-                                                                 time=t)
+                load += self.backbone.get_encoded_value_of_component(gen, result,
+                                                                     time=t)
+            for line_id in components['positive_lines']:
+                load += self.backbone.get_encoded_value_of_component(line_id,
+                                                                     result,
+                                                                     time=t)
+            for line_id in components['negative_lines']:
+                load -= self.backbone.get_encoded_value_of_component(line_id,
+                                                                     result,
+                                                                     time=t)
             if load and not silent:
                 print(f"Imbalance at {bus}::{load}")
             contrib[str((bus, t))] = load
         return contrib
 
-    def calcTotalPowerGeneratedAtBus(self,
-                                     bus: str,
-                                     solution: list,
-                                     time: int = 0
-                                     ) -> float:
+    def calc_total_power_generated_at_bus(self,
+                                          bus: str,
+                                          solution: list,
+                                          time: int = 0
+                                          ) -> float:
         """
         Calculates how much power is generated using generators at this
         'bus' at the time slice with index 'time'.
@@ -1972,17 +1964,17 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             (float)
                 The total power generated without flow or loads.
         """
-        totalPower = 0.0
-        generators = self.backbone.getBusComponents(bus=bus)['generators']
+        total_power = 0.0
+        generators = self.backbone.get_bus_components(bus=bus)['generators']
         for generator in generators:
-            totalPower += self.backbone.getEncodedValueOfComponent(
+            total_power += self.backbone.get_encoded_value_of_component(
                 component=generator, solution=solution, time=time)
-        return totalPower
+        return total_power
 
-    def calcTotalPowerGenerated(self,
-                                solution: list,
-                                time: int = 0
-                                ) -> float:
+    def calc_total_power_generated(self,
+                                   solution: list,
+                                   time: int = 0
+                                   ) -> float:
         """
         Calculates how much power is generated using generators across
         the entire network at a time slice with index 'time'.
@@ -1998,14 +1990,14 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 The total power generated across the whole network
                 without flow or loads.
         """
-        totalPower = 0.0
+        total_power = 0.0
         for bus in self.network.buses.index:
-            totalPower += self.calcTotalPowerGeneratedAtBus(bus=bus,
-                                                            solution=solution,
-                                                            time=time)
-        return totalPower
+            total_power += self.calc_total_power_generated_at_bus(bus=bus,
+                                                                  solution=solution,
+                                                                  time=time)
+        return total_power
 
-    def calcPowerImbalance(self, solution: list) -> float:
+    def calc_power_imbalance(self, solution: list) -> float:
         """
         Returns the sum of all absolutes values of power imbalances at
         each bus over all time slices.
@@ -2020,18 +2012,18 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 The sum of all absolute values of every power imbalance
                 at every bus.
         """
-        powerImbalance = 0.0
+        power_imbalance = 0.0
         for bus in self.network.buses.index:
-            for _, imbalance in self.calcPowerImbalanceAtBus(
+            for _, imbalance in self.calc_power_imbalance_at_bus(
                     bus=bus, result=solution).items():
-                powerImbalance += abs(imbalance)
-        return powerImbalance
+                power_imbalance += abs(imbalance)
+        return power_imbalance
 
-    def calcKirchhoffCostAtBus(self,
-                               bus: str,
-                               result: list,
-                               silent: bool = True
-                               ) -> dict:
+    def calc_kirchhoff_cost_at_bus(self,
+                                   bus: str,
+                                   result: list,
+                                   silent: bool = True
+                                   ) -> dict:
         """
         Returns a dictionary which contains the kirchhoff cost at the
         'bus' for every time slice with index 'time', scaled by the
@@ -2055,14 +2047,14 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 the time slice.
         """
         return {
-            key: (imbalance * self.scaleFactor) ** 2
+            key: (imbalance * self.scale_factor) ** 2
             for key, imbalance in
-            self.calcPowerImbalanceAtBus(bus=bus,
-                                         result=result,
-                                         silent=silent).items()
+            self.calc_power_imbalance_at_bus(bus=bus,
+                                             result=result,
+                                             silent=silent).items()
         }
 
-    def calcKirchhoffCost(self, solution: list) -> float:
+    def calc_kirchhoff_cost(self, solution: list) -> float:
         """
         Calculate the total unscaled kirchhoff cost incurred by a
         solution.
@@ -2076,17 +2068,17 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Total kirchhoff cost incurred without kirchhoffFactor
                 scaling.
         """
-        kirchhoffCost = 0.0
+        kirchhoff_cost = 0.0
         for bus in self.network.buses.index:
-            for _, val in self.calcPowerImbalanceAtBus(
+            for _, val in self.calc_power_imbalance_at_bus(
                     bus=bus, result=solution).items():
-                kirchhoffCost += val ** 2
-        return kirchhoffCost
+                kirchhoff_cost += val ** 2
+        return kirchhoff_cost
 
-    def individualCostContribution(self,
-                                   solution: list,
-                                   silent: bool = True
-                                   ) -> dict:
+    def individual_cost_contribution(self,
+                                     solution: list,
+                                     silent: bool = True
+                                     ) -> dict:
         """
         Returns a dictionary which contains the kirchhoff costs incurred
         at all busses for every time slice, scaled by the
@@ -2109,11 +2101,11 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         """
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcKirchhoffCostAtBus(
+            contrib = {**contrib, **self.calc_kirchhoff_cost_at_bus(
                 bus=bus, result=solution, silent=silent)}
         return contrib
 
-    def individualKirchhoffCost(self, solution, silent=True):
+    def individual_kirchhoff_cost(self, solution, silent=True):
         """
         Returns a dictionary which contains the kirchhoff cost incurred
         at every bus at every time slice, without being scaled by the
@@ -2138,14 +2130,14 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         return {
             key: imbalance ** 2
             for key, imbalance in
-            self.individualPowerImbalance(
+            self.individual_power_imbalance(
                 solution=solution, silent=silent).items()
         }
 
-    def individualPowerImbalance(self,
-                                 solution: list,
-                                 silent: bool = True
-                                 ) -> dict:
+    def individual_power_imbalance(self,
+                                   solution: list,
+                                   silent: bool = True
+                                   ) -> dict:
         """
         Returns a dictionary which contains the power imbalance at each
         bus at every time slice with respect to their type (too much or
@@ -2169,7 +2161,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         """
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib, **self.calcPowerImbalanceAtBus(
+            contrib = {**contrib, **self.calc_power_imbalance_at_bus(
                 bus=bus, result=solution, silent=silent)}
         return contrib
 
@@ -2184,8 +2176,8 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
     """
     # a dict to map config strings to functions which are used creating lists
     # of numbers, which can be used for weights of slack variables
-    slackRepresentationDict = {
-        "binaryPower": binaryPower,
+    slack_representation_dict = {
+        "binary_power": binary_power,
     }
 
     def __init__(self, backbone: IsingBackbone, config: dict):
@@ -2204,24 +2196,24 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                 construct an instance.
         """
         super().__init__(backbone=backbone, config=config)
-        slackWeightGenerator = self.slackRepresentationDict[
-            config.get("slackType", "binaryPower")]
+        slack_weight_generator = self.slack_representation_dict[
+            config.get("slack_type", "binary_power")]
         # an additional factor for scaling the weights of the qubits acting as
         # slack variables
-        slackScale = config.get("slackScale", 1.0)
+        slack_scale = config.get("slack_scale", 1.0)
         # number of slack qubits used
-        slackSize = config.get("slackSize", 7)
-        slackWeights = [- slackScale * i for i in
-                        slackWeightGenerator(slackSize)]
-        # adding slack qubits with the label `slackMarginalCost`
-        self.backbone.createQubitEntriesForComponent(
-            componentName="slackMarginalCost",
-            weights=slackWeights * len(backbone.snapshots),
-            encodingLength=len(slackWeights)
+        slack_size = config.get("slack_size", 7)
+        slack_weights = [- slack_scale * i for i in
+                         slack_weight_generator(slack_size)]
+        # adding slack qubits with the label `slack_marginal_cost`
+        self.backbone.create_qubit_entries_for_component(
+            component_name="slack_marginal_cost",
+            weights=slack_weights * len(backbone.snapshots),
+            encoding_length=len(slack_weights)
         )
 
-    # TODO refactor using a isingBackbone function for encoding squared distances
-    def encodeMarginalCosts(self, time: int) -> None:
+    # TODO refactor using a ising_backbone function for encoding squared distances
+    def encode_marginal_costs(self, time: int) -> None:
         """
         The marginal costs of using generators are considered one single
         global constraint. The square of marginal costs is encoded
@@ -2237,35 +2229,35 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
                 Modifies self.problem. Adds to previously written
                 interaction coefficient.
         """
-        estimatedCost, offset = self.estimateGlobalMarginalCost(
-            time=time, expectedAdditonalCost=0)
-        self.printEstimationReport(estimatedCost=estimatedCost,
-                                   offset=offset,
-                                   time=time)
+        estimated_cost, offset = self.estimate_global_marginal_cost(
+            time=time, expected_additonal_cost=0)
+        self.print_estimation_report(estimated_cost=estimated_cost,
+                                     offset=offset,
+                                     time=time)
         generators = self.network.generators.index
-        generators = list(generators) + ["slackMarginalCost"]
+        generators = list(generators) + ["slack_marginal_cost"]
         load = 0.0
         for bus in self.network.buses.index:
-            load += self.backbone.getLoad(bus, time)
-        for gen1 in generators:
-            if gen1 == "slackMarginalCost":
-                marginalCostGen1 = 1.
+            load += self.backbone.get_load(bus, time)
+        for first_generator in generators:
+            if first_generator == "slack_marginal_cost":
+                marginal_cost_first_generator = 1.
             else:
-                marginalCostGen1 = \
-                    self.network.generators["marginal_cost"].loc[gen1] - offset
-            for gen2 in generators:
-                if gen2 == "slackMarginalCost":
-                    marginalCostGen2 = 1.
+                marginal_cost_first_generator = \
+                    self.network.generators["marginal_cost"].loc[first_generator] - offset
+            for second_generator in generators:
+                if second_generator == "slack_marginal_cost":
+                    marginal_cost_second_generator = 1.
                 else:
-                    marginalCostGen2 = \
-                        self.network.generators["marginal_cost"].loc[gen2] - offset
-                curFactor = self.scaleFactor * \
-                            marginalCostGen1 * \
-                            marginalCostGen2
-                self.backbone.coupleComponents(
-                    firstComponent=gen1,
-                    secondComponent=gen2,
-                    couplingStrength=curFactor
+                    marginal_cost_second_generator = \
+                        self.network.generators["marginal_cost"].loc[second_generator] - offset
+                current_factor = self.scale_factor * \
+                                 marginal_cost_first_generator * \
+                                 marginal_cost_second_generator
+                self.backbone.couple_components(
+                    first_component=first_generator,
+                    second_component=second_generator,
+                    coupling_strength=current_factor
                 )
 
 
@@ -2290,7 +2282,7 @@ class StartupShutdown(AbstractIsingSubproblem, ABC):
 #        if time == 0 or time >= len(self.snapshots):
 #            return
 #
-#        generators = self.getBusComponents(bus)['generators']
+#        generators = self.get_bus_components(bus)['generators']
 #
 #        for generator in generators:
 #            startup_cost = self.network.generators["start_up_cost"].loc[generator]
@@ -2298,30 +2290,30 @@ class StartupShutdown(AbstractIsingSubproblem, ABC):
 #
 #            # start up costs
 #            # summands of (1-g_{time-1})  * g_{time})
-#            self.coupleComponentWithConstant(
+#            self.couple_component_with_constant(
 #                    generator,
-#                    couplingStrength=self.monetaryCostFactor * startup_cost,
+#                    coupling_strength=self.monetaryCostFactor * startup_cost,
 #                    time=time
 #            )
-#            self.coupleComponents(
+#            self.couple_components(
 #                    generator,
 #                    generator,
-#                    couplingStrength= -self.monetaryCostFactor * startup_cost,
+#                    coupling_strength= -self.monetaryCostFactor * startup_cost,
 #                    time = time,
-#                    additionalTime = time -1
+#                    additional_time = time -1
 #            )
 #
 #            # shutdown costs
 #            # summands of g_{time-1} * (1-g_{time})
-#            self.coupleComponentWithConstant(
+#            self.couple_component_with_constant(
 #                    generator,
-#                    couplingStrength=self.monetaryCostFactor * shutdown_cost,
+#                    coupling_strength=self.monetaryCostFactor * shutdown_cost,
 #                    time=time-1
 #            )
-#            self.coupleComponents(
+#            self.couple_components(
 #                    generator,
 #                    generator,
-#                    couplingStrength= -self.monetaryCostFactor * shutdown_cost,
+#                    coupling_strength= -self.monetaryCostFactor * shutdown_cost,
 #                    time = time,
-#                    additionalTime = time -1
+#                    additional_time = time -1
 #            )

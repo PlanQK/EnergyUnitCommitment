@@ -146,7 +146,7 @@ def compareBitStringToRest(bitstring: str, pValues: dict) -> dict:
     pValues = pValues
     pValueKeys = list(pValues.keys())
     pValueKeys.remove(bitstring)
-    results = {"bestBitstring": bitstring,
+    results = {"best_bitstring": bitstring,
                "bitstrings": [],
                "stat": [],
                "p": []}
@@ -233,9 +233,9 @@ def equalSamples(alpha: float, file1: str, file2: str, outfile: str, cut: float 
     pValues2cut = extractSortedP(filename=file2, cut=cut)
     distSample2cut = distributionWithinSample(alpha=alpha, pValues=pValues2cut)
 
-    if distSample1all["bestBitstring"] == distSample2all["bestBitstring"]:
-        stat, p = stats.mannwhitneyu(x=pValues1all[distSample1all["bestBitstring"]],
-                                     y=pValues2all[distSample1all["bestBitstring"]],
+    if distSample1all["best_bitstring"] == distSample2all["best_bitstring"]:
+        stat, p = stats.mannwhitneyu(x=pValues1all[distSample1all["best_bitstring"]],
+                                     y=pValues2all[distSample1all["best_bitstring"]],
                                      alternative=alternative)
     else:
         stat = None
@@ -248,9 +248,9 @@ def equalSamples(alpha: float, file1: str, file2: str, outfile: str, cut: float 
            "sample2": {"filename": file2,
                        "distribution": distSample2all}}
 
-    if distSample1cut["bestBitstring"] == distSample2cut["bestBitstring"]:
-        stat, p = stats.mannwhitneyu(x=pValues1cut[distSample1cut["bestBitstring"]],
-                                     y=pValues2cut[distSample1cut["bestBitstring"]],
+    if distSample1cut["best_bitstring"] == distSample2cut["best_bitstring"]:
+        stat, p = stats.mannwhitneyu(x=pValues1cut[distSample1cut["best_bitstring"]],
+                                     y=pValues2cut[distSample1cut["best_bitstring"]],
                                      alternative=alternative)
     else:
         stat = None

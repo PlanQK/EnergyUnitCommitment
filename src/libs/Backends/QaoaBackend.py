@@ -41,7 +41,7 @@ class QaoaAngleSupervisor:
     """
 
     @classmethod
-    def makeAngleSupervisior(cls, qaoaOptimizer):
+    def make_angle_supervisior(cls, qaoa_optimizer):
         """
         A factory method for returning the correct supervisior for the chosen strategy.
 
@@ -53,17 +53,17 @@ class QaoaAngleSupervisor:
         parameter space.
     
         Args:
-            qaoaOptimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
+            qaoa_optimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
         Returns:
             (QaoaAngleSupervisor) An instance of subclass of a QaoaAngleSupervisor
         """
-        supervisior_type = qaoaOptimizer.config_qaoa.get("supervisior_type", "RandomOrFixed")
+        supervisior_type = qaoa_optimizer.config_qaoa.get("supervisior_type", "RandomOrFixed")
         if supervisior_type == "RandomOrFixed":
-            return QaoaAngleSupervisorRandomOrFixed(qaoaOptimizer)
+            return QaoaAngleSupervisorRandomOrFixed(qaoa_optimizer)
         if supervisior_type == "GridSearch":
-            return QaoaAngleSupervisorGridSearch(qaoaOptimizer)
+            return QaoaAngleSupervisorGridSearch(qaoa_optimizer)
 
-    def getInitialAngleIterator(self):
+    def get_initial_angle_iterator(self):
         """
         This returns an iterator for initial angle initialization. Iterating using this is the main
         way of using this class. By storing a reference to the executing qaoa optimizer, this class
@@ -74,7 +74,7 @@ class QaoaAngleSupervisor:
         """
         raise NotImplementedError
 
-    def getNumAngles(self):
+    def get_num_angles(self):
         """This returns the number of angles  used for parametrization of the quantum circuit.
         This is necessary for correctly binding the constructed circuit to the angles"""
         raise NotImplementedError
@@ -85,46 +85,46 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
     is fixed based on the list entry, or chosen randomly
     """
 
-    def __init__(self, qaoaOptimizer):
+    def __init__(self, qaoa_optimizer):
         """
-        Initializes all attributes necessary to build the iterator that the qaoaOptimizer can consume.
+        Initializes all attributes necessary to build the iterator that the qaoa_optimizer can consume.
     
         Args:
-            qaoaOptimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
+            qaoa_optimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
         Returns:
             (list) a list of float values to be used as angles in a qaoa circuit
         """
-        self.qaoaOptimizer = qaoaOptimizer
-        self.config_qaoa = qaoaOptimizer.config_qaoa
-        self.problemRange = self.config_qaoa.get("problemRange", 2)
-        self.mixingRange = self.config_qaoa.get("mixingRange", 1)
+        self.qaoa_optimizer = qaoa_optimizer
+        self.config_qaoa = qaoa_optimizer.config_qaoa
+        self.problem_range = self.config_qaoa.get("problem_range", 2)
+        self.mixing_range = self.config_qaoa.get("mixing_range", 1)
         self.config_guess = self.config_qaoa["initial_guess"]
-        self.numAngles = len(self.config_guess)
+        self.num_angles = len(self.config_guess)
         self.repetitions = self.config_qaoa["repetitions"]
 
-    def getNumAngles(self):
+    def get_num_angles(self):
         """This returns the number of angles are used for parametrization of the quantum circuit.
         This is necessary for correctly binding the constructed circuit to the angles"""
-        return self.numAngles
+        return self.num_angles
 
-    def getBestInitialAngles(self):
+    def get_best_initial_angles(self):
         """
-        When calling this method, it searches the results of the stored qaoaOptimizer for the best result
+        When calling this method, it searches the results of the stored qaoa_optimizer for the best result
         so far. Then it uses those values to construct an initial angle guess by substituting all angles
         that are set randomly according to the configuration with the best results.
     
         Returns:
-            (np.array) an np array of values to be used as angles
+            (np.array) a np array of values to be used as angles
         """
-        minCFvars = self.qaoaOptimizer.getMinCFvars()
-        self.qaoaOptimizer.output["results"]["initial_guesses"]["refined"] = minCFvars
-        bestInitialGuess = self.config_guess
-        for j in range(self.numAngles):
-            if bestInitialGuess[j] == "rand":
-                bestInitialGuess[j] = minCFvars[j]
-        return bestInitialGuess
+        min_cf_vars = self.qaoa_optimizer.get_min_cf_vars()
+        self.qaoa_optimizer.output["results"]["initial_guesses"]["refined"] = min_cf_vars
+        best_initial_guess = self.config_guess
+        for j in range(self.num_angles):
+            if best_initial_guess[j] == "rand":
+                best_initial_guess[j] = min_cf_vars[j]
+        return best_initial_guess
 
-    def getInitialAngleIterator(self):
+    def get_initial_angle_iterator(self):
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         These are constructed according to the self.config_guess list. If this list contains at least
@@ -135,16 +135,16 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
             (iterator[np.array]) description
         """
         for idx in range(self.repetitions):
-            yield self.chooseInitialAngles()
+            yield self.choose_initial_angles()
 
         if "rand" not in self.config_guess:
             return
 
-        self.config_guess = self.getBestInitialAngles()
+        self.config_guess = self.get_best_initial_angles()
         for idx in range(self.repetitions):
-            yield self.chooseInitialAngles()
+            yield self.choose_initial_angles()
 
-    def chooseInitialAngles(self):
+    def choose_initial_angles(self):
         """
         Method for returning a np.array of angles to be used for each layer in the qaoa circuit
     
@@ -158,9 +158,9 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
             if current_guess == "rand":
                 next_angle = 2 * math.pi * (0.5 - np.random.rand())
                 if idx % 2 == 0:
-                    next_angle *= self.problemRange
+                    next_angle *= self.problem_range
                 else:
-                    next_angle *= self.mixingRange
+                    next_angle *= self.mixing_range
             # The angle is fixed for all repetitions
             else:
                 next_angle = current_guess
@@ -172,7 +172,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
     """a class for choosing qaoa parameters by searching using a grid on the given parameter space
     """
 
-    def __init__(self, qaoaOptimizer):
+    def __init__(self, qaoa_optimizer: QaoaQiskit):
         """
         first calculates the grid that is going to be searched and then sets up the data structures
         necessary to keep track which grid points have already been tried output
@@ -184,35 +184,35 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         Keep in mind that the total number of grids point is the product over all grids over all layers
         which can grow very quickly.
         Each Grid is represented as a dictionary with 6 Values
-            lowerBoundMixing, upperBoundMixing, numGridpointsMixing
-            lowerBoundProblem, upperBoundProblem, numGridpointsProblem
-    
-        Args:
-            defaultGrid: (dict) the default paramters of the grid for one layer
+            lowerBoundMixing, upperBoundMixing, num_grid_mixing
+            lower_bound_problem, upper_bound_problem, num_grid_problem
+        If a value is not specified the value of a default grid is used instead
+            default_grid: (dict) the default paramters of the grid for one layer
                 keys
-                    lowerBoundProblem :
-                    upperBoundProblem :
-                    numGridpointsProblem :
-                    lowerBoundMixing :
-                    upperBoundMixing :
-                    numGridpointsMixing :
+                    lower_bound_problem : -1
+                    upper_bound_problem : 1
+                    num_grid_problem : 3
+                    lowerBoundMixing : -1
+                    upperBoundMixing : 1
+                    num_grid_mixing : 3
+        The config file contains a list of all grids for the layers of the quantum circuit
             gridList: list
                 a list of dictionaries. The i-th dictionary contains the grid values of the i-th layer
         """
-        self.qaoaOptimizer = qaoaOptimizer
-        self.config_qaoa = qaoaOptimizer.config_qaoa
+        self.qaoa_optimizer = qaoa_optimizer
+        self.config_qaoa = qaoa_optimizer.config_qaoa
 
-        self.setDefaultGrid(self.config_qaoa.get('defaultGrid', {}))
-        self.gridsByLayer = [grid for layer in self.config_qaoa['initial_guess']
-                             for grid in self.transformToGridpoints(layer)]
-        self.numAngles = len(self.gridsByLayer)
+        self.set_default_grid(self.config_qaoa.get('default_grid', {}))
+        self.grids_by_layer = [grid for layer in self.config_qaoa['initial_guess']
+                               for grid in self.transform_to_gridpoints(layer)]
+        self.num_angles = len(self.grids_by_layer)
 
-    def getNumAngles(self):
+    def get_num_angles(self):
         """This returns the number of angles are used for parametrization of the quantum circuit.
         This is necessary for correctly binding the constructed circuit to the angles"""
-        return self.numAngles
+        return self.num_angles
 
-    def getInitialAngleIterator(self):
+    def get_initial_angle_iterator(self):
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         Together, these initial angles form a grid on the angle space
@@ -220,58 +220,58 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         Returns:
             (Iterator[np.array]) An iterator which yields initial angle values for the optimizer
         """
-        for angleList in product(*self.gridsByLayer):
-            yield np.array(angleList)
+        for angle_list in product(*self.grids_by_layer):
+            yield np.array(angle_list)
 
-    def setDefaultGrid(self, defaultGrid: dict):
+    def set_default_grid(self, default_grid: dict):
         """
         reads a grid dictionary and saves them to be accessible later as a default fallback value 
         in case they aren't specified for one a layer of qaoa
     
         Args:
-            defaultGrid: (dict) 
+            default_grid: (dict)
                 a dictionary with values to specify a grid. For this grid, there also
                 exist default values to be used as default values
         Returns:
             (None) modifies the attribute self.default
         """
-        self.defaultGrid = {
-            "lowerBoundProblem": defaultGrid.get("lowerBoundProblem", - math.pi),
-            "upperBoundProblem": defaultGrid.get("upperBoundProblem", math.pi),
-            "numGridpointsProblem": defaultGrid.get("numGridpointsProblem", 3),
-            "lowerBoundMixing": defaultGrid.get("lowerBoundMixing", -math.pi),
-            "upperBoundMixing": defaultGrid.get("upperBoundMixing", math.pi),
-            "numGridpointsMixing": defaultGrid.get("numGridpointsMixing", 3),
+        self.default_grid = {
+            "lower_bound_problem": default_grid.get("lower_bound_problem", - math.pi),
+            "upper_bound_problem": default_grid.get("upper_bound_problem", math.pi),
+            "num_gridpoints_problem": _grid.get("num_gridpoints_problem", 3),
+            "lower_bound_mixing": default_grid.get("lower_bound_mixing", -math.pi),
+            "upper_bound_mixing": default_grid.get("upper_bound_mixing", math.pi),
+            "num_gridpoints_mixing": default_grid.get("num_gridpoints_mixing", 3),
         }
 
-    def transformToGridpoints(self, gridDict):
+    def transform_to_gridpoints(self, grid_dict):
         """
         returns two list of grid points based on the dictionary describing the grid points of one layer.
     
         Args:
-            gridDict: (dict) a dicitonary with the following keys
-                    lowerBoundProblem 
-                    upperBoundProblem 
-                    numGridpointsProblem 
+            grid_dict: (dict) a dicitonary with the following keys
+                    lower_bound_problem 
+                    upper_bound_problem 
+                    num_grid_problem 
                     lowerBoundMixing 
                     upperBoundMixing 
-                    numGridpointsMixing 
+                    num_grid_mixing 
         Returns:
             (list, list) returns two lists with float values
         """
-        problemGrid = self.makeGridList(
-            lowerBound=gridDict.get('lowerBoundProblem', self.defaultGrid['lowerBoundProblem']),
-            upperBound=gridDict.get('upperBoundProblem', self.defaultGrid['upperBoundProblem']),
-            numGridpoints=gridDict.get('numGridpointsProblem', self.defaultGrid['numGridpointsProblem']),
+        problem_grid = self.make_grid_list(
+            lower_bound=grid_dict.get('lower_bound_problem', self.default_grid['lower_bound_problem']),
+            upper_bound=grid_dict.get('upper_bound_problem', self.default_grid['upper_bound_problem']),
+            num_gridpoints=grid_dict.get('num_grid_problem', self.default_grid['num_grid_problem']),
         )
-        mixingGrid = self.makeGridList(
-            lowerBound=gridDict.get('lowerBoundMixing', self.defaultGrid['lowerBoundMixing']),
-            upperBound=gridDict.get('upperBoundMixing', self.defaultGrid['upperBoundMixing']),
-            numGridpoints=gridDict.get('numGridpointsMixing', self.defaultGrid['numGridpointsMixing']),
+        mixing_grid = self.make_grid_list(
+            lower_bound=grid_dict.get('lowerBoundMixing', self.default_grid['lowerBoundMixing']),
+            upper_bound=grid_dict.get('upperBoundMixing', self.default_grid['upperBoundMixing']),
+            num_gridpoints=grid_dict.get('num_grid_mixing', self.default_grid['num_grid_mixing']),
         )
-        return problemGrid, mixingGrid
+        return problem_grid, mixing_grid
 
-    def makeGridList(self, lowerBound, upperBound, numGridpoints):
+    def make_grid_list(self, lower_bound, upper_bound, num_gridpoints):
         """
         takes lower and upper bound and returns a list of equidistant points in that interval
         with length equal the specified grid points. a non-positive number of grid points will raise an exception.
@@ -279,19 +279,19 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         singe point.
     
         Args:
-            lowerBound: (float) the minimal grid point
-            upperBound: (float) the maximal grid point
-            numGridpoints: (int) the total number of grid points
+            lower_bound: (float) the minimal grid point
+            upper_bound: (float) the maximal grid point
+            num_gridpoints: (int) the total number of grid points
         Returns:
             (list) a list of floating values which form a grid on the given intervall
         """
-        if numGridpoints <= 0:
+        if num_gridpoints <= 0:
             raise ValueError("trying to construct an empty grid set, which vanishes in the product of grids")
         try:
-            stepSize = float(upperBound - lowerBound) / (numGridpoints - 1)
+            step_size = float(upper_bound - lower_bound) / (num_gridpoints - 1)
         except ZeroDivisionError:
-            return [lowerBound]
-        return [lowerBound + idx * stepSize for idx in range(numGridpoints)]
+            return [lower_bound]
+        return [lower_bound + idx * step_size for idx in range(num_gridpoints)]
 
 
 class QaoaQiskit(BackendBase):
@@ -316,23 +316,23 @@ class QaoaQiskit(BackendBase):
         super().__init__(reader)
         # copy relevant config to make code more readable
         self.config_qaoa = self.config["QaoaBackend"]
-        self.addResultsDict()
-        self.angleSupervisior = QaoaAngleSupervisor.makeAngleSupervisior(
-            qaoaOptimizer=self
+        self.add_results_dict()
+        self.angle_supervisior = QaoaAngleSupervisor.make_angle_supervisior(
+            qaoa_optimizer=self
         )
-        self.numAngles = self.angleSupervisior.getNumAngles()
+        self.numAngles = self.angle_supervisior.get_num_angles()
 
         # initiate local parameters
-        self.iterationCounter = None
+        self.iteration_counter = None
         self.iter_result = {}
         self.rep_result = {}
         self.qc = None
-        self.paramVector = None
+        self.param_vector = None
         self.statistics = {"confidence": 0.0,
-                           "bestBitstring": "",
+                           "best_bitstring": "",
                            "probabilities": {},
-                           "pValues": {},
-                           "uValues": {}
+                           "p_values": {},
+                           "u_values": {}
                            }
 
         # set up connection to IBMQ servers
@@ -341,25 +341,25 @@ class QaoaQiskit(BackendBase):
                               overwrite=True)
             self.provider = IBMQ.load_account()
 
-    def transformProblemForOptimizer(self) -> None:
+    def transform_problem_for_optimizer(self) -> None:
         """
-        Initializes an IsingInterface-instance, which encodes the Ising
+        Initializes an ising_interface-instance, which encodes the Ising
         Spin Glass Problem, using the network to be optimized.
 
         Returns:
             (None)
-                Add the IsingInterface-instance to
-                self.transformedProblem.
+                Add the ising_interface-instance to
+                self.transformed_problem.
         """
-        self.transformedProblem = IsingBackbone.buildIsingProblem(
-            network=self.network, config=self.config["IsingInterface"]
+        self.transformed_problem = IsingBackbone.build_ising_problem(
+            network=self.network, config=self.config["ising_interface"]
         )
         self.output["results"]["qubit_map"] = \
-            self.transformedProblem.getQubitMapping()
+            self.transformed_problem.get_qubit_mapping()
 
     def optimize(self) -> None:
         """
-        Optimizes the network encoded in the IsingInterface-instance. A
+        Optimizes the network encoded in the ising_interface-instance. A
         self-written Qaoa algorithm is used, which can either simulate
         the quantum part or solve it on one of IBMQ's servers (given the
         correct credentials are provided).
@@ -375,24 +375,24 @@ class QaoaQiskit(BackendBase):
         simulator = self.config_qaoa["simulator"]
         simulate = self.config_qaoa["simulate"]
         noise = self.config_qaoa["noise"]
-        initial_guess_original = np.array([0 for _ in range(self.angleSupervisior.getNumAngles())])
+        initial_guess_original = np.array([0 for _ in range(self.angle_supervisior.get_num_angles())])
         num_vars = self.numAngles
         max_iter = self.config_qaoa["max_iter"]
-        totalRepetition = 0
+        total_repetition = 0
 
-        hamiltonian = self.transformedProblem.getHamiltonianMatrix()
-        scaledHamiltonian = self.scaleHamiltonian(hamiltonian=hamiltonian)
+        hamiltonian = self.transformed_problem.get_hamiltonian_matrix()
+        scaled_hamiltonian = self.scale_hamiltonian(hamiltonian=hamiltonian)
         self.output["results"]["hamiltonian"]["original"] = hamiltonian
-        self.output["results"]["hamiltonian"]["scaled"] = scaledHamiltonian
+        self.output["results"]["hamiltonian"]["scaled"] = scaled_hamiltonian
         num_qubits = len(hamiltonian)
 
         # create ParameterVector to be used as placeholder when creating the quantum circuit
-        self.paramVector = ParameterVector("theta", self.numAngles)
-        self.qc = self.create_qc(hamiltonian=scaledHamiltonian, theta=self.paramVector)
+        self.param_vector = ParameterVector("theta", self.numAngles)
+        self.qc = self.create_qc(hamiltonian=scaled_hamiltonian, theta=self.param_vector)
         # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
-        drawTheta = self.createDrawTheta(theta=initial_guess_original)
-        qcDraw = self.qc.bind_parameters({self.paramVector: drawTheta})
-        self.output["results"]["qc"] = qcDraw.draw(output="latex_source")
+        draw_theta = self.create_draw_theta(theta=initial_guess_original)
+        qc_draw = self.qc.bind_parameters({self.param_vector: draw_theta})
+        self.output["results"]["qc"] = qc_draw.draw(output="latex_source")
 
         # setup IBMQ backend and save its configuration to output
         backend, noise_model, coupling_map, basis_gates = self.setup_backend(
@@ -403,18 +403,18 @@ class QaoaQiskit(BackendBase):
         )
         self.output["results"]["backend"] = backend.configuration().to_dict()
 
-        curRepetition = 1
-        for initial_guess in self.angleSupervisior.getInitialAngleIterator():
+        current_repetition = 1
+        for initial_guess in self.angle_supervisior.get_initial_angle_iterator():
             time_start = datetime.timestamp(datetime.now())
-            totalRepetition = curRepetition
+            total_repetition = current_repetition
             print(
-                f"----------------------- Repetition {totalRepetition} ----------------------------------"
+                f"----------------------- Repetition {total_repetition} ----------------------------------"
             )
 
-            self.prepareRepetitionDict()
+            self.prepare_repetition_dict()
             self.rep_result["initial_guess"] = initial_guess.tolist()
 
-            self.iterationCounter = 0
+            self.iteration_counter = 0
 
             expectation = self.get_expectation(
                 backend=backend,
@@ -425,14 +425,14 @@ class QaoaQiskit(BackendBase):
                 simulate=simulate,
             )
 
-            optimizer = self.getClassicalOptimizer(max_iter)
+            optimizer = self.get_classical_optimizer(max_iter)
 
             res = optimizer.optimize(
                 num_vars=num_vars,
                 objective_function=expectation,
                 initial_point=initial_guess,
             )
-            self.rep_result["optimizedResult"] = {
+            self.rep_result["optimized_result"] = {
                 "x": list(res[0]),  # solution [beta, gamma]
                 "fun": res[1],  # objective function value
                 "counts": self.rep_result["iterations"][res[2]]["counts"],  # counts of the optimized result
@@ -443,16 +443,16 @@ class QaoaQiskit(BackendBase):
             duration = time_end - time_start
             self.rep_result["duration"] = duration
 
-            self.output["results"]["repetitions"][totalRepetition] = self.rep_result
+            self.output["results"]["repetitions"][total_repetition] = self.rep_result
 
-            curRepetition += 1
+            current_repetition += 1
 
-        self.output["results"]["totalReps"] = totalRepetition
+        self.output["results"]["total_reps"] = total_repetition
 
-    def processSolution(self) -> None:
+    def process_solution(self) -> None:
         """
         Post-processing of the solution. Adds the components from the
-        IsingInterface-instance to self.output. Furthermore, a
+        ising_interface-instance to self.output. Furthermore, a
         statistical analysis of the results is performed, to determine,
         if a solution can be found with confidence.
 
@@ -461,19 +461,19 @@ class QaoaQiskit(BackendBase):
                 Modifies self.output dictionary with post-process
                 information.
         """
-        self.output["components"] = self.transformedProblem.getData()
+        self.output["components"] = self.transformed_problem.get_data()
 
-        self.extractPvalues()  # get probabilities of bitstrings
-        self.findBestBitstring()
-        self.compareBitStringToRest()  # one-sided Mann-Witney U Test
-        self.determineConfidence()  # check p against various alphas
+        self.extract_p_values()  # get probabilities of bitstrings
+        self.find_best_bitstring()
+        self.compare_bit_string_to_rest()  # one-sided Mann-Witney U Test
+        self.determine_confidence()  # check p against various alphas
 
         self.output["results"]["statistics"] = self.statistics
 
-        self.writeReportToOutput(bestBitstring=self.statistics[
-            "bestBitstring"])
+        self.write_report_to_output(best_bitstring=self.statistics[
+            "best_bitstring"])
 
-    def transformSolutionToNetwork(self) -> None:
+    def transform_solution_to_network(self) -> None:
         """
         Encodes the optimal solution found during optimization and
         stored in self.output into a pypsa.Network. It reads the
@@ -483,20 +483,20 @@ class QaoaQiskit(BackendBase):
 
         Returns:
             (None)
-                Modifies self.output with the outputNetwork.
+                Modifies self.output with the output_network.
         """
-        self.printReport()
-        bestBitstring = self.output["results"]["statistics"]["bestBitstring"]
+        self.print_report()
+        best_bitstring = self.output["results"]["statistics"]["best_bitstring"]
         solution = []
-        for idx, bit in enumerate(bestBitstring):
+        for idx, bit in enumerate(best_bitstring):
             if bit == "1":
                 solution.append(idx)
-        outputNetwork = self.transformedProblem.setOutputNetwork(
+        output_network = self.transformed_problem.set_output_network(
             solution=solution)
-        outputDataset = outputNetwork.export_to_netcdf()
-        self.output["network"] = outputDataset.to_dict()
+        output_dataset = output_network.export_to_netcdf()
+        self.output["network"] = output_dataset.to_dict()
 
-    def addResultsDict(self) -> None:
+    def add_results_dict(self) -> None:
         """
         Adds the basic structure for the self.output["results"]
         dictionary.
@@ -516,11 +516,11 @@ class QaoaQiskit(BackendBase):
             },
             "kirchhoff": {},
             "statistics": {},
-            "totalReps": 0,
+            "total_reps": 0,
             "repetitions": {},
         }
 
-    def prepareRepetitionDict(self) -> None:
+    def prepare_repetition_dict(self) -> None:
         """
         Initializes the basic structure for the
         self.rep_result-dictionary. Its values are initialized to empty
@@ -533,11 +533,11 @@ class QaoaQiskit(BackendBase):
         self.rep_result = {
             "initial_guess": [],
             "duration": None,
-            "optimizedResult": {},
+            "optimized_result": {},
             "iterations": {},
         }
 
-    def prepareIterationDict(self) -> None:
+    def prepare_iteration_dict(self) -> None:
         """
         Initializes the basic structure for the
         self.iter_result-dictionary. Its values are initialized to empty
@@ -554,7 +554,7 @@ class QaoaQiskit(BackendBase):
             "return": None
         }
 
-    def createDrawTheta(self, theta: list) -> list:
+    def create_draw_theta(self, theta: list) -> list:
         """
         Creates a list of the same size as theta with Parameters β and γ
         as values. This list can then be used to bind to a quantum
@@ -572,17 +572,17 @@ class QaoaQiskit(BackendBase):
             (list)
                 The created list of β's and γ's.
         """
-        betaValues = theta[::2]
-        drawTheta = []
-        for layer, _ in enumerate(betaValues):
-            drawTheta.append(Parameter(f"\u03B2{layer + 1}"))  # append beta_i
-            drawTheta.append(Parameter(f"\u03B3{layer + 1}"))  # append gamma_i
+        beta_values = theta[::2]
+        draw_theta = []
+        for layer, _ in enumerate(beta_values):
+            draw_theta.append(Parameter(f"\u03B2{layer + 1}"))  # append beta_i
+            draw_theta.append(Parameter(f"\u03B3{layer + 1}"))  # append gamma_i
 
-        return drawTheta
+        return draw_theta
 
-    def getClassicalOptimizer(self,
-                              max_iter: int
-                              ) -> qiskit.algorithms.optimizers:
+    def get_classical_optimizer(self,
+                                max_iter: int
+                                ) -> qiskit.algorithms.optimizers:
         """
         Initiates and returns the classical optimizer set in the config
         file. If another optimizer than SPSA, COBYLA or Adam is
@@ -598,18 +598,18 @@ class QaoaQiskit(BackendBase):
                 The initialized classical optimizer, as specified in the
                 config.
         """
-        configString = self.config_qaoa["classical_optimizer"]
-        if configString == "SPSA":
+        config_string = self.config_qaoa["classical_optimizer"]
+        if config_string == "SPSA":
             return SPSA(maxiter=max_iter, blocking=False)
-        elif configString == "COBYLA":
+        elif config_string == "COBYLA":
             return COBYLA(maxiter=max_iter, tol=0.0001)
-        elif configString == "ADAM":
+        elif config_string == "ADAM":
             return ADAM(maxiter=max_iter, tol=0.0001)
         raise ValueError(
             "Optimizer name in config file doesn't match any known optimizers"
         )
 
-    def getMinCFvars(self) -> list:
+    def get_min_cf_vars(self) -> list:
         """
         Searches through the optimization results of all repetitions
         done with random (or partly random) initial values for beta and
@@ -622,17 +622,17 @@ class QaoaQiskit(BackendBase):
                 The beta and gamma values associated with the minimal
                 cost function value.
         """
-        searchData = self.output["results"]["repetitions"]
-        minCF = searchData[1]["optimizedResult"]["fun"]
-        minX = []
-        for i in range(1, len(searchData) + 1):
-            if searchData[i]["optimizedResult"]["fun"] <= minCF:
-                minCF = searchData[i]["optimizedResult"]["fun"]
-                minX = searchData[i]["optimizedResult"]["x"]
+        search_data = self.output["results"]["repetitions"]
+        min_cf = search_data[1]["optimized_result"]["fun"]
+        min_x = []
+        for i in range(1, len(search_data) + 1):
+            if search_data[i]["optimized_result"]["fun"] <= min_cf:
+                min_cf = search_data[i]["optimized_result"]["fun"]
+                min_x = search_data[i]["optimized_result"]["x"]
 
-        return minX
+        return min_x
 
-    def scaleHamiltonian(self, hamiltonian: list) -> list:
+    def scale_hamiltonian(self, hamiltonian: list) -> list:
         """
         Scales the hamiltonian so that the maximum absolute value in the
         input hamiltonian is equal to Pi.
@@ -645,13 +645,12 @@ class QaoaQiskit(BackendBase):
             (list)
                 The scaled hamiltonian.
         """
-        matrixMax = np.max(hamiltonian)
-        matrixMin = np.min(hamiltonian)
-        matrixExtreme = max(abs(matrixMax), abs(matrixMin))
-        factor = matrixExtreme / math.pi
-        scaledHamiltonian = np.array(hamiltonian) / factor
-
-        return scaledHamiltonian.tolist()
+        matrix_max = np.max(hamiltonian)
+        matrix_min = np.min(hamiltonian)
+        matrix_extreme = max(abs(matrix_max), abs(matrix_min))
+        factor = matrix_extreme / math.pi
+        scaled_hamiltonian = np.array(hamiltonian) / factor
+        return scaled_hamiltonian.tolist()
 
     def create_qc(self,
                   hamiltonian: list,
@@ -678,14 +677,14 @@ class QaoaQiskit(BackendBase):
         qc = QuantumCircuit(num_qubits)
 
         # beta parameters are at even indices and gamma at odd indices
-        betaValues = theta[::2]
-        gammaValues = theta[1::2]
+        beta_values = theta[::2]
+        gamma_values = theta[1::2]
 
         # add Hadamard gate to each qubit
         for i in range(num_qubits):
             qc.h(i)
 
-        for layer, _ in enumerate(betaValues):
+        for layer, _ in enumerate(beta_values):
             # for visual purposes only, when the quantum circuit is drawn
             qc.barrier()
             qc.barrier()
@@ -695,21 +694,21 @@ class QaoaQiskit(BackendBase):
                     if hamiltonian[i][j] != 0.0:
                         if i == j:
                             qc.rz(
-                                -hamiltonian[i][j] * gammaValues[layer], i
+                                -hamiltonian[i][j] * gamma_values[layer], i
                             )
                             # inversed, as the implementation in the
-                            # IsingInterface inverses the values
+                            # ising_interface inverses the values
                         else:
                             qc.rzz(
-                                -hamiltonian[i][j] * gammaValues[layer], i, j
+                                -hamiltonian[i][j] * gamma_values[layer], i, j
                             )
                             # inversed, as the implementation in the
-                            # IsingInterface inverses the values
+                            # ising_interface inverses the values
             qc.barrier()
 
             # add mixing Hamiltonian to each qubit
             for i in range(num_qubits):
-                qc.rx(betaValues[layer], i)
+                qc.rx(beta_values[layer], i)
 
         qc.measure_all()
 
@@ -737,22 +736,22 @@ class QaoaQiskit(BackendBase):
             return self.output["results"]["kirchhoff"][bitstring]["total"]
         except KeyError:
             self.output["results"]["kirchhoff"][bitstring] = {}
-            kirchhoffCost = 0.0
+            kirchhoff_cost = 0.0
             # calculate the deviation from the optimal for each bus separately
             for bus in self.network.buses.index:
-                bitstringToSolution = [
+                bitstring_to_solution = [
                     idx for idx, bit in enumerate(bitstring) if bit == "1"
                 ]
-                for _, val in self.transformedProblem.calcPowerImbalanceAtBus(
-                        bus, bitstringToSolution
+                for _, val in self.transformed_problem.calc_power_imbalance_at_bus(
+                        bus, bitstring_to_solution
                 ).items():
                     # store the penalty for each bus and then add them to the
                     # total costs
                     self.output["results"]["kirchhoff"][bitstring][bus] = val
-                    kirchhoffCost += abs(val) ** 2
+                    kirchhoff_cost += abs(val) ** 2
             self.output["results"]["kirchhoff"][bitstring]["total"] = \
-                kirchhoffCost
-            return kirchhoffCost
+                kirchhoff_cost
+            return kirchhoff_cost
 
     def compute_expectation(self, counts: dict) -> float:
         """
@@ -783,7 +782,7 @@ class QaoaQiskit(BackendBase):
             }
 
         self.iter_result["return"] = avg / sum_count
-        self.rep_result["iterations"][self.iterationCounter] = self.iter_result
+        self.rep_result["iterations"][self.iteration_counter] = self.iter_result
 
         return self.iter_result["return"]
 
@@ -849,8 +848,7 @@ class QaoaQiskit(BackendBase):
                 backend = Aer.get_backend(simulator)
         else:
             large_enough_devices = self.provider.backends(
-                filters=lambda x: x.configuration().n_qubits > nqubits
-                                  and not x.configuration().simulator
+                filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator
             )
             backend = least_busy(large_enough_devices)
             # backend = self.provider.get_backend("ibmq_lima")
@@ -894,7 +892,7 @@ class QaoaQiskit(BackendBase):
         """
 
         def execute_circ(theta):
-            qc = self.qc.bind_parameters({self.paramVector: theta})
+            qc = self.qc.bind_parameters({self.param_vector: theta})
 
             if simulate:
                 # Run on chosen simulator
@@ -914,8 +912,8 @@ class QaoaQiskit(BackendBase):
                 job_monitor(job_device)
                 results = job_device.result()
             counts = results.get_counts()
-            self.iterationCounter += 1
-            self.prepareIterationDict()
+            self.iteration_counter += 1
+            self.prepare_iteration_dict()
             self.iter_result["theta"] = list(theta)
             self.iter_result["counts"] = counts
 
@@ -923,10 +921,10 @@ class QaoaQiskit(BackendBase):
 
         return execute_circ
 
-    def extractPvalues(self) -> None:
+    def extract_p_values(self) -> None:
         """
         Searches through the results and combines the probability for
-        each bitstring in each repetition of the "optimizedResult" in
+        each bitstring in each repetition of the "optimized_result" in
         lists. E.g. For 100 repetitions, a list for each bitstring is
         created, containing the 100 probability values (one from each
         repetition)
@@ -947,15 +945,15 @@ class QaoaQiskit(BackendBase):
             for key in data:
                 if key <= start:
                     continue
-                if bitstring in data[key]["optimizedResult"]["counts"]:
-                    p = data[key]["optimizedResult"][
+                if bitstring in data[key]["optimized_result"]["counts"]:
+                    p = data[key]["optimized_result"][
                             "counts"][bitstring] / shots
                 else:
                     p = 0
                 probabilities[bitstring].append(p)
         self.statistics["probabilities"] = probabilities
 
-    def findBestBitstring(self) -> None:
+    def find_best_bitstring(self) -> None:
         """
         Takes the median of the probabilities of each bitstring and
         determines, which bitstring has objectively the highest
@@ -967,22 +965,22 @@ class QaoaQiskit(BackendBase):
         """
         probabilities = self.statistics["probabilities"]
         # set first bitstring as best for now
-        bestBitstring = list(probabilities.keys())[0]
+        best_bitstring = list(probabilities.keys())[0]
         # get median of first bitstring
-        bestMedian = median(probabilities[bestBitstring])
+        best_median = median(probabilities[best_bitstring])
 
         for bitstring in probabilities:
-            if median(probabilities[bitstring]) > bestMedian:
-                bestMedian = median(probabilities[bitstring])
-                bestBitstring = bitstring
-        self.statistics["bestBitstring"] = bestBitstring
+            if median(probabilities[bitstring]) > best_median:
+                best_median = median(probabilities[bitstring])
+                best_bitstring = bitstring
+        self.statistics["best_bitstring"] = best_bitstring
 
-    def compareBitStringToRest(self) -> None:
+    def compare_bit_string_to_rest(self) -> None:
         """
-        Compares the bestBitstring (found in the findBestBitstring
+        Compares the best_bitstring (found in the find_best_bitstring
         function) to every other bitstring using a one-sided Mann
         Whitney U Test, where the alternative hypothesis is that the
-        probability to find the bestBitstring is greater than the
+        probability to find the best_bitstring is greater than the
         probabilities of the other bitstrings. The results of the tests
         are stored in the self.statistics dictionary.
 
@@ -990,26 +988,26 @@ class QaoaQiskit(BackendBase):
             (None)
                 Modifies the self.statistics dictionary.
         """
-        bestBitstring = self.statistics["bestBitstring"]
+        best_bitstring = self.statistics["best_bitstring"]
         probabilities = self.statistics["probabilities"]
         for bitstring in probabilities.keys():
-            if bitstring == bestBitstring:
+            if bitstring == best_bitstring:
                 continue
-            u, p = stats.mannwhitneyu(x=probabilities[bestBitstring],
+            u, p = stats.mannwhitneyu(x=probabilities[best_bitstring],
                                       y=probabilities[bitstring],
                                       alternative="greater")
-            self.statistics["pValues"][
-                f"{bestBitstring}-{bitstring}"] = float(p)
-            self.statistics["uValues"][
-                f"{bestBitstring}-{bitstring}"] = float(u)
+            self.statistics["p_values"][
+                f"{best_bitstring}-{bitstring}"] = float(p)
+            self.statistics["u_values"][
+                f"{best_bitstring}-{bitstring}"] = float(u)
 
-    def determineConfidence(self) -> None:
+    def determine_confidence(self) -> None:
         """
-        Determines with which confidence, if any, the bestBitstring can
+        Determines with which confidence, if any, the best_bitstring can
         be found. A list of alphas is checked, starting at 0.01 up until
         0.5. The found confidence is then stored in self.statistics. If
         none is found the value in self.statistics["confidence"] is kept
-        at 0.0, thus indicating no bestBitstring can be confidently
+        at 0.0, thus indicating no best_bitstring can be confidently
         determined.
 
         Returns:
@@ -1019,7 +1017,7 @@ class QaoaQiskit(BackendBase):
         alphas = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
         for alpha in alphas:
             broken = False
-            for key, value in self.statistics["pValues"].items():
+            for key, value in self.statistics["p_values"].items():
                 if value > alpha:
                     broken = True
                     break
@@ -1027,13 +1025,13 @@ class QaoaQiskit(BackendBase):
                 self.statistics["confidence"] = 1 - alpha
                 break
 
-    def writeReportToOutput(self, bestBitstring: str) -> None:
+    def write_report_to_output(self, best_bitstring: str) -> None:
         """
         Writes solution specific values of the optimizer result and the
         Ising spin glass problem solution to the output dictionary.
 
         Args:
-            bestBitstring: (str)
+            best_bitstring: (str)
                 The bitstring representing the best solution found
                 during optimization.
 
@@ -1043,10 +1041,10 @@ class QaoaQiskit(BackendBase):
                 and values.
         """
         solution = []
-        for idx, bit in enumerate(bestBitstring):
+        for idx, bit in enumerate(best_bitstring):
             if bit == "1":
                 solution.append(idx)
-        report = self.transformedProblem.generateReport(solution=solution)
+        report = self.transformed_problem.generate_report(solution=solution)
         for key in report:
             self.output["results"][key] = report[key]
 
@@ -1061,23 +1059,23 @@ class QaoaQiskit(BackendBase):
         """
         print("\n--- Table of Results ---")
         repetitions = self.output["results"]["repetitions"]
-        repetitionIndexSortedByScore = sorted(
+        repetition_index_sorted_by_score = sorted(
             list(range(1, len(repetitions) + 1)),
-            key=lambda x: repetitions[x]['optimizedResult']['fun']
+            key=lambda x: repetitions[x]['optimized_result']['fun']
         )
-        currentScoreBracket = 0
-        horizontalBreak = "------------+---------+--" + self.numAngles * "------"
+        current_score_bracket = 0
+        horizontal_break = "------------+---------+--" + self.numAngles * "------"
 
         # table header
         print(" Repetition |  Score  |" + self.numAngles * "  " + "Solution ")
 
-        for repetition in repetitionIndexSortedByScore:
-            repetitionResult = self.output["results"]["repetitions"][repetition]
-            roundedAngleSolution = [round(angle, 2) for angle in repetitionResult['optimizedResult']['x']]
-            score = repetitionResult['optimizedResult']['fun']
+        for repetition in repetition_index_sorted_by_score:
+            repetition_result = self.output["results"]["repetitions"][repetition]
+            rounded_angle_solution = [round(angle, 2) for angle in repetition_result['optimized_result']['x']]
+            score = repetition_result['optimized_result']['fun']
             # print breaks every integer step
-            if score > currentScoreBracket:
-                print(horizontalBreak)
-                currentScoreBracket = int(score) + 1
-            scoreStr = str(round(score, 2))
-            print(f"     {repetition: <7}|  {scoreStr: <7}|  {roundedAngleSolution}")
+            if score > current_score_bracket:
+                print(horizontal_break)
+                current_score_bracket = int(score) + 1
+            score_str = str(round(score, 2))
+            print(f"     {repetition: <7}|  {score_str: <7}|  {rounded_angle_solution}")

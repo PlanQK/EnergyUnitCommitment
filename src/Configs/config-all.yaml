@@ -1,18 +1,18 @@
 # Please make a copy of this file and call it config.yaml. Make sure not to share it on GitHub, as you will need to
 # add sensitive information, e.g. API token.
 # Use this newly created copy to adjust all configurations.
-APItoken: # your token here
+API_token: # your token here
     IBMQ_API_token: ""
-    dWave_API_token: ""
+    dwave_API_token: ""
 
 # choose backend
-Backend: "sqa"
+backend: "sqa"
     # (string) the backend algorithm to be used. options are:
     # "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
     # "pypsa-glpk", "pypsa-fico", "qaoa"
 
 # all configuration data of the QUBO model of the network
-IsingInterface:
+ising_interface:
     # values for specifiying network to qubit abstraction
     formulation: "customsplit"
         # (string) name of the function how to model lines with qubits
@@ -21,41 +21,41 @@ IsingInterface:
     # each followung entry is the configuration data for one QUBI subproblem
     kirchhoff:
         # Adding Kirchhoff subproblem to QUBO
-        scaleFactor: 1.0
+        scale_factor: 1.0
         # (float) weight of the kirchhoff subproblem in the QUBO
-    marginalCost:
+    marginal_cost:
         # Adding Marginal cost optimization in the QUBO
         formulation: "GlobalCostSquare"
             # (string) name of the class/procedure how to encode the marginal cost optimization
             # choose between GlobalCostSquare, GlobalCostSquareWithSlack, MarginalAsPenalty, LocalMarginalEstimationDistance
         ### these values only pertain the formulation *WithSlack
-        slackType: "binaryPower"
+        slack_type: "binary_power"
             # this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
-        slackScale: 0.1
+        slack_scale: 0.1
             # (float) scalar factor for all slack variable weights
-        slackSize: 4
+        slack_size: 4
             # (int) number of slack variables to be used
         ### end *WithSlack
         ### these values specifiy how costs are estimated if a formulation needs it (all but MarginalAsPenalty)
-        scaleFactor: 0.6
+        scale_factor: 0.6
              # (float) weight of the marginal cost optimization in the QUBO
-        offsetEstimationFactor: 1.225
+        offset_estimation_factor: 1.225
              # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
              # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
              # this method disregerads the topology of the network and is a lower boundary of the cost
-        estimatedCostFactor: 1.0
+        estimated_cost_factor: 1.0
              # (float) TODO: remove this option in code
-        offsetBuildFactor: 1.0
+        offset_build_factor: 1.0
              # (float) TODO: remove this option in code
         ### end estimation config
 
     # TODO not implemented in code yey
     # 
-    minUpDownTime:
-        minUpDownFactor: 1.0
+    min_up_down_time:
+        min_up_down_factor: 1.0
 
 
-QaoaBackend:
+qaoa_backend:
     shots: 200
         # (int) the number of shots
         # max 20,000
@@ -83,10 +83,10 @@ QaoaBackend:
     classical_optimizer: "COBYLA"
         # (string) the classical optimizer to be used
         # choose between "SPSA", "COBYLA" and "ADAM"
-    problemRange: 2
+    problem_range: 2
         # (float) range of a random guess for the angle of a problem hamiltonian. A value of 1 will permit
         # random guesses in the intervall (-pi , pi)
-    mixingRange: 1
+    mixing_range: 1
         # (float) range of a random guess for the angle of a mixing hamiltonian. A value of 1 will permit
         # random guesses in the intervall (-pi , pi)
 
@@ -97,54 +97,54 @@ QaoaBackend:
         # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
         # use "rand" if a random initial guess should be used for this parameter. 
         
-    # TODO decouple data of problem+mixing layers into two layers with lowerBound, upperBound, numGridpoints
+    # TODO decouple data of problem+mixing layers into two layers with lower_bound, upper_bound, num_gridpoints
     # as values
 #   ### "GridSearch" config guess
 #   # GridSearch takes a list of grids which are dictionary that describe the grid for one mixing 
 #   # and problem hamiltonian. A grid dictionary has the form
-#        lowerBoundProblem: -3
+#        lower_bound_problem: -3
 #           # (float) lowest point of the angles for the problem hamiltonian
-#        upperBoundProblem: 3
+#        upper_bound_problem: 3
 #           # (float)  highest point of angles for the problem hamiltonian
-#        numGridpointsProblem: 1
+#        num_gridpoints_problem: 1
 #           # (int) number of angles to try for the problem hamiltonian
-#        lowerBoundMixing: -1
+#        lower_bound_mixing: -1
 #           # (float)  lowest point of the angles for the mixing hamiltonian
-#        upperBoundMixing: 1
+#        upper_bound_mixing: 1
 #           # (float)  highest point of angles for the mixing hamiltonian
-#        numGridpointsMixing: 1
+#        num_gridpoints_mixing: 1
 #           # (int) number of angles to try for the mixing hamiltonian
 #
 #   It also supports default values for all grids given in the dictionary which are used as fallback values
 #   if it hasn't been set in the grid dict that describes one layer
-#     defaultGrid:
-#        lowerBoundProblem: -3
-#        upperBoundProblem: 3
-#        numGridpointsProblem: 1
-#        lowerBoundMixing: -1
-#        upperBoundMixing: 1
-#        numGridpointsMixing: 1
+#     default_grid:
+#        lower_bound_problem: -3
+#        upper_bound_problem: 3
+#        num_gridpoints_problem: 1
+#        lower_bound_mixing: -1
+#        upper_bound_mixing: 1
+#        num_gridpoints_mixing: 1
 
 
-SqaBackend:
+sqa_backend:
     # seed: 10
         # (int)
     # schedule rules can be read in the platform description/sqa repo
-    transverseFieldSchedule: "[8.0,0.0]"
+    transverse_field_schedule: "[8.0,0.0]"
         # (string) transvere field schedule of the simulation
-    temperatureSchedule: "[0.1,iF,0.0001]"
+    temperature_schedule: "[0.1,iF,0.0001]"
         # (string) temperature schedule of the simultion
-    trotterSlices: 500
+    trotter_slices: 500
         # (int) number of trotter slices to be used.
         # more trotter slices make a more precies discretization of the quantum state and
         # increases solution quality and run time
-    optimizationCycles: 300
+    optimization_cycles: 300
         # (int) number of discrete time steps to model continous evolution
         # more cycles improve quality of solution and run time. This falls off rather quickly
 
 
-DWaveBackend:
-    strategy: "LowestEnergy"
+dwave_backend:
+    strategy: "lowest_energy"
         # (string)
         # choose between "LowestEnergy and "ClosestSample"
     postprocess: "flow"
@@ -154,7 +154,7 @@ DWaveBackend:
         # (int) number of seconds that an embedding into working graph can be calculated
        
     ### only necessary for solver dwave-qpu 
-    sampleOrigin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+    sample_origin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
         # (string) filename of the saved sample result file if old result is reused
         # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
 
@@ -171,7 +171,7 @@ DWaveBackend:
         # (int)
 
 
-PypsaBackend:
+pypsa_backend:
     solver_name: "glpk"
         # (string) name of the MILP solver
         # no other solver support yet
@@ -181,5 +181,5 @@ PypsaBackend:
         
 # This can also hold any of the above information. Solver specific configuration data in ${SOLVER}Backend
 # will be copied into this field and then be used
-BackendConfig:
+backend_config:
     #

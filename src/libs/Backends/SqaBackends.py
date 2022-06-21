@@ -39,7 +39,7 @@ class ClassicalBackend(BackendBase):
         super().__init__(reader=reader)
         self.solver = siquan.DTSQA()
 
-    def transformProblemForOptimizer(self) -> None:
+    def transform_problem_for_optimizer(self) -> None:
         """
         Initializes an IsingInterface-instance, which encodes the Ising
         Spin Glass Problem, using the network to be optimized.
@@ -47,15 +47,15 @@ class ClassicalBackend(BackendBase):
         Returns:
             (None)
                 Add the IsingInterface-instance to
-                self.transformedProblem.
+                self.transformed_problem.
         """
         print("transforming problem...")
-        self.transformedProblem = IsingBackbone.buildIsingProblem(
+        self.transformed_problem = IsingBackbone.build_ising_problem(
             network=self.network,
-            config=self.config["IsingInterface"]
+            config=self.config["ising_interface"]
         )
 
-    def transformSolutionToNetwork(self) -> None:
+    def transform_solution_to_network(self) -> None:
         """
         Encodes the optimal solution found during optimization and
         stored in self.output into a pypsa.Network. It reads the
@@ -65,14 +65,14 @@ class ClassicalBackend(BackendBase):
 
         Returns:
             (None)
-                Modifies self.output with the outputNetwork.
+                Modifies self.output with the output_network.
         """
-        self.printReport()
+        self.print_report()
 
-        outputNetwork = self.transformedProblem.setOutputNetwork(
+        output_network = self.transformed_problem.set_output_network(
             solution=self.output["results"]["state"])
-        outputDataset = outputNetwork.export_to_netcdf()
-        self.output["network"] = outputDataset.to_dict()
+        output_dataset = output_network.export_to_netcdf()
+        self.output["network"] = output_dataset.to_dict()
 
     def optimize(self) -> None:
         """
@@ -87,19 +87,19 @@ class ClassicalBackend(BackendBase):
                 dictionary.
         """
         print("starting optimization...")
-        self.configureSolver()
+        self.configure_solver()
         tic = time.perf_counter()
         result = self.solver.minimize(
-            self.transformedProblem.siquanFormat(),
-            self.transformedProblem.numVariables(),
+            self.transformed_problem.siquan_format(),
+            self.transformed_problem.num_variables(),
         )
-        self.output["results"]["optimizationTime"] = time.perf_counter() - tic
+        self.output["results"]["optimization_time"] = time.perf_counter() - tic
         # parse the entry in "state" before using it
         result["state"] = literal_eval(result["state"])
-        self.writeResultsToOutput(result)
+        self.write_results_to_output(result)
         print("done")
 
-    def getHSchedule(self) -> str:
+    def get_h_schedule(self) -> str:
         """
         A method for getting the transverse field schedule in the
         configuration. For classical annealing, there is no transverse
@@ -113,7 +113,7 @@ class ClassicalBackend(BackendBase):
         """
         return "[0]"
 
-    def configureSolver(self) -> None:
+    def configure_solver(self) -> None:
         """
         Reads and sets siquan solver parameter from the config dict.
         Solver configuration is read from the config dict and default
@@ -127,15 +127,15 @@ class ClassicalBackend(BackendBase):
             (None)
                 Modifies self.solver and sets hyperparameters
         """
-        siquanConfig = self.config["SqaBackend"]
-        self.solver.setSeed(siquanConfig.get("seed",
+        siquan_config = self.config["sqa_backend"]
+        self.solver.setSeed(siquan_config.get("seed",
                                              random.randrange(10 ** 6)))
-        self.solver.setHSchedule(self.getHSchedule())
-        self.solver.setTSchedule(siquanConfig.get("temperatureSchedule",
+        self.solver.setHSchedule(self.get_h_schedule())
+        self.solver.setTSchedule(siquan_config.get("temperature_schedule",
                                                   "[0.1,iF,0.0001]"))
-        self.solver.setTrotterSlices(int(siquanConfig.get("trotterSlices",
+        self.solver.setTrotterSlices(int(siquan_config.get("trotter_slices",
                                                           32)))
-        self.solver.setSteps(int(siquanConfig.get("optimizationCycles", 16)))
+        self.solver.setSteps(int(siquan_config.get("optimization_cycles", 16)))
 
     def print_solver_specific_report(self) -> None:
         """
@@ -150,14 +150,14 @@ class ClassicalBackend(BackendBase):
         """
         print(
             f"Total energy cost of QUBO (with constant terms): "
-            f"{self.output['results']['totalCost']}"
+            f"{self.output['results']['total_cost']}"
         )
         print("---")
         print(f"Sqa runtime: {self.output['results']['runtime_sec']}")
         print(f"Sqa runtime cycles: {self.output['results']['runtime_cycles']}")
-        print(f"Ising Interactions: {len(self.transformedProblem.problem)}")
+        print(f"Ising Interactions: {len(self.transformed_problem.problem)}")
 
-    def writeResultsToOutput(self, result: dict) -> None:
+    def write_results_to_output(self, result: dict) -> None:
         """
         This writes solution specific values of the optimizer result
         and the Ising spin glass problem solution the self.output.
@@ -177,7 +177,7 @@ class ClassicalBackend(BackendBase):
             self.output["results"][key] = result[key]
         self.output["results"] = {
             **self.output["results"],
-            **self.transformedProblem.generateReport(
+            **self.transformed_problem.generate_report(
                 result["state"]
             )
         }
@@ -189,10 +189,10 @@ class SqaBackend(ClassicalBackend):
     annealing. This is done using the SiQuAn solver and setting the
     transverse Field to a value given in the configuration file. It
     inherits from ClassicalBackend and only overwrites the method
-    getHSchedule.
+    get_h_schedule.
     """
 
-    def getHSchedule(self) -> str:
+    def get_h_schedule(self) -> str:
         """
         A method for getting the transverse field schedule from the
         configuration and returns it.
@@ -202,5 +202,5 @@ class SqaBackend(ClassicalBackend):
                 The configuration of the 'transverseFieldSchedule', to
                 set in siquan solver, according to self.config.
         """
-        return self.config["SqaBackend"].get("transverseFieldSchedule",
+        return self.config["SqaBackend"].get("transverse_field_schedule",
                                              "[8.0,0.0]")
