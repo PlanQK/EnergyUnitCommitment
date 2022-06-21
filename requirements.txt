@@ -1,5 +1,5 @@
 ./pypsa-0.19.3.zip
-dwave-ocean-sdk=5.2.0
+dwave-ocean-sdk==5.2.0
 xarray==2022.3.0
 netcdf4==1.5.8
 networkx==2.8.4

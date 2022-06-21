@@ -2,9 +2,23 @@ FROM herrd1/siquan:latest
 
 
 WORKDIR /energy
+
+# install some packages to reduce download 
+RUN pip install numpy && \
+    pip install scipy && \
+    pip install pandas && \
+    pip install matplotlib && \
+    pip install pyomo==6.0 && \
+    pip install dimod && \
+    pip install qiskit && \
+    pip install networkx && \
+    pip install tables && \
+    pip install minorminer
+
+RUN pip install "pyomo>=5.7,<=6.0"
+
 COPY requirements.txt /energy/requirements.txt
 COPY pypsa-0.19.3.zip /energy/pypsa-0.19.3.zip
-RUN pip install "pyomo>=5.7,<=6.0"
 RUN pip install pypsa-0.19.3.zip
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 
