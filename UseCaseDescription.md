@@ -1,44 +1,46 @@
-
 The goal of this use case is finding the optimal energy dispatch and transmission flow over time in an energy grid. This helps energy producers and transmission system operators to operate profitably while balancing power generation and demand at all times. The push for decentralized energy sources and demands (e.g. individual photovoltaics, e-mobility) as well as ambitious European CO~2~ emission caps will likely further increase the demand for optimal or near-optimal energy grid costs.
 
-We focus on optimizing the marginal costs associated with running the grid 
-(running costs of generators, transmission lines etc.), network expansion, which optimizes capital costs of installing new generators or transmission lines, and the costs for the start-up/shut-down of generators over time. This pared-down version inherits much of the complexity seen in the full-scale optimization problem, namely, a large number of variables and constraints. The problem can also be extended in numerous way.
-Mathematically, we cast the optimization problem as a mixed integer linear program with two sub-problems: (1) network expansion and (2) the unit commitment problem. Our strategy for solving the mixed integer linear program is to alternate between optimizing these sub-problems for a number of iterations. The complexity of optimizing the marginal costs comes from the large number of variables and constraints (typically on the order or 10-100 million). The sub-problem of optimizing start-up and shutdown costs of generators constitutes the so-called unit commitment problem. Our formulation of unit commitment introduces binary variables that indicate whether a generator is switched on or off for each generator and each time step. Formally the unit commitment problem is NP-hard so we cannot expect a (classical or quantum) computer to solve it in polynomial time. However, the problem is amendable to quantum-inspired solvers and, potentially, to quantum annealers, which might lead to a polynomial speed-up.
+A generic energy system model to model the above mentioned aspects consists of various cost contributions that can be arbitrarily detailed and extended depending on the need of the target situation. In this use case we focus on optimizing the marginal costs associated with running the grid (running costs of generators, transmission lines etc.), capital costs associated with network expansion (installing new generators, transmission lines, ...), and the costs for the start-up/shut-down of generators over time. This pared-down version inherits much of the complexity seen in the full-scale optimization problem, namely, a large number of variables and constraints. The problem can also be extended in numerous ways.
+Mathematically, we cast the optimization problem as a mixed integer linear program with two sub-problems: (1) network expansion and (2) the unit commitment problem. Our strategy for solving the mixed integer linear program is to alternate between optimizing these sub-problems for a number of iterations. The complexity of optimizing the marginal costs comes from the large number of variables and constraints (typically on the order of 10-100 million). The sub-problem of optimizing start-up and shutdown costs of generators constitutes the so-called unit commitment problem. Our formulation of unit commitment introduces binary variables that indicate whether a generator is switched on or off for each generator and each time step. Formally the unit commitment problem is NP-hard so we cannot expect a (classical or quantum) computer to solve it in polynomial time. However, the problem is amendable to quantum-inspired solvers and, potentially, to quantum annealers, which might lead to a runtime speed-up.
 
-An energy grid is a graph that models energy generation, storage, demand and transmission. Typically, each node comprises several modes of energy generation, such as coal-fires power plants, solar energy farms, and energy utilization, such as households and industry. A node is a sufficiently localized entity such as a city or a group of cities. Transmission is modelled as a simple flow between nodes connected by power lines. We do not consider the details of impedances in AC/DC components, i.e. the flow is assumed linear. Figure 1 illustrates an energy grid with five nodes.
+An energy grid is a graph that models energy generation, storage, demand and transmission. Typically, each node comprises several modes of energy generation, such as coal-fire power plants, solar energy farms, and energy utilization, such as households and industry. A node is a sufficiently localized entity such as a city or a group of cities. Transmission is modelled as a simple flow between nodes connected by power lines. We do not consider the details of impedances in AC/DC components, i.e. the flow is assumed linear. Figure 1 illustrates an energy grid with five nodes.
 ::: hljs-center
 
 ![Figure 1: Graph of an energy grid with five nodes and links between nodes](87905ee7-e493-4e48-a61f-2cfd9cd54903)
 *Figure 1: Graph of an energy grid with five nodes and links between nodes*
 :::
 
-We want to minimize the annual system costs (in EUR/a) of an energy grid over a long time horizon. The system costs consist of capital cost for the energy generation (annual investment costs in EUR/MWH) and energy transmission as well as marginal costs for the dispatch (in EUR/MWH).
-A mathematical formulation for the cost function is given by the following expression:
-$$ \sum\limits_{n, s} c_{n, s} \bar{g}_{n, s} + \sum\limits_{n, s} c_{n, s} \bar{h}_{n, s} + \sum\limits_{l} c_{l} F_{l} $$
-$$ + \sum\limits_{n, s, t} o_{n, s, t} g_{n, s, t} + \sum\limits_{n, s, t} o_{n, s, t} h_{n, s, t} $$
-$$ + \sum\limits_{n, s, t} (su_{n, s, t} + sd_{n, s, t}) $$
-Index $n$ is the node, $n$ is a type (e.g. generator type), $l$ an edge in the graph and $t$ is the time step. The terms in the first line correspond to capital costs (i.e. generators, storage units, and transmission lines, respectively), while terms in the second line correspond to the marginal costs (i.e. generators, and storage units, respectively). Already the term in the last line corresponds to the power plant starts up or shuts down costs. In a first approximation, capital costs relate to a time-independent maximally installed capacity of the generation unit or storage unit ($\bar{g}_{n, s}$ and $\bar{h}_{n, s}$). The marginal costs $o_{n, s, t}$ relate to an actual power plant dispatch with an associated generation power $g_{n, s, t}$ and storage usage $h_{n, s, t}$. Currently our data sets do not contain start-up ($su_{n, s, t}$) or shutdown costs ($sd_{n, s, t}$). Table 1 provides an overview of all variables in the optimization problem.
+We want to minimize the annual system costs (in EUR/a) of an energy grid over a long time horizon. The system costs consist of capital cost for the energy generation (annual investment costs in EUR/MWH) and energy transmission as well as marginal costs for the dispatch (in EUR/MWH). The following table provides an overview of all variables in the optimization problem.
 
-|**Variable**|**Description**|
-|-|-|
-|$c_{n, s}$|Capital costs (in MW) per node n and power plant unit or storage unit (installed power capacity or storage capacity)|
-|$c_{l}$|Capital cost per interconnector $l$|
+|**Variable**    |**Description**|
+|      -         |      -        |
+|$c_{n, s}$      |Capital costs (in MW) per node n and power plant unit or storage unit (installed power capacity or storage capacity)|
+|$c_{l}$         |Capital cost per interconnector $l$|
 |$\bar{g}_{n, s}$|Maximum installed generation power of power plant unit|
 |$\bar{h}_{n, s}$|Maximum installed storage capacity|
-|$F_{l}$|Maximum transmission capacity per interconnector|
-|$o_{n, s, t}$|Marginal costs per node $n$ and additional used capacity or storage unit capacity|
-|$g_{n, s, t}$|Generation power per node $n$, power plant unit $s$, and time step $t$|
-|$h_{n, s, t}$|Storage capacity per node $n$, storage capacity $s$, and time step $t$|
-|$su_{n, s, t}$|Start-up costs per node $n$, power plant unit $s$, and time step $t$|
-|$sd_{n, s, t}$|Shut down costs per node $n$, power plant unit $s$, and time step $t$|
+|$F_{l}$         |Maximum transmission capacity per interconnector|
+|$o_{n, s, t}$   |Marginal costs per node $n$ and additional used capacity or storage unit capacity|
+|$g_{n, s, t}$   |Generation power per node $n$, power plant unit $s$, and time step $t$|
+|$h_{n, s, t}$   |Storage capacity per node $n$, storage capacity $s$, and time step $t$|
+|$su_{n, s, t}$  |Start-up costs per node $n$, power plant unit $s$, and time step $t$|
+|$sd_{n, s, t}$  |Shut down costs per node $n$, power plant unit $s$, and time step $t$|
 *Table 1: Overview of variables used in the problem formulation*
 
-As mentioned before, currently our datasets don't contain start-up and shut-down costs, reducing the problem complexity. To further reduce the problem size we, in a first step, neglect the storage capacities, thus resulting in the following expression for the cost function:
-$$ \sum\limits_{n, s} c_{n, s} \bar{g}_{n, s} + \sum\limits_{l} c_{l} F_{l} + \sum\limits_{n, s, t} o_{n, s, t} g_{n, s, t} $$
+Using these variables, we can give a mathematical formulation of the function to be minimized:
+$$ \underbrace{\sum\limits_{n, s} c_{n, s} \bar{g}_{n, s} + \sum\limits_{n, s} c_{n, s} \bar{h}_{n, s} + \sum\limits_{l} c_{l} F_{l} }_{\text{capital costs}}
++ \underbrace{\sum\limits_{n, s, t} o_{n, s, t} g_{n, s, t} + \sum\limits_{n, s, t} o_{n, s, t} h_{n, s, t} }_{\text{marginal costs}}
++ \underbrace{ \sum\limits_{n, s, t} su_{n, s, t} + sd_{n, s, t}  }_{\text{shutdown/start-up costs}}.$$
 
-We can translate this into a Unit Commitment Problem, which can then be modeled as a Quadratic Unconstrained Binary Optimization (QUBO) problem. Using Quantum Annealing, Simulated Quantum Annealing (SQA) algorithms, or Quantum Approximate Optimization Algorithm (QAOA) we can solve this problem and give a suggestion which geenrators should be used, to match the current network load.
+The terms in the first sums correspond to capital costs incurred by the generators, storage units, and transmission lines. Then in the second batch, we add terms that correspond to the marginal costs of the generators and storage units. At last, we add terms that correspond to the power plant start-up or shut-down costs. In a first approximation, capital costs relate to a time-independent maximally installed capacity of the generation unit or storage unit $\bar{g}_{n, s}$ and $\bar{h}_{n, s}$. The marginal costs $o_{n, s, t}$ relate to an actual power plant dispatch with an associated generation power $g_{n, s, t}$ and storage usage $h_{n, s, t}$. 
 
+Currently our data sets do not contain start-up costs $su_{n, s, t}$ or shutdown costs $sd_{n, s, t}$, which reduces the problem complexity. To further reduce the problem size we, in a first step, neglect the storage capacities, thus resulting in the following expression for the cost function:
+ $$ \sum\limits_{n, s} c_{n, s} \bar{g}_{n, s} + \sum\limits_{l} c_{l} F_{l} + \sum\limits_{n, s, t} o_{n, s, t} g_{n, s, t} $$
+
+We can translate this into a Unit Commitment Problem, which can then be modeled as a Quadratic Unconstrained Binary Optimization (QUBO) problem. Using Quantum Annealing, Simulated Quantum Annealing (SQA), or Quantum Approximate Optimization Algorithm (QAOA) we can solve this problem and give a suggestion which generators should be used, to match the current network load.
+ 
 The Unit Commitment Problem currently works minimizing the marginal costs, while considering the capital costs as constants, which will be included in later. Thus only the last term of the expression, i.e. $\sum\limits_{n, s, t} o_{n, s, t} g_{n, s, t}$, will be minimized.
+
+# Additional information not available on the platform
 
 Even though the goal is to minimize the marginal costs, various constraints have to be considered to simulate a real problem. Constraints can be the minimum up/down time of generators, the gradual ramp-up and -down times as well as adhering to the Kirchhoff laws. The last one is the most important one, which is why we implemented it first. 
 

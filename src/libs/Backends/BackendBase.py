@@ -5,6 +5,14 @@ from datetime import datetime
 
 
 class BackendBase(abc.ABC):
+    """
+    The BackendBase class is an interface that the solvers of the unit
+    commitment problem have to adhere it. It also initializes some 
+    attributes that are the same for all solvers.
+
+    How an object that inherits from this class is used to formulate and
+    optimize the unit commitment problem can be seen in `program.py`
+    """
     def __init__(self, reader: InputReader):
         self.output = None
         self.reader = reader

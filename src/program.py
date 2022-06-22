@@ -1,7 +1,9 @@
-"""This file is the entrypoint for the docker run command.
-The docker container loads the pypsa model and performs the optimization
-of the unit commitment problem.
-"""
+"""This file provides the entrypoint for starting an optimization run via the 
+function `run`. It returns a response object containing information on the result
+of the optimization. The PlanQK service uses this method to generate the response
+to a request and the local execution of an optimization uses the provided values
+in the makefile to call this method."""
+
 from typing import Union
 
 import pypsa
