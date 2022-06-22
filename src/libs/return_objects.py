@@ -1,3 +1,8 @@
+"""Basic definitions of the response class that wrap the serialization of optimization results.
+These responses can be used to provide an HTTP response in the case of the service or save 
+the information to the disk
+"""
+
 import json
 from abc import abstractmethod
 from datetime import datetime

@@ -1,3 +1,7 @@
+"""
+This script is used for analyzing and plotting the results of qaoa runs. It's functionality
+will be later be merged with the script for analyzing the other solvers"""
+
 import itertools
 from datetime import datetime
 
