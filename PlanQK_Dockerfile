@@ -1,7 +1,12 @@
+# This dockerfile is for testing the planqk service locally. When building the service,
+# the dockerfile can't be specified, so the adjustments here are just to make the build
+# faster
+
 FROM ghcr.io/planqk/job-template:latest-base-1.0.0
 
 ENV ENTRY_POINT app.user_code.src.program:run
 
+# install big pip packages before copying user code in order to reuse it
 RUN pip install numpy
 RUN pip install scipy
 RUN pip install pandas
@@ -13,7 +18,8 @@ RUN pip install networkx
 RUN pip install tables
 RUN pip install minorminer
 
-
 COPY . ${USER_CODE_DIR}
 # RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
+# PlanQK_requirements.txt contains the path to the pypsa 19.0.3 zip file which is
+# necessary for reading serialized networks.
 RUN pip install -r ${USER_CODE_DIR}/PlanQK_requirements.txt
