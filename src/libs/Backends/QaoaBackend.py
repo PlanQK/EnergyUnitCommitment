@@ -96,8 +96,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
         """
         self.qaoa_optimizer = qaoa_optimizer
         self.config_qaoa = qaoa_optimizer.config_qaoa
-        self.problem_range = self.config_qaoa.get("problem_range", 2)
-        self.mixing_range = self.config_qaoa.get("mixing_range", 1)
+        self.range = self.config_qaoa.get("range", 3.14)
         self.config_guess = self.config_qaoa["initial_guess"]
         self.num_angles = len(self.config_guess)
         self.repetitions = self.config_qaoa["repetitions"]
@@ -156,11 +155,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
             # if chosen randomly, choose a random angle and scale based on whether it is the angle
             # of a problem hamiltonian sub circuit or mixing hamiltonian sub circuit
             if current_guess == "rand":
-                next_angle = 2 * math.pi * (0.5 - np.random.rand())
-                if idx % 2 == 0:
-                    next_angle *= self.problem_range
-                else:
-                    next_angle *= self.mixing_range
+                next_angle = 2 * (0.5 - np.random.rand()) * self.range
             # The angle is fixed for all repetitions
             else:
                 next_angle = current_guess
@@ -177,34 +172,28 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         first calculates the grid that is going to be searched and then sets up the data structures
         necessary to keep track which grid points have already been tried output
 
-        A grid is a product of grids for each angle space of one layer of problem+mixing hamiltonian.
-        We can give a default grid that each layer will use if their grid config doesn't specify it.
-        A grid for one layers needs upper and lower bounds for the angle of the mixing and problem
-        hamiltonian. Furthermore, it either needs to specify how many grid points are added for each angle
+        A grid is a product of grids for each angle space of one layer. These layers are alternating
+        problem and mixing hamiltonians.
+        We can give a default grid whose paramters each layer will use if their grid config doesn't specify it.
+        A grid for one layers needs upper and lower bounds for the angle 
+        Furthermore, it needs to specify how many grid points are added for each angle
         Keep in mind that the total number of grids point is the product over all grids over all layers
         which can grow very quickly.
-        Each Grid is represented as a dictionary with 6 Values
-            lowerBoundMixing, upperBoundMixing, num_grid_mixing
-            lower_bound_problem, upper_bound_problem, num_grid_problem
-        If a value is not specified the value of a default grid is used instead
-            default_grid: (dict) the default paramters of the grid for one layer
-                keys
-                    lower_bound_problem : -1
-                    upper_bound_problem : 1
-                    num_grid_problem : 3
-                    lowerBoundMixing : -1
-                    upperBoundMixing : 1
-                    num_grid_mixing : 3
+        Each Grid is represented as a dictionary with up to three Values
+            lower_bound, upper_bound, num_grid
+        If a value is not specified the value of a default grid is used instead. If the values of th default
+        grid are not set speficiend, the following values will be used as default values
+                lower_bound : -1
+                upper_bound : 1
+                num_gridpoints : 3
         The config file contains a list of all grids for the layers of the quantum circuit
-            gridList: list
-                a list of dictionaries. The i-th dictionary contains the grid values of the i-th layer
+        It can also contain an entry `default_grid`
         """
         self.qaoa_optimizer = qaoa_optimizer
         self.config_qaoa = qaoa_optimizer.config_qaoa
-
         self.set_default_grid(self.config_qaoa.get('default_grid', {}))
-        self.grids_by_layer = [grid for layer in self.config_qaoa['initial_guess']
-                               for grid in self.transform_to_gridpoints(layer)]
+        self.grids_by_layer = [self.transform_to_gridpoints(layer) 
+                                for layer in self.config_qaoa['initial_guess']]
         self.num_angles = len(self.grids_by_layer)
 
     def get_num_angles(self):
@@ -236,55 +225,28 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
             (None) modifies the attribute self.default
         """
         self.default_grid = {
-            "lower_bound_problem": default_grid.get("lower_bound_problem", - math.pi),
-            "upper_bound_problem": default_grid.get("upper_bound_problem", math.pi),
-            "num_gridpoints_problem": _grid.get("num_gridpoints_problem", 3),
-            "lower_bound_mixing": default_grid.get("lower_bound_mixing", -math.pi),
-            "upper_bound_mixing": default_grid.get("upper_bound_mixing", math.pi),
-            "num_gridpoints_mixing": default_grid.get("num_gridpoints_mixing", 3),
+            "lower_bound": default_grid.get("lower_bound", - math.pi),
+            "upper_bound": default_grid.get("upper_bound", math.pi),
+            "num_gridpoints": default_grid.get("num_gridpoints", 3),
         }
 
     def transform_to_gridpoints(self, grid_dict):
         """
-        returns two list of grid points based on the dictionary describing the grid points of one layer.
+        takes the dicitonary describing the initial angles of one layer of qaoa
+        and constructs the correspond list of angles
     
         Args:
             grid_dict: (dict) a dicitonary with the following keys
-                    lower_bound_problem 
-                    upper_bound_problem 
-                    num_grid_problem 
-                    lowerBoundMixing 
-                    upperBoundMixing 
-                    num_grid_mixing 
+                    lower_bound
+                    upper_bound
+                    num_gridpoints
         Returns:
             (list, list) returns two lists with float values
         """
-        problem_grid = self.make_grid_list(
-            lower_bound=grid_dict.get('lower_bound_problem', self.default_grid['lower_bound_problem']),
-            upper_bound=grid_dict.get('upper_bound_problem', self.default_grid['upper_bound_problem']),
-            num_gridpoints=grid_dict.get('num_grid_problem', self.default_grid['num_grid_problem']),
-        )
-        mixing_grid = self.make_grid_list(
-            lower_bound=grid_dict.get('lowerBoundMixing', self.default_grid['lowerBoundMixing']),
-            upper_bound=grid_dict.get('upperBoundMixing', self.default_grid['upperBoundMixing']),
-            num_gridpoints=grid_dict.get('num_grid_mixing', self.default_grid['num_grid_mixing']),
-        )
-        return problem_grid, mixing_grid
+        lower_bound = grid_dict.get('lower_bound', self.default_grid['lower_bound'])
+        upper_bound = grid_dict.get('upper_bound', self.default_grid['upper_bound'])
+        num_gridpoints = grid_dict.get('num_gridpoints', self.default_grid['num_gridpoints'])
 
-    def make_grid_list(self, lower_bound, upper_bound, num_gridpoints):
-        """
-        takes lower and upper bound and returns a list of equidistant points in that interval
-        with length equal the specified grid points. a non-positive number of grid points will raise an exception.
-        If exactly one gridpoint is specified, the returned list will only contain the lower bound as the
-        singe point.
-    
-        Args:
-            lower_bound: (float) the minimal grid point
-            upper_bound: (float) the maximal grid point
-            num_gridpoints: (int) the total number of grid points
-        Returns:
-            (list) a list of floating values which form a grid on the given intervall
-        """
         if num_gridpoints <= 0:
             raise ValueError("trying to construct an empty grid set, which vanishes in the product of grids")
         try:
@@ -315,7 +277,7 @@ class QaoaQiskit(BackendBase):
         """
         super().__init__(reader)
         # copy relevant config to make code more readable
-        self.config_qaoa = self.config["QaoaBackend"]
+        self.config_qaoa = self.config["qaoa_backend"]
         self.add_results_dict()
         self.angle_supervisior = QaoaAngleSupervisor.make_angle_supervisior(
             qaoa_optimizer=self
@@ -337,7 +299,7 @@ class QaoaQiskit(BackendBase):
 
         # set up connection to IBMQ servers
         if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
-            IBMQ.save_account(token=self.config["APItoken"]["IBMQ_API_token"],
+            IBMQ.save_account(token=self.config["API_token"]["IBMQ_API_token"],
                               overwrite=True)
             self.provider = IBMQ.load_account()
 
@@ -939,7 +901,7 @@ class QaoaQiskit(BackendBase):
         probabilities = {}
         shots = self.config_qaoa["shots"]
         # find repetition value from where the refinement process started
-        start = self.output["results"]["totalReps"] - self.config_qaoa["repetitions"]
+        start = self.output["results"]["total_reps"] - self.config_qaoa["repetitions"]
         for bitstring in bitstrings:
             probabilities[bitstring] = []
             for key in data:
