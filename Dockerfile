@@ -35,5 +35,6 @@ RUN chmod -R u+wxr /energy
 RUN mkdir /energy/input-model
 RUN chmod u+xr /energy/input-model
 ENV RUNNING_IN_DOCKER Yes
+ENV TRUSTED_USER Yes
 
 ENTRYPOINT [ "python3", "run.py"]

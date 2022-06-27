@@ -9,6 +9,8 @@ from typing import Union
 import pypsa
 from loguru import logger
 
+from os import environ
+
 try:
     # import when building image for local use
     import libs.Backends as Backends
@@ -74,6 +76,11 @@ def run(
 
         # run optimization
         optimizer.transform_problem_for_optimizer()
+        # disable runtime limits on the optimization by setting the env variable
+        # in the dockerfile. This limits runtime on the platform, but allows you
+        # to run as long as you want locally
+        if not environ.get("TRUSTED_USER", False):
+            optimizer.check_input_size()
         optimizer.optimize()
 
         # hook for potential post-processing like flow optimization for dwave

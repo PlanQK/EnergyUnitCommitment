@@ -68,8 +68,11 @@ class BackendBase(abc.ABC):
         pass
 
     def check_input_size():
-        "check if the size of the problem is currently allowed, and if not,
-        stop the run"
+        """check if the size of the problem is currently allowed or if
+        an estimation of the runtime exceeds some arbitrary limit
+        stop the run
+        """
+        pass
 
     def get_config(self) -> dict:
         """
