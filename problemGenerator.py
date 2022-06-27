@@ -33,7 +33,7 @@ CONFIG = {
     # average generator cost per produced energy (this can be float)
     "av_marginal_cost": 5.0,
     # number of different time slices
-    "snapshots": 1,
+    "snapshots": 3,
     # scaling factor for line capacity in percent
     "line_scale": 20,
     # location where to save the network starting at git root
@@ -49,6 +49,25 @@ def random_factor():
     into account the variance from the CONFIG.
     """
     return 1 + 2 * CONFIG["variance"] * (random.random() - 0.5)
+
+def normalize_output(output_list): 
+    """
+    normalize the output_list by scaling them such that the biggest input is 1.
+    Then return the used scalar and the resulting list. This brings it in line with
+    the pypsa standard which specifies generator output over multiple snapshots
+    by specifying the maximum power a generator can produced. Variation on the
+    available power generation at any snapshot is then given by a the percentage
+    of the maximum power
+
+    Args:
+        output_list: (list[float]) the list to be scaled
+    Returns:
+        (float, list[float]) The maximum entry of the list and the list divided by that
+    """
+    max_element = max(*output_list)
+    print(f"max::{max_element}") 
+    print(f"output_list::{output_list}")
+    return max_element, [value / float(max_element) for value in output_list]
 
 
 class Partitioner:
@@ -96,6 +115,7 @@ class Partitioner:
 class ProblemInstance:
     def __init__(self) -> None:
         self.network = pypsa.Network()
+        self.network.set_snapshots(range(CONFIG["snapshots"]))
         self._create_buses_and_loads()
         self._create_generators()
         self._create_lines()
@@ -142,14 +162,15 @@ class ProblemInstance:
         gen_output_index = 0
         for bus_id in range(len(generators_per_bus)):
             for generator_id in range(generators_per_bus[bus_id]):
+                p_nom, p_max_pu = normalize_output(
+                    [element[gen_output_index] for element in generator_output]
+                )
                 self.network.add(
                     "Generator",
                     f"Gen_{bus_id}_{generator_id}",
                     bus=f"Bus_{bus_id}",
-                    p_max_pu=[
-                        element[gen_output_index] for element in generator_output
-                    ],
-                    p_nom=1,
+                    p_max_pu=p_max_pu,
+                    p_nom=p_nom,
                     marginal_cost=random_factor() * CONFIG["av_marginal_cost"],
                 )
                 gen_output_index += 1
@@ -171,9 +192,9 @@ class ProblemInstance:
                 s_nom=int(random_factor() * line_scale * average_load),
             )
         # add some additional lines as well
-        for bus_id1 in range(len(self.network.buses)):
+        for bus_id_1 in range(len(self.network.buses)):
             for bus_id_2 in range(len(self.network.buses)):
-                if bus_id1 == bus_id_2:
+                if bus_id_1 == bus_id_2:
                     continue
                 if len(
                         self.network.lines[
@@ -193,8 +214,8 @@ class ProblemInstance:
                 ):
                     self.network.add(
                         "Line",
-                        f"Line_{bus_id1}_{bus_id_2}",
-                        bus0=f"Bus_{bus_id1}",
+                        f"Line_{bus_id_1}_{bus_id_2}",
+                        bus0=f"Bus_{bus_id_1}",
                         bus1=f"Bus_{bus_id_2}",
                         s_nom=int(random_factor() * line_scale * average_load),
                     )
