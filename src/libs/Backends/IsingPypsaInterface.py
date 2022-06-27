@@ -1,3 +1,22 @@
+"""This module is the central piece for the mathematical
+model of the unit commitment problem as a QUBO/ising problem
+It provides two core components: 
+- The IsingBackbone class which serves as a layer of abstraction
+    between the pypsa network and the groups of qubits used to
+    represent the components of the network. It also provides
+    methods to couple groups of qubits together and to translate
+    the state of qubits into the corresponding network
+- The AbstractIsingSubproblem class, which defines an interface for
+    classes, that model a constraint or the optimization goal
+    of the unit commitment problem. For that, an instance of an
+    AbstractIsingSubproblem models it corresponding problem/constraint
+    using the methods and abstractions provided by an IsingBackbone.
+
+Expanding on the type of networks and problems that can be read can
+be archieved by extending the IsingBackbone. New constraint can be
+added by writing a new class that conforms to the AbstractIsingSubproblem.
+"""
+
 from abc import ABC
 
 import numpy as np
@@ -118,6 +137,8 @@ class IsingBackbone:
     """
     # dictionary that maps config strings to the corresponding classes and
     # methods
+    # The functions on linesplit_dict define how some value of a capacity of
+    # a transmission line is translated into qubits
     linesplit_dict = {
         "fullsplit": fullsplit,
         "binarysplit": binarysplit,
@@ -1128,12 +1149,19 @@ class AbstractIsingSubproblem:
     def __init__(self, backbone: IsingBackbone, config: dict):
         """
         The constructor for a subproblem to be encoded into the Ising
-        subproblem.
-        Different formulations of the same subproblems use a (factory)
-        classmethod to choose the correct subclass and call this
+        subproblem. Different formulations of the same subproblems use
+        a (factory) classmethod to choose the correct subclass and call this
         constructor. The attributes set here are the minimal attributes
-        that are expected.
-        
+        that are expected. The attributes we set have the following purpose:
+            problem: (dict) this contains the qubo formulation of just the
+                subproblem
+            scale_factor: (float) this contains a linear factor to scale the
+                problem with 
+            backbone: (IsingBackbone) This is the IsingBackbone instance that
+                the AbstractIsingSubproblem instance uses to formulate the
+                constraint
+            network: (pypsa.Network) The underlying network of the unit commitment
+                problem
         Args:
             backbone: (IsingBackbone)
                 The backbone on which to encode the problem.
@@ -1155,11 +1183,10 @@ class AbstractIsingSubproblem:
                          configuration: dict) -> 'AbstractIsingSubproblem':
         """
         Returns an instance of the class set up according to the
-        configuration.
-        This is done by choosing the corresponding subclass of the
-        configuration. After initialization, the instance can encode
-        this subproblem into the ising_backbone by calling the
-        encode_subproblem method.
+        configuration. This is done by choosing the corresponding subclass
+        of the configuration. After initialization, the instance can encode
+        this subproblem into the ising_backbone by calling the encode_subproblem 
+        method.
 
         Args:
             backbone: (IsingBackbone)

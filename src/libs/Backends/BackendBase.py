@@ -1,3 +1,7 @@
+"""This module contains the BackendBase class, which describes the interface
+a solver of the unit commitment problem has to satisfy. It also sets up
+various attributes that are all solvers use"""
+
 import abc
 
 from .InputReader import InputReader
@@ -24,27 +28,48 @@ class BackendBase(abc.ABC):
 
     @abc.abstractmethod
     def transform_problem_for_optimizer(self) -> None:
+        """
+        This transforms the problem given as a pypsa network
+        into the corresponding data structure the algorithm this
+        class implements 
+    
+        Returns:
+            (None) This sets the attribute `self.transformed_problem`
+            to the correct value
+        """
         pass
 
     @abc.abstractmethod
     def optimize(self) -> None:
+        """"
+        This performs the actual optimization after the problem
+        has been transformed appropiately.
+        """
         pass
 
     def process_solution(self) -> None:
+        """
+         if the solution needs any postprocessing_time, this is the
+         hook to do so.
+    
+        Args:
+            PAR
+        Returns:
+            (type) description
+        """
         self.output["results"]["postprocessing_time"] = 0.0
 
     @abc.abstractmethod
     def transform_solution_to_network(self):
+        """
+        writes the solution of the optimization run into a copy of
+        the original pypsa network
+        """
         pass
 
-    @abc.abstractmethod
-    def optimize(self) -> None:
-        pass
-
-    # TODO: implemented in DWave, but not used right now.
-    #  (Can we have a blacklist on PlanQK?)
-    def handle_optimization_stop(self, path):
-        pass
+    def check_input_size():
+        "check if the size of the problem is currently allowed, and if not,
+        stop the run"
 
     def get_config(self) -> dict:
         """
@@ -79,6 +104,14 @@ class BackendBase(abc.ABC):
         return self.output
 
     def print_solver_specific_report(self):
+        """
+        A subclass may overwrite this method in order to print
+        additional information after the generic information about
+        the optimization run.
+    
+        Returns:
+            (None) prints additional output when `print_report` is called
+        """
         pass
 
     def print_report(self) -> None:

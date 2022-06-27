@@ -1,3 +1,16 @@
+"""This module is for managing input and output. It provives classes for
+accepting various forms of input and extract all information relevant to
+the optimization run. Right now it supports the following types of input
+# input
+- reading a network and config file from disk, an additional input string
+when calling the script that initiates the optimization
+- reading jsons, one containing a serialized network, the other a config file
+
+# output
+- so far, output is saved in the backends using a dictionary, or by creating
+a response object
+"""
+
 import copy
 import json
 import pypsa

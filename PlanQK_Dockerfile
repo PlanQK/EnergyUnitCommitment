@@ -19,7 +19,7 @@ RUN pip install tables
 RUN pip install minorminer
 
 COPY . ${USER_CODE_DIR}
-# RUN pip install git+https://github.com/pypsa/pypsa#egg=pypsa
 # PlanQK_requirements.txt contains the path to the pypsa 19.0.3 zip file which is
-# necessary for reading serialized networks.
+# necessary for reading serialized networks. Currently the path of the zip file is hardcoded
+# and has to be adjusted once the patch is live and can be installed using pip
 RUN pip install -r ${USER_CODE_DIR}/PlanQK_requirements.txt

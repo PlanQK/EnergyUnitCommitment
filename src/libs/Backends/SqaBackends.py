@@ -1,3 +1,10 @@
+"""This module serves as a wrapper for the simulated quantum annealing solver. 
+You can find more information on the implementation of it at 
+https://doi.org/10.5905/ethz-1007-127
+It also provides a solver implementing classical annealing by adjusting the
+transverse fied to be 0 everywherw
+"""
+
 import random
 import time
 

@@ -1,3 +1,10 @@
+"""This module uses pypsa's MILP formulation to generate the problem
+and then solves it using one of the installed optimizers. The possible
+choices for optimizers are
+- GLPK
+- FicoXpress (TODO)
+"""
+
 import pypsa
 
 from .BackendBase import BackendBase

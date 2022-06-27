@@ -20,6 +20,17 @@ class Response:
 
     @abstractmethod
     def save_to_json_local_docker(self, folder: str = "Problemset/"):
+        """
+        An abstract method to be overwritten in child classes. The behaviour of the method
+        is to write the contents of the response to the disk. This is needed for saving the 
+        results of an optimization if you ran it locally in a docker container
+    
+        Args:
+            folder: (str) location where the information of the response is dumped. The default
+                option is the mount point that the makefile uses for mounting the network folder
+        Returns:
+            (None) Writes a file to the disk.
+        """
         pass
 
 
@@ -37,6 +48,17 @@ class ErrorResponse(Response):
         self.detail = detail
 
     def save_to_json_local_docker(self, folder: str = "Problemset/"):
+        """
+        saves the thrown error to the disk. Instead of using the name specified
+        in the config for the result, this will instead use a name using the
+        the time when the error was encountered and which error code was thrown.
+    
+        Args:
+            folder: (str) the location wherer to save the response. The default
+                path is the mount point of the makefile for the networks
+        Returns:
+            (None) Saves the error code to the mountpoint of the networks
+        """
         error = {"status_code": self.code,
                  "message": self.detail}
         now = datetime.today()
@@ -56,8 +78,17 @@ class ResultResponse(Response):
     def __init__(self, result: dict, metadata: dict = None):
         self.result = result
         self.metadata = metadata
-        self.fileName = result["file_name"]
+        self.file_name = result["file_name"]
 
     def save_to_json_local_docker(self, folder: str = "Problemset/"):
-        with open(f"{folder}{self.fileName}", "w") as write_file:
+        """
+        Saves the result of the local optimization in a docker container.
+    
+        Args:
+            folder: (str) the location wherer to save the response. The default
+                path is the mount point of the makefile for the networks
+        Returns:
+            (None) Saves the optimization result to the mountpoint of the networks
+        """
+        with open(f"{folder}{self.file_name}", "w") as write_file:
             json.dump(self.result, write_file, indent=2, default=str)

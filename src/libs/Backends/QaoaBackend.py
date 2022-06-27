@@ -1,3 +1,8 @@
+"""This module uses IBM's qiskit runtime to implement the 
+QAOA (quantum approximate optimization algorithm). Using a noise model
+for the qunatum circuit or using an actul quantum computer requires
+an API token"""
+
 import math
 from itertools import product
 

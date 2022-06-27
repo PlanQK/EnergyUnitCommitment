@@ -1,3 +1,15 @@
+"""This module is for providing optimizers using d-wave's cloud for access
+to their quantum hardware. So far, this module supports
+- quantum annealing (usiing pegasus tpology)
+- a hybrid solver
+- tabu search (ocean package, classical algorithm)
+- steepest decent (ocean package, classical algorithm)
+
+For local testing and in case the processing of samples changes, this
+module can also run quantum annealing by reading samples and returning
+them as the result of a run"""
+
+
 import time
 
 import networkx
