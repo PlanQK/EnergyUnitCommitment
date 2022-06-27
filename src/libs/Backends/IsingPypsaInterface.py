@@ -517,16 +517,15 @@ class IsingBackbone:
                 encoding_length=len(single_timestep_split),
             )
 
+
     def create_qubit_entries_for_component(self,
                                            component_name: str,
-                                           num_qubits: int = None,
-                                           weights: list[float] = None,
-                                           encoding_length: int = None
+                                           snapshot_to_weight_dict: dict)
                                            ) -> None:
         """
         A function to create qubits in the self.data dictionary that
         represent some network components. The qubits can be accessed
-        using the componentName.
+        using the component_name.
         The method places several restriction on what it accepts in
         order to generate a valid QUBO later on. The checks are intended
         to prevent name or qubit collision.
@@ -534,13 +533,10 @@ class IsingBackbone:
         Args:
             component_name: (str)
                 The string used to couple the component with qubits.
-            num_qubits: (int)
-                Number of qubits necessary to encode the component.
-            weights: (int)
-                Weight for each qubit which to use whenever it gets
-                coupled with other qubits.
-            encoding_length: (int)
-                Number of qubits used for encoding during one time step
+            snapshot_to_weight_dict: (dict)
+                a dictionary of lists with snapshots as keys and the 
+                corresponding value being the weights of the qubits 
+                representing the component at that snapshot
 
         Returns:
             (None)
@@ -550,24 +546,39 @@ class IsingBackbone:
             raise ValueError("Component names mustn't be of type int")
         if component_name in self.data:
             raise ValueError("Component name has already been used")
-        if weights is None:
-            raise ValueError("Assigned qubits don't have any weight")
-        if num_qubits is None:
-            num_qubits = len(weights) * len(self.snapshots)
-        if num_qubits * len(self.snapshots) != len(weights):
-            raise ValueError("Assigned qubits don't match number of weights")
-        if len(self.snapshots) * encoding_length != num_qubits:
-            raise ValueError("total number of qubits, numer of snapshots and "
-                             "qubits per snapshot is not consistent")
-        indices = range(self.allocated_qubits, self.allocated_qubits + num_qubits)
-        self.allocated_qubits += num_qubits
+
+        snapshot_to_weight_dict = {snapshot : snapshot_to_weight_dict.get(snapshot, [])
+                for snapshot in self.network.snapshots}
+
         self.data[component_name] = {
-            'indices': indices,
-            'weights': weights,
-            'encoding_length': encoding_length,
+            snapshot : 
+            self.allocated_qubit_list(snapshot_to_weight_dict[snapshot])
+            for snapshot in self.network.snapshots
         }
-        for idx, qubit in enumerate(indices):
-            self.data[qubit] = weights[idx]
+        for snapshot, qubit_list in self.data[component_name].items():
+            for idx, qubit in enumerate(qubit_list):
+                self.data[qubit] = snapshot_to_weight_dict[snapshot][idx]
+
+
+    def allocate_qubits_to_weight_list(self, weight_list: list):
+        """
+        For a given list of weights, returns a list of qubits which will we mapped
+        to these weights, starting at the quibt self.allocated_qubits and increasing
+        that counter appropriately
+
+        Args:
+            weight_list: (list[float]) a list of floats, which describes weights to be
+                mapped to newly allocated qubits
+        Returns:
+            (list[int]) a list of consecutive integers, which represent qubits which are
+                    mapped to the weight list. Also increases internal qubit count
+        """
+        num_new_allocated_qubits = len(weight_list)
+        allocated_qubit_list = list(range(self.allocated_qubits, 
+                                            self.allocated_qubits + num_new_allocated_qubits))
+        self.allocated_qubits += num_new_allocated_qubits
+        return allocated_qubit_list
+
 
     # helper functions to set encoded values
     def set_output_network(self, solution: list) -> pypsa.Network:
