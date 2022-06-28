@@ -16,7 +16,7 @@ ising_interface:
     # values for specifiying network to qubit abstraction
     formulation: "customsplit"
         # (string) name of the function how to model lines with qubits
-        # choose between binarysplit, fullsplit, customsplit
+        # choose between binarysplit, fullsplit, customsplit, cutpowersoftwo
         #
     # each followung entry is the configuration data for one QUBI subproblem
     kirchhoff:

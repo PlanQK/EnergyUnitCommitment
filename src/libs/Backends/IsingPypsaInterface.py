@@ -24,6 +24,32 @@ import numpy as np
 import pypsa
 
 
+def cut_powers_of_two(capacity: float) -> list:
+    """
+    A method for splitting up the capacity of a line with a given
+    maximum capacity.
+    It uses powers of two to decompose the capacity and cuts off the 
+    the biggest power of two so the total sum of all powers equals
+    the capacity
+    
+    Args:
+        capacity: (int)
+            The capacity of the line to be decomposed.
+    Returns:
+        (list)
+            A list of weights to be used in decomposing a line.
+    """
+    integer_capacity = int(capacity)
+    if integer_capacity == 0:
+        return []
+    bit_length = integer_capacity.bit_length()
+    positive_powers = [1 << idx for idx in range(bit_length - 1)]
+    already_filled = (1 << bit_length - 1) - 1
+    positive_capacity = positive_powers + [integer_capacity - already_filled]
+    negative_capacity = [- number for number in positive_capacity]
+    return positive_capacity + negative_capacity
+
+
 def fullsplit(capacity: int) -> list:
     """
     A method for splitting up the capacity of a line with a given
@@ -140,6 +166,7 @@ class IsingBackbone:
     # The functions on linesplit_dict define how some value of a capacity of
     # a transmission line is translated into qubits
     linesplit_dict = {
+        "cutpowersoftwo": cut_powers_of_two,
         "fullsplit": fullsplit,
         "binarysplit": binarysplit,
         "customsplit": customsplit,
