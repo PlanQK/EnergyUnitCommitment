@@ -14,7 +14,7 @@ backend: "sqa"
 # all configuration data of the QUBO model of the network
 ising_interface:
     # values for specifiying network to qubit abstraction
-    formulation: "customsplit"
+    formulation: "cutpowersoftwo"
         # (string) name of the function how to model lines with qubits
         # choose between binarysplit, fullsplit, customsplit, cutpowersoftwo
         #
@@ -54,6 +54,10 @@ ising_interface:
     min_up_down_time:
         min_up_down_factor: 1.0
 
+    # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index, so if the network has
+    # fewer snapshots, all are taken
+        # (int) If this is non-positive, the problem will be trivial
+    snapshots: 4
 
 qaoa_backend:
     shots: 200

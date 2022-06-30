@@ -130,6 +130,8 @@ class BackendBase(abc.ABC):
               f'{self.output["results"].get("individual_kirchhoff_cost","N/A")}')
         print(f'Total Kirchhoff cost: '
               f'{self.output["results"].get("kirchhoff_cost","N/A")}')
+        print(f'Kirchhoff cost at each time step: '
+              f'{self.output["results"].get("kirchhoff_cost_by_time","N/A")}')
         print(f'Total power imbalance: '
               f'{self.output["results"].get("power_imbalance","N/A")}')
         print(f'Total Power generated: '

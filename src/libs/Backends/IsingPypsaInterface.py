@@ -24,6 +24,27 @@ import numpy as np
 import pypsa
 
 
+def integer_decomposition_powers_of_two_and_rest(number: int):
+    """
+    for an integer, constructs a list of powers of two + a rest, such 
+    that the sum over that list is equal to this number. This only
+    uses positive numbers
+
+    Args:
+        number: (int) 
+            the number to be decomposed into (mostly) powers of two
+    Returns:
+        (list)
+            a list of integers with sum equal to number
+    """
+    if number == 0:
+        return []
+    bit_length = number.bit_length()
+    positive_powers = [1 << idx for idx in range(bit_length - 1)]
+    already_filled = (1 << bit_length - 1) - 1
+    return positive_powers + [number - already_filled]
+
+
 def cut_powers_of_two(capacity: float) -> list:
     """
     A method for splitting up the capacity of a line with a given
@@ -40,12 +61,7 @@ def cut_powers_of_two(capacity: float) -> list:
             A list of weights to be used in decomposing a line.
     """
     integer_capacity = int(capacity)
-    if integer_capacity == 0:
-        return []
-    bit_length = integer_capacity.bit_length()
-    positive_powers = [1 << idx for idx in range(bit_length - 1)]
-    already_filled = (1 << bit_length - 1) - 1
-    positive_capacity = positive_powers + [integer_capacity - already_filled]
+    positive_capacity = integer_decomposition_powers_of_two_and_rest(integer_capacity)
     negative_capacity = [- number for number in positive_capacity]
     return positive_capacity + negative_capacity
 
@@ -178,7 +194,7 @@ class IsingBackbone:
         Constructor for an Ising Backbone. It requires a network and
         the name of the function that defines how to encode lines. Then
         it goes through the configuration dictionary and encodes all
-        sub-problems present into the instance.
+        sub-problem present into the instance.
 
         Args:
             network: (pypsa.Network)
@@ -200,11 +216,13 @@ class IsingBackbone:
             configuration["kirchhoff"] = {"scale_factor": 1.0}
 
         # resolve string for splitting line capacty to function
-        self._linesplitName = linesplit_name
-        self.splitCapacity = IsingBackbone.linesplit_dict[linesplit_name]
+        self._linesplit_name = linesplit_name
+        self.split_capacity = IsingBackbone.linesplit_dict[linesplit_name]
 
         # network to be solved
         self.network = network
+        if "snapshots" in configuration:
+            self.network.snapshots = self.network.snapshots[:configuration["snapshots"]]
         self.snapshots = network.snapshots
 
         # contains ising coefficients
@@ -377,6 +395,7 @@ class IsingBackbone:
                 interaction coefficient.
         """
         if time is None:
+            print("falling back default time in constant")
             time = self.network.snapshots[0]
         component_adress = self.get_representing_qubits(component, time)
         for qubit in component_adress:
@@ -513,7 +532,6 @@ class IsingBackbone:
             (None)
                 Modifies self.data and self.allocated_qubits
         """
-        timesteps = len(self.snapshots)
         for generator in self.network.generators.index:
             self.create_qubit_entries_for_component(
                 component_name=generator,
@@ -536,11 +554,10 @@ class IsingBackbone:
             (None)
                 Modifies self.data and self.allocated_qubits
         """
-        timesteps = len(self.snapshots)
         for line in self.network.lines.index:
             # we assume that the capacity of a line is constant across all
             # snapshots
-            constant_line_capacity = self.splitCapacity(int(self.network.lines.loc[line].s_nom))
+            constant_line_capacity = self.split_capacity(int(self.network.lines.loc[line].s_nom))
             weight_dict = {
                 time : constant_line_capacity 
                 for time in self.network.snapshots
@@ -810,7 +827,10 @@ class IsingBackbone:
                 Index of time slice for which to get the generator
                 status. This has to be in the network.snapshots index
         """
-        return self.data[gen][time][0] in solution
+        try:
+            return self.data[gen][time][0] in solution
+        except IndexError:
+            return False
 
     def get_generator_dictionary(self, solution: list,
                                  stringify: bool = True) -> dict:
@@ -1029,6 +1049,7 @@ class IsingBackbone:
         return {
             "total_cost": self.calc_cost(solution=solution),
             "kirchhoff_cost": self.calc_kirchhoff_cost(solution=solution),
+            "kirchhoff_cost_by_time": self.calc_kirchhoff_cost_by_time(solution=solution),
             "power_imbalance": self.calc_power_imbalance(solution=solution),
             "total_power": self.calc_total_power_generated(solution=solution),
             "marginal_cost": self.calc_marginal_cost(solution=solution),
@@ -1992,6 +2013,49 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                                                 coupling_strength=current_factor,
                                                 time=time)
 
+
+    def calc_power_imbalance_at_bus_at_time(self,
+                                    bus: str,
+                                    time: any,
+                                    result: list,
+                                    ) -> dict:
+        """
+        Returns a dictionary containing the absolute values of the power
+        imbalance/mismatch at a bus for one particular time step
+        
+        Args:
+            bus: (str)
+                Label of the bus at which to calculate the power
+                imbalances.
+            time: (any)
+                snapshot at which to calculate the power imbalance
+            result: (list)
+                List of all qubits which have spin -1 in the solution
+
+        Returns:
+            (dict)
+                Dictionary containing the power imbalance of 'bus' at
+                all time slices. The keys are tuples of the label of the
+                bus and the index of the time slice. The values are
+                floats, representing the power imbalance of the bus at
+                the time slice.
+        """
+        load = - self.backbone.get_load(bus, time)
+        components = self.backbone.get_bus_components(bus)
+        for gen in components['generators']:
+            load += self.backbone.get_encoded_value_of_component(gen, result,
+                                                                 time=time)
+        for line_id in components['positive_lines']:
+            load += self.backbone.get_encoded_value_of_component(line_id,
+                                                                 result,
+                                                                 time=time)
+        for line_id in components['negative_lines']:
+            load -= self.backbone.get_encoded_value_of_component(line_id,
+                                                                 result,
+                                                                 time=time)
+        return load
+
+
     def calc_power_imbalance_at_bus(self,
                                     bus: str,
                                     result: list,
@@ -2021,24 +2085,8 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 the time slice.
         """
         contrib = {}
-        # TODO option to take only some snapshots
         for time in self.network.snapshots:
-            load = - self.backbone.get_load(bus, time)
-            components = self.backbone.get_bus_components(bus)
-            for gen in components['generators']:
-                load += self.backbone.get_encoded_value_of_component(gen, result,
-                                                                     time=time)
-            for line_id in components['positive_lines']:
-                load += self.backbone.get_encoded_value_of_component(line_id,
-                                                                     result,
-                                                                     time=time)
-            for line_id in components['negative_lines']:
-                load -= self.backbone.get_encoded_value_of_component(line_id,
-                                                                     result,
-                                                                     time=time)
-            if load and not silent:
-                print(f"Imbalance at {bus}::{load}")
-            contrib[str((bus, time))] = load
+            contrib[str((bus, time))] = self.calc_power_imbalance_at_bus_at_time(bus, time, result)
         return contrib
 
     def calc_total_power_generated_at_bus(self,
@@ -2152,6 +2200,30 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                                              result=result,
                                              silent=silent).items()
         }
+
+
+    def calc_kirchhoff_cost_by_time(self, solution: list) -> float:
+        """
+        Calculate the total unscaled kirchhoff cost incurred by a
+        solution at each time step.
+        
+        Args:
+            solution: (list)
+                List of all qubits which have spin -1 in the solution.
+            
+        Returns:
+            (dict)
+                A dictionary with snapshots as keys and the kirchhoff
+                cost at that time step as values
+        """
+        result = {}
+        for time in self.network.snapshots:
+            kirchhoff_cost = 0.0
+            for bus in self.network.buses.index:
+                kirchhoff_cost += self.calc_power_imbalance_at_bus_at_time(bus, time, solution) ** 2
+            result[time] = kirchhoff_cost
+        return result
+
 
     def calc_kirchhoff_cost(self, solution: list) -> float:
         """
