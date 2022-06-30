@@ -15,5 +15,6 @@ makePlots.py
 .ipynb_checkpoints/
 *.ipynb
 JobResponse
+*.png
 !pypsa-0.19.3.zip
 !input/testService.json
