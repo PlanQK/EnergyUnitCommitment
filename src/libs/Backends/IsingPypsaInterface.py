@@ -968,7 +968,7 @@ class IsingBackbone:
             time = self.network.snapshots[0]
         return self.data[component][time]
 
-    def get_qubit_mapping(self, time: any) -> dict:
+    def get_qubit_mapping(self, time: any = None) -> dict:
         """
         Returns a dictionary with all network components and which
         qubits were used for representation in an Ising spin glass
