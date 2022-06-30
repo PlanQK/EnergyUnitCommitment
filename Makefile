@@ -65,7 +65,7 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NET
 # have the following pattern, indicating all levels:
 # "level1__level2__parameterName". The value(s) on the other hand should be given
 # as a string separated by a "__".
-# E.g.	PARAMETER_KIRCHSCALEFACTOR = "ising_interface__kirchhoff__scaleFactor"
+# E.g.	PARAMETER_KIRCHSCALEFACTOR = "ising_interface__kirchhoff__scale_factor"
 # 		VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
 # Comment out any parameters not currently in use.
 # 
@@ -88,11 +88,11 @@ VAL_PARAMETER_BACKEND = sqa
 VAL_PARAMETER_FORMULATION = binarysplit
 
 #PARAMETER_KIRCHSCALEFACTOR = \
-	ising_interface__kirchhoff__scaleFactor
+	ising_interface__kirchhoff__scale_factor
 VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__5.0__10.0
 
 PARAMETER_KIRCHFACTOR = \
-	ising_interface__kirchhoff__scaleFactor
+	ising_interface__kirchhoff__scale_factor
 VAL_PARAMETER_KIRCHFACTOR = 1.0
 
 #PARAMETER_MARGINALFORMULATION = \
@@ -104,7 +104,7 @@ VAL_PARAMETER_MARGINALFORMULATION = binarysplit
 VAL_PARAMETER_MONETARYCOSTFACTOR = 0.2__0.3__0.4
 
 #PARAMETER_MONETARYSCALEFACTOR = \
-	"ising_interface__marginalCost__scaleFactor"
+	"ising_interface__marginalCost__scale_factor"
 VAL_PARAMETER_MONETARYSCALEFACTOR = 1.0__5.0__10.0
 
 #PARAMETER_OFFSETESTIMATIONFACTOR = \
@@ -294,7 +294,7 @@ plt: venv/bin/activate
 	mkdir -p plots && source venv/bin/activate && python makePlots.py
 
 venv/bin/activate:
-	python3 -m venv venv && pip install -r requirements.txt && pip install
+	python3.9 -m venv venv && pip install -r requirements.txt && pip install
 
 # rules for making a sweep for a particular solver
 
