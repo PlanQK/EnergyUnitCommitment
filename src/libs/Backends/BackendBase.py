@@ -168,8 +168,8 @@ class BackendBase(abc.ABC):
                     "config": {
                         "backend": self.config["backend"],
                         "backend_type": backend,
-                        "backend_config": self.config[backend],
-                        "ising_interface": self.config["ising_interface"],
+                        "backend_config": self.config.get(backend, {}),
+                        "ising_interface": self.config.get("ising_interface", {}),
                     },
                     "components": {},
                     "network": {},

@@ -308,7 +308,7 @@ class IsingBackbone:
                 An IsingBackbone that models the unit commitment problem
                 of the network.
         """
-        linesplit_function = config.pop("formulation")
+        linesplit_function = config.pop("formulation", "cutpowersoftwo")
         return IsingBackbone(network, linesplit_function, config)
 
     def flush_cached_problem(self) -> None:

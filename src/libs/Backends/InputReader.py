@@ -76,7 +76,7 @@ class InputReader:
         self.copy_to_backend_config()
         # print final config, but hide api tokens
         config_without_token = copy.deepcopy(self.config)
-        for provider, token in self.config["API_token"].items():
+        for provider, token in self.config.get("API_token", {}).items():
             if token != "":
                 config_without_token["API_token"][provider] = "*****"
         print(f"running with the following configuration {config_without_token}")
@@ -91,12 +91,12 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
-        self.config["backend"] = self.config["backend"].replace('_', '-')
-        for backendType, solver_list in self.backend_to_solver.items():
+        self.config["backend"] = self.config.get("backend", "sqa").replace('_', '-')
+        for backend_type, solver_list in self.backend_to_solver.items():
             if self.config["backend"] in solver_list:
                 self.config["backend_config"] = {
                     **self.config.get("backend_config", {}),
-                    **self.config[backendType],
+                    **self.config.get(backend_type, {}),
                 }
                 return
 
@@ -168,9 +168,13 @@ class InputReader:
                                f"format. The supported formats are {list(self.loaders.keys())}")
             with open("Configs/" + input_config) as file:
                 result = loader(file)
-        if not isinstance(result.get("backend_config", None), dict):
-            result["backend_config"] = {}
-        return result
+        base_dict = {
+            "API_token": {},
+            "backend": "sqa",
+            "ising_interface": {},
+            "backend_config": {},
+        }
+        return {**base_dict, **result}
 
     def add_extra_parameters(self,
                              extra_params: list,
