@@ -134,7 +134,7 @@ class ClassicalBackend(BackendBase):
             (None)
                 Modifies self.solver and sets hyperparameters
         """
-        siquan_config = self.config["sqa_backend"]
+        siquan_config = self.config["backend_config"]
         self.solver.setSeed(siquan_config.get("seed",
                                              random.randrange(10 ** 6)))
         self.solver.setHSchedule(self.get_h_schedule())
@@ -209,5 +209,5 @@ class SqaBackend(ClassicalBackend):
                 The configuration of the 'transverseFieldSchedule', to
                 set in siquan solver, according to self.config.
         """
-        return self.config["sqa_backend"].get("transverse_field_schedule",
+        return self.config["backend_config"].get("transverse_field_schedule",
                                              "[8.0,0.0]")

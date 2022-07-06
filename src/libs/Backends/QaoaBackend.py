@@ -282,7 +282,7 @@ class QaoaQiskit(BackendBase):
         """
         super().__init__(reader)
         # copy relevant config to make code more readable
-        self.config_qaoa = self.config["qaoa_backend"]
+        self.config_qaoa = self.config["backend_config"]
         self.add_results_dict()
         self.angle_supervisior = QaoaAngleSupervisor.make_angle_supervisior(
             qaoa_optimizer=self
