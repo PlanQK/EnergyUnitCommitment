@@ -29,8 +29,10 @@ Currently, the solvers that can be used consist of:
 - Simulated Quantum Annealing
 - Quantum Annealing
 - Tabu search
+- d-wave's hybrid QUBO solver
 
 In principle, this service also contains a solver using the quantum approximation optimization algorithm, but it is currently unavailable due to a bug.
+We also list simulated annealing, which is implemented as simulated quantum annealing with a vanishing transverse field.
 
 
 The following table lists all supported solvers and how to choose them by passing the correct string to the `backend` field. Each solver also supports an additional
@@ -48,7 +50,6 @@ If both the `backend` and the solver specific configuration field set the same p
 | glpk               | pypsa-glpk   | solves a mixed integer linear program obtained by pypsa using the GLPK solver               |  pypsa_backend          |  No         | None
 
 
-Keep in mind that classical simulated annealing is just simulated quantum annealing without a transverse field coupling multiple trotter slices. 
 Since the main focus of this service lies on (simulated) quantum annealing and the MILP reference solution, configuring tabu search and the hybrid algorithm will be added later.
 Thus, choosing a solver adds the following entries the `params` dictionary:
 
