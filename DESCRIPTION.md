@@ -528,3 +528,275 @@ The following table explains all result data that all solvers return.
 
 The solvers also write more data with information about their optimization run.
 Because this data is not relevant for the solution itself and highly dependant on the solver, we won't explain that output.
+
+At last, we provide a small example that can be used to test the solvers.
+In the example below we have used a network consisting of two buses with one generator at each bus.
+At the first bus, the generator produces 3 MW and the load is 1 MW.
+At the other bus, the generator produces 2 MW and the load is 2 MW.
+The two buses are connected by a transmission line with a total capacity of 2 MW. 
+Thus, the optimal solution is two commit the first generator and transport 2 MW to the second bus.
+As you can see in the example below, even such a simple network results in a relatively huge serialized object so it strongly recommended to build the network in PyPSA and then serialized. 
+For better readability, the network data is the second entry with `params` being the first.
+There you also have an overview of all the different solvers.
+Even though the field `backend_config` is empty, it is functionally the same to write it into the corresponding `_backend` JSON.
+Which solver is chosen in only determined by the field `backend`
+
+<details>
+    <summary> JSON containing valid input for network and parameters </summary>
+
+{
+  "params": {
+    "API_token": {
+      "IBMQ_API_token": "",
+      "dwave_API_token": ""
+    },
+    "backend": "sqa",
+    "ising_interface": {
+      "formulation": "fullsplit"
+    },
+    "qaoa_backend": {
+      "shots": 500,
+      "simulate": true,
+      "noise": false,
+      "simulator": "aer_simulator",
+      "initial_guess": [
+        "rand",
+        "rand",
+        "rand",
+        "rand"
+      ],
+      "max_iter": 20,
+      "repetitions": 16,
+      "classical_optimizer": "COBYLA"
+    },
+    "sqa_backend": {
+      "transverse_field_schedule": "[8.0,0.0]",
+      "temperature_schedule": "[0.1,iF,0.0001]",
+      "trotter_slices": 128,
+      "optimization_cycles": 100
+    },
+    "dwave_backend": {
+      "annealing_time": 30,
+      "num_reads": 200,
+      "chain_strength": 60,
+      "timeout": 60,
+    },
+    "pypsa_backend": {
+      "timeout": 10
+    },
+    "backend_config": {
+    }
+  },
+  "data": {
+    "coords": {
+      "snapshots": {
+        "dims": [
+          "snapshots"
+        ],
+        "attrs": {},
+        "data": [
+          0
+        ]
+      },
+      "investment_periods": {
+        "dims": [
+          "investment_periods"
+        ],
+        "attrs": {},
+        "data": []
+      },
+      "generators_i": {
+        "dims": [
+          "generators_i"
+        ],
+        "attrs": {},
+        "data": [
+          "Gen1",
+          "Gen2"
+        ]
+      },
+      "buses_i": {
+        "dims": [
+          "buses_i"
+        ],
+        "attrs": {},
+        "data": [
+          "bus1",
+          "bus2"
+        ]
+      },
+      "loads_i": {
+        "dims": [
+          "loads_i"
+        ],
+        "attrs": {},
+        "data": [
+          "load1",
+          "load2"
+        ]
+      },
+      "lines_i": {
+        "dims": [
+          "lines_i"
+        ],
+        "attrs": {},
+        "data": [
+          "line1"
+        ]
+      }
+    },
+    "attrs": {
+      "network_name": "",
+      "network_pypsa_version": "0.19.3",
+      "network_srid": 4326
+    },
+    "dims": {
+      "snapshots": 1,
+      "investment_periods": 0,
+      "generators_i": 2,
+      "buses_i": 2,
+      "loads_i": 2,
+      "lines_i": 1
+    },
+    "data_vars": {
+      "snapshots_snapshot": {
+        "dims": [
+          "snapshots"
+        ],
+        "attrs": {},
+        "data": [
+          "now"
+        ]
+      },
+      "snapshots_objective": {
+        "dims": [
+          "snapshots"
+        ],
+        "attrs": {},
+        "data": [
+          1
+        ]
+      },
+      "snapshots_generators": {
+        "dims": [
+          "snapshots"
+        ],
+        "attrs": {},
+        "data": [
+          1
+        ]
+      },
+      "snapshots_stores": {
+        "dims": [
+          "snapshots"
+        ],
+        "attrs": {},
+        "data": [
+          1
+        ]
+      },
+      "investment_periods_objective": {
+        "dims": [
+          "investment_periods"
+        ],
+        "attrs": {},
+        "data": []
+      },
+      "investment_periods_years": {
+        "dims": [
+          "investment_periods"
+        ],
+        "attrs": {},
+        "data": []
+      },
+      "generators_bus": {
+        "dims": [
+          "generators_i"
+        ],
+        "attrs": {},
+        "data": [
+          "bus1",
+          "bus2"
+        ]
+      },
+      "generators_p_nom": {
+        "dims": [
+          "generators_i"
+        ],
+        "attrs": {},
+        "data": [
+          1.0,
+          3.0
+        ]
+      },
+      "generators_marginal_cost": {
+        "dims": [
+          "generators_i"
+        ],
+        "attrs": {},
+        "data": [
+          5.0,
+          5.0
+        ]
+      },
+      "loads_bus": {
+        "dims": [
+          "loads_i"
+        ],
+        "attrs": {},
+        "data": [
+          "bus1",
+          "bus2"
+        ]
+      },
+      "loads_p_set": {
+        "dims": [
+          "loads_i"
+        ],
+        "attrs": {},
+        "data": [
+          2.0,
+          1.0
+        ]
+      },
+      "lines_bus0": {
+        "dims": [
+          "lines_i"
+        ],
+        "attrs": {},
+        "data": [
+          "bus1"
+        ]
+      },
+      "lines_bus1": {
+        "dims": [
+          "lines_i"
+        ],
+        "attrs": {},
+        "data": [
+          "bus2"
+        ]
+      },
+      "lines_x": {
+        "dims": [
+          "lines_i"
+        ],
+        "attrs": {},
+        "data": [
+          0.0001
+        ]
+      },
+      "lines_s_nom": {
+        "dims": [
+          "lines_i"
+        ],
+        "attrs": {},
+        "data": [
+          2.0
+        ]
+      }
+    }
+  }
+}
+
+</details>
