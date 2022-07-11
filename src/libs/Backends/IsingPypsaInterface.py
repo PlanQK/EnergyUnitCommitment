@@ -24,6 +24,34 @@ import numpy as np
 import pypsa
 
 
+class ComponentToQubitEncoder:
+    """An interface for classes that, when encoding a network component into
+    multiple qubits, calculate the weights used to do so
+    """
+    def __init__(self, network):
+        """
+        This sets up which pypsa network to use when encoding lines
+        and generators
+    
+        Args:
+            network: (pypsa.Network) the pypsa network which's component to 
+                encode into qubits
+        """
+        self.network = network
+
+    ~classmethod
+    def build_qubit_encoder(cls, generator_representation, line_representation):
+        """
+        A factory used for generating the 
+    
+        Args:
+            PAR
+        Returns:
+            (type) description
+        """
+    
+
+
 def integer_decomposition_powers_of_two_and_rest(number: int):
     """
     for an integer, constructs a list of powers of two + a rest, such 
@@ -43,6 +71,22 @@ def integer_decomposition_powers_of_two_and_rest(number: int):
     positive_powers = [1 << idx for idx in range(bit_length - 1)]
     already_filled = (1 << bit_length - 1) - 1
     return positive_powers + [number - already_filled]
+
+
+def singleton(number: int):
+        """
+        wraps the input number into a list with it as the single entry. 
+        This list is used as a the qubits weight for a network generator
+        which means it can either produce full or no power
+    
+        Args:
+            number: (int) 
+                a number which represents the output of the generator which
+                to calculate qubit weights
+        Returns:
+            (list) a list with only the number as the only entry
+        """
+        return [number]
 
 
 def cut_powers_of_two(capacity: float) -> list:
@@ -179,17 +223,23 @@ class IsingBackbone:
     """
     # dictionary that maps config strings to the corresponding classes and
     # methods
-    # The functions on linesplit_dict define how some value of a capacity of
+    generator_to_qubits_method_lookup_dict = {
+        "singleton": singleton,
+    }
+    # The functions on line_to_qubits_method_lookup_dict define how some value of a capacity of
     # a transmission line is translated into qubits
-    linesplit_dict = {
+    line_to_qubits_method_lookup_dict = {
         "cutpowersoftwo": cut_powers_of_two,
         "fullsplit": fullsplit,
         "binarysplit": binarysplit,
         "customsplit": customsplit,
     }
 
-    def __init__(self, network: pypsa.Network, linesplit_name: str,
-                 configuration: dict):
+    def __init__(self, 
+            network: pypsa.Network, 
+            generator_to_qubits_method_name: str,
+            line_to_qubits_method_name: str,
+            configuration: dict):
         """
         Constructor for an Ising Backbone. It requires a network and
         the name of the function that defines how to encode lines. Then
@@ -199,9 +249,9 @@ class IsingBackbone:
         Args:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
-            linesplit_name: (str)
+            line_to_qubits_method_name: (str)
                 The name of the linesplit function as given in
-                linesplit_dict.
+                line_to_qubits_method_name_lookup_dict.
             configuration: (dict)
                 A dictionary containing all subproblems to be encoded
                 into an ising problem.
@@ -216,8 +266,7 @@ class IsingBackbone:
             configuration["kirchhoff"] = {"scale_factor": 1.0}
 
         # resolve string for splitting line capacty to function
-        self._linesplit_name = linesplit_name
-        self.split_capacity = IsingBackbone.linesplit_dict[linesplit_name]
+        self.line_to_qubits = IsingBackbone.line_to_qubits_method_lookup_dict[line_to_qubits_method_name]
 
         # network to be solved
         self.network = network
@@ -308,8 +357,12 @@ class IsingBackbone:
                 An IsingBackbone that models the unit commitment problem
                 of the network.
         """
-        linesplit_function = config.pop("formulation", "cutpowersoftwo")
-        return IsingBackbone(network, linesplit_function, config)
+        generator_to_qubits_method_name = config.pop("generator_representation", "singleton")
+        line_to_qubits_method_name = config.pop("line_representation", "cutpowersoftwo")
+        return IsingBackbone(network, 
+                generator_to_qubits_method_name, 
+                line_to_qubits_method_name,
+                config)
 
     def flush_cached_problem(self) -> None:
         """
@@ -536,7 +589,8 @@ class IsingBackbone:
             self.create_qubit_entries_for_component(
                 component_name=generator,
                 snapshot_to_weight_dict={
-                    time : [self.get_nominal_power(generator, time)]
+                    time : integer_decomposition_powers_of_two_and_rest(
+                            int(self.get_nominal_power(generator, time)))
                     for time in self.network.snapshots
                 }
             )
@@ -557,7 +611,7 @@ class IsingBackbone:
         for line in self.network.lines.index:
             # we assume that the capacity of a line is constant across all
             # snapshots
-            constant_line_capacity = self.split_capacity(int(self.network.lines.loc[line].s_nom))
+            constant_line_capacity = self.line_to_qubits(int(self.network.lines.loc[line].s_nom))
             weight_dict = {
                 time : constant_line_capacity 
                 for time in self.network.snapshots
@@ -623,6 +677,10 @@ class IsingBackbone:
         for snapshot, qubit_list in self.data[component_name].items():
             for idx, qubit in enumerate(qubit_list):
                 self.data[qubit] = snapshot_to_weight_dict[snapshot][idx]
+
+#        print("-")
+#        print(f"comp name:: {component_name}      snap_weight_dict: {snapshot_to_weight_dict}")
+#        print("-")
 
 
     def allocate_qubits_to_weight_list(self, weight_list: list):
@@ -808,7 +866,7 @@ class IsingBackbone:
             p_max_pu = self.network.generators_t.p_max_pu[generator].loc[time]
         except KeyError:
             p_max_pu = 1.0
-        return self.network.generators.p_nom[generator] * p_max_pu
+        return max(self.network.generators.p_nom[generator] * p_max_pu, 0)
 
     def get_generator_status(self, gen: str, solution: list, time: any 
                              ) -> bool:

@@ -95,6 +95,7 @@ class ClassicalBackend(BackendBase):
         """
         print("starting optimization...")
         self.configure_solver()
+        print(self.config)
         tic = time.perf_counter()
         result = self.solver.minimize(
             self.transformed_problem.siquan_format(),

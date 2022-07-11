@@ -39,6 +39,7 @@ SAVE_FOLDER :=
 # Making will generate a run for each config file specified here. Other config files can be saved
 # in /src/Configs
 CONFIGFILES = config-all.yaml
+CONFIGFILES = failed_config.json
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
@@ -46,9 +47,13 @@ CONFIGFILES = config-all.yaml
 # The default network is a randomly generated network containing 10 buses with 
 # generators that produce integer valued power and a total load of 100
 NETWORKNAME = defaultnetwork.nc
-# NETWORKNAME = testNetwork4QubitIsing_2_0_20.nc 
+NETWORKNAME = testNetwork4QubitIsing_2_0_20.nc 
 # NETWORKNAME = testNetwork5QubitIsing_2_0_20.nc 
-# NETWORKNAME = 220124cost5input_[1]0_[0]_20.nc
+ NETWORKNAME = 220124cost5input_[1]0_[0]_20.nc
+# NETWORKNAME = 20220627_network_5_0_20.nc
+# NETWORKNAME = elec_s_5.nc
+#NETWORKNAME = 20220628_network_5_0_20.nc
+
 
 # lists networks to be used using NETWORKNAME
 SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')

@@ -93,6 +93,7 @@ def run(
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)
     except Exception as e:
+        raise e
         error_code = "500"
         error_detail = f"{type(e).__name__}: {e}"
         logger.info("An error occurred")
