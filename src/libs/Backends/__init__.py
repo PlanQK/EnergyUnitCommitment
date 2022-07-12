@@ -15,7 +15,7 @@ being able to represent networks better).
 
 from .SqaBackends import ClassicalBackend, SqaBackend
 from .DwaveBackends import (
-    DwaveTabuSampler,
+    DwaveTabu,
     DwaveSteepestDescent,
     DwaveCloudHybrid,
     DwaveCloudDirectQPU,

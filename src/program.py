@@ -26,7 +26,7 @@ except ImportError:
 gan_backends = {
     "classical": Backends.ClassicalBackend,
     "sqa": Backends.SqaBackend,
-    "dwave-tabu": Backends.DwaveTabuSampler,
+    "dwave-tabu": Backends.DwaveTabu,
     "dwave-greedy": Backends.DwaveSteepestDescent,
     "pypsa-glpk": Backends.PypsaGlpk,
     "pypsa-fico": Backends.PypsaFico,
@@ -80,7 +80,7 @@ def run(
         # in the dockerfile. This limits runtime on the platform, but allows you
         # to run as long as you want locally
         if not environ.get("TRUSTED_USER", False):
-            optimizer.check_input_size()
+            optimizer.check_input_size(limit=60)
         optimizer.optimize()
 
         # hook for potential post-processing like flow optimization for dwave

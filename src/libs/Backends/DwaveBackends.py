@@ -1,6 +1,6 @@
 """This module is for providing optimizers using d-wave's cloud for access
 to their quantum hardware. So far, this module supports
-- quantum annealing (usiing pegasus tpology)
+- quantum annealing (using pegasus topology)
 - a hybrid solver
 - tabu search (ocean package, classical algorithm)
 - steepest decent (ocean package, classical algorithm)
@@ -9,6 +9,7 @@ For local testing and in case the processing of samples changes, this
 module can also run quantum annealing by reading samples and returning
 them as the result of a run"""
 
+import abc
 
 import time
 
@@ -37,17 +38,18 @@ from glob import glob
 import json
 
 
-class DwaveTabuSampler(BackendBase):
+class AbstractDwaveSampler(BackendBase):
     """
-    A base class for solving the unit commitment problem using the
-    D-Wave server. This is done using D-Wave's dimod package.
+    The base class for optimizers using d-wave's solvers. the optimization
+    is done by a sampler, which is configured  in the child classes
     """
 
     def __init__(self, reader: InputReader):
         """
         Constructor for the D-WaveTabuSampler. It requires an
         InputReader, which handles the loading of the network and
-        configuration file.
+        configuration file and a method for obtaining the correct
+        sampler.
 
         Args:
             reader: (InputReader)
@@ -60,19 +62,18 @@ class DwaveTabuSampler(BackendBase):
         self.sampler = None
         self.get_sampler()
 
+    @abc.abstractmethod
     def get_sampler(self) -> dimod.Sampler:
         """
-        Returns the D-Wave sampler and stores it as the attribute
-        sampler.
-        This method will be overridden in subclasses by choosing
-        different samplers.
+        Returns the D-Wave sampler and stores it as the attribute sampler.
+        This method will be overridden in subclasses by choosing different
+        samplers.
 
         Returns:
             (dimod.Sampler)
                 The optimizer that generates samples of solutions.
         """
-        self.sampler = TabuSampler()
-        return self.sampler
+        raise NotImplementedError
 
     def process_samples(self, sampleset: dimod.SampleSet) -> pandas:
         """
@@ -269,42 +270,66 @@ class DwaveTabuSampler(BackendBase):
         self.output["results"]["sample_df"] = self.sample_df.to_dict('split')
         self.output["results"]["serial"] = sampleset.to_serializable()
 
-
-class DwaveSteepestDescent(DwaveTabuSampler):
-    """
-    A class inheriting from DwaveTabuSampler, but choosing the
-    SteepestDescentSolver as solver.
-    """
-
-    # TODO test if this actually runs
-    def __init__(self, reader: InputReader):
+    def check_input_size(self, limit: int):
         """
-        A constructor for the DwaveTabuSampler. It requires an
-        InputReader, which handles the loading of the network and
-        configuration file. In addition, self.solver is set to be
-        the SteepestDescentSolver.
+        checks if the estimated runtime is longer than the given limit
 
         Args:
-            reader: (InputReader)
-                 Instance of an InputReader, which handled the loading
-                 of the network and configuration file.
+            limit: an integer that is a measure for how long the limit is.
+                    This is not a limit in seconds
+
+        Returns: Doesn't return anything but raises an Error if it would take
+                to long
         """
-        super().__init__(reader=reader)
-        self.solver = greedy.SteepestDescentSolver()
+        pass
 
 
-# TODO: Why inherit from this class? It doesn't add anything, right?
-class DwaveCloud(DwaveTabuSampler):
+class DwaveTabu(AbstractDwaveSampler):
     """
-    Class for structuring the class hierarchy. Inherits from
-    DwaveTabuSampler. Any class that use results obtained by querying
-    D-Wave servers should inherit from this class.
+    An optimizer using Tabu search to optimize a QUBO
     """
 
+    def get_sampler(self) -> dimod.Sampler:
+        """
+        Sets the sampler using Tabu searchs to solve QUBO's
 
-class DwaveCloudHybrid(DwaveCloud):
+        Returns:
+            (dimod.Sampler)
+                The optimizer that generates samples of solutions.
+        """
+        self.sampler = TabuSampler()
+        return self.sampler
+
+
+class DwaveSteepestDescent(AbstractDwaveSampler):
     """
-    Class inheriting from DwaveCloud. It will use a hybrid solver to
+    An optimizer using steepest descent to solve a QUBO
+    """
+
+    def get_sampler(self) -> dimod.Sampler:
+        """
+        Sets the sampler using Tabu searchs to solve QUBO's
+
+        Returns:
+            (dimod.Sampler)
+                The optimizer that generates samples of solutions.
+        """
+        self.sampler = greedy.SteepestDescentSolver()
+        return self.sampler
+
+
+class DwaveCloudSampler(AbstractDwaveSampler):
+    """
+    Class for structuring the class hierarchy. Inherits from AbstractDwaveSampler.
+    Subclasses of sampler that use d-wave cloud services inherit from this
+    class
+    """
+    pass
+
+
+class DwaveCloudHybrid(DwaveCloudSampler):
+    """
+    Class inheriting from DwaveCloudSampler. It will use a hybrid solver to
     solve the given Ising spin glass problem.
     """
 
@@ -348,9 +373,9 @@ class DwaveCloudHybrid(DwaveCloud):
         return sampleset
 
 
-class DwaveCloudDirectQPU(DwaveCloud):
+class DwaveCloudDirectQPU(DwaveCloudSampler):
     """
-    Class inheriting from DwaveCloud. It will try to solve the given
+    Class inheriting from DwaveCloudSampler. It will try to solve the given
     Ising spin glass problem on the D-Wave's cloud based QPU.
     """
 
@@ -687,8 +712,8 @@ class DwaveCloudDirectQPU(DwaveCloud):
                 net_power = generated_power - load + net_flow_through_bus
 
                 graph["super_source"][bus]['flow'] = min(generated_power,
-                                                        generated_power
-                                                        - net_power)
+                                                         generated_power
+                                                         - net_power)
                 graph[bus]["super_sink"]['flow'] = min(load, load + net_power)
         return graph
 

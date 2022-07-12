@@ -41,9 +41,9 @@ class BackendBase(abc.ABC):
 
     @abc.abstractmethod
     def optimize(self) -> None:
-        """"
+        """
         This performs the actual optimization after the problem
-        has been transformed appropiately.
+        has been transformed appropriately.
         """
         pass
 
@@ -51,9 +51,7 @@ class BackendBase(abc.ABC):
         """
          if the solution needs any postprocessing_time, this is the
          hook to do so.
-    
-        Args:
-            PAR
+
         Returns:
             (type) description
         """
@@ -67,7 +65,7 @@ class BackendBase(abc.ABC):
         """
         pass
 
-    def check_input_size(self):
+    def check_input_size(self, limit: int):
         """check if the size of the problem is currently allowed or if
         an estimation of the runtime exceeds some arbitrary limit
         stop the run

@@ -39,7 +39,7 @@ class ComponentToQubitEncoder:
         """
         self.network = network
 
-    ~classmethod
+    @classmethod
     def build_qubit_encoder(cls, generator_representation, line_representation):
         """
         A factory used for generating the 
@@ -49,6 +49,7 @@ class ComponentToQubitEncoder:
         Returns:
             (type) description
         """
+        pass
     
 
 
