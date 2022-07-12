@@ -95,9 +95,10 @@ class InputReader:
         self.config["backend"] = self.config.get("backend", "sqa").replace('_', '-')
         for backend_type, solver_list in self.backend_to_solver.items():
             if self.config["backend"] in solver_list:
+                # expansion has guards for passing None objects as config dicts
                 self.config["backend_config"] = {
-                    **self.config.get("backend_config", {}),
-                    **self.config.get(backend_type, {}),
+                    **(self.config.get("backend_config", {}) or {}),
+                    **(self.config.get(backend_type, {}) or {}),
                 }
                 return
 
