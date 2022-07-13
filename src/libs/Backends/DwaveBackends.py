@@ -268,7 +268,7 @@ class AbstractDwaveSampler(BackendBase):
         self.output["results"]["sample_df"] = self.sample_df.to_dict('split')
         self.output["results"]["serial"] = sampleset.to_serializable()
 
-    def check_input_size(self, limit: int):
+    def check_input_size(self, limit: float = 60.0):
         """
         checks if the estimated runtime is longer than the given limit
 
@@ -279,7 +279,8 @@ class AbstractDwaveSampler(BackendBase):
         Returns: Doesn't return anything but raises an Error if it would take
                 to long
         """
-        pass
+        if len(self.ising_backbone.problem) >= 10000 * limit:
+            raise ValueError("the estimated runtime is too long")
 
 
 class DwaveTabu(AbstractDwaveSampler):

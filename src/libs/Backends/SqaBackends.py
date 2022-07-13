@@ -44,7 +44,14 @@ class ClassicalBackend(BackendBase):
                  of the network and configuration file.
         """
         super().__init__(reader=reader)
+        self.siquan_config = self.config["backend_config"]
+        self.siquan_config.setdefault("seed", random.randrange(10 ** 6))
+        self.siquan_config["transverse_field_schedule"] = self.get_h_schedule()
+        self.siquan_config.setdefault("temperature_schedule", "[0.1,iF,0.0001]")
+        self.siquan_config.setdefault("trotter_slices",32)
+        self.siquan_config.setdefault("optimization_cycles", 16)
         self.solver = siquan.DTSQA()
+        self.configure_solver()
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -61,6 +68,7 @@ class ClassicalBackend(BackendBase):
             network=self.network,
             config=self.config["ising_interface"]
         )
+        self.check_input_size()
 
     def transform_solution_to_network(self) -> None:
         """
@@ -92,7 +100,6 @@ class ClassicalBackend(BackendBase):
                 dictionary.
         """
         print("starting optimization...")
-        self.configure_solver()
         print(self.config)
         tic = time.perf_counter()
         result = self.solver.minimize(
@@ -133,15 +140,11 @@ class ClassicalBackend(BackendBase):
             (None)
                 Modifies self.solver and sets hyperparameters
         """
-        siquan_config = self.config["backend_config"]
-        self.solver.setSeed(siquan_config.get("seed",
-                                             random.randrange(10 ** 6)))
-        self.solver.setHSchedule(self.get_h_schedule())
-        self.solver.setTSchedule(siquan_config.get("temperature_schedule",
-                                                  "[0.1,iF,0.0001]"))
-        self.solver.setTrotterSlices(int(siquan_config.get("trotter_slices",
-                                                          32)))
-        self.solver.setSteps(int(siquan_config.get("optimization_cycles", 16)))
+        self.solver.setSeed(self.siquan_config["seed"])
+        self.solver.setHSchedule(self.siquan_config["transverse_field_schedule"])
+        self.solver.setTSchedule(self.siquan_config["temperature_schedule"])
+        self.solver.setTrotterSlices(int(self.siquan_config["trotter_slices"]))
+        self.solver.setSteps(int(self.siquan_config["optimization_cycles"]))
 
     def print_solver_specific_report(self) -> None:
         """
@@ -187,6 +190,25 @@ class ClassicalBackend(BackendBase):
                 result["state"]
             )
         }
+
+    def check_input_size(self, limit: float = 60.0):
+        """
+        checks if the estimated runtime is longer than the given limit
+
+        Args:
+            limit: an integer that is a measure for how long the limit is.
+                    This is not a limit in seconds because that depends on
+                    the hardware this is running on
+
+        Returns: Doesn't return anything but raises an Error if it would take
+                to long
+        """
+        runtime_factor = len(self.transformed_problem.problem) * 0.001
+        runtime_factor *= self.siquan_config["trotter_slices"] * 0.001
+        runtime_factor *= self.siquan_config["optimization_cycles"] * 0.001
+        used_limit = runtime_factor / limit
+        if used_limit >= 1.0:
+            raise ValueError("the estimated runtime is too long")
 
 
 class SqaBackend(ClassicalBackend):
