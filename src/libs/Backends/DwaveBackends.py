@@ -427,6 +427,25 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
         #    f.write(network + '\n')
         return
 
+
+    def check_input_size(self, limit: float = 60.0):
+        """
+        this sets a limit on the heuristic used for embedding the QUBO onto
+        the working graph of the annealer.
+
+        Args:
+            limit: a float that is a measure for how long we can try to find
+                   an embedding
+
+        Returns: modifies the timeout parameter, which limits how long
+                 the heurstic can search for an embedding
+        """
+        self.config["backend_config"]["timeout"] = min(
+                self.config["backend_config"].get("timeout", 3600),
+                limit
+        )
+
+
     def get_sampler(self) -> dimod.Sampler:
         """
         Returns a D-Wave sampler that will query the quantum annealer
@@ -477,7 +496,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
                        "chain_strength",
                        "programming_thermalization",
                        "readout_thermalization"]}
-        if hasattr(self, 'embedding'):
+        if not hasattr(self, 'embedding'):
             sample_arguments["embedding_parameters"] = dict(
                 timeout=self.config["backend_config"]["timeout"])
             sample_arguments["return_embedding"] = True
