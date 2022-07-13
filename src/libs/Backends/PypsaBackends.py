@@ -75,12 +75,20 @@ class PypsaBackend(BackendBase):
         """
         # TODO implement write from pyomo
         print("Writing from pyomo model to network is not implemented")
+        return self.network
 
+    def print_report(self):
+        """
+        Prints a short report with general information if the problem is feasible
+        and a message that it is infeasible if it is not feasible
+    
+        Returns:
+            (None) 
+        """
         if self.output["results"]["termination_condition"] == "infeasible":
             print("no feasible solution was found, stop writing to network")
         else:
-            self.print_report()
-        return self.network
+            super().print_report()
 
     def write_result_to_output(self, solverstring: str) -> None:
         """

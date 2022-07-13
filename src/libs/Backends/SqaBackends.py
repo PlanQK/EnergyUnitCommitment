@@ -74,8 +74,6 @@ class ClassicalBackend(BackendBase):
             (None)
                 Modifies self.output with the output_network.
         """
-        self.print_report()
-
         output_network = self.transformed_problem.set_output_network(
             solution=self.output["results"]["state"])
         output_dataset = output_network.export_to_netcdf()

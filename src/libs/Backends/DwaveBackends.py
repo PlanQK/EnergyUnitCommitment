@@ -211,8 +211,6 @@ class AbstractDwaveSampler(BackendBase):
             (None)
                 Stores the output_network as dictionary in self.output.
         """
-        self.print_report()
-
         # TODO: check choose_sample function
         best_sample = self.choose_sample()
 

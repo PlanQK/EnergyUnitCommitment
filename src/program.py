@@ -79,15 +79,16 @@ def run(
         # disable runtime limits on the optimization by setting the env variable
         # in the dockerfile. This limits runtime on the platform, but allows you
         # to run as long as you want locally
-        if not environ.get("TRUSTED_USER", False):
-            optimizer.check_input_size(limit=60)
+        if environ.get("TRUSTED_USER", False) != "Yes":
+            optimizer.check_input_size(limit=3)
         optimizer.optimize()
 
         # hook for potential post-processing like flow optimization for dwave
         # solutions
         optimizer.process_solution()
 
-        optimizer.transform_solution_to_network()
+        optimizer.print_report()
+        # optimizer.transform_solution_to_network()
 
         output = optimizer.get_output()
         logger.info("Calculation successfully executed")

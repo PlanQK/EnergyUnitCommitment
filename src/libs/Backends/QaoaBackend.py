@@ -452,7 +452,6 @@ class QaoaQiskit(BackendBase):
             (None)
                 Modifies self.output with the output_network.
         """
-        self.print_report()
         best_bitstring = self.output["results"]["statistics"]["best_bitstring"]
         solution = []
         for idx, bit in enumerate(best_bitstring):
