@@ -94,7 +94,10 @@ def run(
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)
     except Exception as e:
-        raise e
+        # reraise exception to get stack trace. if the environment variable exists,
+        # it is assumed that the program is running locally and not on the planqk service
+        if environ.get("RUNNING_IN_DOCKER", False):
+            raise e
         error_code = "500"
         error_detail = f"{type(e).__name__}: {e}"
         logger.info("An error occurred")
