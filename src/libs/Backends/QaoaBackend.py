@@ -261,6 +261,8 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         return [lower_bound + idx * step_size for idx in range(num_gridpoints)]
 
 
+
+
 class QaoaQiskit(BackendBase):
     """
     A class for solving the unit commitment problem using QAOA. This is
@@ -268,6 +270,18 @@ class QaoaQiskit(BackendBase):
     qiskit package to solve the created problem on simulated or physical
     Hardware.
     """
+
+    @classmethod
+    def build_qaoa_optimizer(cls, reader: InputReader):
+        if self.config_qaoa["simulate"]:
+            if self.config_qaoa["noise"]:
+                qaoa_optimizer = QaoaQiskitNoisySimulator(reader)
+            else:
+                qaoa_optimizer = QaoaQiskitExactSimulator(reader)
+        else:
+            qaoa_optimizer = QaoaQiskitCloudComputer(reader)
+        return qaoa_optimizer
+
 
     def __init__(self, reader: InputReader):
         """
@@ -287,13 +301,13 @@ class QaoaQiskit(BackendBase):
         self.angle_supervisior = QaoaAngleSupervisor.make_angle_supervisior(
             qaoa_optimizer=self
         )
-        self.numAngles = self.angle_supervisior.get_num_angles()
+        self.num_angles = self.angle_supervisior.get_num_angles()
 
         # initiate local parameters
         self.iteration_counter = None
         self.iter_result = {}
         self.rep_result = {}
-        self.qc = None
+        self.quantum_circuit = None
         self.param_vector = None
         self.statistics = {"confidence": 0.0,
                            "best_bitstring": "",
@@ -301,12 +315,24 @@ class QaoaQiskit(BackendBase):
                            "p_values": {},
                            "u_values": {}
                            }
+        self.shots = self.config_qaoa.get("shots",1024)
+        self.max_iter = self.config_qaoa["max_iter"]
+        self.hamiltonian = None
+        self.num_qubits = None
 
-        # set up connection to IBMQ servers
-        if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
-            IBMQ.save_account(token=self.config["API_token"]["IBMQ_API_token"],
-                              overwrite=True)
-            self.provider = IBMQ.load_account()
+        # the four variables are relevant for the backend. The setup
+        # method fills the field with the correct values
+        self.backend = None
+        self.noise_model = None
+        self.coupling_map = None
+        self.basis_gates = None
+        self.setup_backend()
+
+    def setup_backend(self):
+        raise NotImplementedError
+
+# factory for correct qaoa
+#  if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -321,6 +347,8 @@ class QaoaQiskit(BackendBase):
         self.transformed_problem = IsingBackbone.build_ising_problem(
             network=self.network, config=self.config["ising_interface"]
         )
+        self.hamiltonian = self.transformed_problem.get_hamiltonian_matrix()
+        self.num_qubits = len(self.hamiltonian)
         self.output["results"]["qubit_map"] = \
             self.transformed_problem.get_qubit_mapping()
 
@@ -337,65 +365,42 @@ class QaoaQiskit(BackendBase):
                 The optimized solution is stored in the self.output
                 dictionary.
         """
-        # retrieve various parameters from the config
-        shots = self.config_qaoa["shots"]
-        simulator = self.config_qaoa["simulator"]
-        simulate = self.config_qaoa["simulate"]
-        noise = self.config_qaoa["noise"]
-        initial_guess_original = np.array([0 for _ in range(self.angle_supervisior.get_num_angles())])
-        num_vars = self.numAngles
-        max_iter = self.config_qaoa["max_iter"]
         total_repetition = 0
 
-        hamiltonian = self.transformed_problem.get_hamiltonian_matrix()
-        scaled_hamiltonian = self.scale_hamiltonian(hamiltonian=hamiltonian)
-        self.output["results"]["hamiltonian"]["original"] = hamiltonian
-        self.output["results"]["hamiltonian"]["scaled"] = scaled_hamiltonian
-        num_qubits = len(hamiltonian)
-
         # create ParameterVector to be used as placeholder when creating the quantum circuit
-        self.param_vector = ParameterVector("theta", self.numAngles)
-        self.qc = self.create_qc(hamiltonian=scaled_hamiltonian, theta=self.param_vector)
+        self.param_vector = ParameterVector("theta", self.num_angles)
+        self.quantum_circuit = self.create_qc(theta=self.param_vector)
         # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
-        draw_theta = self.create_draw_theta(theta=initial_guess_original)
-        qc_draw = self.qc.bind_parameters({self.param_vector: draw_theta})
-        self.output["results"]["qc"] = qc_draw.draw(output="latex_source")
+
+        draw_theta = self.create_draw_theta()
+        qc_draw = self.quantum_circuit.bind_parameters({self.param_vector: draw_theta})
+        self.output["results"]["latex_circuit"] = qc_draw.draw(output="latex_source")
 
         # setup IBMQ backend and save its configuration to output
-        backend, noise_model, coupling_map, basis_gates = self.setup_backend(
-            simulator=simulator,
-            simulate=simulate,
-            noise=noise,
-            nqubits=num_qubits
-        )
-        self.output["results"]["backend"] = backend.configuration().to_dict()
+        # backend, noise_model, coupling_map, basis_gates = self.setup_backend()
 
         current_repetition = 1
         for initial_guess in self.angle_supervisior.get_initial_angle_iterator():
             time_start = datetime.timestamp(datetime.now())
-            total_repetition = current_repetition
             print(
-                f"----------------------- Repetition {total_repetition} ----------------------------------"
+                f"------------------ Repetition {current_repetition} -----------------------"
             )
 
-            self.prepare_repetition_dict()
-            self.rep_result["initial_guess"] = initial_guess.tolist()
+            self.rep_result =  {
+                "initial_guess": initial_guess.tolist(),
+                "duration": None,
+                "optimized_result": {},
+                "iterations": {},
+            }
 
             self.iteration_counter = 0
 
-            expectation = self.get_expectation(
-                backend=backend,
-                noise_model=noise_model,
-                coupling_map=coupling_map,
-                basis_gates=basis_gates,
-                shots=shots,
-                simulate=simulate,
-            )
+            expectation = self.get_expectation()
 
-            optimizer = self.get_classical_optimizer(max_iter)
+            optimizer = self.get_classical_optimizer(self.max_iter)
 
             res = optimizer.optimize(
-                num_vars=num_vars,
+                num_vars=self.num_angles,
                 objective_function=expectation,
                 initial_point=initial_guess,
             )
@@ -406,15 +411,14 @@ class QaoaQiskit(BackendBase):
                 "nfev": res[2],  # number of objective function calls
             }
 
-            time_end = datetime.timestamp(datetime.now())
-            duration = time_end - time_start
+            duration = datetime.timestamp(datetime.now())  - time_start
             self.rep_result["duration"] = duration
 
-            self.output["results"]["repetitions"][total_repetition] = self.rep_result
+            self.output["results"]["repetitions"][current_repetition] = self.rep_result
 
             current_repetition += 1
 
-        self.output["results"]["total_reps"] = total_repetition
+        self.output["results"]["total_reps"] = current_repetition
 
     def process_solution(self) -> None:
         """
@@ -486,23 +490,6 @@ class QaoaQiskit(BackendBase):
             "repetitions": {},
         }
 
-    def prepare_repetition_dict(self) -> None:
-        """
-        Initializes the basic structure for the
-        self.rep_result-dictionary. Its values are initialized to empty
-        dictionaries, empty lists or None values.
-
-        Returns:
-            (None)
-                Modifies self.rep_result.
-        """
-        self.rep_result = {
-            "initial_guess": [],
-            "duration": None,
-            "optimized_result": {},
-            "iterations": {},
-        }
-
     def prepare_iteration_dict(self) -> None:
         """
         Initializes the basic structure for the
@@ -520,7 +507,7 @@ class QaoaQiskit(BackendBase):
             "return": None
         }
 
-    def create_draw_theta(self, theta: list) -> list:
+    def create_draw_theta(self) -> list:
         """
         Creates a list of the same size as theta with Parameters β and γ
         as values. This list can then be used to bind to a quantum
@@ -538,12 +525,10 @@ class QaoaQiskit(BackendBase):
             (list)
                 The created list of β's and γ's.
         """
-        beta_values = theta[::2]
         draw_theta = []
-        for layer, _ in enumerate(beta_values):
+        for layer in range(int(self.num_angles/2)):
             draw_theta.append(Parameter(f"\u03B2{layer + 1}"))  # append beta_i
             draw_theta.append(Parameter(f"\u03B3{layer + 1}"))  # append gamma_i
-
         return draw_theta
 
     def get_classical_optimizer(self,
@@ -598,39 +583,14 @@ class QaoaQiskit(BackendBase):
 
         return min_x
 
-    def scale_hamiltonian(self, hamiltonian: list) -> list:
+    def create_qc(self, theta: ParameterVector) -> QuantumCircuit:
         """
-        Scales the hamiltonian so that the maximum absolute value in the
-        input hamiltonian is equal to Pi.
-
-        Args:
-            hamiltonian: (list)
-                The input hamiltonian to be scaled.
-
-        Returns:
-            (list)
-                The scaled hamiltonian.
-        """
-        matrix_max = np.max(hamiltonian)
-        matrix_min = np.min(hamiltonian)
-        matrix_extreme = max(abs(matrix_max), abs(matrix_min))
-        factor = matrix_extreme / math.pi
-        scaled_hamiltonian = np.array(hamiltonian) / factor
-        return scaled_hamiltonian.tolist()
-
-    def create_qc(self,
-                  hamiltonian: list,
-                  theta: ParameterVector
-                  ) -> QuantumCircuit:
-        """
-        Creates a qiskit quantum circuit based on the hamiltonian matrix
-        given. The quantum circuit will be created using a
+        Creates a qiskit quantum circuit based on the hamiltonian stored
+        in the instance. The quantum circuit will be created using a
         ParameterVector to create placeholders, which can be filled with
         the actual parameters using qiskit's bind_parameters function.
 
         Args:
-            hamiltonian: (dict)
-                The matrix representing the problem Hamiltonian.
             theta: (ParameterVector)
                 The ParameterVector of the same length as the list of
                 optimizable parameters.
@@ -639,42 +599,47 @@ class QaoaQiskit(BackendBase):
             (QuantumCircuit)
                 The created quantum circuit.
         """
-        num_qubits = len(hamiltonian)
-        qc = QuantumCircuit(num_qubits)
+        qc = QuantumCircuit(self.num_qubits)
 
         # beta parameters are at even indices and gamma at odd indices
         beta_values = theta[::2]
         gamma_values = theta[1::2]
 
+        # this generates the initial super position
         # add Hadamard gate to each qubit
-        for i in range(num_qubits):
+        for i in range(self.num_qubits):
             qc.h(i)
 
         for layer, _ in enumerate(beta_values):
+            # --- Apply Problem Hamiltonian ---
             # for visual purposes only, when the quantum circuit is drawn
             qc.barrier()
             qc.barrier()
-            # add problem Hamiltonian
-            for i in range(len(hamiltonian)):
-                for j in range(i, len(hamiltonian[i])):
-                    if hamiltonian[i][j] != 0.0:
-                        if i == j:
-                            qc.rz(
-                                -hamiltonian[i][j] * gamma_values[layer], i
-                            )
-                            # inversed, as the implementation in the
-                            # ising_interface inverses the values
-                        else:
-                            qc.rzz(
-                                -hamiltonian[i][j] * gamma_values[layer], i, j
-                            )
-                            # inversed, as the implementation in the
-                            # ising_interface inverses the values
-            qc.barrier()
+            for row_num, hamiltonian_row in enumerate(self.hamiltonian):
+                for col_num in range(row_num, self.num_qubits):
+                    ham_value = hamiltonian_row[col_num]
+                    if ham_value == 0.0:
+                        continue
+                    elif row_num ==  col_num:
+                        qc.rz(
+                            ham_value * gamma_values[layer], row_num
+                        )
+                        # inversed, as the implementation in the
+                        # ising_interface inverses the values
+                    else:
+                        qc.rzz(
+                            ham_value * gamma_values[layer], row_num, col_num
+                        )
+                        # inversed, as the implementation in the
+                        # ising_interface inverses the values
 
-            # add mixing Hamiltonian to each qubit
-            for i in range(num_qubits):
+            qc.barrier()
+            # --- End Problem Hamiltonian ---
+
+            # --- Apply Mixing Hamiltonian ---
+            for i in range(self.num_qubits):
                 qc.rx(beta_values[layer], i)
+            # --- End Mixing Hamiltonian ---
 
         qc.measure_all()
 
@@ -752,105 +717,16 @@ class QaoaQiskit(BackendBase):
 
         return self.iter_result["return"]
 
-    def setup_backend(self,
-                      simulator: str,
-                      simulate: bool,
-                      noise: bool,
-                      nqubits: int
-                      ) -> [BaseBackend, NoiseModel, list, list]:
+    def evaluate_circuit(self, circuit):
         """
-        Sets up the qiskit backend based on the settings passed into
-        the function.
+        For the given quantum circuit, evaluates it according to the setting
+        stored in the qaoa instance"""
+        raise NotImplementedError
 
-        Args:
-            simulator: (str)
-                The name of the Quantum Simulator to be used, if
-                simulate is True.
-            simulate: (bool)
-                If True, the specified Quantum Simulator will be used to
-                execute the Quantum Circuit. If False, the least busy
-                IBMQ Quantum Computer will be initiated to be used to
-                execute the Quantum Circuit.
-            noise: (bool)
-                If True, noise will be added to the Simulator. If False,
-                no noise will be added. Only works if "simulate" is set
-                to True. On actual IBMQ devices noise is always present
-                and cannot be deactivated.
-            nqubits: (int)
-                The number of Qubits of the Quantum Circuit. Used to
-                find a suitable IBMQ Quantum Computer.
-
-        Returns:
-            (BaseBackend)
-                The backend to be used.
-            (NoiseModel)
-                The noise model of the chosen backend, if noise is set
-                to True. Otherwise it is set to None.
-            (list)
-                The coupling map of the chosen backend, if noise is set
-                to True. Otherwise it is set to None.
-            (list)
-                The initial basis gates used to compile the noise model,
-                if noise is set to True. Otherwise it is set to None.
-        """
-        noise_model = None
-        coupling_map = None
-        basis_gates = None
-        if simulate:
-            if noise:
-                # https://qiskit.org/documentation/apidoc/aer_noise.html
-                # set IBMQ server to extract noise model and coupling_map
-                device = self.provider.get_backend("ibmq_lima")
-                # Get noise model from IBMQ server
-                noise_model = NoiseModel.from_backend(device)
-                # Get coupling map from backend
-                coupling_map = device.configuration().coupling_map
-                # Get the basis gates for the noise model
-                basis_gates = noise_model.basis_gates
-                # Select the QasmSimulator from the Aer provider
-                backend = Aer.get_backend(simulator)
-
-            else:
-                backend = Aer.get_backend(simulator)
-        else:
-            large_enough_devices = self.provider.backends(
-                filters=lambda x: x.configuration().n_qubits > nqubits and not x.configuration().simulator
-            )
-            backend = least_busy(large_enough_devices)
-            # backend = self.provider.get_backend("ibmq_lima")
-        return backend, noise_model, coupling_map, basis_gates
-
-    def get_expectation(
-            self,
-            backend: BaseBackend,
-            noise_model: NoiseModel = None,
-            coupling_map: list = None,
-            basis_gates: list = None,
-            shots: int = 1024,
-            simulate: bool = True,
-    ) -> callable:
+    def get_expectation(self) -> callable:
         """
         Builds the objective function, which can be used in a classical
         solver.
-
-        Args:
-            backend: (BaseBackend)
-                The backend to be used.
-            noise_model: (NoiseModel)
-                The noise model of the chosen backend. Default: None
-            coupling_map: (list)
-                The coupling map of the chosen backend Default: None
-            basis_gates: (list)
-                The initial basis gates used to compile the noise model.
-                Default: None
-            shots: (int)
-                The number of repetitions of each circuit, for sampling.
-                Default: 1024
-            simulate: (bool)
-                If True, the specified Quantum Simulator will be used to
-                execute the Quantum Circuit. If False, the IBMQ Quantum
-                Computer set in setup_backend will be used to execute
-                the Quantum Circuit. Default: True
 
         Returns:
             (callable)
@@ -858,25 +734,8 @@ class QaoaQiskit(BackendBase):
         """
 
         def execute_circ(theta):
-            qc = self.qc.bind_parameters({self.param_vector: theta})
-
-            if simulate:
-                # Run on chosen simulator
-                results = execute(
-                    experiments=qc,
-                    backend=backend,
-                    shots=shots,
-                    noise_model=noise_model,
-                    coupling_map=coupling_map,
-                    basis_gates=basis_gates,
-                ).result()
-            else:
-                # Submit job to real device and wait for results
-                job_device = execute(experiments=qc,
-                                     backend=backend,
-                                     shots=shots)
-                job_monitor(job_device)
-                results = job_device.result()
+            qc = self.quantum_circuit.bind_parameters({self.param_vector: theta})
+            results = self.evaluate_circuit(qc)
             counts = results.get_counts()
             self.iteration_counter += 1
             self.prepare_iteration_dict()
@@ -1016,9 +875,10 @@ class QaoaQiskit(BackendBase):
 
     def print_solver_specific_report(self):
         """
-        Prints a table containing information about all qaoa optimization repetitions that were performed.
-        This consists of the repetition number, the score of that repetition and which angles lead to that
-        score. The table is sorted by scored and rounded to two decimal places
+        Prints a table containing information about all qaoa optimization 
+        repetitions that were performed. This consists of the repetition number,
+        the score of that repetition and which angles lead to that score. 
+        The table is sorted by scored and rounded to two decimal places
     
         Returns:
             (None) prints qaoa repetition information
@@ -1030,10 +890,10 @@ class QaoaQiskit(BackendBase):
             key=lambda x: repetitions[x]['optimized_result']['fun']
         )
         current_score_bracket = 0
-        horizontal_break = "------------+---------+--" + self.numAngles * "------"
+        horizontal_break = "------------+---------+--" + self.num_angles * "------"
 
         # table header
-        print(" Repetition |  Score  |" + self.numAngles * "  " + "Solution ")
+        print(" Repetition |  Score  |" + self.num_angles * "  " + "Solution ")
 
         for repetition in repetition_index_sorted_by_score:
             repetition_result = self.output["results"]["repetitions"][repetition]
@@ -1045,3 +905,110 @@ class QaoaQiskit(BackendBase):
                 current_score_bracket = int(score) + 1
             score_str = str(round(score, 2))
             print(f"     {repetition: <7}|  {score_str: <7}|  {rounded_angle_solution}")
+
+
+class QaoaQiskitCloud(QaoaQiskit):
+    """
+    Classes that inherit from this class require access to the IBM cloud in order
+    to execute QAOA.
+    """
+ 
+    def __init__(self, reader: InputReader):
+        """
+        In addition to the regular initiation, this set ups the access to the 
+        IBM account"""
+        super().__init__(reader)
+        # set up connection to IBMQ servers
+        IBMQ.save_account(token=self.config["API_token"]["IBMQ_API_token"],
+                          overwrite=True)
+        self.provider = IBMQ.load_account()
+
+
+class QaoaQiskitSimulator(QaoaQiskit):
+    """
+    Classes that inherit from this class simulate quantum circuits in order to
+    execute QAOA
+    """
+    def setup_backend(self) -> [BaseBackend, NoiseModel, list, list]:
+        """
+        Sets up the qiskit backend based on the settings passed into
+        the function.
+        """
+        self.simulator = self.config_qaoa["simulator"]
+        self.backend = Aer.get_backend(self.simulator)
+
+    def evaluate_circuit(self, circuit):
+        """
+        For a given quantum circuit evaluates it according to the settings
+        in this class and returns the results
+        """
+        return execute(
+            experiments=circuit,
+            backend=self.backend,
+            shots=self.shots,
+            noise_model=self.noise_model,
+            coupling_map=self.coupling_map,
+            basis_gates=self.basis_gates,
+        ).result()
+
+
+class QaoaQiskitExactSimulator(QaoaQiskitSimulator):
+    """
+    This implementation of QAOA uses the aer simulator to execute the algorithm
+    using simulated quantum circuits. The simulation is noiseless
+    """
+    pass
+
+
+class QaoaQiskitNoisySimulator(QaoaQiskitCloud, QaoaQiskitSimulator):
+    """
+    This implementation of QAOA uses a simulator with a noise model. In order
+    to get the noise model, access to the IBM cloud is required"""
+
+    def setup_backend(self):
+        """
+        Sets up the qiskit backend based on the settings passed into
+        the function.
+        """
+        # https://qiskit.org/documentation/apidoc/aer_noise.html
+        # set IBMQ server to extract noise model and coupling_map
+        self.device = self.provider.get_backend("ibmq_lima")
+        # Get noise model from IBMQ server
+        self.noise_model = NoiseModel.from_backend(self.device)
+        # Get coupling map from backend
+        self.coupling_map = device.configuration().coupling_map
+        # Get the basis gates for the noise model
+        self.basis_gates = noise_model.basis_gates
+        # Select the QasmSimulator from the Aer provider
+        self.backend = Aer.get_backend(self.simulator)
+
+
+class QaoaQiskitCloudComputer(QaoaQiskitCloud):
+    """
+    This implementation of QAOA sends the quantum circuit to the IBM cloud to be
+    executed an real quantum hardware. 
+    """
+
+    def evaluate_circuit(self, circuit):
+        """
+        For a given quantum circuit evaluates it according to the settings
+        in this class and returns the results
+        """
+        # Submit job to real device and wait for results
+        job_device = execute(experiments=circuit,
+                             backend=self.backend,
+                             shots=self.shots)
+        job_monitor(job_device)
+        return job_device.result()
+
+    def setup_backend(self) -> [BaseBackend, NoiseModel, list, list]:
+        """
+        Sets up the qiskit backend based on the settings passed into
+        the function.
+        """
+
+        large_enough_devices = self.provider.backends(
+            filters=lambda x: x.configuration().n_qubits > self.num_qubits and not x.configuration().simulator
+        )
+        self.backend = least_busy(large_enough_devices)
+
