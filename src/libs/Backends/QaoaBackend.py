@@ -336,7 +336,7 @@ class QaoaQiskit(BackendBase):
         # initiate local parameters
         self.iteration_counter = None
         self.iter_result = {}
-        self.rep_result = {}
+        self.repetition_result = {}
         self.quantum_circuit = None
         self.param_vector = None
         self.statistics = {"confidence": 0.0,
@@ -425,8 +425,8 @@ class QaoaQiskit(BackendBase):
         # create ParameterVector to be used as placeholder when creating the quantum circuit
         self.param_vector = ParameterVector("theta", self.num_angles)
         self.quantum_circuit = self.create_qc(theta=self.param_vector)
-        # bind variables beta and gamma to qc, to generate a circuit which is saved in output as latex source code.
 
+        # bind variables beta and gamma to qc to generate latex code for drawing the circuit
         draw_theta = self.create_draw_theta()
         qc_draw = self.quantum_circuit.bind_parameters({self.param_vector: draw_theta})
         self.output["results"]["latex_circuit"] = qc_draw.draw(output="latex_source")
@@ -441,36 +441,29 @@ class QaoaQiskit(BackendBase):
             print(
                 f"------------------ Repetition {current_repetition} -----------------------"
             )
-
-            self.rep_result =  {
-                "initial_guess": initial_guess.tolist(),
-                "duration": None,
-                "optimized_result": {},
-                "iterations": {},
-            }
-
-            self.iteration_counter = 0
-
-            expectation = self.get_expectation()
+            # the objective function the classical optimizer optimizes. The value
+            # is the expected value of the evaluating the quantum circuit with regards
+            # to the kirchoff measure as in ``
+            objective_function = self.get_circuit_objective_function(initial_guess)
 
             optimizer = self.get_classical_optimizer(self.max_iter)
 
-            res = optimizer.optimize(
+            result = optimizer.optimize(
                 num_vars=self.num_angles,
-                objective_function=expectation,
+                objective_function=objective_function,
                 initial_point=initial_guess,
             )
-            self.rep_result["optimized_result"] = {
-                "x": list(res[0]),  # solution [beta, gamma]
-                "fun": res[1],  # objective function value
-                "counts": self.rep_result["iterations"][res[2]]["counts"],  # counts of the optimized result
-                "nfev": res[2],  # number of objective function calls
+            self.repetition_result["optimized_result"] = {
+                "angle_solution": list(result[0]),  # solution [beta, gamma]
+                "objective_function_value": result[1],  # objective function value
+                "counts": self.repetition_result["iterations"][result[2]]["counts"],  # counts of the optimized result
+                "num_objective_function_evaluations": result[2],  # number of objective function calls
             }
 
             duration = datetime.timestamp(datetime.now())  - time_start
-            self.rep_result["duration"] = duration
+            self.repetition_result["duration"] = duration
 
-            self.output["results"]["repetitions"][current_repetition] = self.rep_result
+            self.output["results"]["repetitions"][current_repetition] = self.repetition_result
 
         self.output["results"]["total_reps"] = current_repetition
 
@@ -628,12 +621,12 @@ class QaoaQiskit(BackendBase):
                 cost function value.
         """
         search_data = self.output["results"]["repetitions"]
-        min_cf = search_data[1]["optimized_result"]["fun"]
+        min_cf = search_data[1]["optimized_result"]["objective_function_value"]
         min_x = []
         for i in range(1, len(search_data) + 1):
-            if search_data[i]["optimized_result"]["fun"] <= min_cf:
-                min_cf = search_data[i]["optimized_result"]["fun"]
-                min_x = search_data[i]["optimized_result"]["x"]
+            if search_data[i]["optimized_result"]["objective_function_value"] <= min_cf:
+                min_cf = search_data[i]["optimized_result"]["objective_function_value"]
+                min_x = search_data[i]["optimized_result"]["angle_solution"]
 
         return min_x
 
@@ -702,7 +695,10 @@ class QaoaQiskit(BackendBase):
     def kirchhoff_satisfied(self, bitstring: str) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given
-        solution.
+        solution by return the value with regards to the kirchhoff measure.
+        The kirchhoff measure is a nonnegative function, that for any state
+        of the network describes how well that state fulfills the kirchhoff
+        condition.
 
         Args:
             bitstring: (str)
@@ -767,7 +763,7 @@ class QaoaQiskit(BackendBase):
             }
 
         self.iter_result["return"] = avg / sum_count
-        self.rep_result["iterations"][self.iteration_counter] = self.iter_result
+        self.repetition_result["iterations"][self.iteration_counter] = self.iter_result
 
         return self.iter_result["return"]
 
@@ -778,16 +774,30 @@ class QaoaQiskit(BackendBase):
         """
         raise NotImplementedError
 
-    def get_expectation(self) -> callable:
+    def get_circuit_objective_function(self, initial_guess: np.array) -> callable:
         """
         Builds the objective function, which can be used in a classical
-        solver.
+        solver. The objective functions logs values using the attributes
+        `iteration_counter` and `rep_result` and resets them before
+        returning the objective function.
+
+        Args:
+            initial_guess: (np.array)
+                The initial angles to be bound to the quantum circuit
 
         Returns:
             (callable)
                 The objective function to be used in a classical solver.
         """
-
+        # dictionary to obtain intermediary results
+        self.repetition_result =  {
+            "initial_guess": initial_guess.tolist(),
+            "duration": None,
+            "optimized_result": {},
+            "iterations": {},
+        }
+        # counter how often this particular objective function has been called
+        self.iteration_counter = 0
         def execute_circ(theta):
             qc = self.quantum_circuit.bind_parameters({self.param_vector: theta})
             results = self.evaluate_circuit(qc)
@@ -942,7 +952,7 @@ class QaoaQiskit(BackendBase):
         repetitions = self.output["results"]["repetitions"]
         repetition_index_sorted_by_score = sorted(
             list(range(1, len(repetitions) + 1)),
-            key=lambda x: repetitions[x]['optimized_result']['fun']
+            key=lambda x: repetitions[x]['optimized_result']["objective_function_value"]
         )
         current_score_bracket = 0
         horizontal_break = "------------+---------+--" + self.num_angles * "------"
@@ -952,8 +962,8 @@ class QaoaQiskit(BackendBase):
 
         for repetition in repetition_index_sorted_by_score:
             repetition_result = self.output["results"]["repetitions"][repetition]
-            rounded_angle_solution = [round(angle, 2) for angle in repetition_result['optimized_result']['x']]
-            score = repetition_result['optimized_result']['fun']
+            rounded_angle_solution = [round(angle, 2) for angle in repetition_result['optimized_result']["angle_solution"]]
+            score = repetition_result['optimized_result']["objective_function_value"]
             # print breaks every integer step
             if score > current_score_bracket:
                 print(horizontal_break)
