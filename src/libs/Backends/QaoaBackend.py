@@ -434,8 +434,9 @@ class QaoaQiskit(BackendBase):
         # setup IBMQ backend and save its configuration to output
         # backend, noise_model, coupling_map, basis_gates = self.setup_backend()
 
-        current_repetition = 1
+        current_repetition = 0
         for initial_guess in self.angle_supervisior.get_initial_angle_iterator():
+            current_repetition += 1
             time_start = datetime.timestamp(datetime.now())
             print(
                 f"------------------ Repetition {current_repetition} -----------------------"
@@ -470,8 +471,6 @@ class QaoaQiskit(BackendBase):
             self.rep_result["duration"] = duration
 
             self.output["results"]["repetitions"][current_repetition] = self.rep_result
-
-            current_repetition += 1
 
         self.output["results"]["total_reps"] = current_repetition
 
