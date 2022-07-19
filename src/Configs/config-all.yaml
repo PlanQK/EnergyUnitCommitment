@@ -13,8 +13,12 @@ backend: "sqa"
 
 # all configuration data of the QUBO model of the network
 ising_interface:
-    # values for specifiying network to qubit abstraction
-    formulation: "cutpowersoftwo"
+    # values for specifiying network to qubit abstraction. all generator
+    # values are rounded to intgers
+    generator_representation: "integer_decomposition"
+        # (string) name of the function how to model lines with qubits
+        # choose between singleton and integer_decomposition
+    line_representation: "binarysplit"
         # (string) name of the function how to model lines with qubits
         # choose between binarysplit, fullsplit, customsplit, cutpowersoftwo
         #

@@ -65,6 +65,16 @@ class BackendBase(abc.ABC):
         """
         pass
 
+    @classmethod
+    def create_optimizer(cls, reader: InputReader):
+        """
+        A class method to instantiate the correct subclass of the 
+        optimizer based on the configuration in the reader. As a default
+        this returns an instance of the calling class, which has to be
+        overriden to get specific subclasses.
+        """
+        return cls(reader)
+
     def check_input_size(self, limit: int):
         """check if the size of the problem is currently allowed or if
         an estimation of the runtime exceeds some arbitrary limit

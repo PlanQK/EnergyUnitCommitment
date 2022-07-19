@@ -226,6 +226,7 @@ class IsingBackbone:
     # methods
     generator_to_qubits_method_lookup_dict = {
         "singleton": singleton,
+        "integer_decomposition": integer_decomposition_powers_of_two_and_rest
     }
     # The functions on line_to_qubits_method_lookup_dict define how some value of a capacity of
     # a transmission line is translated into qubits
@@ -267,12 +268,13 @@ class IsingBackbone:
             configuration["kirchhoff"] = {"scale_factor": 1.0}
 
         # resolve string for splitting line capacty to function
+        self.generator_to_qubits = IsingBackbone.generator_to_qubits_method_lookup_dict[generator_to_qubits_method_name]
         self.line_to_qubits = IsingBackbone.line_to_qubits_method_lookup_dict[line_to_qubits_method_name]
 
         # network to be solved
         self.network = network
         if "snapshots" in configuration:
-            self.network.snapshots = self.network.snapshots[:configuration["snapshots"]]
+            self.network.snapshots = self.network.snapshots[:configuration.pop("snapshots")]
         self.snapshots = network.snapshots
 
         # contains ising coefficients
@@ -590,8 +592,7 @@ class IsingBackbone:
             self.create_qubit_entries_for_component(
                 component_name=generator,
                 snapshot_to_weight_dict={
-                    time : integer_decomposition_powers_of_two_and_rest(
-                            int(self.get_nominal_power(generator, time)))
+                    time : self.generator_to_qubits(int(self.get_nominal_power(generator, time)))
                     for time in self.network.snapshots
                 }
             )
@@ -678,10 +679,6 @@ class IsingBackbone:
         for snapshot, qubit_list in self.data[component_name].items():
             for idx, qubit in enumerate(qubit_list):
                 self.data[qubit] = snapshot_to_weight_dict[snapshot][idx]
-
-#        print("-")
-#        print(f"comp name:: {component_name}      snap_weight_dict: {snapshot_to_weight_dict}")
-#        print("-")
 
 
     def allocate_qubits_to_weight_list(self, weight_list: list):

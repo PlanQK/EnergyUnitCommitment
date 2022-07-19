@@ -198,12 +198,11 @@ class InputReader:
             (None)
                 The self.config dictionary is modified.
         """
-        for index, value in enumerate(extra_param_values):
-            nested_keys = extra_params[index]
+        for index, nested_keys in enumerate(extra_params):
             current_level = self.config
             for key in nested_keys[:-1]:
                 current_level = current_level.setdefault(key, {})
-            current_level[nested_keys[-1]] = value
+            current_level[nested_keys[-1]] = extra_param_values[index]
 
     def get_config(self) -> dict:
         """

@@ -72,7 +72,7 @@ def run(
 
         # set up optimizer with input data
         optimizer_class = gan_backends[input_reader.config["backend"]]
-        optimizer = optimizer_class(reader=input_reader)
+        optimizer = optimizer_class.create_optimizer(reader=input_reader)
 
         # run optimization
         optimizer.transform_problem_for_optimizer()

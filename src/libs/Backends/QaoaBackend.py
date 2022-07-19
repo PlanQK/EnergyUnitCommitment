@@ -84,10 +84,20 @@ class QaoaAngleSupervisor:
         This is necessary for correctly binding the constructed circuit to the angles"""
         raise NotImplementedError
 
+    def get_total_repetitions(self):
+        """
+        Returns the total number of initial angles provide by the `get_best_initial_angles` method
+
+        Returns:
+            (int) length of the iterator provided by `get_best_initial_angles`
+        """
+        raise NotImplementedError
+
 
 class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
-    """a class for choosing initial qaoa angles. The strategy is given by a list. Either an angle parameter
-    is fixed based on the list entry, or chosen randomly
+    """
+    a class for choosing initial qaoa angles. The strategy is given by a list. Either an angle parameter
+    is fixed based on the list entry, or chosen randomly.
     """
 
     def __init__(self, qaoa_optimizer):
@@ -105,6 +115,20 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
         self.config_guess = self.config_qaoa["initial_guess"]
         self.num_angles = len(self.config_guess)
         self.repetitions = self.config_qaoa["repetitions"]
+
+    def get_total_repetitions(self):
+        """
+        Returns the total number of initial angles provide by the `get_best_initial_angles` method
+
+        Returns:
+            (int) length of the iterator provided by `get_best_initial_angles`
+        """
+        if "rand" not in self.config_guess:
+            return self.repetitions
+        else:
+            # if at least one angle was chosen randomly, qaoa is repeated with the
+            # best angles used as initial guesses which leads to twice as many repetitions
+            return 2 * self.repetitions
 
     def get_num_angles(self):
         """This returns the number of angles are used for parametrization of the quantum circuit.
@@ -217,6 +241,15 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         for angle_list in product(*self.grids_by_layer):
             yield np.array(angle_list)
 
+    def get_total_repetitions(self):
+        """
+        Returns the total number of initial angles provide by the `get_best_initial_angles` method
+
+        Returns:
+            (int) length of the iterator provided by `get_best_initial_angles`
+        """
+        return np.product([len(grid) for grid in self.grids_by_layer])
+
     def set_default_grid(self, default_grid: dict):
         """
         reads a grid dictionary and saves them to be accessible later as a default fallback value 
@@ -261,8 +294,6 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         return [lower_bound + idx * step_size for idx in range(num_gridpoints)]
 
 
-
-
 class QaoaQiskit(BackendBase):
     """
     A class for solving the unit commitment problem using QAOA. This is
@@ -272,16 +303,15 @@ class QaoaQiskit(BackendBase):
     """
 
     @classmethod
-    def build_qaoa_optimizer(cls, reader: InputReader):
-        if self.config_qaoa["simulate"]:
-            if self.config_qaoa["noise"]:
+    def create_optimizer(cls, reader: InputReader):
+        if reader.config["backend_config"]["simulate"]:
+            if reader.config["backend_config"]["noise"]:
                 qaoa_optimizer = QaoaQiskitNoisySimulator(reader)
             else:
                 qaoa_optimizer = QaoaQiskitExactSimulator(reader)
         else:
             qaoa_optimizer = QaoaQiskitCloudComputer(reader)
         return qaoa_optimizer
-
 
     def __init__(self, reader: InputReader):
         """
@@ -333,6 +363,31 @@ class QaoaQiskit(BackendBase):
 
 # factory for correct qaoa
 #  if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
+
+    def check_input_size(self, limit: float = 60.0):
+        """
+        checks if the estimated runtime is longer than the given limit
+
+        Args:
+            limit: an integer that is a measure for how long the limit is.
+                    This is not a limit in seconds because that depends on
+                    the hardware this is running on. Because the time of a
+                    circuit evaluation grows exponentially with the number
+                    qubits, they get also capped here.
+
+        Returns: Doesn't return anything but raises an Error if it would take
+                to long
+        """
+        runtime_factor = len(self.transformed_problem.problem)
+        if runtime_factor > 20:
+            raise ValueError(f"the problem requires {runtime_factor} qubits, "
+                             "but they are capped at 20")
+        runtime_factor *= self.config_qaoa["max_iter"] 
+        runtime_factor *= self.angle_supervisior.get_total_repetitions()
+        runtime_factor *= self.config_qaoa["shots"] * 0.0001
+        used_limit = runtime_factor  / limit
+        if used_limit >= 1.0:
+            raise ValueError("the estimated runtime is too long")
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -479,7 +534,7 @@ class QaoaQiskit(BackendBase):
             "backend": None,
             "qubit_map": {},
             "hamiltonian": {},
-            "qc": None,
+            "latex_circuit": None,
             "initial_guesses": {
                 "original": self.config_qaoa["initial_guess"],
                 "refined": [],
@@ -720,7 +775,8 @@ class QaoaQiskit(BackendBase):
     def evaluate_circuit(self, circuit):
         """
         For the given quantum circuit, evaluates it according to the setting
-        stored in the qaoa instance"""
+        stored in the qaoa instance
+        """
         raise NotImplementedError
 
     def get_expectation(self) -> callable:
