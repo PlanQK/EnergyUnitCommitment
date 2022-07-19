@@ -258,6 +258,8 @@ class IsingBackbone:
                 A dictionary containing all subproblems to be encoded
                 into an ising problem.
         """
+        print()
+        print("--- Generating Ising problem ---")
         self.subproblem_table = {
             "kirchhoff": KirchhoffSubproblem,
             "marginal_cost": MarginalCostSubproblem
@@ -306,6 +308,10 @@ class IsingBackbone:
             self._subproblems[subproblem] = subproblem_instance
             self.flush_cached_problem()
             subproblem_instance.encode_subproblem()
+        print()
+        print("--- Finish generating Ising Problem with the following subproblems ---")
+        for key in self._subproblems:
+            print("----- " + key)
 
     def __getattr__(self, method_name: str) -> callable:
         """
@@ -1799,9 +1805,10 @@ class GlobalCostSquare(MarginalCostSubproblem):
             (None)
                 Prints to stdout.
         """
+        print()
         print(f"--- Estimation Parameters at timestep {time} ---")
         print(f"Absolute offset: {offset}")
-        print(f"Minimal estimated Cost (with offset): {estimated_cost}")
+        print(f"Lower limit of minimal cost (with offset): {estimated_cost}")
         print(
             f"Current total estimation at {time}:"
             f" {offset * self.backbone.get_total_load(time)}")

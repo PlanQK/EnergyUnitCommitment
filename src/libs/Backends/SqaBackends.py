@@ -100,7 +100,6 @@ class ClassicalBackend(BackendBase):
                 dictionary.
         """
         print("starting optimization...")
-        print(self.config)
         tic = time.perf_counter()
         result = self.solver.minimize(
             self.transformed_problem.siquan_format(),
