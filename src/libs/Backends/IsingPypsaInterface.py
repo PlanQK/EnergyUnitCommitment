@@ -286,7 +286,10 @@ class IsingBackbone:
         self.cached_problem = {}
 
         # initializing data structures that encode the network into qubits
-        self.data = {}
+        # the encoding dict contains the mapping of network components to qubits
+        self._qubit_encoding = {}
+        # the weights dict containts a mapping of qubits to their weights
+        self._qubit_weights = {}
         self.allocated_qubits = 0
         self.store_generators()
         self.store_lines()
@@ -418,7 +421,7 @@ class IsingBackbone:
         *key, interaction_strength = args
         key = tuple(sorted(key))
         for qubit in key:
-            interaction_strength *= self.data[qubit]
+            interaction_strength *= self._qubit_weights[qubit]
 
         # if we couple two spins, we check if they are different. If both spins
         # are the same, we substitute the product of spins with 1, since
@@ -465,7 +468,7 @@ class IsingBackbone:
             self.add_interaction(qubit, 0.5 * coupling_strength)
             # term with constant cost contribution after applying QUBO to
             # Ising transformation
-            self.add_interaction(0.5 * coupling_strength * self.data[qubit])
+            self.add_interaction(0.5 * coupling_strength * self._qubit_weights[qubit])
 
     # TODO add a method to conveniently encode the squared distance to a fixed
     #  value into an ising
@@ -553,17 +556,17 @@ class IsingBackbone:
                 # transformation
                 self.add_interaction(
                     first_qubit,
-                    coupling_strength * self.data[second_qubit] * 0.25
+                    coupling_strength * self._qubit_weights[second_qubit] * 0.25
                 )
                 self.add_interaction(
                     second_qubit,
-                    coupling_strength * self.data[first_qubit] * 0.25
+                    coupling_strength * self._qubit_weights[first_qubit] * 0.25
                 )
                 # term with constant cost contribution after applying QUBO to
                 # Ising transformation
                 self.add_interaction(
-                    self.data[first_qubit]
-                    * self.data[second_qubit]
+                    self._qubit_weights[first_qubit]
+                    * self._qubit_weights[second_qubit]
                     * coupling_strength * 0.25
                 )
 
@@ -667,7 +670,7 @@ class IsingBackbone:
         """
         if isinstance(component_name, int):
             raise ValueError("Component names mustn't be of type int")
-        if component_name in self.data:
+        if component_name in self._qubit_encoding:
             raise ValueError("Component name has already been used")
 
         # fill snapshot to weight relation with empty lists for snapshots
@@ -677,14 +680,14 @@ class IsingBackbone:
                 for snapshot in self.network.snapshots}
 
         #store component - snapshot - representing qubit relation
-        self.data[component_name] = {
+        self._qubit_encoding[component_name] = {
             snapshot : self.allocate_qubits_to_weight_list(snapshot_to_weight_dict[snapshot])
             for snapshot in self.network.snapshots
         }
         # expose qubit weights at top level of `self.data`
-        for snapshot, qubit_list in self.data[component_name].items():
+        for snapshot, qubit_list in self._qubit_encoding[component_name].items():
             for idx, qubit in enumerate(qubit_list):
-                self.data[qubit] = snapshot_to_weight_dict[snapshot][idx]
+                self._qubit_weights[qubit] = snapshot_to_weight_dict[snapshot][idx]
 
 
     def allocate_qubits_to_weight_list(self, weight_list: list):
@@ -797,7 +800,7 @@ class IsingBackbone:
         return output_network
 
     # helper functions for getting encoded values
-    def get_data(self) -> dict:
+    def get_qubit_encoding(self) -> dict:
         """
         Returns the dictionary that holds information on the encoding
         of the network into qubits.
@@ -807,7 +810,7 @@ class IsingBackbone:
                 The dictionary with network component as keys and qubit
                 information as values
         """
-        return self.data
+        return self._qubit_encoding
 
     def get_bus_components(self, bus: str) -> dict:
         """
@@ -890,7 +893,7 @@ class IsingBackbone:
                 status. This has to be in the network.snapshots index
         """
         try:
-            return self.data[gen][time][0] in solution
+            return self._qubit_encoding[gen][time][0] in solution
         except IndexError:
             return False
 
@@ -1028,7 +1031,7 @@ class IsingBackbone:
         """
         if time is None:
             time = self.network.snapshots[0]
-        return self.data[component][time]
+        return self._qubit_encoding[component][time]
 
     def get_qubit_mapping(self, time: any = None) -> dict:
         """
@@ -1048,7 +1051,7 @@ class IsingBackbone:
         """
         return {component: self.get_representing_qubits(component=component,
                                                         time=time)
-                for component in self.data.keys()
+                for component in self._qubit_encoding.keys()
                 if isinstance(component, str)}
 
     def get_interaction(self, *args) -> float:
@@ -1090,9 +1093,9 @@ class IsingBackbone:
                 of solution.
         """
         value = 0.0
-        for qubit in self.data[component][time]:
+        for qubit in self._qubit_encoding[component][time]:
             if qubit in solution:
-                value += self.data[qubit]
+                value += self._qubit_weights[qubit]
         return value
 
     def generate_report(self, solution: list) -> dict:

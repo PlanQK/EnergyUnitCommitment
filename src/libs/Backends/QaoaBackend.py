@@ -154,7 +154,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
                 best_initial_guess[j] = min_cf_vars[j]
         return best_initial_guess
 
-    def get_initial_angle_iterator(self) -> Iterator[Tuple[int, np.array]]:
+    def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         These are constructed according to the self.config_guess list. If this list contains at least
