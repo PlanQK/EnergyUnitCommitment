@@ -204,17 +204,21 @@ class IsingBackbone:
     """
     This class implements the conversion of a unit commitment problem
     given by a Pypsa network to an Ising spin glass problem.
+
     It acts as an endpoint to decode qubit configuration and encode
     coupling of network components into Ising interactions. It encodes
     the various network components into qubits and provides methods to
     interact with those qubits based on the label of the network
     component they represent. Therefore, it only acts as a data
     structure which other objects can use to model a specific
-    problem/constraint. Modeling of various constraints is delegated
+    problem/constraint. 
+
+    Modeling of various constraints is delegated
     to instances of `IsingSubproblem`, which are stored as attributes.
     An IsingSubproblem provides a method which adds the Ising
     representation of the subproblem it models to the stored Ising
     problem in this class.
+
     Extending the Ising model of the network can be done in two ways. If
     you want to extend which kinds of networks can be read, you have to
     extend this class with methods that convert values of the network
@@ -280,8 +284,8 @@ class IsingBackbone:
         self.snapshots = network.snapshots
 
         # contains ising coefficients
-        self.problem = {}
-        # mirrors encodings of `self.problem`, but is reset after encoding a
+        self.ising_coefficients = {}
+        # mirrors encodings of `self.ising_coefficients`, but is reset after encoding a
         # subproblem to get ising formulations of subproblems
         self.cached_problem = {}
 
@@ -314,7 +318,7 @@ class IsingBackbone:
         print()
         print("--- Finish generating Ising Problem with the following subproblems ---")
         for key in self._subproblems:
-            print("----- " + key)
+            print("--- - " + key)
 
     def __getattr__(self, method_name: str) -> callable:
         """
@@ -410,7 +414,7 @@ class IsingBackbone:
                 All qubits that are involved in this interaction.
         Returns:
             (None)
-                Modifies self.problem by adding the strength of the
+                Modifies self.ising_coefficients by adding the strength of the
                 interaction if an interaction coefficient is already
                 set.
         """
@@ -430,7 +434,7 @@ class IsingBackbone:
         if len(key) == 2:
             if key[0] == key[1]:
                 key = tuple([])
-        self.problem[key] = self.problem.get(key, 0) - interaction_strength
+        self.ising_coefficients[key] = self.ising_coefficients.get(key, 0) - interaction_strength
         self.cached_problem[key] = self.cached_problem.get(key, 0) - interaction_strength
 
     # TODO unify couple_components and with Constant
@@ -456,7 +460,7 @@ class IsingBackbone:
 
         Returns:
             (None)
-                Modifies self.problem. Adds to previously written
+                Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         if time is None:
@@ -508,7 +512,7 @@ class IsingBackbone:
                 are the same.
         Returns:
             (None)
-                Modifies `self.problem`. Adds to previously written
+                Modifies `self.ising_coefficients`. Adds to previously written
                 interaction coefficient.
 
         Example:
@@ -584,6 +588,17 @@ class IsingBackbone:
                 The number of qubits already allocated.
         """
         return self.allocated_qubits
+
+    def num_interactions(self) -> int:
+        """
+        Returns how many different non-zero interactions the ising
+        problem has
+
+        Returns:
+            (int)
+                number of ising interactions
+        """
+        return len(self.ising_coefficients)
 
     # create qubits for generators and lines
     def store_generators(self) -> None:
@@ -1067,7 +1082,7 @@ class IsingBackbone:
                 The interaction strength between all qubits in args.
         """
         sorted_unique_arguments = tuple(sorted(set(args)))
-        return self.problem.get(sorted_unique_arguments, 0.0)
+        return self.ising_coefficients.get(sorted_unique_arguments, 0.0)
 
     def get_encoded_value_of_component(self, component: str, solution: list,
                                        time: any = 0) -> float:
@@ -1151,7 +1166,7 @@ class IsingBackbone:
         """
         solution = set(solution)
         if ising_interactions is None:
-            ising_interactions = self.problem
+            ising_interactions = self.ising_coefficients
         total_cost = 0.0
         for spins, weight in ising_interactions.items():
             if len(spins) == 1:
@@ -1255,7 +1270,7 @@ class IsingBackbone:
                 A list of tuples of the form (interaction-coefficient,
                 list(qubits)).
         """
-        return [(v, list(k)) for k, v in self.problem.items() if
+        return [(v, list(k)) for k, v in self.ising_coefficients.items() if
                 v != 0 and len(k) > 0]
 
     def get_hamiltonian_matrix(self) -> list:
@@ -1303,7 +1318,7 @@ class AbstractIsingSubproblem:
         a (factory) classmethod to choose the correct subclass and call this
         constructor. The attributes set here are the minimal attributes
         that are expected. The attributes we set have the following purpose:
-            problem: (dict) this contains the qubo formulation of just the
+            ising_coefficients: (dict) this contains the qubo formulation of just the
                 subproblem
             scale_factor: (float) this contains a linear factor to scale the
                 problem with 
@@ -1319,7 +1334,7 @@ class AbstractIsingSubproblem:
                 A dict containing all necessary configurations to
                 construct an instance.
         """
-        self.problem = {}
+        self.ising_coefficients = {}
         try:
             self.scale_factor = config["scale_factor"]
         except KeyError:
@@ -1373,7 +1388,7 @@ class AbstractIsingSubproblem:
                 The energy of the spin glass state.
         """
         return self.backbone.calc_cost(solution=solution,
-                                       ising_interactions=self.problem)
+                                       ising_interactions=self.ising_coefficients)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
@@ -1509,7 +1524,7 @@ class MarginalAsPenalty(MarginalCostSubproblem):
 
         Returns:
             (None)
-                Modifies self.problem. Adds to previously written
+                Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         generators = self.backbone.get_bus_components(bus)['generators']
@@ -1917,7 +1932,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
 
         Returns:
             (None)
-                Modifies self.problem. Adds to previously written
+                Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         # TODO make this more readable
@@ -2009,7 +2024,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 self.encode_kirchhoff_constraint(ising_backbone=self.backbone,
                                                  bus=bus,
                                                  time=time)
-        self.problem = self.backbone.cached_problem
+        self.ising_coefficients = self.backbone.cached_problem
 
     def encode_kirchhoff_constraint(self,
                                     ising_backbone: IsingBackbone,
@@ -2043,7 +2058,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
         Returns:
             (None)
-                Modifies self.problem. Adds to previously written
+                Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         components = ising_backbone.get_bus_components(bus)
@@ -2463,7 +2478,7 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
 
         Returns:
             (None)
-                Modifies self.problem. Adds to previously written
+                Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         estimated_cost, offset = self.estimate_global_marginal_cost(

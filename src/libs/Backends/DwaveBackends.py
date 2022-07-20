@@ -157,14 +157,14 @@ class AbstractDwaveSampler(BackendBase):
         # representations
         linear = {
             spins[0]: strength
-            for spins, strength in self.ising_backbone.problem.items()
+            for spins, strength in self.ising_backbone.ising_coefficients.items()
             if len(spins) == 1
         }
         # the convention is different to the sqa solver:
         # need to add a minus to the couplings
         quadratic = {
             spins: -strength
-            for spins, strength in self.ising_backbone.problem.items()
+            for spins, strength in self.ising_backbone.ising_coefficients.items()
             if len(spins) == 2
         }
         return dimod.BinaryQuadraticModel(
@@ -279,7 +279,7 @@ class AbstractDwaveSampler(BackendBase):
         Returns: Doesn't return anything but raises an Error if it would take
                 to long
         """
-        if len(self.ising_backbone.problem) >= 10000 * limit:
+        if self.ising_backbone.num_interactions() >= 10000 * limit:
             raise ValueError("the estimated runtime is too long")
 
 

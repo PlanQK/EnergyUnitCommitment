@@ -113,10 +113,13 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
         """
         self.qaoa_optimizer = qaoa_optimizer
         self.config_qaoa = qaoa_optimizer.config_qaoa
-        self.range = self.config_qaoa.get("range", 3.14)
-        self.config_guess = self.config_qaoa["initial_guess"]
+        self.range = self.config_qaoa.setdefault("range", 3.14)
+        self.config_guess = self.config_qaoa.setdefault(
+            "initial_guess",
+            ["rand", "rand"]
+        )
         self.num_angles = len(self.config_guess)
-        self.repetitions = self.config_qaoa["repetitions"]
+        self.repetitions = self.config_qaoa.setdefault("repetitions", 1)
 
     def get_total_repetitions(self):
         """
@@ -308,8 +311,8 @@ class QaoaQiskit(BackendBase):
 
     @classmethod
     def create_optimizer(cls, reader: InputReader):
-        if reader.config["backend_config"]["simulate"]:
-            if reader.config["backend_config"]["noise"]:
+        if reader.config["backend_config"].setdefault("simulate", True):
+            if reader.config["backend_config"].setdefault("noise", False):
                 qaoa_optimizer = QaoaQiskitNoisySimulator(reader)
             else:
                 qaoa_optimizer = QaoaQiskitExactSimulator(reader)
@@ -335,6 +338,7 @@ class QaoaQiskit(BackendBase):
         self.angle_supervisior = QaoaAngleSupervisor.make_angle_supervisior(
             qaoa_optimizer=self
         )
+        self.config_qaoa.setdefault("classical_optimizer", "COBYLA")
         self.num_angles = self.angle_supervisior.get_num_angles()
 
         # initiate local parameters
@@ -349,8 +353,8 @@ class QaoaQiskit(BackendBase):
                            "p_values": {},
                            "u_values": {}
                            }
-        self.shots = self.config_qaoa.get("shots",1024)
-        self.max_iter = self.config_qaoa["max_iter"]
+        self.shots = self.config_qaoa.setdefault("shots", 200)
+        self.max_iter = self.config_qaoa.setdefault("max_iter", 15)
         self.hamiltonian = None
         self.num_qubits = None
         self._cache = {}
@@ -365,6 +369,7 @@ class QaoaQiskit(BackendBase):
 
     def setup_backend(self):
         raise NotImplementedError
+
 
 # factory for correct qaoa
 #  if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
@@ -383,7 +388,7 @@ class QaoaQiskit(BackendBase):
         Returns: Doesn't return anything but raises an Error if it would take
                 to long
         """
-        runtime_factor = len(self.transformed_problem.problem)
+        runtime_factor = self.transformed_problem.num_interactions()
         if runtime_factor > 20:
             raise ValueError(f"the problem requires {runtime_factor} qubits, "
                              "but they are capped at 20")
@@ -526,7 +531,7 @@ class QaoaQiskit(BackendBase):
             "hamiltonian": {},
             "latex_circuit": None,
             "initial_guesses": {
-                "original": self.config_qaoa["initial_guess"],
+                # "original": self.config_qaoa["initial_guess"],
                 "refined": [],
             },
             "kirchhoff": {},
@@ -966,7 +971,7 @@ class QaoaQiskitSimulator(QaoaQiskit):
         Sets up the qiskit backend based on the settings passed into
         the function.
         """
-        self.simulator = self.config_qaoa["simulator"]
+        self.simulator = self.config_qaoa.setdefault("simulator", "aer_simulator")
         self.backend = Aer.get_backend(self.simulator)
 
     def evaluate_circuit(self, circuit):

@@ -163,7 +163,7 @@ class ClassicalBackend(BackendBase):
         print("---")
         print(f"Sqa runtime: {self.output['results']['runtime_sec']}")
         print(f"Sqa runtime cycles: {self.output['results']['runtime_cycles']}")
-        print(f"Ising Interactions: {len(self.transformed_problem.problem)}")
+        print(f"Ising Interactions: {self.transformed_problem.num_interactions()}")
 
     def write_results_to_output(self, result: dict) -> None:
         """
@@ -202,7 +202,7 @@ class ClassicalBackend(BackendBase):
         Returns: Doesn't return anything but raises an Error if it would take
                 to long
         """
-        runtime_factor = len(self.transformed_problem.problem) * 0.001
+        runtime_factor = self.transformed_problem.num_interactions() * 0.001
         runtime_factor *= self.siquan_config["trotter_slices"] * 0.001
         runtime_factor *= self.siquan_config["optimization_cycles"] * 0.001
         used_limit = runtime_factor / limit
@@ -229,5 +229,5 @@ class SqaBackend(ClassicalBackend):
                 The configuration of the 'transverseFieldSchedule', to
                 set in siquan solver, according to self.config.
         """
-        return self.config["backend_config"].get("transverse_field_schedule",
+        return self.config["backend_config"].setdefault("transverse_field_schedule",
                                              "[8.0,0.0]")
