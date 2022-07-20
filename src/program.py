@@ -80,7 +80,7 @@ def run(
         # in the dockerfile. This limits runtime on the platform, but allows you
         # to run as long as you want locally
         if environ.get("TRUSTED_USER", False) != "Yes":
-            optimizer.check_input_size(limit=3)
+            optimizer.check_input_size(limit=15)
         optimizer.optimize()
 
         # hook for potential post-processing like flow optimization for dwave

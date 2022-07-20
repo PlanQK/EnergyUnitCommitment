@@ -31,6 +31,7 @@ fi
 
 docker run -it \
 -e BASE64_ENCODED=false \
+-e LOG_LEVEL=DEBUG \
 -v ${GIT_ROOT}/input/${NETWORK}.json:/var/input/data/data.json \
 -v ${GIT_ROOT}/input/${CONFIG}.json:/var/input/params/params.json \
 ${DOCKERTAG}  | tee  >(tail -n 1 > JobResponse)

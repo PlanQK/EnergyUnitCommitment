@@ -6,6 +6,8 @@ an API token"""
 import math
 from itertools import product
 
+from typing import Iterator
+
 import numpy as np
 import qiskit
 
@@ -68,14 +70,14 @@ class QaoaAngleSupervisor:
         if supervisior_type == "GridSearch":
             return QaoaAngleSupervisorGridSearch(qaoa_optimizer)
 
-    def get_initial_angle_iterator(self):
+    def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:
         """
         This returns an iterator for initial angle initialization. Iterating using this is the main
         way of using this class. By storing a reference to the executing qaoa optimizer, this class
         can adjust which parameters to use next based on qaoa results.
     
         Returns:
-            (Iterator[np.array]) An iterator which yields initial angle values for the optimizer
+            (Iterator[tuple[int, np.array]]) An iterator which yields initial angle values for the optimizer
         """
         raise NotImplementedError
 
@@ -152,7 +154,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
                 best_initial_guess[j] = min_cf_vars[j]
         return best_initial_guess
 
-    def get_initial_angle_iterator(self):
+    def get_initial_angle_iterator(self) -> Iterator[Tuple[int, np.array]]:
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         These are constructed according to the self.config_guess list. If this list contains at least
@@ -163,14 +165,14 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
             (iterator[np.array]) description
         """
         for idx in range(self.repetitions):
-            yield self.choose_initial_angles()
+            yield idx, self.choose_initial_angles()
 
         if "rand" not in self.config_guess:
             return
 
         self.config_guess = self.get_best_initial_angles()
-        for idx in range(self.repetitions):
-            yield self.choose_initial_angles()
+        for idx in range(self.repetitions, 2 * self.repetitions):
+            yield idx, self.choose_initial_angles()
 
     def choose_initial_angles(self):
         """
@@ -230,7 +232,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         This is necessary for correctly binding the constructed circuit to the angles"""
         return self.num_angles
 
-    def get_initial_angle_iterator(self):
+    def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         Together, these initial angles form a grid on the angle space
@@ -238,8 +240,10 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
         Returns:
             (Iterator[np.array]) An iterator which yields initial angle values for the optimizer
         """
+        current = 0
         for angle_list in product(*self.grids_by_layer):
-            yield np.array(angle_list)
+            yield current, np.array(angle_list)
+            current += 1
 
     def get_total_repetitions(self):
         """
@@ -349,6 +353,7 @@ class QaoaQiskit(BackendBase):
         self.max_iter = self.config_qaoa["max_iter"]
         self.hamiltonian = None
         self.num_qubits = None
+        self._cache = {}
 
         # the four variables are relevant for the backend. The setup
         # method fills the field with the correct values
@@ -434,16 +439,14 @@ class QaoaQiskit(BackendBase):
         # setup IBMQ backend and save its configuration to output
         # backend, noise_model, coupling_map, basis_gates = self.setup_backend()
 
-        current_repetition = 0
-        for initial_guess in self.angle_supervisior.get_initial_angle_iterator():
-            current_repetition += 1
+        for current_repetition, initial_guess in self.angle_supervisior.get_initial_angle_iterator():
             time_start = datetime.timestamp(datetime.now())
             print(
                 f"------------------ Repetition {current_repetition} -----------------------"
             )
             # the objective function the classical optimizer optimizes. The value
-            # is the expected value of the evaluating the quantum circuit with regards
-            # to the kirchoff measure as in ``
+            # is the expected value of the evaluating the parametrized quantum circuit 
+            # with regards to the kirchoff measure as in `kirchhoff_score`
             objective_function = self.get_circuit_objective_function(initial_guess)
 
             optimizer = self.get_classical_optimizer(self.max_iter)
@@ -463,9 +466,9 @@ class QaoaQiskit(BackendBase):
             duration = datetime.timestamp(datetime.now())  - time_start
             self.repetition_result["duration"] = duration
 
-            self.output["results"]["repetitions"][current_repetition] = self.repetition_result
+            self.output["results"]["repetitions"][f"rep_{current_repetition}"] = self.repetition_result
 
-        self.output["results"]["total_reps"] = current_repetition
+        self.output["results"]["total_reps"] = current_repetition + 1
 
     def process_solution(self) -> None:
         """
@@ -479,8 +482,6 @@ class QaoaQiskit(BackendBase):
                 Modifies self.output dictionary with post-process
                 information.
         """
-        self.output["components"] = self.transformed_problem.get_data()
-
         self.extract_p_values()  # get probabilities of bitstrings
         self.find_best_bitstring()
         self.compare_bit_string_to_rest()  # one-sided Mann-Witney U Test
@@ -504,10 +505,7 @@ class QaoaQiskit(BackendBase):
                 Modifies self.output with the output_network.
         """
         best_bitstring = self.output["results"]["statistics"]["best_bitstring"]
-        solution = []
-        for idx, bit in enumerate(best_bitstring):
-            if bit == "1":
-                solution.append(idx)
+        solution = [idx for idx, bit in enumerate(best_bitstring) if bit == "1"]
         output_network = self.transformed_problem.set_output_network(
             solution=solution)
         output_dataset = output_network.export_to_netcdf()
@@ -551,7 +549,7 @@ class QaoaQiskit(BackendBase):
             "theta": [],
             "counts": {},
             "bitstrings": {},
-            "return": None
+            "expected_kirchhoff_score": None
         }
 
     def create_draw_theta(self) -> list:
@@ -620,15 +618,11 @@ class QaoaQiskit(BackendBase):
                 The beta and gamma values associated with the minimal
                 cost function value.
         """
-        search_data = self.output["results"]["repetitions"]
-        min_cf = search_data[1]["optimized_result"]["objective_function_value"]
-        min_x = []
-        for i in range(1, len(search_data) + 1):
-            if search_data[i]["optimized_result"]["objective_function_value"] <= min_cf:
-                min_cf = search_data[i]["optimized_result"]["objective_function_value"]
-                min_x = search_data[i]["optimized_result"]["angle_solution"]
-
-        return min_x
+        best_repetition = min(
+            self.output["results"]["repetitions"].values(),
+            key= lambda repetition_result: repetition_result["optimized_result"]["objective_function_value"]
+            )
+        return best_repetition["optimized_result"]["angle_solution"]
 
     def create_qc(self, theta: ParameterVector) -> QuantumCircuit:
         """
@@ -692,7 +686,7 @@ class QaoaQiskit(BackendBase):
 
         return qc
 
-    def kirchhoff_satisfied(self, bitstring: str) -> float:
+    def kirchhoff_score(self, bitstring: str) -> float:
         """
         Checks if the kirchhoff constraints are satisfied for the given
         solution by return the value with regards to the kirchhoff measure.
@@ -711,33 +705,26 @@ class QaoaQiskit(BackendBase):
                 kirchhoff constrains would be completely satisfied for
                 the given network.
         """
+        # try returning cached results because speed matters here
         try:
-            # check if the kirchhoff costs for this bitstring have already
-            # been calculated and if so use this value
-            return self.output["results"]["kirchhoff"][bitstring]["total"]
+            return self._cache[bitstring]
         except KeyError:
-            self.output["results"]["kirchhoff"][bitstring] = {}
-            kirchhoff_cost = 0.0
-            # calculate the deviation from the optimal for each bus separately
-            for bus in self.network.buses.index:
-                bitstring_to_solution = [
-                    idx for idx, bit in enumerate(bitstring) if bit == "1"
-                ]
-                for _, val in self.transformed_problem.calc_power_imbalance_at_bus(
-                        bus, bitstring_to_solution
-                ).items():
-                    # store the penalty for each bus and then add them to the
-                    # total costs
-                    self.output["results"]["kirchhoff"][bitstring][bus] = val
-                    kirchhoff_cost += abs(val) ** 2
-            self.output["results"]["kirchhoff"][bitstring]["total"] = \
-                kirchhoff_cost
-            return kirchhoff_cost
+            individual_kirchhoff_cost = self.transformed_problem.individual_kirchhoff_cost(
+                [idx for idx, bit in enumerate(bitstring) if bit == "1"]
+            )
+            total_kirchhoff_cost = 0.0
+            for _, cost in individual_kirchhoff_cost.items():
+                total_kirchhoff_cost += cost
+            self._cache[bitstring] = total_kirchhoff_cost
+            self.output["results"]["kirchhoff"][bitstring] = individual_kirchhoff_cost
+            self.output["results"]["kirchhoff"][bitstring]["total"] = total_kirchhoff_cost
+            return total_kirchhoff_cost
 
-    def compute_expectation(self, counts: dict) -> float:
+    def compute_objective_function(self, counts: dict) -> float:
         """
         Computes expectation values based on the measurement/simulation
-        results.
+        results. The value of this is the value of the objective function we try
+        to to minimize using classical optimizers.
 
         Args:
             counts: (dict)
@@ -748,24 +735,21 @@ class QaoaQiskit(BackendBase):
             (float)
                 The expectation value.
         """
-
-        avg = 0
-        sum_count = 0
+        summed_kirchhoff_score = 0.0
         for bitstring, count in counts.items():
-            obj = self.kirchhoff_satisfied(bitstring=bitstring)
-            avg += obj * count
-            sum_count += count
+            objective_function_value = self.kirchhoff_score(bitstring=bitstring)
+            summed_kirchhoff_score += objective_function_value * count
             self.iter_result["bitstrings"][bitstring] = {
                 "count": count,
-                "obj": obj,
-                "avg": avg,
-                "sum_count": sum_count,
+                "kirchhoff_score": objective_function_value,
+                "summed_kirchhoff_score": summed_kirchhoff_score,
+                "sum_count": self.shots,
             }
 
-        self.iter_result["return"] = avg / sum_count
+        self.iter_result["expected_kirchhoff_score"] = summed_kirchhoff_score / self.shots
         self.repetition_result["iterations"][self.iteration_counter] = self.iter_result
 
-        return self.iter_result["return"]
+        return self.iter_result["expected_kirchhoff_score"]
 
     def evaluate_circuit(self, circuit):
         """
@@ -807,7 +791,7 @@ class QaoaQiskit(BackendBase):
             self.iter_result["theta"] = list(theta)
             self.iter_result["counts"] = counts
 
-            return self.compute_expectation(counts=counts)
+            return self.compute_objective_function(counts=counts)
 
         return execute_circ
 
@@ -824,23 +808,14 @@ class QaoaQiskit(BackendBase):
                 Writes the created lists of probabilities into the
                 self.statistics dictionary.
         """
-        data = self.output["results"]["repetitions"]
+        repetition_data = self.output["results"]["repetitions"]
         bitstrings = self.output["results"]["kirchhoff"].keys()
         probabilities = {}
-        shots = self.config_qaoa["shots"]
-        # find repetition value from where the refinement process started
-        start = self.output["results"]["total_reps"] - self.config_qaoa["repetitions"]
         for bitstring in bitstrings:
-            probabilities[bitstring] = []
-            for key in data:
-                if key <= start:
-                    continue
-                if bitstring in data[key]["optimized_result"]["counts"]:
-                    p = data[key]["optimized_result"][
-                            "counts"][bitstring] / shots
-                else:
-                    p = 0
-                probabilities[bitstring].append(p)
+            probabilities[bitstring] = [
+                repetition_data[rep]["optimized_result"]["counts"].get(bitstring, 0.0) / self.shots
+                for rep in repetition_data
+            ]
         self.statistics["probabilities"] = probabilities
 
     def find_best_bitstring(self) -> None:
@@ -854,15 +829,10 @@ class QaoaQiskit(BackendBase):
                 Modifies the self.statistics dictionary.
         """
         probabilities = self.statistics["probabilities"]
-        # set first bitstring as best for now
-        best_bitstring = list(probabilities.keys())[0]
-        # get median of first bitstring
-        best_median = median(probabilities[best_bitstring])
-
-        for bitstring in probabilities:
-            if median(probabilities[bitstring]) > best_median:
-                best_median = median(probabilities[bitstring])
-                best_bitstring = bitstring
+        best_bitstring = min(
+            probabilities.keys(),
+            key=lambda bitstring: median(probabilities[bitstring])
+        )
         self.statistics["best_bitstring"] = best_bitstring
 
     def compare_bit_string_to_rest(self) -> None:
@@ -904,14 +874,11 @@ class QaoaQiskit(BackendBase):
             (None)
                 Modifies the self.statistics dictionary.
         """
-        alphas = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
-        for alpha in alphas:
-            broken = False
+        for alpha in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
             for key, value in self.statistics["p_values"].items():
                 if value > alpha:
-                    broken = True
                     break
-            if not broken:
+            else:
                 self.statistics["confidence"] = 1 - alpha
                 break
 
@@ -930,10 +897,7 @@ class QaoaQiskit(BackendBase):
                 Modifies self.output with solution specific parameters
                 and values.
         """
-        solution = []
-        for idx, bit in enumerate(best_bitstring):
-            if bit == "1":
-                solution.append(idx)
+        solution = [idx for idx, bit in enumerate(best_bitstring) if bit == "1"]
         report = self.transformed_problem.generate_report(solution=solution)
         for key in report:
             self.output["results"][key] = report[key]
@@ -949,10 +913,10 @@ class QaoaQiskit(BackendBase):
             (None) prints qaoa repetition information
         """
         print("\n--- Table of Results ---")
-        repetitions = self.output["results"]["repetitions"]
+        rep_data = self.output["results"]["repetitions"]
         repetition_index_sorted_by_score = sorted(
-            list(range(1, len(repetitions) + 1)),
-            key=lambda x: repetitions[x]['optimized_result']["objective_function_value"]
+            rep_data.keys(),
+            key=lambda repetition: rep_data[repetition]['optimized_result']["objective_function_value"]
         )
         current_score_bracket = 0
         horizontal_break = "------------+---------+--" + self.num_angles * "------"
@@ -961,8 +925,11 @@ class QaoaQiskit(BackendBase):
         print(" Repetition |  Score  |" + self.num_angles * "  " + "Solution ")
 
         for repetition in repetition_index_sorted_by_score:
-            repetition_result = self.output["results"]["repetitions"][repetition]
-            rounded_angle_solution = [round(angle, 2) for angle in repetition_result['optimized_result']["angle_solution"]]
+            repetition_result = rep_data[repetition]
+            rounded_angle_solution = [
+                round(angle, 2) 
+                for angle in repetition_result['optimized_result']["angle_solution"]
+            ]
             score = repetition_result['optimized_result']["objective_function_value"]
             # print breaks every integer step
             if score > current_score_bracket:

@@ -38,7 +38,7 @@ def main():
     if len(sys.argv) >= 3:
         output_name = sys.argv[2]
     else:
-        output_name = input_file[: -len(filetype)]
+        output_name = input_file[: -len(filetype) - 1]
 
     output_file = path_prefix + "input/" + output_name + ".json"
 
