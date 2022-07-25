@@ -1431,7 +1431,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
             "MarginalAsPenalty": MarginalAsPenalty,
             "LocalMarginalEstimation": LocalMarginalEstimation,
         }
-        return subclass_table[configuration["formulation"]](
+        return subclass_table[configuration["strategy"]](
             backbone=backbone, config=configuration)
 
 
@@ -1452,8 +1452,6 @@ class MarginalAsPenalty(MarginalCostSubproblem):
             `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimated_cost_factor`: is going to be removed
-            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1468,11 +1466,6 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         # in all generators to bring the average cost of a generator closer to
         # zero
         self.offset_estimation_factor = float(config["offset_estimation_factor"])
-        # factor to scale estimated cost at a bus after calculation
-        self.estimated_cost_factor = float(config["estimated_cost_factor"])
-        # factor to scale marginal cost of a generator when constructing ising
-        # interactions
-        self.offset_build_factor = float(config["offset_build_factor"])
 
     def encode_subproblem(self) -> None:
         """
@@ -1557,8 +1550,6 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
             `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimated_cost_factor`: is going to be removed
-            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1569,11 +1560,6 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         """
         super().__init__(backbone, config)
         self.offset_estimation_factor = float(config["offset_estimation_factor"])
-        # factor to scale estimated cost at a bus after calculation
-        self.estimated_cost_factor = float(config["estimated_cost_factor"])
-        # factor to scale marginal cost of a generator when constructing ising
-        # interactions
-        self.offset_build_factor = float(config["offset_build_factor"])
 
     def encode_subproblem(self) -> None:
         # TODO: check DocString
@@ -1726,8 +1712,6 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                                  components['negative_lines']
 
         estimated_cost, offset = self.estimate_marginal_cost_at_bus(bus, time)
-        estimated_cost *= self.estimated_cost_factor
-        offset *= self.offset_build_factor
         load = self.backbone.get_load(bus, time)
 
         self.backbone.add_interaction(0.25 * estimated_cost ** 2)
@@ -1783,8 +1767,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
             `offset_estimation_factor`: sets an offset across all
                 generators by the cost of the most efficient generator
                 scaled by this factor
-            `estimated_cost_factor`: is going to be removed
-            `offset_build_factor`: is going to be removed
 
         Args:
             backbone: (IsingBackbone)
@@ -1795,11 +1777,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         super().__init__(backbone, config)
         self.offset_estimation_factor = float(config["offset_estimation_factor"])
-        # factor to scale estimated cost at a bus after calculation
-        self.estimated_cost_factor = float(config["estimated_cost_factor"])
-        # factor to scale marginal cost of a generator when constructing ising
-        # interactions
-        self.offset_build_factor = float(config["offset_build_factor"])
 
     def print_estimation_report(self,
                                 estimated_cost: float,
