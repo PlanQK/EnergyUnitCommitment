@@ -7,6 +7,7 @@ FROM ghcr.io/planqk/job-template:latest-base-1.0.0
 ENV ENTRY_POINT app.user_code.src.program:run
 
 # install big pip packages before copying user code in order to reuse it
+RUN pip install pypsa
 RUN pip install numpy
 RUN pip install scipy
 RUN pip install pandas

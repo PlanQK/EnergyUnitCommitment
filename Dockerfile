@@ -23,8 +23,8 @@ RUN pip install numpy && \
 COPY requirements.txt /energy/requirements.txt
 
 # temporary until pypsa on pip has fix for reading serialized networks
-COPY pypsa-0.19.3.zip /energy/pypsa-0.19.3.zip
-RUN pip install pypsa-0.19.3.zip
+# COPY pypsa-0.19.3.zip /energy/pypsa-0.19.3.zip
+# RUN pip install pypsa-0.19.3.zip
 
 RUN pip install -r /energy/requirements.txt
 RUN apt-get install -y glpk-utils 

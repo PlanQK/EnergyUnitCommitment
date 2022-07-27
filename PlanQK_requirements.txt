@@ -1,4 +1,4 @@
-/app/user_code/pypsa-0.19.3.zip
+pypsa==0.20.0
 dwave-ocean-sdk==5.2.0
 xarray==2022.3.0
 netcdf4==1.5.8
