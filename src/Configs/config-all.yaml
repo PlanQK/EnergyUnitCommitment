@@ -16,9 +16,10 @@ ising_interface:
     # values for specifiying network to qubit abstraction. all generator
     # values are rounded to intgers
     generator_representation: "integer_decomposition"
+    generator_representation: "single_qubit"
         # (string) name of the function how to model lines with qubits
-        # choose between singleton and integer_decomposition
-    line_representation: "binarysplit"
+        # choose between single_qubit and integer_decomposition
+    line_representation: "customsplit"
         # (string) name of the function how to model lines with qubits
         # choose between binarysplit, fullsplit, customsplit, cutpowersoftwo
         #
@@ -29,9 +30,9 @@ ising_interface:
         # (float) weight of the kirchhoff subproblem in the QUBO
     marginal_cost:
         # Adding Marginal cost optimization in the QUBO
-        formulation: "GlobalCostSquare"
+        strategy: "global_cost_square"
             # (string) name of the class/procedure how to encode the marginal cost optimization
-            # choose between GlobalCostSquare, GlobalCostSquareWithSlack, MarginalAsPenalty, LocalMarginalEstimationDistance
+            # choose between global_cost_square, global_cost_square_with_slack, marginal_as_penalty, local_marginal_estimation_distance
         ### these values only pertain the formulation *WithSlack
         slack_type: "binary_power"
             # this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
@@ -44,13 +45,10 @@ ising_interface:
         scale_factor: 0.6
              # (float) weight of the marginal cost optimization in the QUBO
         offset_estimation_factor: 1.225
+        offset_estimation_factor: 1.0
              # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
              # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
              # this method disregerads the topology of the network and is a lower boundary of the cost
-        estimated_cost_factor: 1.0
-             # (float) TODO: remove this option in code
-        offset_build_factor: 1.0
-             # (float) TODO: remove this option in code
         ### end estimation config
 
     # TODO not implemented in code yey
@@ -97,18 +95,18 @@ qaoa_backend:
 
     ### "RandomOrFixed" config guess
     # uses a list to initializes angles in one experiment, substituting the string "rand" by a random number
-    supervisior_type: "RandomOrFixed"
-    initial_guess: ["rand", "rand"]
+    strategy: "random_or_fixed"
+    initial_guess: ["rand", "rand", "rand", "rand"]
         # (list of float or "rand") the initial guess for the classical optimizer and "RandomOrFixed" supervisor
-    range: 2
+    range: 6
         # (float) range of a random guess for the angle. A range of 1 will result in random guesses
         # in the intervall [-1,1]. Only applicable for random guesses
         # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
         # use "rand" if a random initial guess should be used for this parameter. 
         
-#   ### "GridSearch" config guess
-#   # GridSearch takes a list of grids which are dictionary that describe the initial angles 
-#   # of the layers. A grid dictionary containts the following keys
+#   ### "grid_search" config guess
+#   # grid_search takes a list of grids which are dictionary that describe the initial angles 
+#   # of the layers. A grid dictionary contains the following keys
 #        lower_bound: -3
 #           # (float) lowest point of the angles 
 #        upper_bound: 3
@@ -116,14 +114,14 @@ qaoa_backend:
 #        num_gridpoints: 1
 #           # (int) number of angles to try for the problem hamiltonian. Raises an error if fewer
 #           # than 1 are selected. If excactly one is selected, the lower_bound is the chosen grid point
-    supervisior_type: "GridSearch"
-    initial_guess: 
-    - lower_bound: 2
-      upper_bound: 2
-      num_gridpoints: 3
-    - lower_bound: 1
-      upper_bound: 1
-      num_gridpoints: 3
+    # strategy: "grid_search"
+    # initial_guess: 
+    # - lower_bound: 2
+    #   upper_bound: 2
+    #   num_gridpoints: 3
+    # - lower_bound: 1
+    #   upper_bound: 1
+    #   num_gridpoints: 3
 
 #   # It also supports default values for all grids given in the dictionary which are used as fallback values
 #   # The fallback values are given by the dictionary `default_grid`. The default values for that one are
@@ -190,4 +188,3 @@ pypsa_backend:
 # This can also hold any of the above information. Solver specific configuration data in ${SOLVER}Backend
 # will be copied into this field and then be used
 backend_config:
-    #
