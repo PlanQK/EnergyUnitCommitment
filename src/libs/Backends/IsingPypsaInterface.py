@@ -574,6 +574,46 @@ class IsingBackbone:
                     * coupling_strength * 0.25
                 )
 
+    def encode_squared_distance(self, 
+                                label_dictionary: dict,
+                                target: float = 0.0 ,
+                                global_factor: float = 1.0,
+                                time: any = None,
+                                ) -> None:
+        """
+        Encodes the squared distance of all components in `label_dictionary.keys()`
+        to the value `target` with respect to the factors given in keys.
+
+        Args:
+            label_dictionary: (dict)
+                key, value pairs of all components involved in representing the
+                target value.
+            target: (float)
+                the value that is the target for the sum of the components
+                in the label_dictionary
+            global_factor: (float)
+                a factor by which all interaction are multiplied
+            time: (any)
+                the time step at which to couple the components
+        """
+        # constant contribution to cost function so that a configuration
+        # that matches the target value has energy of 0
+        self.add_interaction(global_factor * target ** 2)
+
+        for first_component, first_factor in label_dictionary.items():
+            factor = global_factor * first_factor
+
+            self.couple_component_with_constant(first_component,
+                                                  - 2.0 * factor * target,
+                                                time=time)
+            for second_component, second_factor in label_dictionary.items():
+                current_factor = factor * second_factor
+                # attraction/repulsion term for different/same sign of power
+                # at components
+                self.couple_components(first_component,
+                                        second_component,
+                                        coupling_strength=current_factor,
+                                        time=time)
     # end of coupling functions
 
     def num_variables(self) -> int:
@@ -2039,38 +2079,24 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 interaction coefficient.
         """
         components = ising_backbone.get_bus_components(bus)
-        flattened_components = components['generators'] + \
-                               components['positive_lines'] + \
-                               components['negative_lines']
+        label_dictionary = {
+                label: 1.0 
+                for label in components['generators'] + components['positive_lines']
+                }
+        label_dictionary.update({
+                label: -1.0
+                for label in components['negative_lines']
+        })
+
         demand = ising_backbone.get_load(bus, time=time)
 
-        # constant load contribution to cost function so that a configuration
-        # that fulfills the kirchhoff constraint has energy 0
-        ising_backbone.add_interaction(self.scale_factor * demand ** 2)
-        for first_component in flattened_components:
-            # this factor sets the scale, as well as the sign to encode if
-            # an active component acts a generator or a load
-            factor = self.scale_factor
-            if first_component in components['negative_lines']:
-                factor *= -1.0
-            # reward/penalty term for matching/adding load. Contains all
-            # products with the Load
-            ising_backbone.couple_component_with_constant(first_component,
-                                                          - 2.0 * factor * demand,
-                                                        time=time)
-            for second_component in flattened_components:
-                # adjust sing for direction of flow at line
-                if second_component in components['negative_lines']:
-                    current_factor = -factor
-                else:
-                    current_factor = factor
-                # attraction/repulsion term for different/same sign of power
-                # at components
-                ising_backbone.couple_components(first_component,
-                                                second_component,
-                                                coupling_strength=current_factor,
-                                                time=time)
-
+        ising_backbone.encode_squared_distance(
+                label_dictionary=label_dictionary,
+                target=demand,
+                global_factor=self.scale_factor,
+                time=time
+                )
+        return
 
     def calc_power_imbalance_at_bus_at_time(self,
                                     bus: str,
@@ -2112,7 +2138,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                                                                  result,
                                                                  time=time)
         return load
-
 
     def calc_power_imbalance_at_bus(self,
                                     bus: str,
