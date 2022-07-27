@@ -179,8 +179,6 @@ class BackendBase(abc.ABC):
                         "backend_config": self.config.get(backend, {}),
                         "ising_interface": self.config.get("ising_interface", {}),
                     },
-                    "components": {},
-                    "network": {},
                     "results": {},
                 }
                 return

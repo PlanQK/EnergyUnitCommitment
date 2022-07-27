@@ -21,9 +21,9 @@ This service contains various solvers for optimizing a simplified version of the
 
     - [Encoding constraints](#Encoding_constraints)
 
-      - [Kirchhoff constraint](#Kirchhoff_constraint)
+        - [Kirchhoff constraint](#Kirchhoff_constraint)
 
-      - [Marginal Costs](#Marginal_Costs)
+        - [Marginal Costs](#Marginal_Costs)
 
     - [Solver Configuration](#Solver_Configuration)
 
@@ -37,10 +37,9 @@ This service contains various solvers for optimizing a simplified version of the
 
         - [Mixed Integer Linear Programming](#Mixed_Integer_Linear_Programming)
 
-        - [API tokens](#API-token)
+    - [API tokens](#API-token)
 
-- [Output format](#Output format)
-
+- [Output format](#Output-format)
 
 # Input format
 
@@ -55,16 +54,14 @@ The PyPSA documentation also contains an [example](https://pypsa.readthedocs.io/
 
 ### Building the network in PyPSA
 We start by importing PyPSA and creating a network with three time steps.
-<details>
-  <summary> TODO? </summary>
-  hide code
-</details>
 
 ```
 import PyPSA
 network = pypsa.Network(snapshots=range(3))
 ```
+
 Then we have to add buses at which generators and loads are located and connect them with transmission lines. 
+
 ```
 network.add("Bus","bus_1")
 network.add("Bus","bus_2")
@@ -76,11 +73,13 @@ network.add(
     s_nom=3,
 )
 ```
+
 We can now add the generators and loads to the buses.
+
 ```
 network.add(
     "Generator",
-    "gen_1"
+    "gen_1",
     bus="bus_1",
     committable=True,
     p_min_pu=1,
@@ -105,18 +104,18 @@ network.add(
 network.add(
     "Load",
     "load_2",
-    bus="bus_3",
+    bus="bus_2",
     p_set=[2,1,1]
 )
 ```
+
 The parameter `p_nom` sets the output of the generators and the `p_set` parameter sets a load at each time step for the respective bus. We don't have any minimal up or downtime and by setting `p_min_pu` we require generators to provide 100% of their power if they are committed.
 The QUBO-based solvers ignore the `committable` flag and assume that every generator is committable. The `marginal_cost` keyword sets the cost of producing one unit of power.
-
-
 
 ### Converting a network to JSON
 
 In order to submit this network to the service, we have to turn it into JSON-format. We can do that like this:
+
 ```
 import json
 
@@ -124,17 +123,15 @@ network_xarray = network.export_to_netcdf()
 network_dict = network_xarray.to_dict()
 network_json = json.dump(network_dict)
 ```
-Now you can pass that JSON to the service to solve it. A graphical representation of the problem looks like this.
 
-INSERT_GRAPHIC
-
-You can find the full code for generating the network below
+Now you can pass that JSON to the service to solve it. 
+You can find the full code for generating the network below:
 
 <details>
     <summary> click to expand </summary>
 
 ```
-import PyPSA
+import pypsa
 import json
 
 # create empty network
@@ -146,20 +143,20 @@ network.add("Bus","bus_2")
 network.add(
     "Line",
     "line",
-    bus0="bus_1"
-    bus1="bus_2"
+    bus0="bus_1",
+    bus1="bus_2",
     s_nom=3,
 )
 
 # Add generators and loads
 network.add(
     "Generator",
-    "gen_1"
+    "gen_1",
     bus="bus_1",
     committable=True,
     p_min_pu=1,
     marginal_cost=15,
-    p_nom=4,
+    p_nom=4
 )
 network.add(
     "Generator",
@@ -168,7 +165,7 @@ network.add(
     committable=True,
     p_min_pu=1,
     marginal_cost=10,
-    p_nom=3,
+    p_nom=3
 )
 network.add(
     "Load",
@@ -179,7 +176,7 @@ network.add(
 network.add(
     "Load",
     "load_2",
-    bus="bus_3",
+    bus="bus_2",
     p_set=[2,1,1]
 )
 
@@ -220,33 +217,26 @@ The following solvers from [D-Waves ocean stack](https://docs.ocean.dwavesys.com
 - [Steepest descent](https://docs.ocean.dwavesys.com/en/stable/docs_greedy/sdk_index.html)
 - [Hybrid solver](https://docs.ocean.dwavesys.com/en/stable/docs_hybrid/sdk_index.html)
 
-
 The following table lists all supported solvers and how to choose them by passing the correct string to the `backend` field. 
 
+| solver            | keyword      | description                                                                               | uses QUBO | API token |
+|-------------------|--------------|-------------------------------------------------------------------------------------------|-----------|-----------|
+| sqa               | sqa          | performs simulated quantum annealing. Default solver if none is speficied                 | Yes       | None      |
+| annealing         | classical    | performs simulated annealing                                                              | Yes       | None      |
+| qaoa              | qaoa         | performs QAOA using IBM's qiskit by either simulating or accessing IBM's quantum computer | Yes       | IBMQ      |
+| glpk              | pypsa-glpk   | solves a mixed integer linear program obtained by pypsa using the GLPK solver             | No        | None      |
+| quantum annealing | dwave-qpu    | performs quantum annealing using d-waves quantum annealer                                 | Yes       | D-Wave    |
+| tabu search       | dwave-tabu   | performs tabu search                                                                      | Yes       | None      |
+| steepest decent   | dwave-greedy | performs steepest descent                                                                 | Yes       | None      |
+| hybrid solver     | dwave-hybrid | uses d-waves hybrid solver in the cloud                                                   | Yes       | D-Wave    |
 
-| solver            | keyword      | description                                                                               | configuration keyword | uses QUBO | API token |
-|-------------------|--------------|-------------------------------------------------------------------------------------------|-----------------------|-----------|-----------|
-| sqa               | sqa          | performs simulated quantum annealing. Default solver if none is speficied                 | sqa_backend           | Yes       | None      |
-| annealing         | classical    | performs simulated annealing                                                              | sqa_backend           | Yes       | None      |
-| qaoa              | qaoa         | performs QAOA using IBM's qiskit by either simulating or accessing IBM's quantum computer | qaoa_backend          | Yes       | IBMQ      |
-| glpk              | pypsa-glpk   | solves a mixed integer linear program obtained by pypsa using the GLPK solver             | pypsa_backend         | No        | None      |
-| quantum annealing | dwave-qpu    | performs quantum annealing using d-waves quantum annealer                                 | dwave_backend         | Yes       | D-Wave    |
-| tabu search       | dwave-tabu   | performs tabu search                                                                      | dwave_backend         | Yes       | None      |
-| steepest decent   | dwave-greedy | performs steepest descent                                                                 | dwave_backend         | Yes       | None      |
-| hybrid solver     | dwave-hybrid | uses d-waves hybrid solver in the cloud                                                   | dwave_backend         | Yes       | D-Wave    |
-
-TODO: Remove config keyword because it is confusing?
-
-Each solver also supports an additional configuration keyword which can also be used to passed parameters. 
-If both the `backend` and the solver specific configuration field set the same parameter, the latter value takes precedence.
 Since the main focus of this service lies on (simulated) quantum annealing and the MILP reference solution, configuring tabu search, steepest descent and the hybrid algorithm will be added later. 
-Thus, choosing a solver adds the following entries the `params` dictionary:
+By adding the example below to the `params` field, you can choose the simulated quantum annealing solver.
 
 ```
 {
-    "backend": f"{keyword}",
+    "backend": "sqa",
     "backend_config": {}
-    f"{configuration keyword}": {}
 }
 ```
 
@@ -265,16 +255,30 @@ a variable represents. Then the sum of all weighted involved variables represent
 It depends on the type of the network component how it is interpreted in the context of different problem constraints. 
 Choosing different methods for encoding network components changes how many variables are used and how these weights are determined.
 
+#### Limiting snapshots
+
+In order to limit the size of the QUBO, this service has an option to limit the number of snapshots that are considered for the unit commitment problem
+This can be done by passing an integer to the field `snapshots`.
+For example, adding the following entry to the configuration would limit the unit commitment problem to the first two snapshots.
+
+```
+{
+    "ising_interface": {
+        "snapshots": 2
+    }
+}
+```
+
+----
+
 #### QUBO representation of a transmission line
 
 Variables encoding transmission line represent a fixed amount of directed power flow. Depending on the flow direction and the bus, this will act like a generator or load at each bus.
 The direction of flow is indicated by the sign of the weights. In order to never exceed the limit of the transmission lines, the weights are set up in a way, that the absolute value of
 any subtotal of weights is smaller than the capacity of the line.
 
-
 The following table shows how to configure which transmission line representation to use when constructing the QUBO. The key in the `ising_interface` field is `line_representation` .
 All values are rounded to integers.
-
 
 | parameter value | description of line representation                                                   | additional information                                                                              |
 |-----------------|--------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
@@ -294,9 +298,8 @@ All values are rounded to integers.
 
 | paramter value        | description of generator representation        |
 |-----------------------| ---------------------------------------------- |
-| singleton             | uses a single qubit with weight equal to the maximal power
+| single_qubit             | uses a single qubit with it's weight equal to the maximal power
 | integer_decomposition | binary decomposition of all integers in the range of maximal power. Ignores minimal power output
-
 
 In total, choosing generator and transmission lines encodings add the following entries to the configuration:
 
@@ -304,10 +307,12 @@ In total, choosing generator and transmission lines encodings add the following 
 {
     "ising_interface": {
         "line_representation": "cutpowersoftwo",
-        "generator_representation": "singleton"
+        "generator_representation": "single_qubit"
     }
 }
 ```
+
+----
 
 ### Encoding constraints
 
@@ -322,9 +327,7 @@ The following table describes all supported constraints. Each other key that is 
 | kirchhoff            | The kirchhoff constraint requires that the supplied energy is equal to the load at all buses
 | marginal_cost        | The marginal costs is to be minimal among all feasible solutions
 
-
 We will now go over the various constraints, and how we can choose different approaches to encode it into a QUBO. While all these approaches are technically a correct way, they have different limitations and properties.
-
 
 #### Kirchhoff constraint
 
@@ -334,6 +337,7 @@ For each bus, the QUBO is constructed in a way that the objective function is th
 Because this constraint is integral to the problem, it will always be added to the problem and only has the parameter `scale_factor`. 
 
 For example, adding the kirchhoff constraint with a lagrange multiplier of `2.0` to the QUBO would require adding the following entry to the `ising_interface`:
+
 ```
 {
     "ising_interface": {
@@ -343,7 +347,6 @@ For example, adding the kirchhoff constraint with a lagrange multiplier of `2.0`
     }
 }
 ```
-
 
 #### Marginal Costs
 
@@ -369,24 +372,17 @@ The following table describes various strategies to encode the marginal cost int
 | global_cost_square                  | squared distance of total cost to an estimation                    
 | global_cost_square_with_slack       | squared distance of total cost to an estimation with slack variables
 
-TODO: ensure lower bound??
-TODO: option to add estimation out of the offset
-
 ##### Configuring the estimation
 
-TODO: check how the reference value is calculated
- 
 The parameter for configuring the estimation is `offset_estimation_factor`. When constructing the QUBO for the marginal costs, the marginal costs of each generator
 are offset by the product of that factor and the cost of the most efficient generator. 
 Such an offset doesn't change the solution of the unit commitment problem because all feasible solution are offset by the same value.
 
-The estimation used to encode the marginal cost assumes that the cost of the optimal solutin is zero with respect to the offset marginal costs.
+The estimation used to encode the marginal cost then assumes that the cost of the optimal solutin is zero with respect to the offset marginal costs.
 Thus the estimated value for some `offset_estimation_factor` is the product of it, the marginal cost of the most efficient generator and the total load of the network.
-
 
 The strategy `global_cost_square_with_slack` has three more options on top of the `offset_estimation_factor`. It adds slack variables that act like generators that reduce marginal costs, but produce
 no power. This changes the estimation from a constant value to that constant plus the number represented by the slack variables.
-k
 
 The following table describes the parameters that are used to describe these slack variables.
 
@@ -398,21 +394,20 @@ The following table describes the parameters that are used to describe these sla
 
 The only supported value for `slack_type` is `binary_power`, which configures weights of slack variables as ascending powers of two.  In conjuction with `slack_size`, which specifies how many slack variables are created, the slack in marginal costs can be set up as as any fixed length binary number. The `slack_scale` works similar to `scale_factor` scaling the weights of the slack variables.
 
-In total, an exmaple of a JSON-object for configuring the QUBO looks like this. 
+In total, an example of a JSON-object for configuring the QUBO looks like this. 
 
 ```
 {
     "ising_interface": {
         "generator_representation": "singleton",
         "line_representation": "cutpowersoftwo",
-
         "kirchhoff": {
             "scale_factor": 1.0
         },
         "marginal_cost": {
             "strategy": "global_cost_square_with_slack",
             "scale_factor": 0.3,
-            "offset_estimation_factor": 1.0
+            "offset_estimation_factor": 1.0,
             "slack_type": "binary_power",
             "slack_scale": 0.1,
             "slack_size": 3,
@@ -421,52 +416,56 @@ In total, an exmaple of a JSON-object for configuring the QUBO looks like this.
 }
 ```
 
-Since almost every solver this service provides solves the QUBO that is specified by the `ising_interface`, we now want to briefly explain how you can choose good parameters. It is important to choose a well-behaved QUBO because this keeps the required runtime, that a solver needs to solve it well, low. Finding a feasible solution that just satisfies the kirchhoff constraint is very simple. However, when we try to solve two problems simultaneously, in this case the kirchhoff constraint and the marginal cost, finding a good solutions becomes a lot harder. The issue is that, compared to just the kirchhoff constraint, the set of good solutions is significantly smaller. Another issue is that improvements in one subproblem tend to incur costs in the other. Because the kirchhoff constraint is mandatory, you also have to make sure that the solution solves it optimally, which tends to lead to huge differences in scale. Difference in scales of subproblems also lead to bad results because the bigger problem overshadows the smaller, which in turn gets solved badly due to the gradient with respect to it being so small.
+----
 
-You can think of the solver as a stochastic process to explain this. For a given QUBO, solving it with a specific quality can be thought of as random sampling from the distribution of all states.  This sample has the property that the distance to the optimal solution with regards to the QUBO's cost is limited. A QUBO is well-behaved if the set of states that are close enough to that optimal solution is very small, which would result in good convergence. However, huge difference in scales inflate this set. If the magnitude of the scales is similar, this means that both subproblems are solved similarly well. However, the kirchhoff constraint has to be solved optimally.
+### Solver Configuration
 
-In order to get around this, the idea is solve a series of QUBOs, with each previous solution allowing you to tweak the QUBO in a way that brings the two subproblems closer together. This is what the estimation based strategies are for, with the estimation serving as a means to get around the issue of differences in scale messing up the quality of the solution.
+At last we describe the different solvers that this service provides, how to use them and which options you have for configuring them using the field `backend_config`.
+If no solver has been specified, simulated quantum annealing will be used.
+For each solver, a runtime duration is estimated and if exceeded, the optimization will not be performed.
 
-### Backend Config
-
-At last we describe the different solvers that this service provides, how to use them and which options you have for configuring them. Each solver that you can choose solves a QUBO, so the difference between them is how they solve it. The only exception are the solvers that solve a mixed integer linear program like glpk. We now go through the different solvers and describe how you can use `backend_config` to configure it.
-
-The default QUBO-based solver is simulated quantum annealing.
+----
 
 #### Simulated Quantum Annealing
-This solver solves a QUBO using a monte carlo simulation of quantum annealing to find an optimal solution.  You can find more information on simulated quantum annealing [here](https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/) and on quantum annealing [here](https://platform.planqk.de/algorithms/786e1ff5-991e-428d-a538-b8b99bc3d175/).  More on the used solver itself can be found [here](https://platform.lanqk.de/services/ff5c0cdd-4a87-4473-8086-cb658a9f85a2) In this particular case, this service uses the same implementation as the SQA service, but also provides the tools to construct the QUBO, as well as interpret a solution as a state of the network.
+This solver solves a QUBO using a monte carlo simulation of quantum annealing to find an optimal solution. You can find more information on simulated quantum annealing [here](https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/) and on quantum annealing [here](https://platform.planqk.de/algorithms/786e1ff5-991e-428d-a538-b8b99bc3d175/). More on the solver itself can be found [here](https://platform.lanqk.de/services/ff5c0cdd-4a87-4473-8086-cb658a9f85a2). 
+This service uses the same implementation as the SQA service, but also provides the translation of the unit commitment problem to a QUBO problem.
 
 The following table shows which  parameters can be adjusted.
 
 parameter                 |  Default Value    |    Description                                                                                             |  Runtime Impact            
 ------------------------- | ----------------- |  --------------------------------------------------------------------------------------------------------  |  -----------------  
-transverse_field_schedule | "[8.0,0.0]"       |  The transverse field strength schedule. It describes the interaction strength between trotter slices      |  None
-temperature_schedule      | "[0.1,iF,0.0001]" |  The temperature schedule. At higher temperatures, qubit states are more likely to change                  |  None
 trotter                   | 32                |  The number of trotter slices. They are an approximation of the quantum state of quantum annealing         |  grows linearly
 optimization_cycles       | 20                |  The number of discrete time steps used to simulate the continuous evolution of the quantum state          |  grows linearly
+transverse_field_schedule | "[8.0,0.0]"       |  The transverse field strength schedule. It describes the interaction strength between trotter slices      |  None
+temperature_schedule      | "[0.1,iF,0.0001]" |  The temperature schedule. At higher temperatures, qubit states are more likely to change                  |  None
 seed                      | N/A               |  The seed used by the random number generator for the solver. Unless explicitly set, the seed is random    |  None
-time_limit                | None              |  An upper limit of the estimated runtime. The service will fail right away if this limit is exceeded       |  None or stops the service
 
-You can see that the first two parameters both describe a schedule. Thus, we have to explain what a schedule is and how it affects the solver. Simulated quantum annealing simulates the continous evolution of a quantum state in multiple discrete time steps. The two schedules determine the strength of two aspects of the simulation at each time step. Similar to classical annealing, the temperature is a measure of how much change can happen in one time step, while the transverse field is a measure of interaction strength between different trotter slices.
+The first two parameters control how accurate the simulation is. This determines the quality of the solution, but also the runtime.
+The next two parameters describe a schedule. Thus, we explain what a schedule is and how it affects the solver. 
+Simulated quantum annealing simulates the continous evolution of a quantum state in multiple discrete time steps. A schedule determines the strength of a field in the simulation at each time step.
+In our case, this is the temperature and the transverse field. The former is a measure of how much qubits can change their state, while the latter is the interaction strength between different trotter slices.
 
-#### Specifying a Schedule
+##### Specifying a Schedule
 
-A schedule is a function $f \colon [0,1] \rightarrow \mathbb{R}$ of the unit interval.  If the simulation consists of $n+1$ steps with the zeroth step $t_0 = 0$ and last step $t_n = 1$, the strength of a field according to that schedule at the $i$-th step is given as $f(\frac{i}{n})$. The string that describes the schedule is simply a shorthand for refering to a member of a  family of functions that can be used as schedules. You can also concatenate different schedules in which case they get evenly  distributed over the unit interval. The following table gives an overview over admissable strings.
+A schedule is a function $f \colon [0,1] \rightarrow \mathbb{R}$ of the unit interval.  If the simulation consists of $n+1$ steps with the zeroth step $t_0 = 0$ and last step $t_n = 1$, the strength of a field according to that schedule at the $i$-th step is given as $f(\frac{i}{n})$.
+You can configure a schedule by passing a string, which are shorthands for refering to a member of a  family of functions.
+You can also concatenate different schedules in which case they get evenly distributed over the unit interval. The following table gives an overview over all admissable strings.
 
 Schedule String    |  Function                                                                                                        | Description
 ----------------   | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------
-[10,1] or [10,l,1] |  $p \mapsto 10 - 9 \cdot p$                                                                                      | a linear ramp from 10 to 1 
-[a,iF,b]           |  $p \mapsto \frac{a \cdot b}{b + (a - b) \cdot p}$                                                               | This is fast at the beginning and slow towards the end
-[a,iS,b]           |  $p \mapsto a + b - \frac{a \cdot b}{a - (a - b) \cdot p}$                                                       | This is slow at the beginning and fast towards the end
-[a,sS,b]           |  $p \mapsto a + (b - a) \cdot p^2$                                                                               | N/A
-[a,sF,b]           |  $p \mapsto b + (a - b) \cdot (p-1)^2$                                                                           | N/A
-[10,l,2,2,l,1]     |  $p \mapsto \begin{cases} 10 - 16 \cdot p & p \leq \frac{1}{2} \\ 3 - 2 \cdot p & p \geq \frac{1}{2} \end{cases}$| first a linear ramp from 10 to 2 and then in the same time a linear ramp from 2 to 1
+"[10,1]" or "[10,l,1]" |  $p \mapsto 10 - 9 \cdot p$                                                                                      | a linear ramp from 10 to 1 
+"[a,iF,b]"           |  $p \mapsto \frac{a \cdot b}{b + (a - b) \cdot p}$                                                               | This is fast at the beginning and slow towards the end
+"[a,iS,b]"           |  $p \mapsto a + b - \frac{a \cdot b}{a - (a - b) \cdot p}$                                                       | This is slow at the beginning and fast towards the end
+"[a,sS,b]"           |  $p \mapsto a + (b - a) \cdot p^2$                                                                               | A quadratic ramp from a to b that starts slow 
+"[a,sF,b]"           |  $p \mapsto b + (a - b) \cdot (p-1)^2$                                                                           | A quadratic ramp from a to b that starts fast
+"[10,l,2,2,l,1]"     |  $p \mapsto \begin{cases} 10 - 16 \cdot p & p \leq \frac{1}{2} \\ 3 - 2 \cdot p & p \geq \frac{1}{2} \end{cases}$| first a linear ramp from 10 to 2 and then in the same time a linear ramp from 2 to 1
 
 Any string that adheres to the rules above is a valid value for the temperature or transverse field schedule. As general advice, both the number of trotter slices, as well as time steps increase the solution quality, but also increase the runtime linearly. Increasing them however has dimininishing returns on solution quality, with the number of time steps dminishing faster.
 
+In total, a valid configuration for simulated quantum annealing looks like this.
 ```
 {
-    "sqa_backend": {
+    "backend_config": {
         "transverse_field_schedule": "[8.0,0.0]",
         "temperature_schedule": "[0.1,iF,0.0001]",
         "trotter_slices": 512,
@@ -475,34 +474,39 @@ Any string that adheres to the rules above is a valid value for the temperature 
 }
 ```
 
-#### Quantum Annealing
-Quantum Annealing uses D-Wave's quantum hardware to perform quantum annealing. For that, it uses the advantage 4.1 quantum annealer.  This requires an API token. Due to to hardware limitations, problem size is significantly limited and solutions aren't as accurate as other solvers. You can find more information on the quantum annealer [here](https://docs.ocean.dwavesys.com/en/stable/overview/qpu.html) and more information on the parameters that the annealer accepts [here](https://docs.dwavesys.com/docs/latest/c_solver_parameters.html). The service builds the QUBO and commits it to d-wave's cloud service.  For this solver, a d-wave API token is mandatory.
+----
 
-The most important parameters for this solvers are listed in the following table:
+#### Quantum Annealing
+
+Quantum Annealing uses D-Wave's advantage 4.1 quantum annealer to perform quantum annealing. Due to the hardware's limitations, problem size is significantly limited and solutions aren't as accurate as other solvers. You can find more information on the quantum annealer [here](https://docs.ocean.dwavesys.com/en/stable/overview/qpu.html) and more information on the parameters that the annealer accepts [here](https://docs.dwavesys.com/docs/latest/c_solver_parameters.html). The service builds the QUBO and commits it to D-Wave's cloud service. This solver requires a D-Wave API token.
+
+Only the parameters in the following table will be passed to the solver. The optimization itself doesn't have a time limit, but if the embedding onto the annealer's working graph takes to long, this service will cancel it.
 
 |  parameter       |  description  
 | ---------------- | ------------------------------------
 | annealing_time   | duration of a single annealing run in microseconds  
 | num_reads        | number of repetitions of quantum annealing
 | chain_strength   | the strength of chains used to embed the QUBO onto the working graph of the annealer
-| timeout          | time in seconds that the embedding algorith has to embed the QUBO onto the working graph before it fails
 
-Due to noise in the samples, this solver also performs simple flow optimization to improve the results. Both annealing time and number of reads improve the solution. In general more annealing runs are better than annealing longer. The chain strength has to adjusted to the problem at hand. If the strength is two small, breaks in chains break the theoretical model of the problem which leads to bad solutions.  If the chain strength is to high, it's magnitude overshadows the optimization of the actual problem, once again, leading to bad results.  In total, an example for the configuration of the quantum annealer looks like this:
+The chain strength has to adjusted to the problem at hand. If the strength is too small, breaks in chains invalidate the theoretical model of the problem which leads to bad solutions.
+If the chain strength is too high, it's magnitude overshadows the optimization of the actual problem, once again leading to bad results. 
+
+Because the quantum annealer is noisy, this solver also performs simple flow optimization to improve the results. Both the annealing time and number of reads improve the solution but the impact of the former hits a plateau very quickly. 
+
+In total, an example for the configuration of the quantum annealer looks like this:
 
 ```
-"dwave_backend": {
-    timeout: 100
-    annealing_time: 50
-    num_reads: 200
+"backend_config": {
+    timeout: 100,
+    annealing_time: 50,
+    num_reads: 200,
     chain_strength: 70
 }
 ```
 
-Instead of `dwave_backend`, you can also use `backend_config` as the key for the four configuration parameters.
-
+----
 
 #### Quantum Approximation Optimization Algorithm (QAOA)
-Right now, the QAOA solver is broken and using it will not return a result.
 
 The quantum approximation optimization algorithm build a parametrized quantum circuit to solve the problem. Then, it uses a classical optimizer to adjust the parameters so the circuit better fits the problem. You can find more information on QAOA and how it works [here](https://qiskit.org/textbook/ch-applications/qaoa.html). For the implementation of this service, you can choose to either simulate the circuit or access IBM's quantum computer to run it. If you want to use a quantum computer or the noise model of a quantum computer, you have to provide an API token.
 
@@ -513,64 +517,86 @@ The following Table describes the various parameters that QAOA accepts.
 |  parameter name       |  description                                                                                         |  possible values
 | --------------------  |  --------------------------------------------------------------------------------------------------  |  ----------------
 |  shots                |  number of circuit evaluations when sampling the circuit during optimization                         |  a natural number up to 20000
-|  simulate             |  boolean for deciding wether to use a simulator or submitting problems to quantum hardware           |  True or False
-|  simulator            |  a string specify which simulator use for the quantum circuit if simulate is set to True             |  qasm_simulator, aer_simulator, statevector_simulator, aer_simulator_statevector
-|  noise                |  boolean for deciding wether to use a noise model or not                                             |  True of False
 |  max_iter             |  number of steps the classical optimizer uses to optimize the parametrization                        |  an integer
-|  repetitions          |  number of independent optimiziation runs with different initial angle values                        |  an integer
 |  classical_optimizer  |  a string specifying the classical optimizer used for optimizing parametrization                     |  SPSA, COBYLA, ADAM
-|  supervisior_type     |  a string describing which method to use for angle initialization                                    |  RandomOrFixed, GridSearch
-|  initial_guess        |  a list of values used in choosing inital angles of the various layers of the quantum circuit        |  depends on the supervisior_type
-|  range                |  the range of values to be used when randomly initializing an angle                                  |  a float
+|  simulate             |  boolean for deciding wether to use a simulator or submitting problems to quantum hardware           |  True or False
+|  simulator            |  a string to specify which simulator to use for the quantum circuit if simulate is set to True       |  qasm_simulator, aer_simulator, statevector_simulator, aer_simulator_statevector
+|  noise                |  boolean for deciding wether to use a noise model or not                                             |  True of False
+
+
+Reading the description of QAOA and the description column in the should suffice for configuring these parameters. Regarding the simulator choice, you can find more information at qiskit's [documentation](https://qiskit.org/documentation/tutorials/simulators/1_aer_provider.html).
+
+What is left is the choice of the initial parameters. Because the initial choice has a huge impact on the subsequent optimization, this service implements two strategies for choosing them over multiple independent runs. These two can be chosen by either passing the value `random_or_fixed` or `grid_search` to the field `strategy`. 
+
+Because the quantum circuit consists of alternating layers of circuits that either apply the mixing or the problem Hamiltonian, a strategy is just a method for generating a list of floats of even length.
+
+##### Random or fixed parameter choice
+
+The strategy `random_or_fixed` generates the list of floating values based on a list that has either floats or the string "rand" as entries.
+If the entry is a float, it will be kept as it is. If it is the string `"rand"`, it will be replaced by a random value in the neighbourhood of zero.
+
+|  parameter name       |  description                                                                                         |  type
+|  initial_guess        |  a list of values used in choosing inital angles of the various layers of the quantum circuit        |  a list with floats or the string "rand" as entries
+|  range                |  the upper limit of the absolute value of a chosen random value                                      |  float
+|  repetitions          |  number of independent QAOA runs that are started                                                    |  integer 
   
-Reading the description of QAOA, the impact of the first few parameters is clear. Regarding the simulator choice, you can find more information at qiskit's [documentation](https://qiskit.org/documentation/tutorials/simulators/1_aer_provider.html). The last three parameters are details of our implementation and require more information.
+The lenght of the list `inital_guess` also implicitly sets the number of layers in the quantum circuit.
 
-Over the course of the algorithm, QAOA iteratively improves the parametrization of the quantum circuit to find a circuit which fits the problem well. One issue with this approach that the initial parametrization has a huge impact because the optimization problem has a lot of local minima. In order to adress it, the parameter `repetitions` allows us to run QAOA multiple times with different initial values. However, you still have to specify which initial values to use which is what the last three parameters is for.
+The following JSON-object is an example for the a configuaration of QAOA using random initialization of all angles in the intervall $(-3,3) \subset \mathbb{R}$:
 
-Because the parametrization of the quantum circuit can be described by a tuple of floating values, we provide two different methods for generating these tupels in the `supervisior_type` field. Each of these require a different type of argument for the value of `inital_guess`
-
-The option `RandomOrFixed` requires a list with values either being floating values or the string `"rand"`. When QAOA requires a tuple of initial angles, this list is returned after substituting each entry `"rand"` with a random floating value. The intervall in which the randomly chosen values lie is given by the value of `range`. For a parameter value `x`, the intervall from which a random number is drawn is given as `(-x, x)` with the default value being `3.14` if none is passed in the configuration. Then, for every possible combination, a QAOA run is started.
-
-The option `GridSearch` specifies a regular set of floating values which are possible as initial values for each layer of the quantum circuit. A set of floating values for a layer is specified as a JSON-object with the keys `lower_bound`, `upper_bound` and `num_gridpoints`. The values for each field are floats, with initial values being in the intervall given by the bounds.
-
-The following JSON-object is an example for the a configuaration of QAOA using random initialization of some angles:
 ```
 {
-    "qaoa_backend": {
+    "backend_config": {
         shots: 200,
         simulate: "True",
         noise: "False",
         simulator: "aer_simulator",
-        max_iter: 20,
-        repetitions: 10,
+        max_iter: 15,
+        repetitions: 8,
         classical_optimizer: "COBYLA",
-        supervisior_type: "RandomOrFixed",
+        strategy: "random_or_fixed",
         initial_guess: ["rand", "rand"],
         range: 3
     }
 }
 ```
-Using the option `GridSearch`, the configuration would look like this
+
+##### Grid Search
+
+|  initial_guess        |  a list of values used in choosing inital angles of the various layers of the quantum circuit        |  a list with floats or the string "rand" 
+
+The strategy `grid_search` initializes the angles from a grid of parameter values. For each layer of the quantum circuit, a lower and upper bound is given, aswell as the number of points to use.
+Then, the algorithm goes over all combination of points and uses them as inital angles for the layers.
+
+The only paremeter needed ist `inital_guess` which is a list of dictionaries, each specifying the grid for their respecitve layer of the circuit. The following table explains the entries these 
+dictionaries have:
+
+|  key             |   description                                                                                             |   type  
+|  lower_bound     |   the smallest float used as an initial angle                                                             |  float
+|  upper_bound     |   the biggest float used as an inital angle                                                               |  float
+|  num_gridpoints  |   The number of floats used an initial angles in the intervall between the lower bound and upper bound    |  float
+
+The following JSON-object is an example for a configuration of the strategy `grid_search`:
 
 ```
 {
-    "qaoa_backend": {
+    "backend_config": {
         shots: 200,
         simulate: "True",
         noise: "False",
         simulator: "aer_simulator",
-        max_iter: 20,
+        max_iter: 15,
         classical_optimizer: "COBYLA",
-        supervisior_type: "GridSearch",
+        strategy: "grid_search",
         initial_guess: [
             {
-                lower_bound: -2
-                upper_bound: 2
+                lower_bound: -2,
+                upper_bound: 2,
                 num_gridpoints: 3
             },
             {
-                lower_bound: -2
-                upper_bound: 2
+                lower_bound: -2,
+                upper_bound: 2,
                 num_gridpoints: 3
             }
         ]
@@ -578,8 +604,11 @@ Using the option `GridSearch`, the configuration would look like this
 }
 ```
 
+This would start nine QAOA runs witha quantum circuit consisting of one layer with the initial angles being all combinations of the numbers $-2,0,2$.
+
 #### Mixed Integer Linear Programming
-The [mixed integer linear programming approach](https://en.wikipedia.org/wiki/Linear_programming) uses pypsa's native method to cast the problem into a mixed integer linear program and solve it using GLPK. Since is just a wrapper for pypsa native solving method, this has just one option for the maximal duration of the optimization.
+
+The [mixed integer linear programming approach](https://en.wikipedia.org/wiki/Linear_programming) uses PyPSA's native method to cast the problem into a mixed integer linear program and solve it using GLPK. Because this is just a wrapper for PyPSA's native solving method, this has just one option for the maximal duration of the optimization.
 
 |   configuration key  |  impact            
 | -------------------- | ------------------ 
@@ -589,304 +618,45 @@ An example for configuring this solver is very short. Due to the nature of the p
 
 ```
 {
-    "pypsa_backend": {
+    "backend_config": {
         "timeout": 10
     }
 }
 ```
 
-#### API-token
-Using D-Wave's quantum hardware or using an IBM quantum computer for qaoa requires an API token. For d-wave services, you have to use the key `dwave_API_token`, and for ibm, the key is  `IMBQ_API_token`.
+### API-token
+
+Using D-Wave's quantum hardware or using an IBM quantum computer for QAOA requires an API token. For D-Wave services, you have to use the key `dwave_API_token` and for IBM the key `IMBQ_API_token` to pass the token.
 
 ```
 "API_token": {
     "IBMQ_API_token": "Your IMBQ API token",
-    "dwave_API_token": "Your d-wave API token"
+    "dwave_API_token": "Your D-Wave API token"
 }
 ```
 
-### Output format
+----
 
-After a succesful calculation, this service returns a JSON object. This JSON-object has a field for storing all relevant result details. Is also saves the various parameters used to generate the result in order to give some context to the result The returned JSON has the following fields:
+## Output format
+
+After a succesful calculation, this service returns a JSON object. This JSON-object has a field for storing all relevant result details. Is also saves the various parameters used to generate the result in order to give some context to the result and fills in default values that were used. The returned JSON has the following fields:
 
 - `results`: this contains information about the solution
-- `config`: the various configuration parameters that were passed to the solver
 - `network`: the serialized network which's unit commitment problem was solved
+- `config`: the various configuration parameters that were passed to the solver
 - `start_time`, `end_time`: the start and end time in `yyyy-mm-dd-hh-mm-ss` format
 
-For each solver, the following values are in the `results` object for each solver The following table explains all result data that all solvers return.
+For every solver the values in table below are in the `results` object. The table explains the result data that all solvers return. Each solver also adds extra entries that describe aspects that are unique to their solving method. Those won't be explained here.
 
 |  keyword                   |     description  
 | -------------------------- | ---------------
 | total_cost                 |  Cost of the QUBO representing the unit commitment problem including constants.
-| kirchhoff_cost             |  sum of all squared deviations from satisfiying the kirchhoff constraint
-| power_imbalance            |  sum of all linear absolute deviations from satisfiying the kirchhoff constraint
+| kirchhoff_cost             |  sum of all squared deviations from the kirchhoff constraint
+| power_imbalance            |  sum of all linear absolute deviations from the kirchhoff constraint
 | total_power                |  total power generated by the solution
 | marginal_cost              |  total marginal costs incurred by the solution
-| individual_kirchhoff_cost  |  JSON object with stringified (bus, snapshot) tupels as keys, and the deviation from the kirchhoff constraint at that bus and snapshot as values
-| unit_commitment            |  JSON object with stringified (generator, snapshot) tupels as keys, and the percentange of the maximal power output of that generator in the solution at that snapshot as values
-| powerflow                  |  JSON object with stringified (line, snapshot) tupels as keys, and the powerflow including the direction as the sign using that line at that snapshot as values
+| individual_kirchhoff_cost  |  JSON object with stringified `f"({bus}, {snapshot})"` tuples as keys and the deviation from the kirchhoff constraint at that bus and snapshot as values
+| unit_commitment            |  JSON object with stringified `f"({generator}, {snapshot})"` tupels as keys and the percentange of the maximal power output of that generator in the solution at that snapshot as values
+| powerflow                  |  JSON object with stringified `f"({line}, {snapshot})"` tupels as keys and the powerflow sign through that line at that snapshot as values
 
-The solvers also write more data with information about their optimization run. Because this data is not relevant for the solution itself and highly dependant on the solver, we won't explain that output.
-
-At last, we provide a small example that can be used to test the solvers. In the example below we have used a network consisting of two buses with one generator at each bus. At the first bus, the generator produces 3 MW and the load is 1 MW. At the other bus, the generator produces 2 MW and the load is 2 MW. The two buses are connected by a transmission line with a total capacity of 2 MW.  Thus, the optimal solution is two commit the first generator and transport 2 MW to the second bus. As you can see in the example below, even such a simple network results in a relatively huge serialized object so it strongly recommended to build the network in PyPSA and then serialized.  For better readability, the network data is the second entry with `params` being the first. There you also have an overview of all the different solvers. Even though the field `backend_config` is empty, it is functionally the same to write it into the corresponding `_backend` JSON. Which solver is chosen in only determined by the field `backend`
-
-<details>
-    <summary> JSON containing valid input for network and parameters </summary>
-
-{
-  "params": {
-    "API_token": {
-      "IBMQ_API_token": "",
-      "dwave_API_token": ""
-    },
-    "backend": "sqa",
-    "ising_interface": {
-      "formulation": "fullsplit"
-    },
-    "qaoa_backend": {
-      "shots": 500,
-      "simulate": true,
-      "noise": false,
-      "simulator": "aer_simulator",
-      "initial_guess": [
-        "rand",
-        "rand",
-        "rand",
-        "rand"
-      ],
-      "max_iter": 20,
-      "repetitions": 16,
-      "classical_optimizer": "COBYLA"
-    },
-    "sqa_backend": {
-      "transverse_field_schedule": "[8.0,0.0]",
-      "temperature_schedule": "[0.1,iF,0.0001]",
-      "trotter_slices": 128,
-      "optimization_cycles": 100
-    },
-    "dwave_backend": {
-      "annealing_time": 30,
-      "num_reads": 200,
-      "chain_strength": 60,
-      "timeout": 60,
-    },
-    "pypsa_backend": {
-      "timeout": 10
-    },
-    "backend_config": {
-    }
-  },
-  "data": {
-    "coords": {
-      "snapshots": {
-        "dims": [
-          "snapshots"
-        ],
-        "attrs": {},
-        "data": [
-          0
-        ]
-      },
-      "investment_periods": {
-        "dims": [
-          "investment_periods"
-        ],
-        "attrs": {},
-        "data": []
-      },
-      "generators_i": {
-        "dims": [
-          "generators_i"
-        ],
-        "attrs": {},
-        "data": [
-          "Gen1",
-          "Gen2"
-        ]
-      },
-      "buses_i": {
-        "dims": [
-          "buses_i"
-        ],
-        "attrs": {},
-        "data": [
-          "bus1",
-          "bus2"
-        ]
-      },
-      "loads_i": {
-        "dims": [
-          "loads_i"
-        ],
-        "attrs": {},
-        "data": [
-          "load1",
-          "load2"
-        ]
-      },
-      "lines_i": {
-        "dims": [
-          "lines_i"
-        ],
-        "attrs": {},
-        "data": [
-          "line1"
-        ]
-      }
-    },
-    "attrs": {
-      "network_name": "",
-      "network_pypsa_version": "0.19.3",
-      "network_srid": 4326
-    },
-    "dims": {
-      "snapshots": 1,
-      "investment_periods": 0,
-      "generators_i": 2,
-      "buses_i": 2,
-      "loads_i": 2,
-      "lines_i": 1
-    },
-    "data_vars": {
-      "snapshots_snapshot": {
-        "dims": [
-          "snapshots"
-        ],
-        "attrs": {},
-        "data": [
-          "now"
-        ]
-      },
-      "snapshots_objective": {
-        "dims": [
-          "snapshots"
-        ],
-        "attrs": {},
-        "data": [
-          1
-        ]
-      },
-      "snapshots_generators": {
-        "dims": [
-          "snapshots"
-        ],
-        "attrs": {},
-        "data": [
-          1
-        ]
-      },
-      "snapshots_stores": {
-        "dims": [
-          "snapshots"
-        ],
-        "attrs": {},
-        "data": [
-          1
-        ]
-      },
-      "investment_periods_objective": {
-        "dims": [
-          "investment_periods"
-        ],
-        "attrs": {},
-        "data": []
-      },
-      "investment_periods_years": {
-        "dims": [
-          "investment_periods"
-        ],
-        "attrs": {},
-        "data": []
-      },
-      "generators_bus": {
-        "dims": [
-          "generators_i"
-        ],
-        "attrs": {},
-        "data": [
-          "bus1",
-          "bus2"
-        ]
-      },
-      "generators_p_nom": {
-        "dims": [
-          "generators_i"
-        ],
-        "attrs": {},
-        "data": [
-          1.0,
-          3.0
-        ]
-      },
-      "generators_marginal_cost": {
-        "dims": [
-          "generators_i"
-        ],
-        "attrs": {},
-        "data": [
-          5.0,
-          5.0
-        ]
-      },
-      "loads_bus": {
-        "dims": [
-          "loads_i"
-        ],
-        "attrs": {},
-        "data": [
-          "bus1",
-          "bus2"
-        ]
-      },
-      "loads_p_set": {
-        "dims": [
-          "loads_i"
-        ],
-        "attrs": {},
-        "data": [
-          2.0,
-          1.0
-        ]
-      },
-      "lines_bus0": {
-        "dims": [
-          "lines_i"
-        ],
-        "attrs": {},
-        "data": [
-          "bus1"
-        ]
-      },
-      "lines_bus1": {
-        "dims": [
-          "lines_i"
-        ],
-        "attrs": {},
-        "data": [
-          "bus2"
-        ]
-      },
-      "lines_x": {
-        "dims": [
-          "lines_i"
-        ],
-        "attrs": {},
-        "data": [
-          0.0001
-        ]
-      },
-      "lines_s_nom": {
-        "dims": [
-          "lines_i"
-        ],
-        "attrs": {},
-        "data": [
-          2.0
-        ]
-      }
-    }
-  }
-}
-
-</details>
+In essence, `total_cost` describes how well the QUBO was solved, `marginal_cost` describes the objective function of the unit commitment problem and `unit_commitment` in conjuction with `powerflow` describes the state of the network that has been calculated as the solution.

@@ -64,10 +64,10 @@ class QaoaAngleSupervisor:
         Returns:
             (QaoaAngleSupervisor) An instance of subclass of a QaoaAngleSupervisor
         """
-        supervisior_type = qaoa_optimizer.config_qaoa.get("supervisior_type", "RandomOrFixed")
-        if supervisior_type == "RandomOrFixed":
+        supervisior_type = qaoa_optimizer.config_qaoa.get("strategy", "random_or_fixed")
+        if supervisior_type == "random_or_fixed":
             return QaoaAngleSupervisorRandomOrFixed(qaoa_optimizer)
-        if supervisior_type == "GridSearch":
+        if supervisior_type == "grid_search":
             return QaoaAngleSupervisorGridSearch(qaoa_optimizer)
 
     def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:

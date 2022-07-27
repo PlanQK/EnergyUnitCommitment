@@ -69,7 +69,7 @@ class InputReader:
                 A list of the extra parameters to be added to the
                 config dictionary.
         """
-        self.network, self.networkName = self.make_network(network)
+        self.network, self.network_name = self.make_network(network)
         self.config = self.make_config(config)
         self.add_extra_parameters(extra_params=extra_params,
                                   extra_param_values=extra_param_values)
@@ -128,10 +128,10 @@ class InputReader:
             return pypsa.Network(f"Problemset/" + network), network
         elif isinstance(network, dict):
             loaded_dataset = xarray.Dataset.from_dict(network)
-            loaded_net = pypsa.Network(name="")
+            loaded_net = pypsa.Network()
             pypsa.Network.import_from_netcdf(network=loaded_net,
                                              path=loaded_dataset)
-            return loaded_net, "network_from_dict"
+            return loaded_net, network["attr"].get("network_name", "network_from_dict")
         elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
         raise TypeError("The network has to be given as a dictionary, "
@@ -232,4 +232,4 @@ class InputReader:
             (str)
                 The network name.
         """
-        return self.networkName
+        return self.network_name

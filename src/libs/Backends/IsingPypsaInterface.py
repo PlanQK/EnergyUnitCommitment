@@ -74,7 +74,7 @@ def integer_decomposition_powers_of_two_and_rest(number: int):
     return positive_powers + [number - already_filled]
 
 
-def singleton(number: int):
+def single_qubit(number: int):
         """
         wraps the input number into a list with it as the single entry. 
         This list is used as a the qubits weight for a network generator
@@ -229,7 +229,7 @@ class IsingBackbone:
     # dictionary that maps config strings to the corresponding classes and
     # methods
     generator_to_qubits_method_lookup_dict = {
-        "singleton": singleton,
+        "single_qubit": single_qubit,
         "integer_decomposition": integer_decomposition_powers_of_two_and_rest
     }
     # The functions on line_to_qubits_method_lookup_dict define how some value of a capacity of
@@ -373,7 +373,7 @@ class IsingBackbone:
                 An IsingBackbone that models the unit commitment problem
                 of the network.
         """
-        generator_to_qubits_method_name = config.pop("generator_representation", "singleton")
+        generator_to_qubits_method_name = config.pop("generator_representation", "single_qubit")
         line_to_qubits_method_name = config.pop("line_representation", "cutpowersoftwo")
         return IsingBackbone(network, 
                 generator_to_qubits_method_name, 
@@ -1139,7 +1139,6 @@ class IsingBackbone:
                                                             stringify=True),
             "powerflow": self.get_flow_dictionary(solution=solution,
                                                   stringify=True),
-            "hamiltonian": self.get_hamiltonian_matrix()
         }
 
     def calc_cost(self, solution: list,
@@ -1426,12 +1425,12 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 backbone.
         """
         subclass_table = {
-            "GlobalCostSquare": GlobalCostSquare,
-            "GlobalCostSquareWithSlack": GlobalCostSquareWithSlack,
-            "MarginalAsPenalty": MarginalAsPenalty,
-            "LocalMarginalEstimation": LocalMarginalEstimation,
+            "global_cost_square": GlobalCostSquare,
+            "global_cost_square_with_slack": GlobalCostSquareWithSlack,
+            "marginal_as_penalty": MarginalAsPenalty,
+            "local_marginal_estimation": LocalMarginalEstimation,
         }
-        return subclass_table[configuration["strategy"]](
+        return subclass_table[configuration.setdefault("strategy", "global_cost_square")](
             backbone=backbone, config=configuration)
 
 
@@ -1776,7 +1775,8 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 construct an instance.
         """
         super().__init__(backbone, config)
-        self.offset_estimation_factor = float(config["offset_estimation_factor"])
+        self.offset_estimation_factor = float(config.setdefault("offset_estimation_factor", 1.0))
+        config
 
     def print_estimation_report(self,
                                 estimated_cost: float,
