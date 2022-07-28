@@ -9,16 +9,17 @@ WORKDIR /energy
 
 # Install some packages to reduce download size when remaking the images
 # The installed packaged are all in the requirements.txt
-RUN pip install numpy && \
-    pip install scipy && \
-    pip install pandas && \
-    pip install matplotlib && \
-    pip install pyomo==6.0 && \
-    pip install dimod && \
-    pip install qiskit && \
-    pip install networkx && \
-    pip install tables && \
-    pip install minorminer
+RUN pip install pyomo==6.0 && \
+    pip install pypsa==0.20.0 && \
+    pip install numpy==1.23.1 && \
+    pip install scipy==1.8.1 && \
+    pip install pandas==1.4.3 && \
+    pip install matplotlib==3.5.2 
+RUN pip install dimod==0.11.2 && \
+    pip install qiskit==0.36.2 && \
+    pip install networkx==2.8.4 && \
+    pip install tables==3.7.0 && \
+    pip install minorminer==0.2.9
 
 COPY requirements.txt /energy/requirements.txt
 
@@ -34,7 +35,9 @@ RUN chmod -R u+wxr /energy
 # add placeholder for the input model
 RUN mkdir /energy/input-model
 RUN chmod u+xr /energy/input-model
+# Flag for showing full stack trace if running it locally by reraising errors
 ENV RUNNING_IN_DOCKER Yes
+# Flag for diabling runtime limitations
 ENV TRUSTED_USER Yes
 
 ENTRYPOINT [ "python3", "run.py"]
