@@ -16,5 +16,5 @@ makePlots.py
 *.ipynb
 JobResponse
 *.png
-!pypsa-0.19.3.zip
+!openapi-spec.yaml
 !input/testService.json

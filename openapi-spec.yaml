@@ -1,0 +1,510 @@
+openapi: 3.0.0
+info:
+  version: "1.0"
+  title: Unit Commitment Problem
+  description: |
+    API description of the service solving the unit commitment problem
+paths:
+  /:
+    get:
+      tags:
+        - Status API
+      summary: Health checking endpoint
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    title: Status of the service
+                    type: string
+                    example: Service is up and running
+    post:
+      tags:
+        - Service API
+      summary: Asynchronous execution of a unit commitment solver
+      description: This starts the optimization of the unit commitment problem for a network. The location header of the response contains the URL which can be used to query the status and the result of the optimization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                params:
+                  type: object
+                  properties:
+                    backend:
+                      type: string
+                      default: "sqa"
+                    ising_interface:
+                      type: object
+                      default: {}
+                    backend_config:
+                      type: object
+                      default: {}
+                    API_token: 
+                      type: object
+                      properties:
+                        IBMQ_API_token:
+                          type: string
+                          default: "Your IMBQ API token"
+                        dwave_API_token:
+                          type: string
+                          default:  "Your D-Wave API token"
+            example:
+              data: {
+                "coords": {
+                  "snapshots": {
+                    "dims": [
+                      "snapshots"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      0,
+                      1,
+                      2
+                    ]
+                  },
+                  "investment_periods": {
+                    "dims": [
+                      "investment_periods"
+                    ],
+                    "attrs": {},
+                    "data": []
+                  },
+                  "lines_i": {
+                    "dims": [
+                      "lines_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "line"
+                    ]
+                  },
+                  "buses_i": {
+                    "dims": [
+                      "buses_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "bus_1",
+                      "bus_2"
+                    ]
+                  },
+                  "loads_i": {
+                    "dims": [
+                      "loads_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "load_1",
+                      "load_2"
+                    ]
+                  },
+                  "loads_t_p_set_i": {
+                    "dims": [
+                      "loads_t_p_set_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "load_1",
+                      "load_2"
+                    ]
+                  },
+                  "generators_i": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "gen_1",
+                      "gen_2"
+                    ]
+                  }
+                },
+                "attrs": {
+                  "network_name": "",
+                  "network_pypsa_version": "0.19.3",
+                  "network_srid": 4326
+                },
+                "dims": {
+                  "snapshots": 3,
+                  "investment_periods": 0,
+                  "lines_i": 1,
+                  "buses_i": 2,
+                  "loads_i": 2,
+                  "loads_t_p_set_i": 2,
+                  "generators_i": 2
+                },
+                "data_vars": {
+                  "snapshots_snapshot": {
+                    "dims": [
+                      "snapshots"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      0,
+                      1,
+                      2
+                    ]
+                  },
+                  "snapshots_objective": {
+                    "dims": [
+                      "snapshots"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      1,
+                      1,
+                      1
+                    ]
+                  },
+                  "snapshots_stores": {
+                    "dims": [
+                      "snapshots"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      1,
+                      1,
+                      1
+                    ]
+                  },
+                  "snapshots_generators": {
+                    "dims": [
+                      "snapshots"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      1,
+                      1,
+                      1
+                    ]
+                  },
+                  "investment_periods_objective": {
+                    "dims": [
+                      "investment_periods"
+                    ],
+                    "attrs": {},
+                    "data": []
+                  },
+                  "investment_periods_years": {
+                    "dims": [
+                      "investment_periods"
+                    ],
+                    "attrs": {},
+                    "data": []
+                  },
+                  "lines_bus0": {
+                    "dims": [
+                      "lines_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "bus_1"
+                    ]
+                  },
+                  "lines_bus1": {
+                    "dims": [
+                      "lines_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "bus_2"
+                    ]
+                  },
+                  "lines_s_nom": {
+                    "dims": [
+                      "lines_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      3
+                    ]
+                  },
+                  "loads_bus": {
+                    "dims": [
+                      "loads_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "bus_1",
+                      "bus_2"
+                    ]
+                  },
+                  "loads_t_p_set": {
+                    "dims": [
+                      "snapshots",
+                      "loads_t_p_set_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      [
+                        2,
+                        2
+                      ],
+                      [
+                        3,
+                        1
+                      ],
+                      [
+                        2,
+                        1
+                      ]
+                    ]
+                  },
+                  "generators_bus": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      "bus_1",
+                      "bus_2"
+                    ]
+                  },
+                  "generators_p_nom": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      4,
+                      3
+                    ]
+                  },
+                  "generators_p_min_pu": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      1,
+                      1
+                    ]
+                  },
+                  "generators_marginal_cost": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      15,
+                      10
+                    ]
+                  },
+                  "generators_committable": {
+                    "dims": [
+                      "generators_i"
+                    ],
+                    "attrs": {},
+                    "data": [
+                      true,
+                      true
+                    ]
+                  }
+                }
+              } 
+              params: {
+                "backend": "sqa",
+                "ising_interface": {
+                  "generator_representation": "single_qubit",
+                  "line_representation": "cutpowersoftwo"
+                },
+                "backend_config": {
+                  "trotter_slices": 128,
+                  "optimization_cycles": 64
+                }
+              }
+      responses:
+        "201":
+          description: Execution of unit commitment optimization has started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/job"
+          headers:
+            Location:
+              description: URL to query the status and the result of unit commitment optimization
+              schema:
+                type: string
+        "400":
+          description: Invalid input
+        "500":
+          description: Internal server error
+
+  /{id}:
+    get:
+      tags:
+        - Service API
+      summary: Check execution status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The ID of a unit commitment optimization
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/job"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+  /{id}/result:
+    get:
+      tags:
+        - Service API
+      summary: Get the result of a unit commitment optimization
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The ID of a specific unit commitment optimization
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    description: object containing a list of qubits which have spin -1 in the solution and additional information about the execution
+                  code:
+                    type: string
+                    description: service-specific error code representing the type of problem encountered
+                  detail:
+                    type: string
+                    description: service-specific error message describing the detail of the problem encountered
+              example:
+                result: {
+{
+  "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
+  "metadata": null,
+  "result": {
+    "components": {},
+    "config": {
+      "backend": "sqa",
+      "backend_config": {},
+      "backend_type": "sqa_backend",
+      "ising_interface": {
+        "kirchhoff": {
+          "scale_factor": 1
+        }
+      }
+    },
+    "end_time": "2022-7-27_4-36-49",
+    "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
+    "network": {},
+    "results": {
+      "H": "[8.0, 0.0]",
+      "T": "[0.1, iF, 0.0001]",
+      "energy": "-35.500000",
+      "energy_distr": "{0: -35.5, 1: -3.5, 2: -32}",
+      "first_in": "0",
+      "individual_kirchhoff_cost": {
+        "('bus_1', 0)": 0,
+        "('bus_1', 1)": 0,
+        "('bus_1', 2)": 0,
+        "('bus_2', 0)": 0,
+        "('bus_2', 1)": 0,
+        "('bus_2', 2)": 0
+      },
+      "kirchhoff_cost": 0,
+      "kirchhoff_cost_by_time": {
+        "0": 0,
+        "1": 0,
+        "2": 0
+      },
+      "marginal_cost": 150,
+      "maxcut": "9.000000",
+      "nt": "128",
+      "optimization_time": 0.004629228031262755,
+      "periodic": "1",
+      "postprocessing_time": 0,
+      "power_imbalance": 0,
+      "powerflow": {
+        "('line', 0)": 2,
+        "('line', 1)": 1,
+        "('line', 2)": -2
+      },
+      "remap": "sorted,fill,0",
+      "runtime_cycles": "12314682",
+      "runtime_sec": "0.004109",
+      "seed": "998318",
+      "state": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8,
+        10,
+        14,
+        16,
+        17
+      ],
+      "steps": "64",
+      "total_cost": 0,
+      "total_power": 11,
+      "trotter_degen": "19",
+      "trotter_min_index": "0",
+      "unit_commitment": {
+        "('gen_1', 0)": 1,
+        "('gen_1', 1)": 1,
+        "('gen_1', 2)": 0,
+        "('gen_2', 0)": 0,
+        "('gen_2', 1)": 0,
+        "('gen_2', 2)": 1
+      }
+    },
+    "start_time": "2022-7-27_4-36-49"
+  }
+}
+
+
+                "TODO" : "TODO"}
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    job:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [UNKNOWN, PENDING, RUNNING, SUCCEEDED, FAILED]
+        createdAt:
+          type: string
+      example:
+        id: 87cb778e-ac43-11ec-b909-0242ac120002
+        status: SUCCEEDED
+        createdAt: "2022-01-01 22:38:08"
