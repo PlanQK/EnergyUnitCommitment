@@ -68,7 +68,6 @@ class ClassicalBackend(BackendBase):
             network=self.network,
             config=self.config["ising_interface"]
         )
-        self.check_input_size()
 
     def transform_solution_to_network(self) -> None:
         """

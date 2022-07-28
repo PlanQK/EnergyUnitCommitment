@@ -131,7 +131,7 @@ class InputReader:
             loaded_net = pypsa.Network()
             pypsa.Network.import_from_netcdf(network=loaded_net,
                                              path=loaded_dataset)
-            return loaded_net, network["attr"].get("network_name", "network_from_dict")
+            return loaded_net, network["attrs"].get("network_name", "network_from_dict")
         elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
         raise TypeError("The network has to be given as a dictionary, "
