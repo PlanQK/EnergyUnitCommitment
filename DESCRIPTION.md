@@ -536,6 +536,7 @@ The strategy `random_or_fixed` generates the list of floating values based on a 
 If the entry is a float, it will be kept as it is. If it is the string `"rand"`, it will be replaced by a random value in the neighbourhood of zero.
 
 |  parameter name       |  description                                                                                         |  type
+| --------------------- | ---------------------------------------------------------------------------------------------------- | -----------------------------------------
 |  initial_guess        |  a list of values used in choosing inital angles of the various layers of the quantum circuit        |  a list with floats or the string "rand" as entries
 |  range                |  the upper limit of the absolute value of a chosen random value                                      |  float
 |  repetitions          |  number of independent QAOA runs that are started                                                    |  integer 
@@ -571,10 +572,11 @@ Then, the algorithm goes over all combination of points and uses them as inital 
 The only paremeter needed ist `inital_guess` which is a list of dictionaries, each specifying the grid for their respecitve layer of the circuit. The following table explains the entries these 
 dictionaries have:
 
-|  key             |   description                                                                                             |   type  
-|  lower_bound     |   the smallest float used as an initial angle                                                             |  float
-|  upper_bound     |   the biggest float used as an inital angle                                                               |  float
-|  num_gridpoints  |   The number of floats used an initial angles in the intervall between the lower bound and upper bound    |  float
+|  key             |   description                                                                                             |   type   |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | -------- |
+|  lower_bound     |   the smallest float used as an initial angle                                                             |  float   |
+|  upper_bound     |   the biggest float used as an inital angle                                                               |  float   |
+|  num_gridpoints  |   The number of floats used an initial angles in the intervall between the lower bound and upper bound    |  float   |
 
 The following JSON-object is an example for a configuration of the strategy `grid_search`:
 
