@@ -49,6 +49,9 @@ ising_interface:
              # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
              # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
              # this method disregerads the topology of the network and is a lower boundary of the cost
+        # local cost estimation
+        # factor how to consider line transmission in local costs
+        line_cost_factor: -1.0
         ### end estimation config
 
     # TODO not implemented in code yey

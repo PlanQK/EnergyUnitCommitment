@@ -1489,6 +1489,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         """
         super().__init__(backbone, config)
         self.offset_factor = float(config.setdefault("offset_factor", 1.0))
+        print(f"\n--- Encoding marginal costs: {config['strategy']} ---")
         self.offset = self.choose_offset()
 
     def choose_offset(self) -> float:
@@ -1567,6 +1568,21 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
     cost.
     """
 
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        """
+        Reads the additional `line_cost_factor` variable which is uses to 
+        set a marginal costs equivalency for transmitted power
+
+        Args:
+            backbone: (IsingBackbone)
+                The backbone on which to encode the marginal cost problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance of the marginal costs problem.
+        """
+        super().__init__(backbone, config)
+        self.line_cost_factor = config.setdefault("line_cost_factor", 1.0)
+
     def encode_subproblem(self) -> None:
         """
         Encodes the minimization of the marginal cost by adding an offset 
@@ -1621,8 +1637,18 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 Modifies self.backbone. Adds to previously written
                 interaction coefficient
         """
+        components = self.backbone.get_bus_components(bus)
+        bus_components_to_cost = self.get_generator_to_cost_dict(bus)
+        bus_components_to_cost.update({
+                label: self.line_cost_factor
+                for label in components['positive_lines']
+        })
+        bus_components_to_cost.update({
+                label: - self.line_cost_factor
+                for label in components['negative_lines']
+        })
         self.backbone.encode_squared_distance(
-            self.get_generator_to_cost_dict(bus=bus), 
+            bus_components_to_cost,
             global_factor=self.scale_factor,
             time=time,
         )
