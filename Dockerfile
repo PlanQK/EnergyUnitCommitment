@@ -9,7 +9,7 @@ WORKDIR /energy
 
 # Install some packages to reduce download size when remaking the images
 # The installed packaged are all in the requirements.txt
-RUN pip install pyomo==6.0 && \
+RUN pip install pyomo==6.4.1 && \
     pip install pypsa==0.20.0 && \
     pip install numpy==1.23.1 && \
     pip install scipy==1.8.1 && \

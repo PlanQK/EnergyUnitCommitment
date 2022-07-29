@@ -7,7 +7,7 @@ FROM ghcr.io/planqk/job-template:latest-base-1.0.0
 ENV ENTRY_POINT app.user_code.src.program:run
 
 # install big pip packages before copying user code in order to reuse it
-RUN pip install pyomo==6.0
+RUN pip install pyomo==6.4.1
 RUN pip install pypsa==0.20.0
 RUN pip install numpy==1.23.1
 RUN pip install scipy===1.8.1
