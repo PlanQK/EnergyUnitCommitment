@@ -731,8 +731,10 @@ class IsingBackbone:
         # fill snapshot to weight relation with empty lists for snapshots
         # that implicitly require 0 qubits since they don't appear in the 
         # snapshot_to_weight_dict dictionary
-        snapshot_to_weight_dict = {snapshot : snapshot_to_weight_dict.get(snapshot, [])
-                for snapshot in self.network.snapshots}
+        snapshot_to_weight_dict = {
+            snapshot : snapshot_to_weight_dict.get(snapshot, [])
+            for snapshot in self.network.snapshots
+        }
 
         #store component - snapshot - representing qubit relation
         self._qubit_encoding[component_name] = {
@@ -1294,8 +1296,8 @@ class IsingBackbone:
                 scaling.
         """
         marginal_cost = 0.0
-        for key, val in self.individual_marginal_cost(solution=solution).items():
-            marginal_cost += val
+        for marginal_cost_at_bus in self.individual_marginal_cost(solution=solution).values():
+            marginal_cost += marginal_cost_at_bus
         return marginal_cost
 
     # getter for encoded ising problem parameters
@@ -1473,6 +1475,34 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         return subclass_table[configuration.setdefault("strategy", "global_cost_square")](
             backbone=backbone, config=configuration)
 
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        """
+        Since all marginal cost use an offset of the marginal cost to center
+        it around zero, initializing the offset from the config is done here.
+
+        Args:
+            backbone: (IsingBackbone)
+                The backbone on which to encode the marginal cost problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance of the marginal costs problem.
+        """
+        super().__init__(backbone, config)
+        self.offset_factor = float(config.setdefault("offset_factor", 1.0))
+        self.offset = self.choose_offset()
+
+    def choose_offset(self) -> float:
+        """
+        Calculates the offset, by which to offset all marginal costs.
+        The chosen offset is the minimal marginal cost of all generators.
+
+        Returns:
+            (float)
+                The value, by which to offset all marginal costs of the
+                network components.
+        """
+        return self.offset_factor * self.network.generators["marginal_cost"].min()
+
 
 class MarginalAsPenalty(MarginalCostSubproblem):
     """
@@ -1481,30 +1511,6 @@ class MarginalAsPenalty(MarginalCostSubproblem):
     with the value being the marginal costs incurred by committing that
     generator. This linear penalty can be slightly changed.
     """
-
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        The constructor for encoding marginal cost as linear penalties.
-        It inherits its functionality from the AbstractIsingSubproblem
-        constructor. Additionally, it sets three more parameters which
-        slightly change how the penalty is applied:
-            `offset_estimation_factor`: sets an offset across all
-                generators by the cost of the most efficient generator
-                scaled by this factor
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to encode the problem.
-            config: (dict)
-                A dict containing all necessary configurations to
-                construct an instance.
-        """
-        super().__init__(backbone, config)
-        # factor which in conjunction with the minimal cost per energy produced
-        # describes by how much each marginal cost per unit produced is offset
-        # in all generators to bring the average cost of a generator closer to
-        # zero
-        self.offset_estimation_factor = float(config["offset_estimation_factor"])
 
     def encode_subproblem(self) -> None:
         """
@@ -1516,31 +1522,13 @@ class MarginalAsPenalty(MarginalCostSubproblem):
             (None)
                 Modifies self.backbone.
         """
-        # Marginal costs are only modelled as linear penalty. Thus, it
-        # suffices to iterate over all time steps and all buses to get all
-        # generators
+        # Marginal costs are only modelled as linear penalty. Thus, it suffices 
+        # to iterate over all time steps and all buses to get all generators
         for time in self.network.snapshots:
             for bus in self.network.buses.index:
                 self.encode_marginal_costs(bus=bus, time=time)
 
-    def marginal_cost_offset(self) -> float:
-        """
-        Returns a float by which all generator marginal costs per power
-        will be offset. Since every generator will be offset, this will
-        not change relative costs between them. It changes the range of
-        energy contributions this constraint provides. Adding marginal
-        costs as a cost to the QUBO formulation will penalize all
-        generator configurations. The offset shifts it, so that the
-        cheapest generator doesn't get any penalty.
-
-        Returns:
-            (float)
-                The offset of all generator's marginal costs.
-        """
-        return 1.0 * min(self.network.generators[
-                             "marginal_cost"]) * self.offset_estimation_factor
-
-    def encode_marginal_costs(self, bus: str, time: int) -> None:
+    def encode_marginal_costs(self, bus: str, time: any) -> None:
         """
         Encodes marginal costs for running generators and transmission
         lines at a single bus.
@@ -1560,7 +1548,7 @@ class MarginalAsPenalty(MarginalCostSubproblem):
                 interaction coefficient.
         """
         generators = self.backbone.get_bus_components(bus)['generators']
-        cost_offset = self.marginal_cost_offset()
+        cost_offset = self.choose_offset()
         for generator in generators:
             self.backbone.couple_component_with_constant(
                 component=generator,
@@ -1579,38 +1567,15 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
     cost.
     """
 
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        The constructor for encoding marginal cost as distance between
-        the incurred and estimated costs.
-        It inherits its functionality from the AbstractIsingSubproblem
-        constructor. Additionally, it sets three more parameters which
-        slightly change how the penalty is applied:
-            `offset_estimation_factor`: sets an offset across all
-                generators by the cost of the most efficient generator
-                scaled by this factor
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to encode the problem.
-            config: (dict)
-                A dict containing all necessary configurations to
-                construct an instance.
-        """
-        super().__init__(backbone, config)
-        self.offset_estimation_factor = float(config["offset_estimation_factor"])
-
     def encode_subproblem(self) -> None:
-        # TODO: check DocString
         """
-        Encodes the minimization of the marginal cost by estimating the
-        cost at each bus and modeling a minimization of the distance of
-        the incurred cost to the estimated cost. The exact modeling of
-        this can be adjusted using the parameters: ''
+        Encodes the minimization of the marginal cost by adding an offset 
+        to the marginal costs. Then at each bus the marginal costs are modeled
+        as the squared distance of the offset cost to zero.
 
         Returns:
             (None)
-                Modifies self.backbone.
+                Modifies `self.backbone`.
         """
         # Estimation is done independently at each bus. Thus, it suffices to
         # iterate over all snapshots and buses to encode the subproblem
@@ -1618,114 +1583,25 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
             for bus in self.network.buses.index:
                 self.encode_marginal_costs(bus=bus, time=time)
 
-    def choose_offset(self, sorted_generators: list) -> float:
+    def get_generator_to_cost_dict(self, bus: str) -> dict:
         """
-        Calculates a float by which to offset all marginal costs. The
-        chosen offset is the minimal marginal cost of the generators in
-        the provided list.
-
-        Args:
-            sorted_generators: (list)
-                A list of generators already sorted by their minimal
-                cost in ascending order.
-
-        Returns:
-            (float)
-                The offset by which to adjust all marginal costs of
-                network components.
-        """
-        # there are lots of ways to choose an offset. offsetting such that 0 is
-        # minimal cost is decent but for example choosing an offset slightly
-        # over that seems to also produce good results. It is not clear how
-        # important the same sign on all marginal costs is
-        marginal_cost_list = [self.network.generators["marginal_cost"].loc[gen]
-                              for gen in sorted_generators]
-        return self.offset_estimation_factor * np.min(marginal_cost_list)
-
-    def estimate_marginal_cost_at_bus(self,
-                                      bus: str,
-                                      time: int
-                                      ) -> [float, float]:
-        """
-        Estimates a lower bound for marginal costs incurred by matching
-        the load at the bus only with generators that are at this bus.
+        Returns a dictionary with generators of the specified bus as keys and 
+        the their offset marginal costs
 
         Args:
             bus: (str)
-                Label of the bus at which to estimate marginal costs.
-            time: (int)
-                Index of the time slice for which to estimate marginal
-                costs.
+                The label of the bus of the network
 
         Returns:
-            (float)
-                An estimation of the incurred marginal cost if the
-                marginal costs of generators are all offset by the
-                second return value.
-            (float)
-                The value by which to offset the marginal costs of all
-                generators.
+            (dict)
+                A dict with generators as keys and their offset marginal costs as 
+                values
         """
-        remaining_load = self.backbone.get_load(bus, time)
-        generators = self.backbone.get_bus_components(bus)['generators']
-        sorted_generators = sorted(
-            generators,
-            key=lambda gen: self.network.generators["marginal_cost"].loc[gen]
-        )
-        offset = self.choose_offset(sorted_generators)
-        cost_estimation = 0.0
-        for generator in sorted_generators:
-            if remaining_load <= 0:
-                break
-            supplied_power = min(self.backbone.get_nominal_power(
-                                            generator=generator, 
-                                            time=time),
-                                load)
-            cost_estimation += supplied_power * (
-                    self.network.generators["marginal_cost"].loc[
-                        generator] - offset)
-            remaining_load -= supplied_power
-        return cost_estimation, offset
-
-    def calculate_cost(self,
-                       component_to_be_valued: str,
-                       all_components: dict,
-                       offset: float,
-                       estimated_cost: float,
-                       load: float
-                       ) -> float:
-        # TODO: check DocString
-        """
-        Calculates and returns the marginal costs of a component
-        'componentToBeValued'.
-
-        Args:
-            component_to_be_valued: (str)
-                Label of the component at which to estimate marginal
-                costs.
-            all_components: (dict)
-                All components connect to a specific bus, including
-                'componentToBeValued'.
-            offset: (float)
-                The value by which to offset the marginal costs of all
-                generators.
-            estimated_cost: (float)
-                An estimation of the incurred marginal cost.
-            load: (float)
-                The load on the bus, to which all given components are
-                connected.
-
-        Returns:
-            (float)
-                The marginal costs of the specified component.
-        """
-        if component_to_be_valued in all_components["generators"]:
-            return self.network.generators["marginal_cost"].loc[
-                       component_to_be_valued] - offset
-        if component_to_be_valued in all_components["positive_lines"]:
-            return 0.5 * estimated_cost / load
-        if component_to_be_valued in all_components["negative_lines"]:
-            return 0.5 * - estimated_cost / load
+        generators = self.network.generators
+        return {
+            generator :  self.network.generators["marginal_cost"].loc[generator] - self.offset
+            for generator in generators.index[generators["bus"] == bus]
+        }
 
     def encode_marginal_costs(self, bus: str, time: any) -> None:
         """
@@ -1745,49 +1621,11 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 Modifies self.backbone. Adds to previously written
                 interaction coefficient
         """
-        components = self.backbone.get_bus_components(bus)
-        flattened_componenents = components['generators'] + \
-                                 components['positive_lines'] + \
-                                 components['negative_lines']
-
-        estimated_cost, offset = self.estimate_marginal_cost_at_bus(bus, time)
-        load = self.backbone.get_load(bus, time)
-
-        self.backbone.add_interaction(0.25 * estimated_cost ** 2)
-        for first_component in flattened_componenents:
-            self.backbone.couple_component_with_constant(
-                first_component,
-                - 2.0 * self.calculate_cost(first_component,
-                                            components,
-                                            offset,
-                                            estimated_cost,
-                                            load,
-                                            )
-                * estimated_cost
-                * self.scale_factor,
-                time=time
-            )
-            for second_component in flattened_componenents:
-                current_factor = self.scale_factor * \
-                                 self.calculate_cost(
-                                     first_component,
-                                     components,
-                                     offset,
-                                     estimated_cost,
-                                     load,
-                                 ) * \
-                                 self.calculate_cost(
-                                     second_component,
-                                     components,
-                                     offset,
-                                     estimated_cost,
-                                     load,
-                                 )
-                self.backbone.couple_components(
-                    first_component,
-                    second_component,
-                    coupling_strength=current_factor
-                )
+        self.backbone.encode_squared_distance(
+            self.get_generator_to_cost_dict(bus=bus), 
+            global_factor=self.scale_factor,
+            time=time,
+        )
 
 
 class GlobalCostSquare(MarginalCostSubproblem):
@@ -1797,31 +1635,8 @@ class GlobalCostSquare(MarginalCostSubproblem):
     distance of the actual cost to the estimated cost.
     """
 
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        A constructor for encoding marginal cost as quadratic penalties.
-        It inherits its functionality from the AbstractIsingSubproblem
-        constructor. Additionally, it sets three more parameters which
-        slightly change how the penalty is applied:
-            `offset_estimation_factor`: sets an offset across all
-                generators by the cost of the most efficient generator
-                scaled by this factor
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to encode the problem.
-            config: (dict)
-                A dict containing all necessary configurations to
-                construct an instance.
-        """
-        super().__init__(backbone, config)
-        self.offset_estimation_factor = float(config.setdefault("offset_estimation_factor", 1.0))
-        config
-
     def print_estimation_report(self,
-                                estimated_cost: float,
-                                offset: float,
-                                time: int
+                                time: any
                                 ) -> None:
         """
         Prints the estimated marginal cost and the offset of the cost
@@ -1840,13 +1655,15 @@ class GlobalCostSquare(MarginalCostSubproblem):
             (None)
                 Prints to stdout.
         """
+        current_estimation = self.backbone.get_total_load(time) * self.offset
         print()
         print(f"--- Estimation Parameters at timestep {time} ---")
-        print(f"Absolute offset: {offset}")
-        print(f"Lower limit of minimal cost (with offset): {estimated_cost}")
-        print(
-            f"Current total estimation at {time}:"
-            f" {offset * self.backbone.get_total_load(time)}")
+        print(f"Offset factor: {self.offset_factor}")
+        print(f"Absolute offset: {self.offset}")
+        print(f"Baseline cost at {time}: "
+              f"{current_estimation/self.offset_factor}")
+        print(f"Current total estimation at {time}: "
+              f"{current_estimation}")
         print("---")
 
     def encode_subproblem(self) -> None:
@@ -1861,83 +1678,22 @@ class GlobalCostSquare(MarginalCostSubproblem):
         for time in self.network.snapshots:
             self.encode_marginal_costs(time=time)
 
-    def choose_offset(self, sorted_generators: list) -> float:
+    def get_generator_to_cost_dict(self) -> dict:
         """
-        Calculates the offset, by which to offset all marginal costs.
-        The chosen offset is the minimal marginal cost of a generator in
-        'sorted_generators'.
-
-        Args:
-            sorted_generators: (list)
-                A list of generators already sorted by their minimal
-                cost in ascending order.
+        Returns a dictionary with generators as keys and the their offset marginal
+        costs
 
         Returns:
-            (float)
-                The value, by which to offset all marginal costs of the
-                network components.
+            (dict)
+                A dict with generators as keys and their offset marginal costs as 
+                values
         """
-        # there are lots of ways to choose an offset. offsetting such that 0 is
-        # minimal cost is decent but for example choosing an offset slightly
-        # over that seems to also produce good results. It is not clear how
-        # important the same sign on all marginal costs is
-        marginal_cost_list = [self.network.generators["marginal_cost"].loc[gen]
-                              for gen in sorted_generators]
-        return self.offset_estimation_factor * np.min(marginal_cost_list)
+        return {
+            generator :  self.network.generators["marginal_cost"].loc[generator] - self.offset
+            for generator in self.network.generators.index
+        }
 
-    def estimate_global_marginal_cost(self,
-                                      time: int,
-                                      expected_additonal_cost: float = 0.0
-                                      ) -> [float, float]:
-        """
-        Estimates a lower bound of incurred marginal costs if locality
-        of generators could be ignored at a given time slice.
-        Unavoidable baseline costs of matching the load is ignored. The
-        offset to reduce baseline costs to 0 and estimated marginal cost
-        with a constant is returned.
-
-        Args:
-            time: (int)
-                Index of time slice for which to calculate the lower
-                bound of offset marginal cost.
-            expected_additonal_cost: (float)
-                Constant by which to offset the returned marginal cost.
-                Default: 0.0
-
-        Returns:
-            (float)
-                An estimation of the incurred marginal cost if the
-                marginal costs of generators are all offset by the
-                second return value.
-            (float)
-                The value by which to offset the marginal costs of all
-                generators.
-        """
-        load = 0.0
-        for bus in self.network.buses.index:
-            load += self.backbone.get_load(bus, time)
-
-        sorted_generators = sorted(
-            self.network.generators.index,
-            key=lambda gen: self.network.generators["marginal_cost"].loc[gen]
-        )
-        offset = self.choose_offset(sorted_generators)
-        cost_estimation = 0.0
-        for generator in sorted_generators:
-            if load <= 0:
-                break
-            supplied_power = min(self.backbone.get_nominal_power(
-                                            generator=generator, 
-                                            time=time),
-                                load)
-            cost_estimation += supplied_power * (
-                    self.network.generators["marginal_cost"].loc[
-                        generator] - offset)
-            load -= supplied_power
-        return cost_estimation + expected_additonal_cost, offset
-
-    # TODO refactor using a isingbackbone function for encoding squared distances
-    def encode_marginal_costs(self, time: int) -> None:
+    def encode_marginal_costs(self, time: any) -> None:
         """
         The marginal costs of using generators are considered one single
         global constraint. The square of marginal costs is encoded
@@ -1952,32 +1708,76 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
-        # TODO make this more readable
-        estimated_cost, offset = \
-            self.estimate_global_marginal_cost(time=time,
-                                               expected_additonal_cost=0)
-        self.print_estimation_report(estimated_cost=estimated_cost,
-                                     offset=offset,
-                                     time=time)
-        generators = self.network.generators.index
-        # estimation of marginal costs is a global estimation.
-        # Calculate total power needed
-        # offset the marginal costs per energy produces and encode problem
-        # into backbone
-        for first_generator in generators:
-            marginal_cost_first_generator = self.network.generators["marginal_cost"].loc[
-                                                first_generator] - offset
-            for second_generator in generators:
-                marginal_cost_second_generator = \
-                    self.network.generators["marginal_cost"].loc[second_generator] - offset
-                current_factor = self.scale_factor * \
-                                 marginal_cost_first_generator * \
-                                 marginal_cost_second_generator
-                self.backbone.couple_components(
-                    first_component=first_generator,
-                    second_component=second_generator,
-                    coupling_strength=current_factor
-                )
+        self.print_estimation_report(time=time)
+        self.backbone.encode_squared_distance(
+            self.get_generator_to_cost_dict(), 
+            global_factor=self.scale_factor,
+            time=time,
+        )
+
+
+class GlobalCostSquareWithSlack(GlobalCostSquare):
+    """
+    A subproblem class that models the minimization of the marginal
+    costs. It does this by estimating it and then modelling the squared
+    distance of the actual cost to the estimated cost. It also adds a
+    slack term to the estimation which is independent of the network and
+    serves to slightly adjust the estimation during the optimization.
+    """
+    # a dict to map config strings to functions which are used creating lists
+    # of numbers, which can be used for weights of slack variables
+    slack_representation_dict = {
+        "binary_power": binary_power,
+    }
+
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        """
+        A constructor for encoding marginal cost as quadratic penalties,
+        including as well a slack variable.
+        It inherits its functionality from the GlobalCostSquare
+        constructor. Additionally, it adds slack qubits to the
+        IsingBackbone.
+
+        Args:
+            backbone: (IsingBackbone)
+                The backbone on which to encode the problem.
+            config: (dict)
+                A dict containing all necessary configurations to
+                construct an instance.
+        """
+        super().__init__(backbone=backbone, config=config)
+        slack_weight_generator = self.slack_representation_dict[
+            config.get("slack_type", "binary_power")]
+        # an additional factor for scaling the weights of the qubits acting as
+        # slack variables
+        self.slack_scale = config.get("slack_scale", 1.0)
+        # number of slack qubits used
+        self.slack_size = config.get("slack_size", 3)
+        self.slack_weights = [-weight for weight in slack_weight_generator(self.slack_size)]
+
+        snapshot_to_slack_dict = {
+            snapshot : self.slack_weights
+            for snapshot in self.network.snapshots
+        }
+        # adding slack qubits with the label `slack_marginal_cost`
+        self.backbone.create_qubit_entries_for_component(
+            component_name="slack_marginal_cost",
+            snapshot_to_weight_dict=snapshot_to_slack_dict
+        )
+
+    def get_generator_to_cost_dict(self) -> dict:
+        """
+        Returns a dictionary with generators as keys and the their offset marginal
+        costs and en entry for the slack variables
+
+        Return:
+            (dict)
+                A dictionary with generators, the slack comonent and associated
+                marginal costs as values
+        """
+        result = super().get_generator_to_cost_dict()
+        result["slack_marginal_cost"] = self.slack_scale
+        return result
 
 
 class KirchhoffSubproblem(AbstractIsingSubproblem):
@@ -2418,101 +2218,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             contrib = {**contrib, **self.calc_power_imbalance_at_bus(
                 bus=bus, result=solution, silent=silent)}
         return contrib
-
-
-class GlobalCostSquareWithSlack(GlobalCostSquare):
-    """
-    A subproblem class that models the minimization of the marginal
-    costs. It does this by estimating it and then modelling the squared
-    distance of the actual cost to the estimated cost. It also adds a
-    slack term to the estimation which is independent of the network and
-    serves to slightly adjust the estimation during the optimization.
-    """
-    # a dict to map config strings to functions which are used creating lists
-    # of numbers, which can be used for weights of slack variables
-    slack_representation_dict = {
-        "binary_power": binary_power,
-    }
-
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        A constructor for encoding marginal cost as quadratic penalties,
-        including as well a slack variable.
-        It inherits its functionality from the GlobalCostSquare
-        constructor. Additionally, it adds slack qubits to the
-        IsingBackbone.
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to encode the problem.
-            config: (dict)
-                A dict containing all necessary configurations to
-                construct an instance.
-        """
-        super().__init__(backbone=backbone, config=config)
-        slack_weight_generator = self.slack_representation_dict[
-            config.get("slack_type", "binary_power")]
-        # an additional factor for scaling the weights of the qubits acting as
-        # slack variables
-        slack_scale = config.get("slack_scale", 1.0)
-        # number of slack qubits used
-        slack_size = config.get("slack_size", 7)
-        slack_weights = [- slack_scale * i for i in
-                         slack_weight_generator(slack_size)]
-        # adding slack qubits with the label `slack_marginal_cost`
-        self.backbone.create_qubit_entries_for_component(
-            component_name="slack_marginal_cost",
-            weights=slack_weights * len(backbone.snapshots),
-            encoding_length=len(slack_weights)
-        )
-
-    # TODO refactor using a ising_backbone function for encoding squared distances
-    def encode_marginal_costs(self, time: int) -> None:
-        """
-        The marginal costs of using generators are considered one single
-        global constraint. The square of marginal costs is encoded
-        into the energy and thus minimized.
-
-        Args:
-            time: (int)
-                Index of time slice for which to estimate the marginal
-                cost.
-
-        Returns:
-            (None)
-                Modifies self.ising_coefficients. Adds to previously written
-                interaction coefficient.
-        """
-        estimated_cost, offset = self.estimate_global_marginal_cost(
-            time=time, expected_additonal_cost=0)
-        self.print_estimation_report(estimated_cost=estimated_cost,
-                                     offset=offset,
-                                     time=time)
-        generators = self.network.generators.index
-        generators = list(generators) + ["slack_marginal_cost"]
-        load = 0.0
-        for bus in self.network.buses.index:
-            load += self.backbone.get_load(bus, time)
-        for first_generator in generators:
-            if first_generator == "slack_marginal_cost":
-                marginal_cost_first_generator = 1.
-            else:
-                marginal_cost_first_generator = \
-                    self.network.generators["marginal_cost"].loc[first_generator] - offset
-            for second_generator in generators:
-                if second_generator == "slack_marginal_cost":
-                    marginal_cost_second_generator = 1.
-                else:
-                    marginal_cost_second_generator = \
-                        self.network.generators["marginal_cost"].loc[second_generator] - offset
-                current_factor = self.scale_factor * \
-                                 marginal_cost_first_generator * \
-                                 marginal_cost_second_generator
-                self.backbone.couple_components(
-                    first_component=first_generator,
-                    second_component=second_generator,
-                    coupling_strength=current_factor
-                )
 
 
 class StartupShutdown(AbstractIsingSubproblem, ABC):

@@ -32,7 +32,7 @@ ising_interface:
         # Adding Marginal cost optimization in the QUBO
         strategy: "global_cost_square"
             # (string) name of the class/procedure how to encode the marginal cost optimization
-            # choose between global_cost_square, global_cost_square_with_slack, marginal_as_penalty, local_marginal_estimation_distance
+            # choose between global_cost_square, global_cost_square_with_slack, marginal_as_penalty, local_marginal_estimation
         ### these values only pertain the formulation *WithSlack
         slack_type: "binary_power"
             # this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
@@ -44,8 +44,8 @@ ising_interface:
         ### these values specifiy how costs are estimated if a formulation needs it (all but MarginalAsPenalty)
         scale_factor: 0.6
              # (float) weight of the marginal cost optimization in the QUBO
-        offset_estimation_factor: 1.225
-        offset_estimation_factor: 1.0
+        offset_factor: 1.225
+        # offset_factor: 1.0
              # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
              # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
              # this method disregerads the topology of the network and is a lower boundary of the cost

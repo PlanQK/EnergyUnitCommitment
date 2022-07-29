@@ -374,14 +374,14 @@ The following table describes various strategies to encode the marginal cost int
 
 ##### Configuring the estimation
 
-The parameter for configuring the estimation is `offset_estimation_factor`. When constructing the QUBO for the marginal costs, the marginal costs of each generator
+The parameter for configuring the estimation is `offset_factor`. When constructing the QUBO for the marginal costs, the marginal costs of each generator
 are offset by the product of that factor and the cost of the most efficient generator. 
 Such an offset doesn't change the solution of the unit commitment problem because all feasible solution are offset by the same value.
 
 The estimation used to encode the marginal cost then assumes that the cost of the optimal solutin is zero with respect to the offset marginal costs.
-Thus the estimated value for some `offset_estimation_factor` is the product of it, the marginal cost of the most efficient generator and the total load of the network.
+Thus the estimated value for some `offset_factor` is the product of it, the marginal cost of the most efficient generator and the total load of the network.
 
-The strategy `global_cost_square_with_slack` has three more options on top of the `offset_estimation_factor`. It adds slack variables that act like generators that reduce marginal costs, but produce
+The strategy `global_cost_square_with_slack` has three more options on top of the `offset_factor`. It adds slack variables that act like generators that reduce marginal costs, but produce
 no power. This changes the estimation from a constant value to that constant plus the number represented by the slack variables.
 
 The following table describes the parameters that are used to describe these slack variables.
@@ -407,7 +407,7 @@ In total, an example of a JSON-object for configuring the QUBO looks like this.
         "marginal_cost": {
             "strategy": "global_cost_square_with_slack",
             "scale_factor": 0.3,
-            "offset_estimation_factor": 1.0,
+            "offset_factor": 1.0,
             "slack_type": "binary_power",
             "slack_scale": 0.1,
             "slack_size": 3,
