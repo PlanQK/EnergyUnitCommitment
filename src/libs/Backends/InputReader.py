@@ -19,6 +19,7 @@ import yaml
 
 from typing import Union
 
+from .. import Backends
 
 class InputReader:
     """
@@ -200,6 +201,29 @@ class InputReader:
                 self.add_params_dict(config_value, current_level.setdefault(config_key, {}))
             else:
                 current_level[config_key] = config_value
+
+    def get_optimizer_class(self):
+        """
+        Returns the corresponding optimizer class that is specified
+        in the `config` attribute of this instance
+
+        Returns:
+            (BackendBase)
+                The optimizer class that corresponds to the config value
+        """
+        gan_backends = {
+            "classical": Backends.ClassicalBackend,
+            "sqa": Backends.SqaBackend,
+            "dwave-tabu": Backends.DwaveTabu,
+            "dwave-greedy": Backends.DwaveSteepestDescent,
+            "pypsa-glpk": Backends.PypsaGlpk,
+            "pypsa-fico": Backends.PypsaFico,
+            "dwave-hybrid": Backends.DwaveCloudHybrid,
+            "dwave-qpu": Backends.DwaveCloudDirectQPU,
+            "dwave-read-qpu": Backends.DwaveReadQPU,
+            "qaoa": Backends.QaoaQiskit,
+        }
+        return gan_backends[self.config["backend"]]
 
     def get_config(self) -> dict:
         """

@@ -22,20 +22,6 @@ except ImportError:
     from .libs.Backends.InputReader import InputReader
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
-# TODO eliminate ${solver}Backend strings
-gan_backends = {
-    "classical": Backends.ClassicalBackend,
-    "sqa": Backends.SqaBackend,
-    "dwave-tabu": Backends.DwaveTabu,
-    "dwave-greedy": Backends.DwaveSteepestDescent,
-    "pypsa-glpk": Backends.PypsaGlpk,
-    "pypsa-fico": Backends.PypsaFico,
-    "dwave-hybrid": Backends.DwaveCloudHybrid,
-    "dwave-qpu": Backends.DwaveCloudDirectQPU,
-    "dwave-read-qpu": Backends.DwaveReadQPU,
-    "qaoa": Backends.QaoaQiskit,
-}
-
 
 def run(
         data: Union[pypsa.Network, str] = None,
@@ -69,7 +55,7 @@ def run(
         input_reader = InputReader(network=data, config=params, params_dict=params_dict)
 
         # set up optimizer with input data
-        optimizer_class = gan_backends[input_reader.config["backend"]]
+        optimizer_class = input_reader.get_optimizer_class()
         optimizer = optimizer_class.create_optimizer(reader=input_reader)
 
         # run optimization
