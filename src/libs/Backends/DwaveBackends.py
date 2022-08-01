@@ -211,7 +211,6 @@ class AbstractDwaveSampler(BackendBase):
             (None)
                 Stores the output_network as dictionary in self.output.
         """
-        # TODO: check choose_sample function
         best_sample = self.choose_sample()
 
         output_network = self.ising_backbone.set_output_network(solution=[
@@ -410,22 +409,6 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
                 The combined filepath.
         """
         return glob(path.join(root_path, file_regex))
-
-    # TODO: remove?
-    def handle_optimization_stop(self, path):
-        """
-        If a network raises an error during optimization, add this
-        network to the blacklisted networks for this optimizer and
-        timeout value Blacklistfiles are of the form
-        '{path}/{self.config["backend_config"]["timeout"]}'
-        '_{backend}_blacklist'
-        """
-        # on unix writing small buffers is atomic. no file locking necessary
-        # append to existing file or create a new one
-        # with open(f'{path}/{self.config["backend_config"]["timeout"]}_'
-        #          f'qpu_blacklist', 'a+') as f:
-        #    f.write(network + '\n')
-        return
 
     def check_input_size(self, limit: float = 60.0):
         """
@@ -638,7 +621,6 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
     # quantum computation struggles with fine tuning powerflow to match
     # demand exactly. Using a classical approach to tune power flow can
     # achieved in polynomial time
-    # TODO refactor this method
     def build_flow_problem(self,
                            generator_state: list,
                            line_values: dict = None

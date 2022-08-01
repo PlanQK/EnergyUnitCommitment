@@ -418,7 +418,6 @@ class IsingBackbone:
         self.ising_coefficients[key] = self.ising_coefficients.get(key, 0) - interaction_strength
         self.cached_problem[key] = self.cached_problem.get(key, 0) - interaction_strength
 
-    # TODO unify couple_components and with Constant
     def couple_component_with_constant(self, component: str,
                                        coupling_strength: float = 1,
                                        time: any = None) -> None:
@@ -454,9 +453,6 @@ class IsingBackbone:
             # term with constant cost contribution after applying QUBO to
             # Ising transformation
             self.add_interaction(0.5 * coupling_strength * self._qubit_weights[qubit])
-
-    # TODO add a method to conveniently encode the squared distance to a fixed
-    #  value into an ising
 
     def couple_components(self,
                           first_component: str,

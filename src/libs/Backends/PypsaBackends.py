@@ -2,7 +2,7 @@
 and then solves it using one of the installed optimizers. The possible
 choices for optimizers are
 - GLPK
-- FicoXpress (TODO)
+- FicoXpress
 """
 
 import pypsa
@@ -44,7 +44,6 @@ class PypsaBackend(BackendBase):
                 Modifies `self.opt` and `self.transformed_problem`.
         """
         print("transforming problem...")
-        # TODO: maybe deepcopy before setting things in network.
         self.network.generators.committable = True
         self.network.generators.p_nom_extendable = False
 
@@ -89,7 +88,6 @@ class PypsaBackend(BackendBase):
                 Returns a pypsa network which solves the unit commitment
                 problem.
         """
-        # TODO implement write from pyomo
         print("Writing from pyomo model to network is not implemented")
         return self.network
 
@@ -124,7 +122,6 @@ class PypsaBackend(BackendBase):
         self.output["results"]["termination_condition"] \
             = solverstring.splitlines()[-7].split()[2]
         if self.output["results"]["termination_condition"] != "infeasible":
-            # TODO get result better out of model?
             total_cost = 0
             total_power = 0
             for key, val in self.transformed_problem.generator_p.get_values(
@@ -170,7 +167,6 @@ class PypsaBackend(BackendBase):
         print("done")
 
 
-# TODO: Are they necessary? the solver is chosen in the config-file, isn´t it?
 class PypsaFico(PypsaBackend):
     pass
 
