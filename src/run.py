@@ -45,7 +45,7 @@ def parse_cli_params(param_string: str):
 
     Args:
         param_string: (str)
-            A string containing entries of a nested dictionary to be parsed
+            A string containing entries of a nested dictionary to be parsed.
             Different Parameters are separated by `params_seperator`. The keys
             and the value are separated by `keyword_seperator`
     """
@@ -64,7 +64,7 @@ def parse_cli_params(param_string: str):
     return result
 
 
-def insert_value(key_chain, value, current_level):
+def insert_value(key_chain: list, value: any, current_level: dict):
     """
     insert a value in the dictionary by descending the keychain
 
@@ -77,7 +77,7 @@ def insert_value(key_chain, value, current_level):
             The dictionary in which to write the value
 
     Returns:
-        Modifies the passed dictionary
+        Modifies the passed dictionary and returns `None`.
     """
     for key in key_chain[:-1]:
         current_level = current_level.setdefault(key, {})

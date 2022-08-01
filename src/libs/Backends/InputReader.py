@@ -87,7 +87,6 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
-        print(self.config)
         self.config["backend"] = self.config.get("backend", "sqa").replace('_', '-')
         for backend_type, solver_list in self.backend_to_solver.items():
             if self.config["backend"] in solver_list:

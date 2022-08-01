@@ -9,6 +9,10 @@ from datetime import datetime
 
 
 class Response:
+    """
+    A class for wrapping the serialization of optimization results.
+    """
+
     def to_json(self):
         """
         Converts the data of the response into json format and returns it as a string
@@ -72,7 +76,8 @@ class ResultResponse(Response):
     Represents the result to be passed back to the caller.
 
     Args:
-        result (dict): Json serializable Dict to be passed back to the caller
+        result (dict): serializable dictionary to be passed back to the caller
+        metadata (dict): serializable dictionary containing meta data
     """
 
     def __init__(self, result: dict, metadata: dict = None):
@@ -85,7 +90,8 @@ class ResultResponse(Response):
         Saves the result of the local optimization in a docker container.
     
         Args:
-            folder: (str) the location where to save the response. The default
+            folder: (str) 
+                The location where to save the response. The default
                 path is the mount point of the makefile for the networks
         Returns:
             (None) Saves the optimization result to the mount point of the networks

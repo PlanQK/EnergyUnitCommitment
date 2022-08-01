@@ -61,6 +61,7 @@ class QaoaAngleSupervisor:
     
         Args:
             qaoa_optimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
+
         Returns:
             (QaoaAngleSupervisor) An instance of subclass of a QaoaAngleSupervisor
         """
@@ -82,9 +83,14 @@ class QaoaAngleSupervisor:
         raise NotImplementedError
 
     def get_num_angles(self):
-        """This returns the number of angles  used for parametrization of the quantum circuit.
-        This is necessary for correctly binding the constructed circuit to the angles"""
-        raise NotImplementedError
+        """
+        This returns the number of angles  used for parametrization of the quantum circuit.
+        This is necessary for correctly binding the constructed circuit to the angles
+
+        Returns:
+            (int) number of angles that are used for circuit parametrization
+        """
+        return self.num_angles
 
     def get_total_repetitions(self):
         """
@@ -98,7 +104,7 @@ class QaoaAngleSupervisor:
 
 class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
     """
-    a class for choosing initial qaoa angles. The strategy is given by a list. Either an angle parameter
+    A class for choosing initial qaoa angles. The strategy is given by a list. Either an angle parameter
     is fixed based on the list entry, or chosen randomly.
     """
 
@@ -108,6 +114,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
     
         Args:
             qaoa_optimizer: (QaoaQiskit) The qaoa optimizer that will consume the supplied angles
+
         Returns:
             (list) a list of float values to be used as angles in a qaoa circuit
         """
@@ -135,11 +142,6 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
             # best angles used as initial guesses which leads to twice as many repetitions
             return 2 * self.repetitions
 
-    def get_num_angles(self):
-        """This returns the number of angles are used for parametrization of the quantum circuit.
-        This is necessary for correctly binding the constructed circuit to the angles"""
-        return self.num_angles
-
     def get_best_initial_angles(self):
         """
         When calling this method, it searches the results of the stored qaoa_optimizer for the best result
@@ -160,7 +162,7 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
     def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:
         """
         returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
-        These are constructed according to the self.config_guess list. If this list contains at least
+        These are constructed according to the `self.config_guess` list. If this list contains at least
         one random initialization, it will choose the best angle result so far and return those to be 
         used for more qaoa repetitions.
     
@@ -198,31 +200,26 @@ class QaoaAngleSupervisorRandomOrFixed(QaoaAngleSupervisor):
 
 
 class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
-    """a class for choosing qaoa parameters by searching using a grid on the given parameter space
+    """
+    A class for choosing qaoa parameters using a grid search of the parameter space
     """
 
-    def __init__(self, qaoa_optimizer):
+    def __init__(self, qaoa_optimizer: BackendBase):
         """
-        TODO: Rewrite doc string
-        first calculates the grid that is going to be searched and then sets up the data structures
-        necessary to keep track which grid points have already been tried output
+        This sets up an object that returns an iterator which can be used to perform a grid
+        search of the possible initial parameters of a quantum circuit.
 
-        A grid is a product of grids for each angle space of one layer. These layers are alternating
-        problem and mixing hamiltonians.
-        We can give a default grid whose paramters each layer will use if their grid config doesn't specify it.
-        A grid for one layers needs upper and lower bounds for the angle 
-        Furthermore, it needs to specify how many grid points are added for each angle
-        Keep in mind that the total number of grids point is the product over all grids over all layers
-        which can grow very quickly.
-        Each Grid is represented as a dictionary with up to three Values
-            lower_bound, upper_bound, num_grid
-        If a value is not specified the value of a default grid is used instead. If the values of th default
-        grid are not set speficiend, the following values will be used as default values
-                lower_bound : -1
-                upper_bound : 1
-                num_gridpoints : 3
-        The config file contains a list of all grids for the layers of the quantum circuit
-        It can also contain an entry `default_grid`
+        A parametrization of a quantum circuit is basically a list of floats, one for each
+        layer. The grid that is searched is specified by passing lower and upper bounds for each
+        layer and how many (equidistant) points are going to be considered in that range.
+
+        For each layer, this is passed as a dictionary with up to three `key:value` pairs:
+            - lower_bound : -1
+            - upper_bound : 1
+            - num_gridpoints : 3
+
+        The whole grid is then specified by a list of such dictionaries. Default values can also
+        be passed using configuration key `default_grid` with the same dictionary structure
         """
         self.qaoa_optimizer = qaoa_optimizer
         self.config_qaoa = qaoa_optimizer.config_qaoa
@@ -231,14 +228,9 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
                                for layer in self.config_qaoa['initial_guess']]
         self.num_angles = len(self.grids_by_layer)
 
-    def get_num_angles(self):
-        """This returns the number of angles are used for parametrization of the quantum circuit.
-        This is necessary for correctly binding the constructed circuit to the angles"""
-        return self.num_angles
-
     def get_initial_angle_iterator(self) -> Iterator[tuple[int, np.array]]:
         """
-        returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
+        Returns an iterator that returns initial angle guesses to be consumed by the qaoa optimizer.
         Together, these initial angles form a grid on the angle space
    
         Returns:
@@ -267,6 +259,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
             default_grid: (dict)
                 a dictionary with values to specify a grid. For this grid, there also
                 exist default values to be used as default values
+
         Returns:
             (None) modifies the attribute `self.default`
         """
@@ -286,6 +279,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
                     lower_bound
                     upper_bound
                     num_gridpoints
+
         Returns:
             (list, list) returns two lists with float values
         """
@@ -312,6 +306,19 @@ class QaoaQiskit(BackendBase):
 
     @classmethod
     def create_optimizer(cls, reader: InputReader):
+        """
+        A factory method for instantiaing the correct subclass of `QaoaQiskit`
+        which is the super class for all optimizer that perform QAOA.
+
+        Args:
+            reader: (InputReader)
+                An instance of the input reader that contains the configuration
+                of the solver and which optimizer to instantiate
+
+        Returns:
+            (QaoaQiskit) An optimizer that perfoms QAOA using the settings passed
+                         in the `reader`.
+        """
         if reader.config["backend_config"].setdefault("simulate", True):
             if reader.config["backend_config"].setdefault("noise", False):
                 qaoa_optimizer = QaoaQiskitNoisySimulator(reader)
@@ -369,10 +376,15 @@ class QaoaQiskit(BackendBase):
         self.setup_backend()
 
     def setup_backend(self):
-        raise NotImplementedError
+        """
+        Configures the backend (simulator or quantum hardware) that is used
+        for QAOA
 
-    # factory for correct qaoa
-    #  if self.config_qaoa["noise"] or (not self.config_qaoa["simulate"]):
+        Returns:
+            (None)
+                Sets up attributes for the qiskit backend that is used for QAOA.
+        """
+        raise NotImplementedError
 
     def check_input_size(self, limit: float = 60.0):
         """
@@ -385,8 +397,10 @@ class QaoaQiskit(BackendBase):
                     circuit evaluation grows exponentially with the number
                     qubits, they get also capped here.
 
-        Returns: Doesn't return anything but raises an Error if it would take
-                to long
+        Returns: 
+            (None) 
+                Doesn't return anything or has side effects, unless the limit 
+                of the runtime is exceeded. Then this raises a ValueError 
         """
         runtime_factor = self.transformed_problem.num_interactions()
         if runtime_factor > 20:
@@ -406,8 +420,7 @@ class QaoaQiskit(BackendBase):
 
         Returns:
             (None)
-                Add the ising_interface-instance to
-                self.transformed_problem.
+                Add the ising_interface-instance to self.transformed_problem.
         """
         self.transformed_problem = IsingBackbone.build_ising_problem(
             network=self.network, config=self.config["ising_interface"]
@@ -439,9 +452,6 @@ class QaoaQiskit(BackendBase):
         draw_theta = self.create_draw_theta()
         qc_draw = self.quantum_circuit.bind_parameters({self.param_vector: draw_theta})
         self.output["results"]["latex_circuit"] = qc_draw.draw(output="latex_source")
-
-        # setup IBMQ backend and save its configuration to output
-        # backend, noise_model, coupling_map, basis_gates = self.setup_backend()
 
         current_repetition = -1
         for current_repetition, initial_guess in self.angle_supervisor.get_initial_angle_iterator():
@@ -750,10 +760,16 @@ class QaoaQiskit(BackendBase):
 
         return self.iter_result["expected_kirchhoff_score"]
 
-    def evaluate_circuit(self, circuit):
+    def evaluate_circuit(self, circuit: QuantumCircuit):
         """
-        For the given quantum circuit, evaluates it according to the setting
-        stored in the qaoa instance
+        For the given quantum circuit, this method executes it. 
+
+        This is a wrapper to call the correct execute wether we a simulator
+        or quantum hardware
+
+        Args:
+            circuit: (QuantumCircuit)
+                A quantum circuit as specified in the QAOA algorithm
         """
         raise NotImplementedError
 
@@ -947,8 +963,13 @@ class QaoaQiskitCloud(QaoaQiskit):
 
     def __init__(self, reader: InputReader):
         """
-        In addition to the regular initiation, this sets up the access to the
-        IBM account"""
+        In addition to the regular initiation of a QAOA optimizer, instance of this class
+        require access to IBM's cloud. The setup for that is done during initialization
+
+        Args:
+            reader: (InputReader)
+                An input reader containg all configuration data for the optimizer
+        """
         super().__init__(reader)
         # set up connection to IBMQ servers
         IBMQ.save_account(token=self.config["API_token"]["IBMQ_API_token"],
@@ -962,18 +983,29 @@ class QaoaQiskitSimulator(QaoaQiskit):
     execute QAOA
     """
 
-    def setup_backend(self) -> [BaseBackend, NoiseModel, list, list]:
+    def setup_backend(self):
         """
         Sets up the qiskit backend based on the settings passed into
         the function.
+        
+        Returns
+            (None) 
+                Sets the `backend` attribute to the qiskit simulator
         """
         self.simulator = self.config_qaoa.setdefault("simulator", "aer_simulator")
         self.backend = Aer.get_backend(self.simulator)
 
-    def evaluate_circuit(self, circuit):
+    def evaluate_circuit(self, circuit: QuantumCircuit):
         """
         For a given quantum circuit evaluates it according to the settings
         in this class and returns the results
+
+        Args:
+            circuit: (QuantumCircuit)
+                The parametrized quantum circuit as
+
+        Returns:
+            (dict): the result of simulating the circuit on a simulator
         """
         return execute(
             experiments=circuit,
@@ -1002,6 +1034,11 @@ class QaoaQiskitNoisySimulator(QaoaQiskitCloud, QaoaQiskitSimulator):
         """
         Sets up the qiskit backend based on the settings passed into
         the function.
+
+        Returns:
+            (None)
+                Sets up all attributes so the simulator can execute 
+                the quantum circuit with noise
         """
         # https://qiskit.org/documentation/apidoc/aer_noise.html
         # set IBMQ server to extract noise model and coupling_map
@@ -1026,6 +1063,15 @@ class QaoaQiskitCloudComputer(QaoaQiskitCloud):
         """
         For a given quantum circuit evaluates it according to the settings
         in this class and returns the results
+
+        Args:
+            circuit: (QuantumCircuit)
+                The parametrized quantum circuit to be executed
+
+        Returns:
+            (dict)
+                A dicitonary containg the result of executing the circuit on
+                IBM's quantum hardware
         """
         # Submit job to real device and wait for results
         job_device = execute(experiments=circuit,
@@ -1034,12 +1080,15 @@ class QaoaQiskitCloudComputer(QaoaQiskitCloud):
         job_monitor(job_device)
         return job_device.result()
 
-    def setup_backend(self) -> [BaseBackend, NoiseModel, list, list]:
+    def setup_backend(self) -> None:
         """
         Sets up the qiskit backend based on the settings passed into
         the function.
+        
+        Returns:
+            (None)
+                Sets the least busy device that can fit the circuit as the backend
         """
-
         large_enough_devices = self.provider.backends(
             filters=lambda x: x.configuration().n_qubits > self.num_qubits and not x.configuration().simulator
         )

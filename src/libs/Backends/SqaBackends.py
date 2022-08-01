@@ -191,15 +191,17 @@ class ClassicalBackend(BackendBase):
 
     def check_input_size(self, limit: float = 60.0):
         """
-        checks if the estimated runtime is longer than the given limit
+        Checks if the estimated runtime is longer than the given limit
 
         Args:
-            limit: an integer that is a measure for how long the limit is.
-                    This is not a limit in seconds because that depends on
-                    the hardware this is running on
+            limit: (float)
+                An integer that is a measure for how big the limit is.
+                This is not a limit in seconds because that depends on
+                the hardware this is running on
 
-        Returns: Doesn't return anything but raises an Error if it would take
-                to long
+        Returns: 
+            Doesn't return anything but raises an Error if it would take
+            too long
         """
         runtime_factor = self.transformed_problem.num_interactions() * 0.001
         runtime_factor *= self.siquan_config["trotter_slices"] * 0.001

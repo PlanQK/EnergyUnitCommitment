@@ -25,6 +25,16 @@ import numpy as np
 import pypsa
 from numpy import ndarray
 
+# The following methods are used to assign lists of floting values to single argument
+# These lists are used as weights for encoding network generators and transmission
+# lines as qubits. 
+
+# Methods used for generator encodings return lists of positive values, such that
+# the sum of all weights is equal to the argument of the function
+
+# Methods used for transmission line encodings returns lists such that the absolute value
+# of any subtotal doesn't exceed the argument and the sum of all positives values and the 
+# absolute value of the sum of all negative values is equal to the argument.
 
 def integer_decomposition_powers_of_two_and_rest(number: int):
     """
@@ -67,9 +77,10 @@ def cut_powers_of_two(capacity: float) -> list:
     """
     A method for splitting up the capacity of a line with a given
     maximum capacity.
+
     It uses powers of two to decompose the capacity and cuts off
     the biggest power of two so the total sum of all powers equals
-    the capacity
+    the capacity. The capacity is also rounded to an integer.
     
     Args:
         capacity: (int)
@@ -88,12 +99,10 @@ def fullsplit(capacity: int) -> list:
     """
     A method for splitting up the capacity of a line with a given
     maximum capacity.
-    A line is split into qubits with weights just that any sum of
-    active qubits never exceeds the capacity and so that it can
-    represent any value that is smaller than the capacity. This method
-    archives this by splitting the lines into qubits which all have
-    either weight 1 or -1.
-    
+
+    It uses the numbers `1` and `-1` as weights. The capacity is rounded
+    to an integer
+        
     Args:
         capacity: (int)
             The capacity of the line to be decomposed.
@@ -382,7 +391,7 @@ class IsingBackbone:
             args[-1]: (float)
                 The basic interaction strength before applying qubit
                 weights.
-            args[:-1]: (int)
+            args[:-1]: (list)
                 All qubits that are involved in this interaction.
         Returns:
             (None)
@@ -426,7 +435,7 @@ class IsingBackbone:
             coupling_strength: (float)
                 Coefficient of QUBO multiplication by which to scale the
                 interaction. Does not contain qubit specific weight.
-            time: (int)
+            time: (any)
                 Index of time slice for which to couple qubit
                 representing the component.
 
@@ -474,10 +483,10 @@ class IsingBackbone:
             coupling_strength: (float)
                 Coefficient of QUBO multiplication by which to scale all
                 interactions.
-            time: (int)
+            time: (any)
                 Index of time slice of the first component for which to
                 couple qubits representing it.
-            additional_time: (int)
+            additional_time: (any)
                 Index of time slice of the second component for which
                 to couple qubits representing it. The default parameter
                 'None' is used if the time slices of both components
@@ -488,7 +497,7 @@ class IsingBackbone:
                 interaction coefficient.
 
         Example:
-            Let X_1, X_2 be the qubits representing firstComponent and
+            Let X_1, X_2 be the qubits representing first_component and
             Y_1, Y_2 the qubits representing second_component. The QUBO
             product the method translates into Ising spin glass
             coefficients is:
@@ -567,6 +576,11 @@ class IsingBackbone:
                 a factor by which all interaction are multiplied
             time: (any)
                 the time step at which to couple the components
+
+        Returns:
+            (None)
+                Modifies `self.ising_coefficients` and `self.cached_problem`
+        
         """
         # constant contribution to cost function so that a configuration
         # that matches the target value has energy of 0
@@ -726,6 +740,7 @@ class IsingBackbone:
         Args:
             weight_list: (list[float]) a list of floats, which describes weights to be
                 mapped to newly allocated qubits
+
         Returns:
             (list[int]) a list of consecutive integers, which represent qubits which are
                     mapped to the weight list. Also increases internal qubit count
@@ -886,7 +901,7 @@ class IsingBackbone:
         Args:
             generator: (str)
                 The generator label.
-            time: (int)
+            time: (any)
                 Index of time slice for which to get nominal power. Has to
                 be in the index self.network.snapshots
 
@@ -901,8 +916,7 @@ class IsingBackbone:
             p_max_pu = 1.0
         return max(self.network.generators.p_nom[generator] * p_max_pu, 0)
 
-    def get_generator_status(self, gen: str, solution: list, time: any
-                             ) -> bool:
+    def get_generator_status(self, gen: str, solution: list, time: any) -> bool:
         """
         Returns the status of a generator 'gen' (i.e. on or off) at a
         time slice 'time' in a given solution. If the generator is
@@ -914,7 +928,7 @@ class IsingBackbone:
                 The label of the generator.
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
-            time: (int)
+            time: (any)
                 Index of time slice for which to get the generator
                 status. This has to be in the network.snapshots index
         """
@@ -998,7 +1012,7 @@ class IsingBackbone:
         Args:
             bus: (str)
                 Label of bus at which to calculate the total load.
-            time: (int)
+            time: (any)
                 Index of time slice for which to get the total load.
             silent: (bool)
                 Flag for turning print on or off
@@ -1027,7 +1041,7 @@ class IsingBackbone:
         Returns the total load over all buses at one time slice.
 
         Args:
-            time: (int)
+            time: (any)
                 Index of time slice at which to return the load.
         Returns:
             (float)
@@ -1046,7 +1060,7 @@ class IsingBackbone:
         Args:
             component: (str)
                 Label of the (network) component.
-            time: (int)
+            time: (any)
                 Index of time slice for which to get representing
                 qubits. This has to be in the network.snapshots index
 
@@ -1066,7 +1080,7 @@ class IsingBackbone:
         problem.
         
         Args:
-            time: (int)
+            time: (any)
                 Index of time slice for which to get qubit map
 
         Returns:
@@ -1506,7 +1520,7 @@ class MarginalAsPenalty(MarginalCostSubproblem):
         Args:
             bus: (str)
                 Label of the bus at which to add marginal costs.
-            time: (int)
+            time: (any)
                 Index of time slice for which to add marginal cost.
 
         Returns:
@@ -1593,7 +1607,7 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
         Args:
             bus: (str)
                 Label of the bus at which to encode marginal costs.
-            time: (int)
+            time: (any)
                 Index of the time slice for which to estimate marginal
                 costs.
 
@@ -1685,7 +1699,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
         into the energy and thus minimized.
 
         Args:
-            time: (int)
+            time: (any)
                 Index of time slice for which to encode marginal costs.
 
         Returns:
@@ -1854,7 +1868,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             bus: (str)
                 Label of the bus at which to enforce the kirchhoff
                 constraint.
-            time: (int)
+            time: (any)
                 Index of time slice at which to enforce the kirchhoff
                 constraint.
 
@@ -1969,9 +1983,10 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Label of the bus at which to calculate the total power.
             solution: (list)
                 List of all qubits that have spin -1 in a solution.
-            time: (int)
+            time: (any)
                 Index of the time slice at which to calculate the total
                 power.
+
         Returns:
             (float)
                 The total power generated without flow or loads.
@@ -2017,6 +2032,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         Args:
             solution: (list)
                 List of all qubits which have spin -1 in the solution.
+
         Returns:
             (float)
                 The sum of all absolute values of every power imbalance
@@ -2048,6 +2064,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Switch to enable status messages send to stdout. If
                 true, no messages are sent.
                 Default: True
+
         Returns:
             (dict)
                 Dictionary containing the kirchhoff cost of 'bus' at
@@ -2123,6 +2140,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Switch to enable status messages send to stdout. If
                 true, no messages are sent.
                 Default: True
+
         Returns:
             (dict)
                 Dictionary containing the kirchhoff cost of every bus at
@@ -2182,6 +2200,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Switch to enable status messages send to stdout. If
                 true, no messages are sent.
                 Default: True
+
         Returns:
             (dict)
                 Dictionary containing the power imbalance of every bus

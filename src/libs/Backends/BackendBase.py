@@ -34,34 +34,42 @@ class BackendBase(abc.ABC):
         class implements 
     
         Returns:
-            (None) This sets the attribute `self.transformed_problem`
-            to the correct value
+            (None) 
+                This sets the attribute `self.transformed_problem`
+                to the correct value
         """
         pass
 
     @abc.abstractmethod
     def optimize(self) -> None:
         """
-        This performs the actual optimization after the problem
-        has been transformed appropriately.
+        This method calls the optimization method of the solver after
+        the unit commitment problem has been transformed. The result is
+        written to the attribute `self.result`
+
+        Returns:
+            (None) 
+                Modifies `self.output` and can have side effects on other
+                attributes.
         """
         pass
 
     def process_solution(self) -> None:
         """
-         if the solution needs any postprocessing_time, this is the
-         hook to do so.
+        A hook for postprocessing of the solution if this is required
 
         Returns:
-            (type) description
+            (type) 
+                Returns nothing, but can have side effects if this method
+                is overwritten is a subclass.
         """
         self.output["results"]["postprocessing_time"] = 0.0
 
     @abc.abstractmethod
     def transform_solution_to_network(self):
         """
-        writes the solution of the optimization run into a copy of
-        the original pypsa network
+        This writes the solution of the optimization run into a copy of
+        the original pypsa network.
         """
         pass
 
@@ -69,16 +77,35 @@ class BackendBase(abc.ABC):
     def create_optimizer(cls, reader: InputReader):
         """
         A class method to instantiate the correct subclass of the 
-        optimizer based on the configuration in the reader. As a default
-        this returns an instance of the calling class, which has to be
-        overridden to get specific subclasses.
+        optimizer based on the configuration in the reader. 
+
+        This method returns an instance of the calling class. If the optimizer
+        are organized as subclasses of an abstract class, this method has
+        to be overwritten to return a class that can be instantiated.
+
+        Args:
+            reader: (InputReader)
+                An instance of the InputReader. Any input that the optimizer
+                accepts has to be passed by this instance.
         """
         return cls(reader)
 
     def check_input_size(self, limit: int):
-        """check if the size of the problem is currently allowed or if
+        """
+        Check if the size of the problem is currently allowed or if
         an estimation of the runtime exceeds some arbitrary limit
-        stop the run
+        stop the run.
+
+        Args:
+            limit: (int)
+                A parameter for the upper limit that an optimization run is
+                allowed to take. This is not meant to be how many seconds
+                it can take.
+
+        Returns:
+            (None) 
+                If the input takes to long to optimize, this raises
+                an error.
         """
         pass
 
