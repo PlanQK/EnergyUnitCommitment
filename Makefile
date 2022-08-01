@@ -240,15 +240,16 @@ VAL_PARAMETER_PYPSATIMEOUT = 60
 
 ###### extra parameter string generation ######
 
+join_with_underscore = $(subst $(eval) ,_,$(wildcard $1))
+
 # combine each parameter name with its values, if it is not commented out
-EXTRAPARAMSEPARATE =	$(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
+EXTRAPARAMSEPARATE = $(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
 						$(foreach value, ${VAL_${name}}, \
-						$(strip ${${name}}___${value})))
+						$(strip ${${name}}__${value})))
 
 # join all separate parameter___value pairs
-EXTRAPARAM = 	$(subst " ","____",$(foreach param, \
+EXTRAPARAM = $(subst " ","____",$(foreach param, \
 				${EXTRAPARAMSEPARATE},$(param)))
-
 # if no Parameters are declared in the Makefile, the string will be set to an
 # empty string
 ifeq ($(EXTRAPARAM),)

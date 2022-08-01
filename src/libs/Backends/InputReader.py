@@ -49,8 +49,7 @@ class InputReader:
     def __init__(self,
                  network: Union[str, dict, pypsa.Network],
                  config: Union[str, dict],
-                 extra_params: list = [],
-                 extra_param_values: list = []
+                 params_dict: dict = {},
                  ):
         """
         Obtain the configuration dictionary and pypsa.Network,
@@ -65,14 +64,10 @@ class InputReader:
             config: (Union[str, dict])
                 A string or dictionary to be used to obtain the
                 configuration for the problem instances.
-            extra_params: (list)
-                A list of the extra parameters to be added to the
-                config dictionary.
         """
         self.network, self.network_name = self.make_network(network)
         self.config = self.make_config(config)
-        self.add_extra_parameters(extra_params=extra_params,
-                                  extra_param_values=extra_param_values)
+        self.add_params_dict(params_dict)
         self.copy_to_backend_config()
         # print final config, but hide api tokens
         config_without_token = copy.deepcopy(self.config)
@@ -178,31 +173,27 @@ class InputReader:
         }
         return {**base_dict, **result}
 
-    def add_extra_parameters(self,
-                             extra_params: list,
-                             extra_param_values: list
-                             ) -> None:
+    def add_params_dict(self, params_dict: dict = {}, current_level: dict = None) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
 
         Args:
-            extra_params: (list)
-                A list of the extra parameters to be added to the
-                config dictionary.
-            extra_param_values: (list)
-                A list of values of the extra parameters to be added to
-                the config dictionary.
+            params_dict: (dict)
+                a dictionary containing parameters to be put into the
+                config, overwriting existing values
 
         Returns:
             (None)
                 The self.config dictionary is modified.
         """
-        for index, nested_keys in enumerate(extra_params):
+        if current_level is None:
             current_level = self.config
-            for key in nested_keys[:-1]:
-                current_level = current_level.setdefault(key, {})
-            current_level[nested_keys[-1]] = extra_param_values[index]
+        for config_key, config_value in params_dict.items():
+            if isinstance(config_value, dict):
+                self.add_params_dict(config_value, current_level.setdefault(config_key, {}))
+            else:
+                current_level[config_key] = config_value
 
     def get_config(self) -> dict:
         """

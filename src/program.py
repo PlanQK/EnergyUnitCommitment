@@ -40,8 +40,7 @@ gan_backends = {
 def run(
         data: Union[pypsa.Network, str] = None,
         params: Union[dict, str] = None,
-        extra_params: list = [],
-        extra_param_values: list = [],
+        params_dict: dict = {},
 ) -> Response:
     """
     This is the entrypoint for starting an optimization run. data is used to provide
@@ -50,15 +49,16 @@ def run(
     config entries of the config file on the fly.
 
     Args:
-        data: (pypsa.Network|str) the network to be optimized. This is either
-                a pypsa network, a dict containing a serialized pypsa network
-                or the path to a netcdf file containing the network
-        params: (dict|str) The default argument for giving optimizer parameters.
-                They are either given directly as a dict, or a path to a config file
-        extra_params: (list) a list containing parameter names of params to be overwritten
-                This is exclusively used by the Makefile.
-        extra_param_values: (list) a list containing the values of the parameters to
-                be overwritten as specified by extra_params
+        data: (pypsa.Network|str)
+            the network to be optimized. This is either
+            a pypsa network, a dict containing a serialized pypsa network
+            or the path to a netcdf file containing the network
+        params: (dict|str)
+            The default argument for giving optimizer parameters.
+            They are either given directly as a dict, or a path to a config file
+        params_dict: (dict)
+            A python dictionary containing configuration parameters that are 
+            added after the params argument has been processed
     Returns:
         (ResultResponse) The response that contains the meta data
                          and results of the optimization
@@ -66,9 +66,7 @@ def run(
     response: Response
     try:
         # load all relevant data and parameters
-        input_reader = InputReader(network=data, config=params,
-                                   extra_params=extra_params,
-                                   extra_param_values=extra_param_values)
+        input_reader = InputReader(network=data, config=params, params_dict=params_dict)
 
         # set up optimizer with input data
         optimizer_class = gan_backends[input_reader.config["backend"]]

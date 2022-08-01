@@ -1,4 +1,4 @@
-"""This file is the entrypoint for the docker run command for the image build from the Dockerfile.
+f"""This file is the entrypoint for the docker run command for the image build from the Dockerfile.
 The base image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
 optimization of the unit commitment problem. The result will be written to a json file  in a location
 that the Makefile will mount to the host's drive. In order to do that, it transforms the arguments
@@ -17,82 +17,69 @@ from program import run
 from itertools import product
 import ast
 
+keyword_seperator = "__"
+params_seperator = "____"
 
 def main():
     # reading input
     network = sys.argv[1]
     params = sys.argv[2]
-    # the sys.argv[3] string contains entries of a nested dictionary,
-    # where for each parameter its name and nested levels are separated by
-    # "__", as well as all desired values for this parameter are separated
-    # by "__". The names and values for parameters are separated by "___"
-    # and between all name-value pairs a separator of "____" was inserted.
-    extra_params = []
-    extra_params_values = []
-    # split up extra parameter string if parsed by Makefile
-    if len(sys.argv) >= 3 and sys.argv[3] != "":
-        argument_split = [x.split("___") for x in sys.argv[3].split("____")]
-        for [name, value] in argument_split:
-            extra_params.append(name.split("__"))
-            extra_params_values.append(value)
-        extra_params_values = expand_value_list(extra_params_values)
-        extra_params_values = typecast_values(extra_params_values)
-    # run optimization and save results
-    for values in extra_params_values:
-        response = run(data=network, params=params,
-                       extra_params=extra_params,
-                       extra_param_values=values)
-        response.save_to_json_local_docker()
-    if not extra_params_values:
-        response = run(data=network, params=params)
-        response.save_to_json_local_docker()
+    # the sys.argv[3] string contains configuration parameter so the makefile
+    # can also pass parameters
+    cli_params_dict = {}
+    if len(sys.argv) > 3 :
+        cli_params_dict = parse_cli_params(sys.argv[3])
 
-
-def expand_value_list(values_to_expand: list) -> list:
+    response = run(data=network, params=params, params_dict=cli_params_dict)
+    response.dump_results()
+    
+def parse_cli_params(param_string: str):
     """
-    Takes a list of values for extra parameters, where each element in
-    the list can represent multiple values for this parameter, and
-    expands this list to return a list of list, where each possible
-    combination of the input values is stored.
-    E.g.:   Input:  ["1.0__2.0", "10__5__0"]
-            Output: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
-                     ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
+    Parse the input of the command line that contains configuration values
+
+    Takes a string containing a parameter and which values you want to use
+    and parses that into a pair of lists. The first list containts the list
+    of keys which to descent into the config dictionary, and the second list
+    containts the list of python values (str, int, float) that are going to be used
+
     Args:
-        values_to_expand: (list)
-            A list of values for all extra parameters. The values for
-            parameters have to be separated by "__".
-            E.g.: ["1.0__2.0", "10__5__0"]
+        param_string: (str)
+            A string containing entries of a nested dictionary to be parsed
+            Different Parameters are seperated by `params_seperator`. The keys
+            and the value are seperated by `keyword_seperator`
+    """
+    if not param_string:
+        return {}
+    result = {}
+    param_string_list = param_string.split(params_seperator)
+    for param_string in param_string_list:
+        entries = param_string.split(keyword_seperator)
+        key_chain, value = entries[:-1], entries[-1]
+        try:
+            value = ast.literal_eval(value)
+        except ValueError:
+            pass
+        insert_value(key_chain, value, result)
+    return result
+
+def insert_value(key_chain, value, current_level):
+    """
+    insert a value in the dictionary by descending the keychain
+
+    Args:
+        key_chain: (list)
+            A list of strings that are the keys in a nested dictionary
+        value: (any)
+            The value to be written into the dictionary
+        dictionary: (dictO
+            The dictionary in which to write the value
 
     Returns:
-        (list)
-            The expanded list of values. A list of lists with all
-            possible combinations of the input values.
-            E.g.: [["1.0", "10"], ["1.0", "5"], ["1.0", "0"],
-                   ["2.0", "10"], ["2.0", "5"], ["2.0", "0"]]
+        Modifies the passed dictionary
     """
-    value_lists = [[x] for x in values_to_expand[0].split("__")]
-    return list(product(*value_lists))
-
-
-def typecast_values(values: list) -> list:
-    """
-    Analyzes a of list of strings and typecasts them into floats,
-    ints or list, if necessary.
-    Args:
-        values: (list)
-            A list of lists of strings (returned by expand_value_list)
-            which should be typecast.
-            E.g.: [["1.0", "10", "test"], ["1.0", "5", "test"],
-                   ["2.0", "10", "test"], ["2.0", "5", "test"]]
-    Returns:
-        (list)
-            A list of lists with the typecast values.
-            E.g.: [[1.0, 10, "test"], [1.0, 5, "test"],
-                   [2.0, 10, "test"], [2.0, 5, "test"]]
-    """
-    return [[ast.literal_eval(literal)
-                for literal in cross_product_element]
-            for cross_product_element in values]
+    for key in key_chain[:-1]:
+        current_level = current_level.setdefault(key, {})
+    current_level[key_chain[-1]] = value
 
 
 if __name__ == "__main__":
