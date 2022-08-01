@@ -31,7 +31,7 @@ The makefile contains variables that specify where the PyPSA network to be solve
 also be used to temporarily overwrite values in the config file. A brief overview of the parameters you can adjust are the following
 
 1. `CONFIGFILES` : This contains a glob which will be used to search the folder `./src/Configs/` for config files.
-2. `NETWORKNAME` : This contains a glob which will be used to search the folder `./sweepNetworks/` for PyPSA networks.
+2. `NETWORKNAME` : This contains a glob which will be used to search the folder `./networks/` for PyPSA networks.
 3. `SAVE_FOLDER` : This specifies a path relative to the repositiories's root where the results will be saved to.
 
 Overwriting values of the config files is further explained in the Makefile. Additional information on the variables above  can also be found in the makefile.
@@ -56,7 +56,7 @@ For qaoa results, `statAnalysis.py`, and `plotQaoa.py` provide methods to aggreg
 
 ### Generating test networks
 The script `problemGenerator.py` generates random problem instances of the unit commitment problem. You can speficy the number of busses and the average capacity
-of a transmission line when calling it. These networks will be written to `sweepNetworks`. (TODO: Change it to write to `sweepNetworks` and not `Problemset`)
+of a transmission line when calling it. These networks will be written to `networks`. (TODO: Change it to write to `networks` and not `Problemset`)
 The script `input/convert_to_json.py` can be used to convert pypsa networks into json files, which is the format used by the planqk service.
 
 

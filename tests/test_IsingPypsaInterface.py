@@ -13,10 +13,10 @@ from libs.Backends.IsingPypsaInterface import IsingBackbone
 
 @pytest.fixture(scope='session')
 def network_path():
-    network_path = "../sweepNetworks/testNetwork4QubitIsing_2_0_20.nc"
-    network_path = "../sweepNetworks/elec_s_5.nc"
-    # network_path = "../sweepNetworks/20220629_network_5_0_20.nc"
-    # network_path = "../sweepNetworks/20220629_network_3_0_20.nc"
+    network_path = "../networks/testNetwork4QubitIsing_2_0_20.nc"
+    network_path = "../networks/elec_s_5.nc"
+    # network_path = "../networks/20220629_network_5_0_20.nc"
+    # network_path = "../networks/20220629_network_3_0_20.nc"
     return network_path
 
 

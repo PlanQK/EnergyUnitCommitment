@@ -37,7 +37,7 @@ CONFIG = {
     # scaling factor for line capacity in percent
     "line_scale": 20,
     # location where to save the network starting at git root
-    "savepath" : "sweepNetworks",
+    "savepath" : "networks",
     # prefix of the filename. If this is empty the prefix will be set to
     # {date}_network , with the date win yyyymmdd format
     "prefix" : "",

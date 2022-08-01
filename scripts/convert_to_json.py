@@ -37,7 +37,7 @@ def set_path_prefix():
 
 def convert_network(input_name: str, output_name: str):
     """
-    Takes the name of a network in `sweepNetworks`, converts it 
+    Takes the name of a network in `networks`, converts it 
     to json, and dumps it to `input` using the output_name
     
     Args:
@@ -46,7 +46,7 @@ def convert_network(input_name: str, output_name: str):
         output_name: (str)
             the name out the output json without the file extension
     """
-    input_path = os.path.join(path_prefix, "sweepNetworks", input_name) + ".nc"
+    input_path = os.path.join(path_prefix, "networks", input_name) + ".nc"
     output_path = os.path.join(path_prefix, "input", output_name) + ".json"
 
     print("reading network")

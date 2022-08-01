@@ -1,8 +1,8 @@
-# This makefile is used for starting otpimization runs. Using various parameters that can be set, it will generate
+# 1 This makefile is used for starting otpimization runs. Using various parameters that can be set, it will generate
 # rules for the result files, and then generates them by starting a docker container. The possible recipes to me 
 # made can be found at the bottom of the file. 
 #
-# The optimization runs for which the rules are created by searching /sweepNetworks for pypsa networks and /src/Config
+# The optimization runs for which the rules are created by searching /networks for pypsa networks and /src/Config
 # for config files. They can be specified using a glob expression. The result files will then consist of all combinations
 # networks and configs, and a  string which indicates which parameters are overwritten by the makefile and the date when
 # the rule was created.
@@ -21,7 +21,7 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 ###### set mount paths ######
 # for development purposes, we don't build the entire image, but mount the the code that is changed often.
 # We also mount the folder containing the networks and the config files
-MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/sweepNetworks/,target=/energy/Problemset
+MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
 MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
 # only mount qpu results if there actually any results
@@ -46,7 +46,7 @@ CONFIGFILES = failed_config.json
 #CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-# Choose a regex that will be used to search the sweepNetworks folder for networks. 
+# Choose a regex that will be used to search the networks folder for networks. 
 # The default network is a randomly generated network containing 10 buses with 
 # generators that produce integer valued power and a total load of 100
 NETWORKNAME = defaultnetwork.nc
@@ -59,7 +59,7 @@ NETWORKNAME = testNetwork4QubitIsing_2_0_20.nc
 
 
 # lists networks to be used using NETWORKNAME
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/sweepNetworks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
@@ -273,11 +273,11 @@ GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1)) docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p ${SAVE_FOLDER}
-	mv $(PROBLEMDIRECTORY)/sweepNetworks/$(strip $(1))_* ${SAVE_FOLDER}
+	mv $(PROBLEMDIRECTORY)/networks/$(strip $(1))_* ${SAVE_FOLDER}
 endef
 
 $(foreach filename, $(SWEEPFILES), \

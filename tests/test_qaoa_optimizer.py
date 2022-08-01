@@ -12,7 +12,7 @@ def main():
     config_file = "config.yaml"
 
     net_import = pypsa.Network(
-        os.path.dirname(__file__) + "../../sweepNetworks/" + input_net
+        os.path.dirname(__file__) + "../../networks/" + input_net
     )
 
     with open(os.path.dirname(__file__) + "/Configs/" + config_file) as file:
