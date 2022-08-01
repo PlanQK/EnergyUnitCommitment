@@ -2,14 +2,14 @@
 
 # This script can be used for testing the planqk service. It uses a deprecated way to start the container
 # by giving the parameters as arguments of the docker run command. This limits the input size by because
-# the shell can't take arbitrarily large arguments. Use `test_volume_input.sh.sh` to test with bigger 
+# the shell can't take arbitrarily large arguments. Use `test_volume_input.sh` to test with bigger 
 # problem instances. 
 
 # Build PlanQK service
 # --------------------
 # If you want to make the service on the actual platform you have to slightly adjust the 
 # PlanQK_requirements.txt file, changing the name to `requirements.txt`. and put it in a zip file with
-# src folder
+# the `src` folder
 
 # How to use
 # -----------
