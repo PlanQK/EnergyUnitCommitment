@@ -397,92 +397,88 @@ paths:
                     description: service-specific error message describing the detail of the problem encountered
               example:
                 result: {
-{
-  "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
-  "metadata": null,
-  "result": {
-    "components": {},
-    "config": {
-      "backend": "sqa",
-      "backend_config": {},
-      "backend_type": "sqa_backend",
-      "ising_interface": {
-        "kirchhoff": {
-          "scale_factor": 1
-        }
-      }
-    },
-    "end_time": "2022-7-27_4-36-49",
-    "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
-    "network": {},
-    "results": {
-      "H": "[8.0, 0.0]",
-      "T": "[0.1, iF, 0.0001]",
-      "energy": "-35.500000",
-      "energy_distr": "{0: -35.5, 1: -3.5, 2: -32}",
-      "first_in": "0",
-      "individual_kirchhoff_cost": {
-        "('bus_1', 0)": 0,
-        "('bus_1', 1)": 0,
-        "('bus_1', 2)": 0,
-        "('bus_2', 0)": 0,
-        "('bus_2', 1)": 0,
-        "('bus_2', 2)": 0
-      },
-      "kirchhoff_cost": 0,
-      "kirchhoff_cost_by_time": {
-        "0": 0,
-        "1": 0,
-        "2": 0
-      },
-      "marginal_cost": 150,
-      "maxcut": "9.000000",
-      "nt": "128",
-      "optimization_time": 0.004629228031262755,
-      "periodic": "1",
-      "postprocessing_time": 0,
-      "power_imbalance": 0,
-      "powerflow": {
-        "('line', 0)": 2,
-        "('line', 1)": 1,
-        "('line', 2)": -2
-      },
-      "remap": "sorted,fill,0",
-      "runtime_cycles": "12314682",
-      "runtime_sec": "0.004109",
-      "seed": "998318",
-      "state": [
-        0,
-        1,
-        5,
-        6,
-        7,
-        8,
-        10,
-        14,
-        16,
-        17
-      ],
-      "steps": "64",
-      "total_cost": 0,
-      "total_power": 11,
-      "trotter_degen": "19",
-      "trotter_min_index": "0",
-      "unit_commitment": {
-        "('gen_1', 0)": 1,
-        "('gen_1', 1)": 1,
-        "('gen_1', 2)": 0,
-        "('gen_2', 0)": 0,
-        "('gen_2', 1)": 0,
-        "('gen_2', 2)": 1
-      }
-    },
-    "start_time": "2022-7-27_4-36-49"
-  }
-}
-
-
-                "TODO" : "TODO"}
+                          "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
+                          "metadata": null,
+                          "result": {
+                            "components": {},
+                            "config": {
+                              "backend": "sqa",
+                              "backend_config": {},
+                              "backend_type": "sqa_backend",
+                              "ising_interface": {
+                                "kirchhoff": {
+                                  "scale_factor": 1
+                                }
+                              }
+                            },
+                            "end_time": "2022-7-27_4-36-49",
+                            "file_name": "network_from_dict_sqa_2022-7-27_4-36-49.json",
+                            "network": {},
+                            "results": {
+                              "H": "[8.0, 0.0]",
+                              "T": "[0.1, iF, 0.0001]",
+                              "energy": "-35.500000",
+                              "energy_distr": "{0: -35.5, 1: -3.5, 2: -32}",
+                              "first_in": "0",
+                              "individual_kirchhoff_cost": {
+                                "('bus_1', 0)": 0,
+                                "('bus_1', 1)": 0,
+                                "('bus_1', 2)": 0,
+                                "('bus_2', 0)": 0,
+                                "('bus_2', 1)": 0,
+                                "('bus_2', 2)": 0
+                              },
+                              "kirchhoff_cost": 0,
+                              "kirchhoff_cost_by_time": {
+                                "0": 0,
+                                "1": 0,
+                                "2": 0
+                              },
+                              "marginal_cost": 150,
+                              "maxcut": "9.000000",
+                              "nt": "128",
+                              "optimization_time": 0.004629228031262755,
+                              "periodic": "1",
+                              "postprocessing_time": 0,
+                              "power_imbalance": 0,
+                              "powerflow": {
+                                "('line', 0)": 2,
+                                "('line', 1)": 1,
+                                "('line', 2)": -2
+                              },
+                              "remap": "sorted,fill,0",
+                              "runtime_cycles": "12314682",
+                              "runtime_sec": "0.004109",
+                              "seed": "998318",
+                              "state": [
+                                0,
+                                1,
+                                5,
+                                6,
+                                7,
+                                8,
+                                10,
+                                14,
+                                16,
+                                17
+                              ],
+                              "steps": "64",
+                              "total_cost": 0,
+                              "total_power": 11,
+                              "trotter_degen": "19",
+                              "trotter_min_index": "0",
+                              "unit_commitment": {
+                                "('gen_1', 0)": 1,
+                                "('gen_1', 1)": 1,
+                                "('gen_1', 2)": 0,
+                                "('gen_2', 0)": 0,
+                                "('gen_2', 1)": 0,
+                                "('gen_2', 2)": 1
+                              }
+                            },
+                            "start_time": "2022-7-27_4-36-49"
+                          }
+                        }
         "400":
           description: Invalid input
         "403":
@@ -492,19 +488,3 @@ paths:
         "500":
           description: Internal server error
 
-components:
-  schemas:
-    job:
-      type: object
-      properties:
-        id:
-          type: string
-        status:
-          type: string
-          enum: [UNKNOWN, PENDING, RUNNING, SUCCEEDED, FAILED]
-        createdAt:
-          type: string
-      example:
-        id: 87cb778e-ac43-11ec-b909-0242ac120002
-        status: SUCCEEDED
-        createdAt: "2022-01-01 22:38:08"
