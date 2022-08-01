@@ -2,7 +2,7 @@ venv/*
 Problemset*/*
 *.pyc
 .vscode/*
-docker.tmp
+*.tmp
 *networks*/*
 TestProblems/
 results_*

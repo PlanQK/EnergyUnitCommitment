@@ -13,6 +13,8 @@ DOCKERCOMMAND := docker
 DOCKERFILE = Dockerfile
 DOCKERTAG = energy:1.0
 
+VENV_NAME = venv
+
 ###### set problem directory ######
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # alternative in case this is not a git repository
@@ -273,7 +275,7 @@ GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p ${SAVE_FOLDER}
@@ -291,19 +293,21 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py
-	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch docker.tmp
+.docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py
+	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
 
 
 # all plots are generated using the python plot_results script
-plots: venv/bin/activate
-	mkdir -p plots && source venv/bin/activate && python plot_results.py
+plots: $(VENV_NAME)/bin/activate
+	mkdir -p plots && . $(VENV_NAME)/bin/activate && python scripts/plot_results.py
 
-plt: venv/bin/activate
-	mkdir -p plots && source venv/bin/activate && python makePlots.py
+plt: $(VENV_NAME)/bin/activate
+	mkdir -p plots && . $(VENV_NAME)/bin/activate && python scripts/make_plots.py
 
-venv/bin/activate:
-	python3.9 -m venv venv && pip install -r requirements.txt && pip install
+$(VENV_NAME)/bin/activate: requirements.txt
+	test -d $(VENV_NAME) || python3.9 -m venv $(VENV_NAME)
+	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt
+	touch $(VENV_NAME)/bin/activate
 
 # rules for making a sweep for a particular solver
 
