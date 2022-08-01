@@ -1,4 +1,4 @@
-f"""This file is the entrypoint for the docker run command for the image build from the Dockerfile.
+"""This file is the entrypoint for the docker run command for the image build from the Dockerfile.
 The base image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
 optimization of the unit commitment problem. The result will be written to a json file  in a location
 that the Makefile will mount to the host's drive. In order to do that, it transforms the arguments
@@ -14,11 +14,11 @@ import sys
 
 from program import run
 
-from itertools import product
 import ast
 
 keyword_seperator = "__"
 params_seperator = "____"
+
 
 def main():
     # reading input
@@ -27,26 +27,27 @@ def main():
     # the sys.argv[3] string contains configuration parameter so the makefile
     # can also pass parameters
     cli_params_dict = {}
-    if len(sys.argv) > 3 :
+    if len(sys.argv) > 3:
         cli_params_dict = parse_cli_params(sys.argv[3])
 
     response = run(data=network, params=params, params_dict=cli_params_dict)
     response.dump_results()
-    
+
+
 def parse_cli_params(param_string: str):
     """
     Parse the input of the command line that contains configuration values
 
     Takes a string containing a parameter and which values you want to use
-    and parses that into a pair of lists. The first list containts the list
+    and parses that into a pair of lists. The first list contains the list
     of keys which to descent into the config dictionary, and the second list
-    containts the list of python values (str, int, float) that are going to be used
+    contains the list of python values (str, int, float) that are going to be used
 
     Args:
         param_string: (str)
             A string containing entries of a nested dictionary to be parsed
-            Different Parameters are seperated by `params_seperator`. The keys
-            and the value are seperated by `keyword_seperator`
+            Different Parameters are separated by `params_seperator`. The keys
+            and the value are separated by `keyword_seperator`
     """
     if not param_string:
         return {}
@@ -62,6 +63,7 @@ def parse_cli_params(param_string: str):
         insert_value(key_chain, value, result)
     return result
 
+
 def insert_value(key_chain, value, current_level):
     """
     insert a value in the dictionary by descending the keychain
@@ -71,7 +73,7 @@ def insert_value(key_chain, value, current_level):
             A list of strings that are the keys in a nested dictionary
         value: (any)
             The value to be written into the dictionary
-        dictionary: (dictO
+        current_level: (dict)
             The dictionary in which to write the value
 
     Returns:

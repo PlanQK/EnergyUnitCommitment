@@ -40,11 +40,11 @@ gan_backends = {
 def run(
         data: Union[pypsa.Network, str] = None,
         params: Union[dict, str] = None,
-        params_dict: dict = {},
+        params_dict: dict = None,
 ) -> Response:
     """
     This is the entrypoint for starting an optimization run. data is used to provide
-    the network and params the default way to give solver parameterns. These are used
+    the network and params the default way to give solver parameters. These are used
     by the PlanQK service. The other parameters are hooks for the Makefile to change
     config entries of the config file on the fly.
 
@@ -60,7 +60,7 @@ def run(
             A python dictionary containing configuration parameters that are 
             added after the params argument has been processed
     Returns:
-        (ResultResponse) The response that contains the meta data
+        (ResultResponse) The response that contains the metadata
                          and results of the optimization
     """
     response: Response

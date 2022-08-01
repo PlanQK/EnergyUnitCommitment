@@ -2,7 +2,7 @@
 You can find more information on the implementation of it at 
 https://doi.org/10.5905/ethz-1007-127
 It also provides a solver implementing classical annealing by adjusting the
-transverse fied to be 0 everywherw
+transverse field to be 0 everywhere
 """
 
 import random
@@ -48,7 +48,7 @@ class ClassicalBackend(BackendBase):
         self.siquan_config.setdefault("seed", random.randrange(10 ** 6))
         self.siquan_config["transverse_field_schedule"] = self.get_h_schedule()
         self.siquan_config.setdefault("temperature_schedule", "[0.1,iF,0.0001]")
-        self.siquan_config.setdefault("trotter_slices",32)
+        self.siquan_config.setdefault("trotter_slices", 32)
         self.siquan_config.setdefault("optimization_cycles", 16)
         self.solver = siquan.DTSQA()
         self.configure_solver()
@@ -72,14 +72,14 @@ class ClassicalBackend(BackendBase):
     def transform_solution_to_network(self) -> None:
         """
         Encodes the optimal solution found during optimization and
-        stored in self.output into a pypsa.Network. It reads the
+        stored in `self.output` into a pypsa.Network. It reads the
         solution stored in the optimizer instance, prints some
         information regarding it to stdout and then writes it into a
         network, which is then saved in self.output.
 
         Returns:
             (None)
-                Modifies self.output with the output_network.
+                Modifies `self.output` with the output_network.
         """
         output_network = self.transformed_problem.set_output_network(
             solution=self.output["results"]["state"])
@@ -95,7 +95,7 @@ class ClassicalBackend(BackendBase):
 
         Returns:
             (None)
-                The optimized solution is stored in the self.output
+                The optimized solution is stored in the `self.output`
                 dictionary.
         """
         print("starting optimization...")
@@ -128,15 +128,15 @@ class ClassicalBackend(BackendBase):
         """
         Reads and sets siquan solver parameter from the config dict.
         Solver configuration is read from the config dict and default
-        values are used if it is not specifified in the configuration.
+        values are used if it is not specified in the configuration.
         These default values are not suitable for solving large
         problems. Since classical annealing and simulated quantum
         annealing only differs in the transverse field, setting that
-        field is in its own method so it can be overwritten.
+        field is in its own method, so it can be overwritten.
         
         Returns:
             (None)
-                Modifies self.solver and sets hyperparameters
+                Modifies `self.solver` and sets hyperparameters
         """
         self.solver.setSeed(self.siquan_config["seed"])
         self.solver.setHSchedule(self.siquan_config["transverse_field_schedule"])
@@ -177,7 +177,7 @@ class ClassicalBackend(BackendBase):
 
         Returns:
             (None)
-                Modifies self.output with solution specific parameters
+                Modifies `self.output` with solution specific parameters
                 and values.
         """
         for key in result:
@@ -229,4 +229,4 @@ class SqaBackend(ClassicalBackend):
                 set in siquan solver, according to self.config.
         """
         return self.config["backend_config"].setdefault("transverse_field_schedule",
-                                             "[8.0,0.0]")
+                                                        "[8.0,0.0]")

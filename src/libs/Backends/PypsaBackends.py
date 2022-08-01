@@ -61,7 +61,6 @@ class PypsaBackend(BackendBase):
                 "backend_config"]["solver_name"])
         self.opt.options["tmlim"] = self.config["backend_config"]["timeout"]
 
-
     def check_input_size(self, limit: float = 60.0):
         """
         sets the maximum run time to the limit given as an argument
@@ -77,7 +76,6 @@ class PypsaBackend(BackendBase):
         """
         self.opt.options["tmlim"] = min(limit,
                                         self.config["backend_config"]["timeout"])
-
 
     def transform_solution_to_network(self) -> pypsa.Network:
         """
@@ -110,7 +108,7 @@ class PypsaBackend(BackendBase):
 
     def write_result_to_output(self, solverstring: str) -> None:
         """
-        Write the solution and information about it into the self.output
+        Write the solution and information about it into the `self.output`
         dictionary.
     
         Args:

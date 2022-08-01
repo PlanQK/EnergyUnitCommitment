@@ -39,7 +39,7 @@ class ErrorResponse(Response):
     Represents an error to be passed back to the caller.
 
     Args:
-        code (int): HTTP status code to be passed back to the caller
+        code (str): HTTP status code to be passed back to the caller
         detail (str): Error message to be passed back to the caller
     """
 
@@ -51,13 +51,13 @@ class ErrorResponse(Response):
         """
         saves the thrown error to the disk. Instead of using the name specified
         in the config for the result, this will instead use a name using the
-        the time when the error was encountered and which error code was thrown.
+        time when the error was encountered and which error code was thrown.
     
         Args:
-            folder: (str) the location wherer to save the response. The default
+            folder: (str) the location where to save the response. The default
                 path is the mount point of the makefile for the networks
         Returns:
-            (None) Saves the error code to the mountpoint of the networks
+            (None) Saves the error code to the mount point of the networks
         """
         error = {"status_code": self.code,
                  "message": self.detail}
@@ -85,10 +85,10 @@ class ResultResponse(Response):
         Saves the result of the local optimization in a docker container.
     
         Args:
-            folder: (str) the location wherer to save the response. The default
+            folder: (str) the location where to save the response. The default
                 path is the mount point of the makefile for the networks
         Returns:
-            (None) Saves the optimization result to the mountpoint of the networks
+            (None) Saves the optimization result to the mount point of the networks
         """
         with open(f"{folder}{self.file_name}", "w") as write_file:
             json.dump(self.result, write_file, indent=2, default=str)

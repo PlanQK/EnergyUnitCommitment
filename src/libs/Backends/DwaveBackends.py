@@ -1,9 +1,9 @@
 """This module is for providing optimizers using d-wave's cloud for access
-to their quantum hardware. So far, this module supports
+to their quantum hardware. So far, this module supports:
 - quantum annealing (using pegasus topology)
 - a hybrid solver
 - tabu search (ocean package, classical algorithm)
-- steepest decent (ocean package, classical algorithm)
+- steepest descent (ocean package, classical algorithm)
 
 For local testing and in case the processing of samples changes, this
 module can also run quantum annealing by reading samples and returning
@@ -113,7 +113,7 @@ class AbstractDwaveSampler(BackendBase):
     def process_solution(self) -> None:
         """
         Gets and writes info about the sample_df containing all samples and
-        writes it in the self.output dictionary.
+        writes it in the `self.output` dictionary.
 
         Returns:
             (None)
@@ -307,7 +307,7 @@ class DwaveSteepestDescent(AbstractDwaveSampler):
 
     def get_sampler(self) -> dimod.Sampler:
         """
-        Sets the sampler using Tabu searchs to solve QUBO's
+        Sets the sampler using Tabu search to solve QUBO's
 
         Returns:
             (dimod.Sampler)
@@ -427,7 +427,6 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
         #    f.write(network + '\n')
         return
 
-
     def check_input_size(self, limit: float = 60.0):
         """
         this sets a limit on the heuristic used for embedding the QUBO onto
@@ -438,13 +437,12 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
                    an embedding
 
         Returns: modifies the timeout parameter, which limits how long
-                 the heurstic can search for an embedding
+                 the heuristic can search for an embedding
         """
         self.config["backend_config"]["timeout"] = min(
                 self.config["backend_config"].get("timeout", 3600),
                 limit
         )
-
 
     def get_sampler(self) -> dimod.Sampler:
         """
@@ -453,7 +451,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
         In order to appropriately configure the solver, this method will
         also read the config attribute and save some settings as
         attributes. If a fitting embedding is found, it will be reused
-        to embed the problem onto the hardware.
+        to embed the theoretical QUBO model onto the hardware.
 
         Returns:
             (dimod.Sampler)
@@ -580,7 +578,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
     def process_solution(self):
         """
         Gets and writes info about the sample_df and writes it in the
-        self.output dictionary. Inherits from its parent class and sets
+        `self.output` dictionary. Inherits from its parent class and sets
         additional values in self.output.
 
         Returns:

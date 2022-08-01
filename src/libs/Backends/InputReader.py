@@ -49,7 +49,7 @@ class InputReader:
     def __init__(self,
                  network: Union[str, dict, pypsa.Network],
                  config: Union[str, dict],
-                 params_dict: dict = {},
+                 params_dict: dict = None,
                  ):
         """
         Obtain the configuration dictionary and pypsa.Network,
@@ -173,7 +173,7 @@ class InputReader:
         }
         return {**base_dict, **result}
 
-    def add_params_dict(self, params_dict: dict = {}, current_level: dict = None) -> None:
+    def add_params_dict(self, params_dict: dict = None, current_level: dict = None) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
@@ -182,11 +182,17 @@ class InputReader:
             params_dict: (dict)
                 a dictionary containing parameters to be put into the
                 config, overwriting existing values
+            current_level: (dict)
+                The current dictionary in the nested `self.config` that is passed
+                to write the values in `params_dict` into it recursively
+                with the correct nested keywords
 
         Returns:
             (None)
                 The self.config dictionary is modified.
         """
+        if params_dict is None:
+            return
         if current_level is None:
             current_level = self.config
         for config_key, config_value in params_dict.items():
