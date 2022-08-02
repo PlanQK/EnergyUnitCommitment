@@ -27,13 +27,13 @@ from numpy import ndarray
 
 # The following methods are used to assign lists of floting values to single argument
 # These lists are used as weights for encoding network generators and transmission
-# lines as qubits. 
+# lines as qubits.
 
 # Methods used for generator encodings return lists of positive values, such that
 # the sum of all weights is equal to the argument of the function
 
 # Methods used for transmission line encodings returns lists such that the absolute value
-# of any subtotal doesn't exceed the argument and the sum of all positives values and the 
+# of any subtotal doesn't exceed the argument and the sum of all positives values and the
 # absolute value of the sum of all negative values is equal to the argument.
 
 def integer_decomposition_powers_of_two_and_rest(number: int):
@@ -722,7 +722,7 @@ class IsingBackbone:
             snapshot: self.allocate_qubits_to_weight_list(snapshot_to_weight_dict[snapshot])
             for snapshot in self.network.snapshots
         }
-        # expose qubit weights at top level of `self.data`
+        # expose qubit weights in `self._qubit_weights`
         for snapshot, qubit_list in self._qubit_encoding[component_name].items():
             for idx, qubit in enumerate(qubit_list):
                 self._qubit_weights[qubit] = snapshot_to_weight_dict[snapshot][idx]
@@ -770,7 +770,7 @@ class IsingBackbone:
             for generator in output_network.generators.index:
                 # set value in status-dataframe in generators_t dictionary
                 status = int(
-                    self.get_generator_status(gen=generator,
+                    self.get_generator_status(generator=generator,
                                               solution=solution,
                                               time=time))
                 column_status = list(output_network.generators_t.status.columns)
@@ -912,12 +912,10 @@ class IsingBackbone:
             p_max_pu = 1.0
         return max(self.network.generators.p_nom[generator] * p_max_pu, 0)
 
-    def get_generator_status(self, gen: str, solution: list, time: any) -> bool:
+    def get_generator_status(self, generator: str, solution: list, time: any) -> float:
         """
-        Returns the status of a generator 'gen' (i.e. on or off) at a
-        time slice 'time' in a given solution. If the generator is
-        represented by multiple qubits, the first qubit of that snapshot
-        is assumed to model the status of the generator
+        Returns the status of a generator which is the percentage of the
+        maximum output at the time slice 'time' in a given solution.
 
         Args:
             gen: (str)
@@ -928,10 +926,13 @@ class IsingBackbone:
                 Index of time slice for which to get the generator
                 status. This has to be in the network.snapshots index
         """
-        try:
-            return self._qubit_encoding[gen][time][0] in solution
-        except IndexError:
-            return False
+        maximum_output = self.get_nominal_power(generator, time)
+        if maximum_output == 0.0:
+            return 0.0
+        generated_power = self.get_encoded_value_of_component(generator=generator,
+                                                              solution=solution,
+                                                              time=time)
+        return generated_power / maximum_output
 
     def get_generator_dictionary(self, solution: list,
                                  stringify: bool = True) -> dict:
@@ -961,12 +962,10 @@ class IsingBackbone:
                 key = (generator, time)
                 if stringify:
                     key = str(key)
-                result[key] = int(
-                    self.get_generator_status(
-                        gen=generator,
+                result[key] = self.get_generator_status(
+                        generator=generator,
                         solution=solution,
                         time=time)
-                )
         return result
 
     def get_flow_dictionary(self, solution: list,
