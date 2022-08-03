@@ -236,6 +236,9 @@ class IsingBackbone:
         Args:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
+            generator_to_qubits_method_name: (str)
+                The name of the generator weight function as given in
+                generator_to_qubits_method_name_lookup_dict.
             line_to_qubits_method_name: (str)
                 The name of the linesplit function as given in
                 line_to_qubits_method_name_lookup_dict.
@@ -247,7 +250,8 @@ class IsingBackbone:
         print("--- Generating Ising problem ---")
         self.subproblem_table = {
             "kirchhoff": KirchhoffSubproblem,
-            "marginal_cost": MarginalCostSubproblem
+            "marginal_cost": MarginalCostSubproblem,
+            "minimal_power": MinimalGeneratorOutput
         }
         if "kirchhoff" not in configuration:
             print("No Kirchhoff configuration found, "
@@ -266,9 +270,11 @@ class IsingBackbone:
 
         # contains ising coefficients
         self.ising_coefficients = {}
+        self.ising_coefficients_positive = {}
+        self.ising_coefficients_negative = {}
         # mirrors encodings of `self.ising_coefficients`, but is reset after encoding a
         # subproblem to get ising formulations of subproblems
-        self.cached_problem = {}
+        self.ising_coefficients_cached = {}
 
         # initializing data structures that encode the network into qubits
         # the encoding dict contains the mapping of network components to qubits
@@ -287,10 +293,8 @@ class IsingBackbone:
                 print(f"{subproblem} is not a valid subproblem, skipping "
                       f"encoding")
                 continue
-            if not subproblem_configuration:
-                print(f"Subproblem {subproblem} has no configuration data, "
-                      f"skipping encoding")
-                continue
+            if subproblem_configuration is None:
+                subproblem_configuration = {}
             subproblem_instance = self.subproblem_table[
                 subproblem].build_subproblem(self, subproblem_configuration)
             self._subproblems[subproblem] = subproblem_instance
@@ -368,12 +372,12 @@ class IsingBackbone:
         Returns:
             (None)
         """
-        self.cached_problem = {}
+        self.ising_coefficients_cached = {}
 
     # functions to couple components. The couplings are interpreted as
     # multiplications of QUBO polynomials. The final interactions are
     # coefficients for an ising spin glass problem
-    def add_interaction(self, *args) -> None:
+    def add_interaction(self, *args, weighted_interaction=True) -> None:
         """
         This method is used for adding a new Ising interactions between
         multiple qubits to the problem.
@@ -405,8 +409,9 @@ class IsingBackbone:
             )
         *key, interaction_strength = args
         key = tuple(sorted(key))
-        for qubit in key:
-            interaction_strength *= self._qubit_weights[qubit]
+        if weighted_interaction:
+            for qubit in key:
+                interaction_strength *= self._qubit_weights[qubit]
 
         # if we couple two spins, we check if they are different. If both spins
         # are the same, we substitute the product of spins with 1, since
@@ -415,8 +420,13 @@ class IsingBackbone:
         if len(key) == 2:
             if key[0] == key[1]:
                 key = tuple([])
+        # store interaction, wether it is positive or negative, and in the cache
         self.ising_coefficients[key] = self.ising_coefficients.get(key, 0) - interaction_strength
-        self.cached_problem[key] = self.cached_problem.get(key, 0) - interaction_strength
+        if interaction_strength > 0:
+            self.ising_coefficients_negative[key] = self.ising_coefficients_negative.get(key, 0) - interaction_strength
+        else:
+            self.ising_coefficients_positive[key] = self.ising_coefficients_positive.get(key, 0) - interaction_strength
+        self.ising_coefficients_cached[key] = self.ising_coefficients_cached.get(key, 0) - interaction_strength
 
     def couple_component_with_constant(self, component: str,
                                        coupling_strength: float = 1,
@@ -550,6 +560,49 @@ class IsingBackbone:
                     * self._qubit_weights[second_qubit]
                     * coupling_strength * 0.25
                 )
+
+    def add_basis_polynomial_interaction(self,
+                                         first_qubit: int = None,
+                                         second_qubit: int = None,
+                                         zero_qubits_list: list = [],
+                                         interaction_strength: float = 1.0):
+        """
+        For a given list of qubo variables, adds the term to the ising interactions
+        that has impact on the cost except for the state spefied in the `variable_value_list`
+
+        This uses the fact, that a QUBO is a polynomial of order two. The space of valid
+        QUBO's is then generated by the polynomials of the form
+            (X_i - x_i)(X_j - x_j) for x_i, x_j in {0,1} and X_i, X_j arbitrary QUBO variables.
+
+        Args:
+            first_qubit: (int)
+                The first qubit variable that is involved in the polynomial
+            second_qubit: (int)
+                The second qubit variable that is involved in the polynomial
+            zero_qubits_list: (list)
+                A list of qubits that are 0 (1 in the ising formulation) in the specified state
+                of the QUBO variables to which the cost is added to.
+            interaction_strength: (float)
+                The magnitude of the term that is added to the QUBO
+
+        Returns:
+            (None)
+                Modifies the stored ising problem
+        """
+        if first_qubit in zero_qubits_list:
+            first_sign = -1
+        else:
+            first_sign = 1
+        if second_qubit in zero_qubits_list:
+            second_sign = -1
+        else:
+            second_sign = 1
+
+        self.add_interaction(first_qubit, second_qubit, -0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_qubit, second_sign * -0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(second_qubit, first_sign * -0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_sign * second_sign * -0.25 * interaction_strength, weighted_interaction=False)
+
 
     def encode_squared_distance(self,
                                 label_dictionary: dict,
@@ -891,8 +944,7 @@ class IsingBackbone:
 
     def get_nominal_power(self, generator: str, time: any) -> float:
         """
-        Returns the nominal power of a generator at a time step saved
-        in the network.
+        Returns the nominal power of a generator at a time step 
         
         Args:
             generator: (str)
@@ -910,7 +962,17 @@ class IsingBackbone:
             p_max_pu = self.network.generators_t.p_max_pu[generator].loc[time]
         except KeyError:
             p_max_pu = 1.0
-        return max(self.network.generators.p_nom[generator] * p_max_pu, 0)
+        return max(self.network.generators.p_nom[generator] * p_max_pu, 0.0)
+
+    def  get_minimal_power(self, generator: str, time: any):
+        """
+        Returns the minimal power output of a generator at a time step
+        """
+        try:
+            p_min_pu = self.network.generators_t.p_min_pu[generator].loc[time]
+        except KeyError:
+            p_min_pu = 0.0
+        return max(self.network.generators.p_nom[generator] * p_min_pu, 0.0)
 
     def get_generator_status(self, generator: str, solution: list, time: any) -> float:
         """
@@ -929,7 +991,7 @@ class IsingBackbone:
         maximum_output = self.get_nominal_power(generator, time)
         if maximum_output == 0.0:
             return 0.0
-        generated_power = self.get_encoded_value_of_component(generator=generator,
+        generated_power = self.get_encoded_value_of_component(component=generator,
                                                               solution=solution,
                                                               time=time)
         return generated_power / maximum_output
@@ -1104,7 +1166,9 @@ class IsingBackbone:
         sorted_unique_arguments = tuple(sorted(set(args)))
         return self.ising_coefficients.get(sorted_unique_arguments, 0.0)
 
-    def get_encoded_value_of_component(self, component: str, solution: list,
+    def get_encoded_value_of_component(self,
+                                       component: str,
+                                       solution: list,
                                        time: any = 0) -> float:
         """
         Returns the encoded value of a component according to the spin
@@ -1835,7 +1899,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 self.encode_kirchhoff_constraint(ising_backbone=self.backbone,
                                                  bus=bus,
                                                  time=time)
-        self.ising_coefficients = self.backbone.cached_problem
+        self.ising_coefficients = self.backbone.ising_coefficients_cached
 
     def encode_kirchhoff_constraint(self,
                                     ising_backbone: IsingBackbone,
@@ -2210,6 +2274,87 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             contrib = {**contrib, **self.calc_power_imbalance_at_bus(
                 bus=bus, result=solution, silent=silent)}
         return contrib
+
+class MinimalGeneratorOutput(AbstractIsingSubproblem):
+    """
+    This constraint enforces the minimal output of a generator by transforming
+    positive first-order interactions of generator qubits into a second-order
+    interaction with a status qubit
+    """
+
+    @classmethod
+    def build_subproblem(cls,
+                         backbone: IsingBackbone,
+                         configuration: dict):
+        """
+        A factory method for returning an instance that enforces the minimal
+        generator output.
+
+        Args:
+            backbone: (IsingBackbone)
+                The ising_backbone which to modify
+            configuration: (dict)
+                A stub for the config dictionary that is passed, but this
+                argument is ignored
+
+        Returns:
+            (MinimalGeneratorOutput)
+                An instance of this class
+        """
+        return MinimalGeneratorOutput(backbone, configuration)
+
+
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        """
+        This method stores the backbone that is modified as a reference
+
+        Args:
+            backbone: (IsingBackbone)
+                The backbone on which to modify the first-order interactions
+            config: (dict)
+                The options how to enforce minimal output
+        """
+        self.backbone = backbone
+        self.network = backbone.network
+        self.scale_factor = config.setdefault("scale_factor", 1.0)
+
+    def encode_subproblem(self) -> None:
+        """
+        Modifies the first order interactions of generator qubits into
+        second-oder interactions with a status qubit
+
+        Returns:
+            (None)
+                Modifies `self.backbone.ising_coefficients` and
+                `self.backbone.ising_coefficients_positive
+        """
+        for generator in self.network.generators.index:
+            self.modifiy_positive_interactions(generator=generator)
+
+    def modifiy_positive_interactions(self, generator: str):
+        """
+        Modifies the first-order ising interactions of the generator
+        at the given time slice
+
+        Args:
+            generator: (str) label of the network generator
+            time: (any) the snapshot at which to modify the encoding
+
+        Returns:
+            (None)
+                Modifies the attribute `self.backbone`
+        """
+        generator_qubit_map = self.backbone._qubit_encoding[generator]
+        for qubit_list in generator_qubit_map.values():
+            if not qubit_list:
+                continue
+            status_qubit = qubit_list[0]
+            for qubit in qubit_list[1:]:
+                interaction_strength = self.scale_factor * self.backbone.ising_coefficients_positive[(qubit,)]
+                self.backbone.add_basis_polynomial_interaction(first_qubit=status_qubit,
+                                                               second_qubit=qubit,
+                                                               zero_qubits_list=[qubit],
+                                                               interaction_strength=interaction_strength)
 
 
 class StartupShutdown(AbstractIsingSubproblem, ABC):
