@@ -11,7 +11,7 @@ import time
 from ast import literal_eval
 
 from .InputReader import InputReader
-from .IsingPypsaInterface import IsingBackbone
+from .ising_backbone import IsingBackbone
 from .BackendBase import BackendBase
 
 # try import from local .so

@@ -12,10 +12,10 @@ import numpy as np
 import qiskit
 
 try:
-    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
+    from .ising_backbone import IsingBackbone  # import for Docker run
     from .BackendBase import BackendBase  # import for Docker run
 except ImportError:
-    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
+    from ising_backbone import IsingBackbone  # import for local/debug run
     from BackendBase import BackendBase  # import for local/debug run
 
 from datetime import datetime
@@ -33,10 +33,10 @@ from scipy import stats
 from .InputReader import InputReader
 
 try:
-    from .IsingPypsaInterface import IsingBackbone  # import for Docker run
+    from .ising_backbone import IsingBackbone  # import for Docker run
     from .BackendBase import BackendBase  # import for Docker run
 except ImportError:
-    from IsingPypsaInterface import IsingBackbone  # import for local/debug run
+    from ising_backbone import IsingBackbone  # import for local/debug run
     from BackendBase import BackendBase  # import for local/debug run
 
 
