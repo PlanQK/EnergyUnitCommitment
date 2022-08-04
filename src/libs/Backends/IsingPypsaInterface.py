@@ -17,7 +17,7 @@ extending the `IsingBackbone`. New constraint can be added by writing a
 new class that conforms to the `AbstractIsingSubproblem`.
 """
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Tuple, Any
 
 import numpy as np
@@ -36,11 +36,12 @@ from numpy import ndarray
 # of any subtotal doesn't exceed the argument and the sum of all positives values and the
 # absolute value of the sum of all negative values is equal to the argument.
 
-def integer_decomposition_powers_of_two_and_rest(number: int):
+
+def binary_power_and_rest(number: int):
     """
-    for an integer, constructs a list of powers of two + a rest, such 
-    that the sum over that list is equal to this number. This only
-    uses positive numbers
+    Constructs a minimal list of positive integers which sum up to the passed
+    argument and such that for every smaller, positive number there exists
+    a subtotal of the list that is equal to it.
 
     Args:
         number: (int) 
@@ -56,130 +57,296 @@ def integer_decomposition_powers_of_two_and_rest(number: int):
     already_filled = (1 << bit_length - 1) - 1
     return positive_powers + [number - already_filled]
 
-
-def single_qubit(number: int):
+class QubitEncoder(ABC):
     """
-    wraps the input number into a list with it as the single entry.
-    This list is used as the qubits weight for a network generator
-    which means it can either produce full or no power
+    An interface for objects that transform network components
+    into qubit representation and encode this into the backbone
 
-    Args:
-        number: (int) 
-            a number which represents the output of the generator which
-            to calculate qubit weights
-    Returns:
-        (list) a list with only the number as the only entry
+    For each type of component that is encoded into qubits, we 
+    implement another interface that extends this and whose 
+    subclasses transform that type of component.
     """
-    return [number]
 
+    def __init__(self, backbone):
+        self.backbone = backbone
+        self.network = backbone.network
 
-def cut_powers_of_two(capacity: float) -> list:
+    @classmethod
+    @abstractmethod
+    def create_encoder(cls, backbone, config: str):
+        """
+        A factory method to be overwritten by the interface that
+        extends this one. This method will be called to get the 
+        encoder for one type of network component
+
+        Args:
+            backbone: (IsingBackbone)
+                The IsingBackbone instance on which to encode the 
+                network component
+            config: (str)
+                A string describing which subclass to instantiate
+                for generator encoding
+        """
+
+    def encode_qubits(self):
+        """
+        The entrypoint for the backbone to call to encode the network
+        component that is specific to the class of the instance.
+        """
+        for component in self.get_components():
+            self.backbone.create_qubit_entries_for_component(
+                component_name=component,
+                snapshot_to_weight_dict=self.encoding_method(component)
+                )
+
+    def encoding_method(self, component: str) -> dict:
+        """
+        Returns the dictionary with all weights of the component
+        for all time steps
+        """
+        return {
+                time: self.get_weights(component, time)
+                for time in self.network.snapshots
+                }
+
+    @abstractmethod
+    def get_weights(self, component: str, time: any) -> list:
+        """
+        For the given component and snapshot this methods returns the
+        weights of qubit that encode it. The component type is
+        dependent of the subclass of the encoder
+        """
+
+    @abstractmethod
+    def get_components(self):
+        """
+        Returns an iterable of all components this instances transforms into
+        qubits.
+        """
+
+class GeneratorEncoder(QubitEncoder):
     """
-    A method for splitting up the capacity of a line with a given
-    maximum capacity.
-
-    It uses powers of two to decompose the capacity and cuts off
-    the biggest power of two so the total sum of all powers equals
-    the capacity. The capacity is also rounded to an integer.
-    
-    Args:
-        capacity: (int)
-            The capacity of the line to be decomposed.
-    Returns:
-        (list)
-            A list of weights to be used in decomposing a line.
+    An encoder for transforming generators into groups of qubits.
     """
-    integer_capacity = int(capacity)
-    positive_capacity = integer_decomposition_powers_of_two_and_rest(integer_capacity)
-    negative_capacity = [- number for number in positive_capacity]
-    return positive_capacity + negative_capacity
+
+    def get_components(self):
+        """
+        Returns a list of all network generators
+        """
+        return self.network.generators.index
+
+    @classmethod
+    def create_encoder(cls, backbone, config: str):
+        """
+        A factory method for constructing an encoder for generators
+
+        Admissable string for the config are:
+            - `"single_qubit"`
+            - `"integer_decomposition"`
+            - `"with_status"`
+
+        Args:
+            backbone: (IsingBackbone)
+                The IsingBackbone instance on which to encode the 
+                network component
+            config: (str)
+                A string describing which subclass to instantiate
+                for generator encoding
+        """
+        if config == "single_qubit":
+            return SingleQubitGeneratorEncoder(backbone)
+        elif config == "integer_decomposition":
+            return BinaryPowerGeneratorEncoder(backbone)
+        elif config == "with_status":
+            return WithStatusQubitGeneratorEncoder(backbone)
+        raise ValueError(f"{config} is not a valid option for generator encoding")
 
 
-def fullsplit(capacity: int) -> list:
+class SingleQubitGeneratorEncoder(GeneratorEncoder):
     """
-    A method for splitting up the capacity of a line with a given
-    maximum capacity.
+    Transform generators into a single qubit with weight equal to
+    the power output of the generator
+    """
 
-    It uses the numbers `1` and `-1` as weights. The capacity is rounded
-    to an integer
+    def get_weights(self, component: str, time: any) -> list:
+        """
+        Returns a list with it's only entry being the maximal powerout
+        of the generator at the time step
+
+        Args:
+            component: (str)
+                The label of the generator for which to calculate the weight
+            time: (any)
+                the snapshot for which to calculate the weight for
+
+        Returns:
+            (list) 
+                A list of positive numbers that sum up to the maximal
+                power output of the generator
+        """
+        return [int(self.backbone.get_nominal_power(component, time))]
+
+class BinaryPowerGeneratorEncoder(GeneratorEncoder):
+    """
+    Transform generators into qubits with powers of two and a rest as weights
+    """
+
+    def get_weights(self, component: str, time: any) -> list:
+        """
+        Returns the binary decomposition and the rest for the maximal 
+        output of the component
+
+        Args:
+            component: (str)
+                The label of the generator for which to calculate the weight
+            time: (any)
+                the snapshot for which to calculate the weight for
+
+        Returns:
+            (list) 
+                A list of positive numbers that sum up to the maximal
+                power output of the generator
+        """
+        return binary_power_and_rest(int(self.backbone.get_nominal_power(component, time)))
+
+class WithStatusQubitGeneratorEncoder(GeneratorEncoder):
+    """
+    Transforms a generator by using a qubit with weight equal to the minimal
+    power and filling the range to the maximal power using binary powers
+    a rest.
+
+    This generator encoding is compatible with the MinimalGeneratorOutput constraint
+    because it is sets the first weight at each time step to the minimal poweroutput
+    that is to be enforced
+    """
+
+    def get_weights(self, component: str, time: any) -> list:
+        """
+        Returns a list with the first entry as the minimal output of
+        the generator and the range up to the maxium output being being 
+        filled using binary powers and a rest.
+
+        Args:
+            component: (str)
+                The label of the generator for which to calculate the weight
+            time: (any)
+                the snapshot for which to calculate the weight for
+
+        Returns:
+            (list) 
+                A list of positive numbers that sum up to the maximal
+                power output of the generator and the first entry being\
+                the minimal output of the generator
+        """
+        minimal_power = self.backbone.get_minimal_power(component, time)
+        max_power = self.backbone.get_nominal_power(component, time)
+        return [minimal_power] + binary_power_and_rest(max_power - minimal_power)
+
+
+class LineEncoder(QubitEncoder):
+    """
+    An encoder for transforming transmission lines into groups of qubits.
+    """
+
+    def get_components(self):
+        """
+        Returns a list of all network transmission lines
+        """
+        return self.network.lines.index
+
+    @classmethod
+    def create_encoder(cls, backbone, config: str):
+        """
+        A factory method for constructing an encoder for generators
+
+        Admissable string for the config are:
+            - `"single_qubit"`
+            - `"integer_decomposition"`
+
+        Args:
+            backbone: (IsingBackbone)
+                The IsingBackbone instance on which to encode the 
+                network component
+            config: (str)
+                A string describing which subclass to instantiate
+                for generator encoding
+        """
+        if config == "fullsplit":
+            return FullsplitLineEncoder(backbone)
+        elif config == "cutpowersoftwo":
+            return CutPowersOfTwoLineEncoder(backbone)
+        raise ValueError(f"{config} is not a valid option for generator encoding")
+
+
+class FullsplitLineEncoder(LineEncoder):
+    """
+    Transform a transmission line by using only qubits of weight 1 or -1
+    """
+
+    def get_weights(self, component, time):
+        """
+        Split up a transmission line using the smallest integer-valued weights
+        as possible
+
+        Args:
+            component: (str)
+                The label of the transmission line for which to calculate the weight
+            time: (any)
+                the snapshot for which to calculate the weight for
+
+        Returns:
+            (list) 
+                Returns a list of 1 and -1 with each number occuring equal
+                to the capacity of the transmission line at that timestep
+        """
+        capacity = int(self.network.lines.loc[component].s_nom)
+        return capacity * [1] + capacity * [-1]
+
+class CutPowersOfTwoLineEncoder(LineEncoder):
+    """
+    Transforms a transmission line by using powers of two and a rest term for
+    each direction of the flow
+    """
+
+    def get_weights(self, component, time):
+        """
+        Split up a transmission line using powers of two and a rest for
+        each direction
+
+        Args:
+            component: (str)
+                The label of the transmission line for which to calculate the weight
+            time: (any)
+                the snapshot for which to calculate the weight for
+
+        Returns:
+            (list) 
+                A list of powers of two and a rest term with positive and
+                negative sign
+        """
+        capacity = int(self.network.lines.loc[component].s_nom)
+        return self.cut_powers_of_two(capacity)
+
+    def cut_powers_of_two(self, capacity: float) -> list:
+        """
+        A method for splitting up the capacity of a line with a given
+        maximum capacity.
+
+        It uses powers of two to decompose the capacity and cuts off
+        the biggest power of two so the total sum of all powers equals
+        the capacity. The capacity is also rounded to an integer.
         
-    Args:
-        capacity: (int)
-            The capacity of the line to be decomposed.
-    Returns:
-        (list)
-            A list of weights to be used in decomposing a line.
-    """
-    return [1] * capacity + [-1] * capacity
-
-
-def binarysplit(capacity: int) -> list:
-    """
-    A method for splitting up the capacity of a line with a given
-    maximum capacity.
-    A line is split into qubits with weights of the given capacity, or
-    its inverse. This way the line can carry energy bidirectional.
-
-    Args:
-        capacity: (int)
-            The capacity of the line to be decomposed.
-    Returns:
-        (list)
-            A list of weights to be used in decomposing a line.
-    """
-    return [capacity, -capacity]
-
-
-def customsplit(capacity: int) -> list:
-    """
-    A method for splitting up the capacity of a line with a given
-    maximum capacity.
-    A line is split into qubits with weights, which are determined in a
-    custom manner, where the sum of positive and the sum of negative
-    weights is always the given capacity.
-
-    Args:
-        capacity: (int)
-            The capacity of the line to be decomposed.
-    Returns:
-        (list)
-            A list of weights to be used in decomposing a line.
-    """
-    if capacity == 0:
-        return []
-    if capacity == 1:
-        return [1, -1]
-    if capacity == 2:
-        return [2, -1, -1]
-    if capacity == 3:
-        return [3, -2, -1]
-    if capacity == 4:
-        return [2, 2, -3, -1, ]
-    if capacity == 5:
-        return [4, 1, -3, -2]
-    raise ValueError("Capacity is too big to be decomposed")
-
-
-def binary_power(number: int) -> list:
-    """
-    return a cut-off binary representation of the argument. It is a list
-    of powers of two and a rest such that the sum over the list is equal
-    to the number.
-    
-    Args:
-        number: (int)
-            The integer to be decomposed
-    Returns:
-        (list)
-            List of integer whose sum is equal to the number
-    """
-    if number < 0:
-        raise ValueError
-    if number == 0:
-        return []
-    number_of_bits = number.bit_length()
-    result = [2 ** exp for exp in range(number_of_bits - 1)]
-    return result + [number - 2 ** (number_of_bits - 1) + 1]
+        Args:
+            capacity: (int)
+                The capacity of the line to be decomposed.
+        Returns:
+            (list)
+                A list of weights to be used in decomposing a line.
+        """
+        integer_capacity = int(capacity)
+        positive_capacity = binary_power_and_rest(integer_capacity)
+        negative_capacity = [- number for number in positive_capacity]
+        return positive_capacity + negative_capacity
 
 
 class IsingBackbone:
@@ -207,20 +374,6 @@ class IsingBackbone:
     add a new constraint, you have to write a class that adheres to the
     `AbstractIsingSubproblem` interface
     """
-    # dictionary that maps config strings to the corresponding classes and
-    # methods
-    generator_to_qubits_method_lookup_dict = {
-        "single_qubit": single_qubit,
-        "integer_decomposition": integer_decomposition_powers_of_two_and_rest
-    }
-    # The functions on line_to_qubits_method_lookup_dict define how some value of a capacity of
-    # a transmission line is translated into qubits
-    line_to_qubits_method_lookup_dict = {
-        "cutpowersoftwo": cut_powers_of_two,
-        "fullsplit": fullsplit,
-        "binarysplit": binarysplit,
-        "customsplit": customsplit,
-    }
 
     def __init__(self,
                  network: pypsa.Network,
@@ -259,8 +412,6 @@ class IsingBackbone:
             configuration["kirchhoff"] = {"scale_factor": 1.0}
 
         # resolve string for splitting line capacity to function
-        self.generator_to_qubits = IsingBackbone.generator_to_qubits_method_lookup_dict[generator_to_qubits_method_name]
-        self.line_to_qubits = IsingBackbone.line_to_qubits_method_lookup_dict[line_to_qubits_method_name]
 
         # network to be solved
         self.network = network
@@ -282,8 +433,8 @@ class IsingBackbone:
         # the weights dictionary contains a mapping of qubits to their weights
         self._qubit_weights = {}
         self.allocated_qubits = 0
-        self.store_generators()
-        self.store_lines()
+        self.store_generators(generator_to_qubits_method_name)
+        self.store_lines(line_to_qubits_method_name)
 
         # read configuration dict, store in _subproblems and apply encodings
         self._subproblems = {}
@@ -676,7 +827,7 @@ class IsingBackbone:
         return len(self.ising_coefficients)
 
     # create qubits for generators and lines
-    def store_generators(self) -> None:
+    def store_generators(self, config: str = "single_qubit") -> None:
         """
         Assigns qubits to each generator in self.network. For each
         generator it writes generator specific parameters (i.e. power,
@@ -687,17 +838,9 @@ class IsingBackbone:
             (None)
                 Modifies self.data and self.allocated_qubits
         """
-        for generator in self.network.generators.index:
-            self.create_qubit_entries_for_component(
-                component_name=generator,
-                snapshot_to_weight_dict={
-                    time: self.generator_to_qubits(int(self.get_nominal_power(generator, time)))
-                    for time in self.network.snapshots
-                }
-            )
-        return
+        GeneratorEncoder.create_encoder(self, config).encode_qubits()
 
-    def store_lines(self) -> None:
+    def store_lines(self, config: str) -> None:
         """
         Assigns a number of qubits, according to the option set in
         self.config, to each line in self.network. For each line, line
@@ -709,18 +852,7 @@ class IsingBackbone:
             (None)
                 Modifies self.data and self.allocated_qubits
         """
-        for line in self.network.lines.index:
-            # we assume that the capacity of a line is constant across all
-            # snapshots
-            constant_line_capacity = self.line_to_qubits(int(self.network.lines.loc[line].s_nom))
-            weight_dict = {
-                time: constant_line_capacity
-                for time in self.network.snapshots
-            }
-            self.create_qubit_entries_for_component(
-                component_name=line,
-                snapshot_to_weight_dict=weight_dict
-            )
+        LineEncoder.create_encoder(self, config).encode_qubits()
 
     def create_qubit_entries_for_component(self,
                                            component_name: str,
@@ -1785,7 +1917,7 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
     # a dict to map config strings to functions which are used creating lists
     # of numbers, which can be used for weights of slack variables
     slack_representation_dict = {
-        "binary_power": binary_power,
+        "binary_power": binary_power_and_rest,
     }
 
     def __init__(self, backbone: IsingBackbone, config: dict):
@@ -2330,6 +2462,7 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
         """
         for generator in self.network.generators.index:
             self.modifiy_positive_interactions(generator=generator)
+        self.ising_coefficients = self.backbone.ising_coefficients_cached
 
     def modifiy_positive_interactions(self, generator: str):
         """

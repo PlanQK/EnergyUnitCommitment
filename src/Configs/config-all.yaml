@@ -18,11 +18,15 @@ ising_interface:
     generator_representation: "integer_decomposition"
     generator_representation: "single_qubit"
         # (string) name of the function how to model lines with qubits
-        # choose between single_qubit and integer_decomposition
-    line_representation: "customsplit"
+        # choose between:
+        #   - single_qubit
+        #   - integer_decomposition
+        #   - with_status
+    line_representation: "cutpowersoftwo"
         # (string) name of the function how to model lines with qubits
-        # choose between binarysplit, fullsplit, customsplit, cutpowersoftwo
-        #
+        # choose between :
+        #   - fullsplit,
+        #   - cutpowersoftwo
     # each followung entry is the configuration data for one QUBI subproblem
     kirchhoff:
         # Adding Kirchhoff subproblem to QUBO
@@ -58,6 +62,11 @@ ising_interface:
     # 
     min_up_down_time:
         min_up_down_factor: 1.0
+
+    # This constraint doesn't requires arguments and add a penalty that turns the first qubit of each generator at
+    # at each time step into a status qubit. If the generator_representation chosen is `with_status`, this will
+    # enforce the minimal output of committable generators
+    minimal_power:
 
     # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index, so if the network has
     # fewer snapshots, all are taken
