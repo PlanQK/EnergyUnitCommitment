@@ -7,8 +7,7 @@ Expanding on the type of networks that can be modelled is achieved by
 extending the `IsingBackbone`. 
 """
 
-from abc import ABC, abstractmethod
-from typing import Tuple, Any
+from typing import Any
 
 import numpy as np
 
@@ -35,6 +34,7 @@ def binary_power_and_rest(number: int):
     positive_powers = [1 << idx for idx in range(bit_length - 1)]
     already_filled = (1 << bit_length - 1) - 1
     return positive_powers + [number - already_filled]
+
 
 class IsingBackbone:
     """
@@ -64,8 +64,6 @@ class IsingBackbone:
 
     def __init__(self,
                  network: pypsa.Network,
-                 generator_to_qubits_method_name: str,
-                 line_to_qubits_method_name: str,
                  configuration: dict):
         """
         Constructor for an Ising Backbone. It requires a network and
@@ -76,30 +74,10 @@ class IsingBackbone:
         Args:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
-            generator_to_qubits_method_name: (str)
-                The name of the generator weight function as given in
-                generator_to_qubits_method_name_lookup_dict.
-            line_to_qubits_method_name: (str)
-                The name of the linesplit function as given in
-                line_to_qubits_method_name_lookup_dict.
             configuration: (dict)
                 A dictionary containing all subproblems to be encoded
                 into an ising problem.
         """
-        print()
-        print("--- Generating Ising problem ---")
-        self.subproblem_table = {
-            "kirchhoff": KirchhoffSubproblem,
-            "marginal_cost": MarginalCostSubproblem,
-            "minimal_power": MinimalGeneratorOutput
-        }
-        if "kirchhoff" not in configuration:
-            print("No Kirchhoff configuration found, "
-                  "adding Kirchhoff constraint with Factor 1.0")
-            configuration["kirchhoff"] = {"scale_factor": 1.0}
-
-        # resolve string for splitting line capacity to function
-
         # network to be solved
         self.network = network
         if "snapshots" in configuration:
@@ -120,28 +98,10 @@ class IsingBackbone:
         # the weights dictionary contains a mapping of qubits to their weights
         self._qubit_weights = {}
         self.allocated_qubits = 0
-        self.store_generators(generator_to_qubits_method_name)
-        self.store_lines(line_to_qubits_method_name)
 
         # read configuration dict, store in _subproblems and apply encodings
         self._subproblems = {}
         # dictionary of all support subproblems
-        for subproblem, subproblem_configuration in configuration.items():
-            if subproblem not in self.subproblem_table:
-                print(f"{subproblem} is not a valid subproblem, skipping "
-                      f"encoding")
-                continue
-            if subproblem_configuration is None:
-                subproblem_configuration = {}
-            subproblem_instance = self.subproblem_table[
-                subproblem].build_subproblem(self, subproblem_configuration)
-            self._subproblems[subproblem] = subproblem_instance
-            self.flush_cached_problem()
-            subproblem_instance.encode_subproblem()
-        print()
-        print("--- Finish generating Ising Problem with the following subproblems ---")
-        for key in self._subproblems:
-            print("--- - " + key)
 
     def __getattr__(self, method_name: str) -> callable:
         """
@@ -173,35 +133,6 @@ class IsingBackbone:
         else:
             raise AttributeError(f"{method_name} was not found in any stored "
                                  f"subproblem")
-
-    # obtain config file using a reader
-    @classmethod
-    def build_ising_problem(cls, network: pypsa.Network, config: dict):
-        """
-        This is a factory method for making an IsingBackbone that
-        corresponds to the problem in the network.
-        First, it retrieves information from the config dictionary on
-        which kind of IsingBackbone to build and then returns the
-        IsingBackbone object made using the rest of the configuration.
-
-        Args:
-            network: (pypsa.Network)
-                The unit commitment problem passed as a `pypsa.Network`
-                that is to be cast into QUBO/Ising form.
-            config: (dict)
-                A dictionary containing all information about the QUBO
-                formulations.
-        Returns:
-            (IsingBackbone)
-                An IsingBackbone that models the unit commitment problem
-                of the network.
-        """
-        generator_to_qubits_method_name = config.pop("generator_representation", "single_qubit")
-        line_to_qubits_method_name = config.pop("line_representation", "cutpowersoftwo")
-        return IsingBackbone(network,
-                             generator_to_qubits_method_name,
-                             line_to_qubits_method_name,
-                             config)
 
     def flush_cached_problem(self) -> None:
         """
@@ -402,7 +333,7 @@ class IsingBackbone:
     def add_basis_polynomial_interaction(self,
                                          first_qubit: int = None,
                                          second_qubit: int = None,
-                                         zero_qubits_list: list = [],
+                                         zero_qubits_list: list = None,
                                          interaction_strength: float = 1.0):
         """
         For a given list of qubo variables, adds the term to the ising interactions
@@ -427,6 +358,9 @@ class IsingBackbone:
             (None)
                 Modifies the stored ising problem
         """
+        if zero_qubits_list is None:
+            zero_qubits_list = []
+
         if first_qubit in zero_qubits_list:
             first_sign = -1
         else:
@@ -440,7 +374,6 @@ class IsingBackbone:
         self.add_interaction(first_qubit, second_sign * -0.25 * interaction_strength, weighted_interaction=False)
         self.add_interaction(second_qubit, first_sign * -0.25 * interaction_strength, weighted_interaction=False)
         self.add_interaction(first_sign * second_sign * -0.25 * interaction_strength, weighted_interaction=False)
-
 
     def encode_squared_distance(self,
                                 label_dictionary: dict,
@@ -512,34 +445,6 @@ class IsingBackbone:
                 number of ising interactions
         """
         return len(self.ising_coefficients)
-
-    # create qubits for generators and lines
-    def store_generators(self, config: str = "single_qubit") -> None:
-        """
-        Assigns qubits to each generator in self.network. For each
-        generator it writes generator specific parameters (i.e. power,
-        corresponding qubits, size of encoding) into the dictionary
-        self.data. At last, it updates object specific parameters.
-
-        Returns:
-            (None)
-                Modifies self.data and self.allocated_qubits
-        """
-        GeneratorEncoder.create_encoder(self, config).encode_qubits()
-
-    def store_lines(self, config: str) -> None:
-        """
-        Assigns a number of qubits, according to the option set in
-        self.config, to each line in self.network. For each line, line
-        specific parameters (i.e. power, corresponding qubits, size of
-        encoding) are as well written into the dictionary self.data. At
-        last, it updates object specific parameters.
-        
-        Returns:
-            (None)
-                Modifies self.data and self.allocated_qubits
-        """
-        LineEncoder.create_encoder(self, config).encode_qubits()
 
     def create_qubit_entries_for_component(self,
                                            component_name: str,
@@ -783,7 +688,7 @@ class IsingBackbone:
             p_max_pu = 1.0
         return max(self.network.generators.p_nom[generator] * p_max_pu, 0.0)
 
-    def  get_minimal_power(self, generator: str, time: any):
+    def get_minimal_power(self, generator: str, time: any):
         """
         Returns the minimal power output of a generator at a time step
         """
@@ -1196,4 +1101,3 @@ class IsingBackbone:
                 A numpy array containing all eigenvalues.
         """
         return np.linalg.eigh(self.get_hamiltonian_matrix())
-

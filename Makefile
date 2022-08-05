@@ -24,13 +24,13 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # for development purposes, we don't build the entire image, but mount the the code that is changed often.
 # We also mount the folder containing the networks and the config files
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
-MOUNTBACKENDPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs/Backends,target=/energy/libs/Backends
+MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
 # only mount qpu results if there actually any results
 ifeq ("$(wildcard $(PROBLEMDIRECTORY)/results_qpu_sweep)", "")
 MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
 endif
-MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTBACKENDPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURESULTPATH)
+MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURESULTPATH)
 
 ###### define save folder ######
 # choose a folder where the results should be saved to. If the folder

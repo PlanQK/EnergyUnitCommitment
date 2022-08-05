@@ -138,11 +138,11 @@ class AbstractDwaveSampler(BackendBase):
                 Spin Glass Problem.
         """
         print("transforming Problem...")
-        self.ising_backbone = IsingBackbone.build_ising_problem(
+        qubo_transformator = QuboTransformator(
             network=self.network,
             config=self.config["ising_interface"]
         )
-        return self.ising_backbone
+        self.ising_backbone = qubo_transformator.transform_network_to_qubo()
 
     def get_dimod_model(self) \
             -> dimod.BinaryQuadraticModel:

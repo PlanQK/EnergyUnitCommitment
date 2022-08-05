@@ -5,6 +5,7 @@ import pypsa
 
 from .ising_backbone import IsingBackbone
 
+
 def binary_power_and_rest(number: int):
     """
     Constructs a minimal list of positive integers which sum up to the passed
@@ -36,7 +37,7 @@ class QubitEncoder(ABC):
     subclasses transform that type of component.
     """
 
-    def __init__(self, backbone):
+    def __init__(self, backbone: IsingBackbone):
         self.backbone = backbone
         self.network = backbone.network
 
@@ -92,6 +93,7 @@ class QubitEncoder(ABC):
         Returns an iterable of all components this instances transforms into
         qubits.
         """
+
 
 class GeneratorEncoder(QubitEncoder):
     """
@@ -155,6 +157,7 @@ class SingleQubitGeneratorEncoder(GeneratorEncoder):
         """
         return [int(self.backbone.get_nominal_power(component, time))]
 
+
 class BinaryPowerGeneratorEncoder(GeneratorEncoder):
     """
     Transform generators into qubits with powers of two and a rest as weights
@@ -177,6 +180,7 @@ class BinaryPowerGeneratorEncoder(GeneratorEncoder):
                 power output of the generator
         """
         return binary_power_and_rest(int(self.backbone.get_nominal_power(component, time)))
+
 
 class WithStatusQubitGeneratorEncoder(GeneratorEncoder):
     """
@@ -271,6 +275,7 @@ class FullsplitLineEncoder(LineEncoder):
         capacity = int(self.network.lines.loc[component].s_nom)
         return capacity * [1] + capacity * [-1]
 
+
 class CutPowersOfTwoLineEncoder(LineEncoder):
     """
     Transforms a transmission line by using powers of two and a rest term for
@@ -316,4 +321,3 @@ class CutPowersOfTwoLineEncoder(LineEncoder):
         positive_capacity = binary_power_and_rest(integer_capacity)
         negative_capacity = [- number for number in positive_capacity]
         return positive_capacity + negative_capacity
-

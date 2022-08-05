@@ -7,6 +7,27 @@ import pypsa
 from .ising_backbone import IsingBackbone
 
 
+def binary_power_and_rest(number: int):
+    """
+    Constructs a minimal list of positive integers which sum up to the passed
+    argument and such that for every smaller, positive number there exists
+    a subtotal of the list that is equal to it.
+
+    Args:
+        number: (int)
+            the number to be decomposed into (mostly) powers of two
+    Returns:
+        (list)
+            a list of integers with sum equal to number
+    """
+    if number == 0:
+        return []
+    bit_length = number.bit_length()
+    positive_powers = [1 << idx for idx in range(bit_length - 1)]
+    already_filled = (1 << bit_length - 1) - 1
+    return positive_powers + [number - already_filled]
+
+
 class AbstractIsingSubproblem:
     """
     An interface for classes that model the Ising formulation
@@ -625,7 +646,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
     def calc_power_imbalance_at_bus(self,
                                     bus: str,
                                     result: list,
-                                    silent: bool = True
                                     ) -> dict:
         """
         Returns a dictionary containing the absolute values of the power
@@ -637,10 +657,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 imbalances.
             result: (list)
                 List of all qubits which have spin -1 in the solution
-            silent: (bool)
-                Switch to enable status messages send to stdout. If
-                true, no messages are sent.
-                Default: True
 
         Returns:
             (dict)
@@ -735,7 +751,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
     def calc_kirchhoff_cost_at_bus(self,
                                    bus: str,
                                    result: list,
-                                   silent: bool = True
                                    ) -> dict:
         """
         Returns a dictionary which contains the kirchhoff cost at the
@@ -747,10 +762,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 Label of the bus at which to calculate the total power.
             result: (list)
                 List of all qubits that have spin -1 in a solution.
-            silent: (bool)
-                Switch to enable status messages send to stdout. If
-                true, no messages are sent.
-                Default: True
 
         Returns:
             (dict)
@@ -764,8 +775,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             key: (imbalance * self.scale_factor) ** 2
             for key, imbalance in
             self.calc_power_imbalance_at_bus(bus=bus,
-                                             result=result,
-                                             silent=silent).items()
+                                             result=result).items()
         }
 
     def calc_kirchhoff_cost_by_time(self, solution: list) -> dict:
@@ -813,7 +823,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
     def individual_cost_contribution(self,
                                      solution: list,
-                                     silent: bool = True
                                      ) -> dict:
         """
         Returns a dictionary which contains the kirchhoff costs incurred
@@ -823,10 +832,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         Args:
             solution: (list)
                 List of all qubits that have spin -1 in a solution.
-            silent: (bool)
-                Switch to enable status messages send to stdout. If
-                true, no messages are sent.
-                Default: True
 
         Returns:
             (dict)
@@ -839,10 +844,10 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         contrib = {}
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calc_kirchhoff_cost_at_bus(
-                bus=bus, result=solution, silent=silent)}
+                bus=bus, result=solution)}
         return contrib
 
-    def individual_kirchhoff_cost(self, solution, silent=True):
+    def individual_kirchhoff_cost(self, solution):
         """
         Returns a dictionary which contains the kirchhoff cost incurred
         at every bus at every time slice, without being scaled by the
@@ -851,10 +856,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         Args:
             solution: (list)
                 List of all qubits that have spin -1 in a solution.
-            silent: (bool)
-                Switch to enable status messages send to stdout. If
-                true, no messages are sent.
-                Default: True
+
         Returns:
             (dict)
                 Dictionary containing the kirchhoff cost of every bus at
@@ -868,12 +870,11 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             key: imbalance ** 2
             for key, imbalance in
             self.individual_power_imbalance(
-                solution=solution, silent=silent).items()
+                solution=solution).items()
         }
 
     def individual_power_imbalance(self,
                                    solution: list,
-                                   silent: bool = True
                                    ) -> dict:
         """
         Returns a dictionary which contains the power imbalance at each
@@ -883,10 +884,6 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         Args:
             solution: (list)
                 List of all qubits which have spin -1 in the solution.
-            silent: (bool)
-                Switch to enable status messages send to stdout. If
-                true, no messages are sent.
-                Default: True
 
         Returns:
             (dict)
@@ -900,8 +897,9 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
         contrib = {}
         for bus in self.network.buses.index:
             contrib = {**contrib, **self.calc_power_imbalance_at_bus(
-                bus=bus, result=solution, silent=silent)}
+                bus=bus, result=solution)}
         return contrib
+
 
 class MinimalGeneratorOutput(AbstractIsingSubproblem):
     """
@@ -931,21 +929,6 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
         """
         return MinimalGeneratorOutput(backbone, configuration)
 
-
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        This method stores the backbone that is modified as a reference
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to modify the first-order interactions
-            config: (dict)
-                The options how to enforce minimal output
-        """
-        self.backbone = backbone
-        self.network = backbone.network
-        self.scale_factor = config.setdefault("scale_factor", 1.0)
-
     def encode_subproblem(self) -> None:
         """
         Modifies the first order interactions of generator qubits into
@@ -967,7 +950,6 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
 
         Args:
             generator: (str) label of the network generator
-            time: (any) the snapshot at which to modify the encoding
 
         Returns:
             (None)
@@ -984,4 +966,3 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                                                                second_qubit=qubit,
                                                                zero_qubits_list=[qubit],
                                                                interaction_strength=interaction_strength)
-
