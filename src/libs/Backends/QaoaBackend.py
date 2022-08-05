@@ -11,13 +11,15 @@ from typing import Iterator
 import numpy as np
 import qiskit
 
-from libs.qubo_transformator.ising_backbone import IsingBackbone
-from libs.qubo_transformator import QuboTransformator
 
 try:
     from .BackendBase import BackendBase  # import for Docker run
+    from ..qubo_transformator.ising_backbone import IsingBackbone
+    from ..qubo_transformator import QuboTransformator
 except ImportError:
     from BackendBase import BackendBase  # import for local/debug run
+    from libs.qubo_transformator.ising_backbone import IsingBackbone
+    from libs.qubo_transformator import QuboTransformator
 
 from datetime import datetime
 from numpy import median

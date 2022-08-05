@@ -13,8 +13,6 @@ from ast import literal_eval
 from .InputReader import InputReader
 from .BackendBase import BackendBase
 
-from libs.qubo_transformator.ising_backbone import IsingBackbone
-from libs.qubo_transformator import QuboTransformator
 
 # try import from local .so
 # Error message for image: herrd1/siquan:latest
@@ -22,8 +20,12 @@ from libs.qubo_transformator import QuboTransformator
 # (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
     from . import siquan
+    from ..qubo_transformator.ising_backbone import IsingBackbone
+    from ..qubo_transformator import QuboTransformator
 # try import from installed module siquan
 except ImportError:
+    from libs.qubo_transformator.ising_backbone import IsingBackbone
+    from libs.qubo_transformator import QuboTransformator
     import siquan
 
 

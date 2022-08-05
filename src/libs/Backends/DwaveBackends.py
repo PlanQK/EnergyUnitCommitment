@@ -27,8 +27,13 @@ from tabu import TabuSampler
 from .BackendBase import BackendBase
 from .InputReader import InputReader
 
-from libs.qubo_transformator import QuboTransformator
-from libs.qubo_transformator.ising_backbone import IsingBackbone
+try:
+    from libs.qubo_transformator import QuboTransformator
+    from libs.qubo_transformator.ising_backbone import IsingBackbone
+except ImportError:
+    from ..qubo_transformator import QuboTransformator
+    from ..qubo_transformator.ising_backbone import IsingBackbone
+
 
 # import packages for flow optimization
 import networkx as nx
