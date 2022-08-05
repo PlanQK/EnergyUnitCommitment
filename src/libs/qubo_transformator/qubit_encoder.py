@@ -3,7 +3,7 @@ import typing
 
 import pypsa
 
-from ising_backbone import IsingBackbone
+from .ising_backbone import IsingBackbone
 
 def binary_power_and_rest(number: int):
     """

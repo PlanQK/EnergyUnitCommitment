@@ -1,5 +1,7 @@
 import typing
 
+from abc import ABC
+
 import pypsa
 
 from .ising_backbone import IsingBackbone

@@ -11,11 +11,12 @@ from typing import Iterator
 import numpy as np
 import qiskit
 
+from libs.qubo_transformator.ising_backbone import IsingBackbone
+from libs.qubo_transformator import QuboTransformator
+
 try:
-    from .ising_backbone import IsingBackbone  # import for Docker run
     from .BackendBase import BackendBase  # import for Docker run
 except ImportError:
-    from ising_backbone import IsingBackbone  # import for local/debug run
     from BackendBase import BackendBase  # import for local/debug run
 
 from datetime import datetime
@@ -31,13 +32,6 @@ from qiskit.circuit import Parameter, ParameterVector
 from scipy import stats
 
 from .InputReader import InputReader
-
-try:
-    from .ising_backbone import IsingBackbone  # import for Docker run
-    from .BackendBase import BackendBase  # import for Docker run
-except ImportError:
-    from ising_backbone import IsingBackbone  # import for local/debug run
-    from BackendBase import BackendBase  # import for local/debug run
 
 
 class QaoaAngleSupervisor:

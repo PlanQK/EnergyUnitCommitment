@@ -26,7 +26,9 @@ from tabu import TabuSampler
 # importing local QUBO modelling packages
 from .BackendBase import BackendBase
 from .InputReader import InputReader
-from .ising_backbone import IsingBackbone
+
+from libs.qubo_transformator import QuboTransformator
+from libs.qubo_transformator.ising_backbone import IsingBackbone
 
 # import packages for flow optimization
 import networkx as nx

@@ -1,12 +1,10 @@
 import pypsa
 
-from ising_backbone import IsingBackbone
-
-from qubit_encoder import GeneratorEncoder, LineEncoder
-from ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput
+from .ising_backbone import IsingBackbone
+from .qubit_encoder import GeneratorEncoder, LineEncoder
+from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput
 
 import typing
-
 
 class QuboTransformator:
 
