@@ -1,0 +1,253 @@
+{
+  "coords": {
+    "snapshots": {
+      "dims": [
+        "snapshots"
+      ],
+      "attrs": {},
+      "data": [
+        0,
+        1,
+        2
+      ]
+    },
+    "investment_periods": {
+      "dims": [
+        "investment_periods"
+      ],
+      "attrs": {},
+      "data": []
+    },
+    "lines_i": {
+      "dims": [
+        "lines_i"
+      ],
+      "attrs": {},
+      "data": [
+        "line"
+      ]
+    },
+    "buses_i": {
+      "dims": [
+        "buses_i"
+      ],
+      "attrs": {},
+      "data": [
+        "bus_1",
+        "bus_2"
+      ]
+    },
+    "loads_i": {
+      "dims": [
+        "loads_i"
+      ],
+      "attrs": {},
+      "data": [
+        "load_1",
+        "load_2"
+      ]
+    },
+    "loads_t_p_set_i": {
+      "dims": [
+        "loads_t_p_set_i"
+      ],
+      "attrs": {},
+      "data": [
+        "load_1",
+        "load_2"
+      ]
+    },
+    "generators_i": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        "gen_1",
+        "gen_2"
+      ]
+    }
+  },
+  "attrs": {
+    "network_name": "",
+    "network_pypsa_version": "0.19.3",
+    "network_srid": 4326
+  },
+  "dims": {
+    "snapshots": 3,
+    "investment_periods": 0,
+    "lines_i": 1,
+    "buses_i": 2,
+    "loads_i": 2,
+    "loads_t_p_set_i": 2,
+    "generators_i": 2
+  },
+  "data_vars": {
+    "snapshots_snapshot": {
+      "dims": [
+        "snapshots"
+      ],
+      "attrs": {},
+      "data": [
+        0,
+        1,
+        2
+      ]
+    },
+    "snapshots_objective": {
+      "dims": [
+        "snapshots"
+      ],
+      "attrs": {},
+      "data": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "snapshots_stores": {
+      "dims": [
+        "snapshots"
+      ],
+      "attrs": {},
+      "data": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "snapshots_generators": {
+      "dims": [
+        "snapshots"
+      ],
+      "attrs": {},
+      "data": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "investment_periods_objective": {
+      "dims": [
+        "investment_periods"
+      ],
+      "attrs": {},
+      "data": []
+    },
+    "investment_periods_years": {
+      "dims": [
+        "investment_periods"
+      ],
+      "attrs": {},
+      "data": []
+    },
+    "lines_bus0": {
+      "dims": [
+        "lines_i"
+      ],
+      "attrs": {},
+      "data": [
+        "bus_1"
+      ]
+    },
+    "lines_bus1": {
+      "dims": [
+        "lines_i"
+      ],
+      "attrs": {},
+      "data": [
+        "bus_2"
+      ]
+    },
+    "lines_s_nom": {
+      "dims": [
+        "lines_i"
+      ],
+      "attrs": {},
+      "data": [
+        3.0
+      ]
+    },
+    "loads_bus": {
+      "dims": [
+        "loads_i"
+      ],
+      "attrs": {},
+      "data": [
+        "bus_1",
+        "bus_2"
+      ]
+    },
+    "loads_t_p_set": {
+      "dims": [
+        "snapshots",
+        "loads_t_p_set_i"
+      ],
+      "attrs": {},
+      "data": [
+        [
+          2.0,
+          2.0
+        ],
+        [
+          3.0,
+          1.0
+        ],
+        [
+          2.0,
+          1.0
+        ]
+      ]
+    },
+    "generators_bus": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        "bus_1",
+        "bus_2"
+      ]
+    },
+    "generators_p_nom": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        4.0,
+        3.0
+      ]
+    },
+    "generators_p_min_pu": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        1.0,
+        1.0
+      ]
+    },
+    "generators_marginal_cost": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        15.0,
+        10.0
+      ]
+    },
+    "generators_committable": {
+      "dims": [
+        "generators_i"
+      ],
+      "attrs": {},
+      "data": [
+        true,
+        true
+      ]
+    }
+  }
+}

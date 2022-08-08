@@ -24,7 +24,7 @@ DOCKERTAG=energy:planqk
 SERVICE_DOCKERFILE=PlanQK_Dockerfile
 
 # default path where json files are stored
-PATH_PREFIX="/input/"
+PATH_PREFIX="input/"
 
 # You can change this file name or pass it as the last argument when calling the script
 PATH_TO_JSON_FILE="test_service_input"
