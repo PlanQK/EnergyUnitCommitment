@@ -1,20 +1,37 @@
+# The virtual environment and cached python files
 venv/*
-Problemset*/*
 *.pyc
-.vscode/*
-*.tmp
-*networks*/*
-TestProblems/
+
+# pypsa input networks 
+networks/*
+!defaultnetwork.nc
+
+# serialized pypsa networks except one for testing the service
+input/*.json
+!input/toy_network.json
+!input/test_service_input.json
+!input/config.json
+
+# local optimization results
 results_*
-plots/*
-/build_and_run_euc.sh
-makePlots.py
-*.yaml
-*.json
+
+# indicator file for the last time the docker image was built
+.docker.tmp
+
+# ignore yaml (config) files except the example
+src/configs/*.yaml
+!src/configs/config-all.yaml
+
+# ignore zip file for service building and the test result of testing it
 *.zip
+JobResponse
+
+# jupyter notebooks
 .ipynb_checkpoints/
 *.ipynb
-JobResponse
-*.png
-!openapi-spec.yaml
-!input/testService.json
+
+# any plots and the file that has a receipe for making plots.
+# make_plots_example.py contains an exampe how to use the plot scripts
+make_plots.py
+plots/*
+
