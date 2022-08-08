@@ -56,8 +56,7 @@ class PypsaBackend(BackendBase):
         )
         self.opt = pypsa.opf.network_lopf_prepare_solver(
             network=self.network,
-            solver_name=self.config[
-                "backend_config"]["solver_name"])
+            solver_name=self.config["backend_config"].get("solver_name","glpk"))
         self.opt.options["tmlim"] = self.config["backend_config"]["timeout"]
 
     def check_input_size(self, limit: float = 60.0):

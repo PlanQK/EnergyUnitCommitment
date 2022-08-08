@@ -6,72 +6,72 @@ API_token: # your token here
     dwave_API_token: ""
 
 # choose backend
-backend: "sqa"
+backend: "pypsa-glpk"
     # (string) the backend algorithm to be used. options are:
-    # "classical", "sqa", "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
-    # "pypsa-glpk", "pypsa-fico", "qaoa"
+    # sqa based: "classical", "sqa", 
+    # dwave based: "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
+    # milp based: "pypsa-glpk", "pypsa-fico"
+    # qiskit based: "qaoa"
 
 # all configuration data of the QUBO model of the network
 ising_interface:
-    # values for specifiying network to qubit abstraction. all generator
-    # values are rounded to intgers
-    generator_representation: "integer_decomposition"
-    generator_representation: "single_qubit"
+    # values for specifiying network to qubit abstraction. all generator values are rounded to intgers
+    generator_representation: "with_status"
         # (string) name of the function how to model lines with qubits
         # choose between:
-        #   - single_qubit
-        #   - integer_decomposition
-        #   - with_status
+        #   - single_qubit (1 qubit per generator)
+        #   - integer_decomposition (binary decomposition)
+        #   - with_status (binary decomposition with correct status qubit)
     line_representation: "cutpowersoftwo"
         # (string) name of the function how to model lines with qubits
-        # choose between :
-        #   - fullsplit,
-        #   - cutpowersoftwo
-    # each followung entry is the configuration data for one QUBI subproblem
+        # choose between:
+        #   - fullsplit (qubits of weight 1, -1)
+        #   - cutpowersoftwo (positive and negative binary decomposition)
+
+    # each following entry is the configuration data for one QUBO constraint
+    # The kirchhoff constraint
     kirchhoff:
-        # Adding Kirchhoff subproblem to QUBO
         scale_factor: 1.0
-        # (float) weight of the kirchhoff subproblem in the QUBO
+          # (float) weight of the kirchhoff subproblem in the QUBO
+    # Adding Marginal cost optimization in the QUBO
     marginal_cost:
-        # Adding Marginal cost optimization in the QUBO
+        scale_factor: 0.6
+          # (float) weight of the marginal cost optimization in the QUBO
         strategy: "global_cost_square"
+        # strategy: "global_cost_square"
             # (string) name of the class/procedure how to encode the marginal cost optimization
-            # choose between global_cost_square, global_cost_square_with_slack, marginal_as_penalty, local_marginal_estimation
-        ### these values only pertain the formulation *WithSlack
+            # choose between:
+            #   - global_cost_square,
+            #   - global_cost_square_with_slack,
+            #   - marginal_as_penalty,
+            #   - local_marginal_estimation
+        ### these values only pertain the strateies "*with_slack"
         slack_type: "binary_power"
-            # this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
+            # (string) this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
+            # choose between:
+            #   - binary_power
         slack_scale: 0.1
             # (float) scalar factor for all slack variable weights
         slack_size: 4
             # (int) number of slack variables to be used
-        ### end *WithSlack
+        ### end *with_slack
         ### these values specifiy how costs are estimated if a formulation needs it (all but MarginalAsPenalty)
-        scale_factor: 0.6
-             # (float) weight of the marginal cost optimization in the QUBO
         offset_factor: 1.225
-        # offset_factor: 1.0
-             # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation 
-             # obtained by adding the most efficient generators to the solution and cap it when the total load has been met
-             # this method disregerads the topology of the network and is a lower boundary of the cost
-        # local cost estimation
-        # factor how to consider line transmission in local costs
+           # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation
+           # obtained by using the most efficient rate for each unit of power that is required
+        # these value only pertain the strategy "local_marginal_estimation"
         line_cost_factor: -1.0
+          # (double) factor how to consider line transmission in local costs
         ### end estimation config
 
-    # TODO not implemented in code yey
-    # 
-    min_up_down_time:
-        min_up_down_factor: 1.0
-
-    # This constraint doesn't requires arguments and add a penalty that turns the first qubit of each generator at
-    # at each time step into a status qubit. If the generator_representation chosen is `with_status`, this will
-    # enforce the minimal output of committable generators
+    # This constraint turns the first qubit of each generator at at each time step into a status qubit. If the
+    # generator_representation chosen is `with_status`, this will enforce the minimal output of committable generators
     minimal_power:
+        scale_factor: 1.0
+          # (float) weight of he enforcement. status qubit are already scaled by the weight of the power interactions of non-status qubits
 
-    # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index, so if the network has
-    # fewer snapshots, all are taken
-        # (int) If this is non-positive, the problem will be trivial
-    snapshots: 4
+    snapshots: 1
+    # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index
 
 qaoa_backend:
     shots: 200
@@ -79,102 +79,96 @@ qaoa_backend:
         # max 20,000
     simulate: True
         # (boolean) use a simulator or a QPU
-        # if True: use simulator;
-        # if False: use real IBMQ QPU (IBMQ API token required)
+        #   - True: use simulator;
+        #   - False: use real IBMQ QPU (IBMQ API token required)
     noise: False
         # (boolean) simulate with or without noise (only used, when simulate is True)
-        # if True: use simulator with noise model (IBMQ API token required);
-        # if False: use simulator without noise model
+        #   - True: use simulator with noise model (IBMQ API token required)
+        #   - False: use simulator without noise model
     simulator: "aer_simulator"
         # (string) the qiskit simulator to be used (only used, when simulate is True)
-        # choose between "qasm_simulator", "aer_simulator", "statevector_simulator" 
-        # and "aer_simulator_statevector"
-        
+        # choose between
+        #   - qasm_simulator
+        #   - aer_simulator
+        #   - statevector_simulator
+        #   - aer_simulator_statevector
+
     # supervisior determines how angles are chosen at the beginning of one experiment
     # There are two possible supervisor right now. they are grouped with the parameter
     # for choosing initial angles because the type varies for different supervisors
-    # supervisior_type: "RandomOrFixed"
-    # supervisior_type: "GridSearch"
-        # (string) how to choose inital angles
-        # choose between "RandomOrFixed" and "GridSearch"
-    max_iter: 10
+    strategy: "random_or_fixed"
+    # (string) strategy for choosing initial angle values:
+    #   - random_or_fixed
+    #   - grid_search
+    max_iter: 1
         # (int) maximum number iterations of the classical optimizer
-    repetitions: 5
+    repetitions: 1
         # (int) number of experiment repetitions
     classical_optimizer: "COBYLA"
         # (string) the classical optimizer to be used
         # choose between "SPSA", "COBYLA" and "ADAM"
 
-    ### "RandomOrFixed" config guess
+    ### "random_or_fixed" config guess
     # uses a list to initializes angles in one experiment, substituting the string "rand" by a random number
     strategy: "random_or_fixed"
     initial_guess: ["rand", "rand", "rand", "rand"]
-        # (list of float or "rand") the initial guess for the classical optimizer and "RandomOrFixed" supervisor
+        # (list of float or the string "rand") the initial guess for the classical optimizer and "random_or_fixed" strategy
+        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...
+        # use "rand" if a random initial guess should be used for this parameter.
     range: 6
         # (float) range of a random guess for the angle. A range of 1 will result in random guesses
         # in the intervall [-1,1]. Only applicable for random guesses
-        # has to be an even number of parameters starting with beta, then gamma, then beta again and so on...;
-        # use "rand" if a random initial guess should be used for this parameter. 
-        
-#   ### "grid_search" config guess
-#   # grid_search takes a list of grids which are dictionary that describe the initial angles 
-#   # of the layers. A grid dictionary contains the following keys
-#        lower_bound: -3
-#           # (float) lowest point of the angles 
-#        upper_bound: 3
-#           # (float)  highest point of angles 
-#        num_gridpoints: 1
-#           # (int) number of angles to try for the problem hamiltonian. Raises an error if fewer
-#           # than 1 are selected. If excactly one is selected, the lower_bound is the chosen grid point
-    # strategy: "grid_search"
-    # initial_guess: 
-    # - lower_bound: 2
-    #   upper_bound: 2
-    #   num_gridpoints: 3
-    # - lower_bound: 1
-    #   upper_bound: 1
-    #   num_gridpoints: 3
 
-#   # It also supports default values for all grids given in the dictionary which are used as fallback values
-#   # The fallback values are given by the dictionary `default_grid`. The default values for that one are
-#   # the following ones
-#    default_grid:
-#       lower_bound: -3
-#       upper_bound: 3
-#       num_gridpoints: 1
+    ### "grid_search" config guess
+    # grid_search takes a list of grids which are dictionary that describe the initial angles
+    # of the layers. A grid dictionary contains the three keys `lower_bound`, `upper_bound` and `num_gridpoints`.
+    # The default grid below is an example also defines fallback values for incomplete dictionaries
+    default_grid:
+        lower_bound: -3
+           # (float) lowest value of the inital angle
+        upper_bound: 3
+           # (float) highest value of the inital angle
+        num_gridpoints: 3
+           # (int) number of angles to try for the current layer. If the chosen number is 1, the
+           # lower_bound will be the only grid point for that layer
+    strategy: "grid_search"
+    initial_guess: 
+      - lower_bound: 2
+        upper_bound: 2
+        num_gridpoints: 3
+      - lower_bound: 1
+        upper_bound: 1
+        num_gridpoints: 3
 
 
 sqa_backend:
-    # seed: 10
-        # (int)
-    # schedule rules can be read in the platform description/sqa repo
+    # seed: 722225
+        # (int) The initial seed of the sqa solver which is otherwise initialized randomly
+    # schedule rules can be read in the platform description `DESCRIPTION.md`
     transverse_field_schedule: "[8.0,0.0]"
         # (string) transvere field schedule of the simulation
     temperature_schedule: "[0.1,iF,0.0001]"
         # (string) temperature schedule of the simultion
     trotter_slices: 500
-        # (int) number of trotter slices to be used.
-        # more trotter slices make a more precies discretization of the quantum state and
-        # increases solution quality and run time
-    optimization_cycles: 300
-        # (int) number of discrete time steps to model continous evolution
-        # more cycles improve quality of solution and run time. This falls off rather quickly
+        # (int) number of trotter slices to be used. The trotter slices are the discretization of the
+        # continous quantum state
+    optimization_cycles: 400
+        # (int) number of discrete time steps to model the continous evolution
 
 
 dwave_backend:
     strategy: "lowest_energy"
         # (string)
-        # choose between "lowest_energy and "closest_sample"
+        # choose between:
+        #   - lowest_energy
+        #   - closest_sample
     postprocess: "flow"
-        # (string) determines how to improve qpu result. only flow optimization
-        # is possible
-    timeout: 100
+        # (string) determines how to improve qpu result. only flow optimization is possible
+    timeout: 10
         # (int) number of seconds that an embedding into working graph can be calculated
-       
-    ### only necessary for solver dwave-qpu 
-    sample_origin: "infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1"
+    ### only necessary for solver dwave-qpu
+    sample_origin: "results_qpu_sweep/file_containing_qpu_result"
         # (string) filename of the saved sample result file if old result is reused
-        # choose between absolute filepath of the sample or "cloud" (possibly receive a json via PlanQK-Platform?)
 
     # D-Wave annealer config, see https://docs.ocean.dwavesys.com/en/stable/overview/qpu.html
     annealing_time: 1
@@ -190,13 +184,10 @@ dwave_backend:
 
 
 pypsa_backend:
-    solver_name: "glpk"
-        # (string) name of the MILP solver
-        # no other solver support yet
     timeout: 10
         # (int) how many second the MILP is allowed to calculate a solution. after this time, an (non-optimal) solution
         # will be returned
-        
-# This can also hold any of the above information. Solver specific configuration data in ${SOLVER}Backend
-# will be copied into this field and then be used
+
+# The following entry can also contain config data, but is used by all solvers
 backend_config:
+
