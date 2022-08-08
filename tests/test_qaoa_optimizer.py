@@ -15,7 +15,7 @@ def main():
         os.path.dirname(__file__) + "../../networks/" + input_net
     )
 
-    with open(os.path.dirname(__file__) + "/Configs/" + config_file) as file:
+    with open(os.path.dirname(__file__) + "/configs/" + config_file) as file:
         config = yaml.safe_load(file)
 
     input_reader = InputReader(network=net_import, config=config)

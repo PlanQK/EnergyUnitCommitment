@@ -164,7 +164,7 @@ class InputReader:
             except KeyError:
                 raise KeyError(f"The file format {filetype} doesn't match any supported "
                                f"format. The supported formats are {list(self.loaders.keys())}")
-            with open("Configs/" + input_config) as file:
+            with open("configs/" + input_config) as file:
                 result = loader(file)
         base_dict = {
             "API_token": {},

@@ -25,7 +25,7 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # We also mount the folder containing the networks and the config files
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
 MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
-MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/Configs,target=/energy/Configs
+MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/configs,target=/energy/configs
 # only mount qpu results if there actually any results
 ifeq ("$(wildcard $(PROBLEMDIRECTORY)/results_qpu_sweep)", "")
 MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
@@ -42,10 +42,10 @@ SAVE_FOLDER :=
 ###### define config file ######
 # this file is the default file which contains values for all valid configurations of all solvers.
 # Making will generate a run for each config file specified here. Other config files can be saved
-# in /src/Configs
+# in /src/configs
 CONFIGFILES = config-all.yaml
-CONFIGFILES = failed_config.json
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/Configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+# CONFIGFILES = almost_empty.yaml
+#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
 # Choose a regex that will be used to search the networks folder for networks. 
@@ -65,7 +65,7 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKN
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
-# possible options in src/Configs.
+# possible options in src/configs.
 # The name of the parameter has to be stored in a variable with the
 # PARAMETER_ prefix and the values for it in a variable with the
 # VAL_PARAMETER_ prefix. Only Parameters which have a name with the PARAMETER_ prefix
