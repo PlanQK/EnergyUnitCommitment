@@ -1,24 +1,22 @@
-# 1 This makefile is used for starting otpimization runs. Using various parameters that can be set, it will generate
-# rules for the result files, and then generates them by starting a docker container. The possible recipes to me 
-# made can be found at the bottom of the file. 
+# This makefile is used for starting optimization runs. Using various parameters that can be set, it will generate
+# rules for the result files, and then generates them by starting a docker container. The possible recipes to be
+# made can be found at the bottom of the file.
 #
-# The optimization runs for which the rules are created by searching /networks for pypsa networks and /src/Config
+# The optimization runs for which the rules are created by searching /networks for pypsa networks and /src/config
 # for config files. They can be specified using a glob expression. The result files will then consist of all combinations
-# networks and configs, and a  string which indicates which parameters are overwritten by the makefile and the date when
+# networks and configs, and a string which indicates which parameters are overwritten by the makefile and the date when
 # the rule was created.
 
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
-#DOCKERFILE = PlanQK_Dockerfile
 DOCKERFILE = Dockerfile
 DOCKERTAG = energy:1.0
 
+# a virtual environment to run stuff without a docker container
 VENV_NAME = venv
 
 ###### set problem directory ######
 PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
-# alternative in case this is not a git repository
-#PROBLEMDIRECTORY := $(shell pwd)
 
 ###### set mount paths ######
 # for development purposes, we don't build the entire image, but mount the the code that is changed often.
@@ -34,7 +32,7 @@ MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURES
 
 ###### define save folder ######
 # choose a folder where the results should be saved to. If the folder
-# doesn't exist, it will be created. If no folder is specified, one will 
+# doesn't exist, it will be created. If no folder is specified, one will
 # be created using the name `results_general_sweep`
 # If specifiying your own folder, DON'T forget '/' for a valid folder name
 SAVE_FOLDER := 
@@ -45,20 +43,15 @@ SAVE_FOLDER :=
 # in /src/configs
 CONFIGFILES = config-all.yaml
 # CONFIGFILES = almost_empty.yaml
-#CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
-# Choose a regex that will be used to search the networks folder for networks. 
-# The default network is a randomly generated network containing 10 buses with 
+# Choose a regex that will be used to search the networks folder for networks.
+# The default network is a randomly generated network containing 10 buses with
 # generators that produce integer valued power and a total load of 100
 NETWORKNAME = defaultnetwork.nc
-NETWORKNAME = testNetwork4QubitIsing_2_0_20.nc 
-# NETWORKNAME = testNetwork5QubitIsing_2_0_20.nc 
- NETWORKNAME = 220124cost5input_[1]0_[0]_20.nc
-# NETWORKNAME = 20220627_network_5_0_20.nc
+NETWORKNAME = network_4qubit_2_bus.nc
 # NETWORKNAME = elec_s_5.nc
-#NETWORKNAME = 20220628_network_5_0_20.nc
-
 
 # lists networks to be used using NETWORKNAME
 SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
@@ -73,171 +66,119 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKN
 #
 # Since there are multiple levels in the config dictionary the name has to
 # have the following pattern, indicating all levels:
-# "level1__level2__parameterName". The value(s) on the other hand should be given
+# "level1__level2__parameter". The value(s) on the other hand should be given
 # as a string separated by a "__".
 # E.g.	PARAMETER_KIRCHSCALEFACTOR = "ising_interface__kirchhoff__scale_factor"
-# 		VAL_PARAMETER_KIRCHSCALEFACTOR = "1.0__5.0__10.0"
+# 		VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__2.0
 # Comment out any parameters not currently in use.
-# 
+# TODO logic for splitting up parameter values into multiple files to be made
 
 ### General Parameters
 # Uncommenting a line of the form #PARMETER_* will overwrite the value in the config
 # with the value below it.
 
 ### A parameter for setting the solver.
-#PARAMETER_BACKEND = Backend
-VAL_PARAMETER_BACKEND = sqa 
-
+# PARAMETER_BACKEND = backend
+VAL_PARAMETER_BACKEND = sqa
 
 ### Ising Model Parameters
 # Determines how network, constraints, and optimization goals are encoded
 # Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
 
-#PARAMETER_FORMULATION = \
-	ising_interface__formulation
-VAL_PARAMETER_FORMULATION = binarysplit
+# PARAMETER_GENERATORREPRESENTATION = ising_interface__generator_representation
+VAL_PARAMETER_GENERATORREPRESENTATION = with_status
 
-#PARAMETER_KIRCHSCALEFACTOR = \
-	ising_interface__kirchhoff__scale_factor
-VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__5.0__10.0
+# PARAMETER_LINEREPRESENTATION = ising_interface__line_representation
+VAL_PARAMETER_LINEREPRESENTATION = cutpowersoftwo
 
-PARAMETER_KIRCHFACTOR = \
-	ising_interface__kirchhoff__scale_factor
-VAL_PARAMETER_KIRCHFACTOR = 1.0
+# PARAMETER_KIRCHSCALEFACTOR = ising_interface__kirchhoff__scale_factor
+VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0
 
-#PARAMETER_MARGINALFORMULATION = \
-	ising_interface__marginalCost__formulation
+# PARAMETER_MARGINALFORMULATION = ising_interface__marginal_cost__formulation
 VAL_PARAMETER_MARGINALFORMULATION = binarysplit
 
-#PARAMETER_MONETARYCOSTFACTOR = \
-	"ising_interface__marginalCost__monetaryCostFactor"
-VAL_PARAMETER_MONETARYCOSTFACTOR = 0.2__0.3__0.4
+# PARAMETER_MONETARYSCALEFACTOR = ising_interface__marginal_cost__scale_factor
+VAL_PARAMETER_MONETARYSCALEFACTOR = 0.5
 
-#PARAMETER_MONETARYSCALEFACTOR = \
-	"ising_interface__marginalCost__scale_factor"
-VAL_PARAMETER_MONETARYSCALEFACTOR = 1.0__5.0__10.0
-
-#PARAMETER_OFFSETESTIMATIONFACTOR = \
-	ising_interface__marginalCost__offsetEstimationFactor
-VAL_PARAMETER_OFFSETESTIMATIONFACTOR_VAL = 1.1__1.2__1.3
-
-#PARAMETER_ESTIMATEDCOSTFACTOR = \
-	ising_interface__marginalCost__estimatedCostFactor
-VAL_PARAMETER_ESTIMATEDCOSTFACTOR_VAL = 1.0
-
-#PARAMETER_OFFSETBUILDFACTOR = \
-	ising_interface__marginalCost__offsetBuildFactor
-VAL_PARAMETER_OFFSETBUILDFACTOR_VAL = 1.0
-
-#PARAMETER_MINUPDOWNFACTOR = \
-	ising_interface__minUpDownTime__minUpDownFactor
-VAL_PARAMETER_MINUPDOWNFACTOR = 1.0
+# PARAMETER_OFFSETFACTOR = ising_interface__marginal_cost__offset_factor
+VAL_PARAMETER_OFFSETFACTOR_VAL = 1.2
 
 
 ### QAOA Parameters
-#PARAMETER_QAOASHOTS = \
-	QaoaBackend__shots
+# PARAMETER_QAOASHOTS = qaoa_backend__shots
 VAL_PARAMETER_QAOASHOTS = 500
 
-#PARAMETER_QAOASIMULATE = \
-	QaoaBackend__simulate
+# PARAMETER_QAOASIMULATE = qaoa_backend__simulate
 VAL_PARAMETER_QAOASIMULATE = True
 
-#PARAMETER_QAOANOISE = \
-	QaoaBackend__noise
+# PARAMETER_QAOANOISE = qaoa_backend__noise
 VAL_PARAMETER_QAOANOISE = True
 
-#PARAMETER_QAOASIMULATOR = \
-	QaoaBackend__simulator
+# PARAMETER_QAOASIMULATOR = qaoa_backend__simulator
 VAL_PARAMETER_QAOASIMULATOR = aer_simulator
 
-#PARAMETER_QAOAINITGUESS = \
-	QaoaBackend__initial_guess
-#TODO: Parse a list to run.py
-VAL_PARAMETER_QAOAINITGUESS = [rand rand]
+# PARAMETER_QAOAINITGUESS = qaoa_backend__initial_guess
+VAL_PARAMETER_QAOAINITGUESS = ['rand', 'rand']
 
-#PARAMETER_QAOAMAXITER = \
-	QaoaBackend__max_iter
-VAL_PARAMETER_QAOAMAXITER = 100
+# PARAMETER_QAOAMAXITER = qaoa_backend__max_iter
+VAL_PARAMETER_QAOAMAXITER = 30
 
-#PARAMETER_QAOAREPS = \
-	QaoaBackend__repetitions
-VAL_PARAMETER_QAOAREPS = 50
+# PARAMETER_QAOAREPS = qaoa_backend__repetitions
+VAL_PARAMETER_QAOAREPS = 20
 
-#PARAMETER_QAOACLASSICALOPT = \
-	QaoaBackend__classical_optimizer
+# PARAMETER_QAOACLASSICALOPT = qaoa_backend__classical_optimizer
 VAL_PARAMETER_QAOACLASSICALOPT = COBYLA
 
 
 ### SQA Parameters
-#PARAMETER_TRANSVERSEFIELD = \
-	sqa_backend__transverseFieldSchedule
+# PARAMETER_TRANSVERSEFIELD = sqa_backend__transverse_field_schedule
 VAL_PARAMETER_TRANSVERSEFIELD = 8.0
 
-#PARAMETER_SIQUAN_TEMP = \
-	sqa_backend__temperatureSchedule
+# PARAMETER_SIQUAN_TEMP = sqa_backend__temperature_schedule
 VAL_PARAMETER_SIQUAN_TEMP = 0.1
 
-#PARAMETER_TROTTERSLICES = \
-	sqa_backend__trotterSlices
-VAL_PARAMETER_TROTTERSLICES = 20__40__60__80__100
+# PARAMETER_TROTTERSLICES = sqa_backend__trotter_slices
+VAL_PARAMETER_TROTTERSLICES = 40__80
 
-#PARAMETER_OPTIMIZATIONCYCLES = \
-	sqa_backend__optimizationCycles
-VAL_PARAMETER_OPTIMIZATIONCYCLES = 10__20
+# PARAMETER_OPTIMIZATIONCYCLES = sqa_backend__optimization_cycles
+VAL_PARAMETER_OPTIMIZATIONCYCLES = 20
 
 
 ### D-Wave Quantum Annealer Parameters.
 # Requires an APIToken set in the config
-#PARAMETER_ANNEAL_TIME = \
-	DWaveBackend__annealing_time
+# PARAMETER_ANNEAL_TIME = dwave_backend__annealing_time
 VAL_PARAMETER_ANNEAL_TIME = 100
 
-#PARAMETER_NUM_READS = \
-	DWaveBackend__num_reads
+# PARAMETER_NUM_READS = dwave_backend__num_reads
 VAL_PARAMETER_NUM_READS = 200
 
-#PARAMETER_CHAINSTRENGTH = \
-	DWaveBackend__chain_strength
+# PARAMETER_CHAINSTRENGTH = dwave_backend__chain_strength
 VAL_PARAMETER_CHAINSTRENGTH = 60
 
-#PARAMETER_PROGTHERMALIZATION = \
-	DWaveBackend__programming_thermalization
+# PARAMETER_PROGTHERMALIZATION = dwave_backend__programming_thermalization
 VAL_PARAMETER_PROGTHERMALIZATION = 1
 
-#PARAMETER_READTHERMALIZATION = \
-	DWaveBackend__readout_thermalization
+# PARAMETER_READTHERMALIZATION = dwave_backend__readout_thermalization
 VAL_PARAMETER_READTHERMALIZATION = 1
 
-#PARAMETER_SAMPLECUTSIZE = \
-	DWaveBackend__sampleCutSize
-VAL_PARAMETER_SAMPLECUTSIZE = 200
+# PARAMETER_STRATEGY = dwave_backend__strategy
+VAL_PARAMETER_STRATEGY = lowest_energy
 
-#PARAMETER_STRATEGY = \
-	DWaveBackend__strategy
-VAL_PARAMETER_STRATEGY = LowestEnergy
-
-#PARAMETER_POSTPROCESS = \
-	DWaveBackend__postprocess
+# PARAMETER_POSTPROCESS = dwave_backend__postprocess
 VAL_PARAMETER_POSTPROCESS = flow
 
-#PARAMETER_DWAVETIMEOUT = \
-	DWaveBackend__timeout
+# PARAMETER_DWAVETIMEOUT = dwave_backend__timeout
 VAL_PARAMETER_DWAVETIMEOUT = 100
 
-#PARAMETER_SAMPLEORIGIN = \
-	DWaveBackend__sampleOrigin
-VAL_PARAMETER_SAMPLEORIGIN = \
-	infoNocost_220124cost5input_10_0_20.nc_300_200_fullsplit_60_1
+# PARAMETER_SAMPLEORIGIN = dwave_backend__sample_origin
+VAL_PARAMETER_SAMPLEORIGIN = filename
 
 
 ### GLPK Parameter
-#PARAMETER_PYPSASOLVERNAME = \
-	PypsaBackend__solver_name
+# PARAMETER_PYPSASOLVERNAME = pypsa_backend__solver_name
 VAL_PARAMETER_PYPSASOLVERNAME = glpk
 
-#PARAMETER_PYPSATIMEOUT = \
-	PypsaBackend__timeout
+# PARAMETER_PYPSATIMEOUT = pypsa_backend__timeout
 VAL_PARAMETER_PYPSATIMEOUT = 60
 
 ###### extra parameter string generation ######
@@ -293,7 +234,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-.docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py
+.docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
 
 
