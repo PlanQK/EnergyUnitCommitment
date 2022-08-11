@@ -704,7 +704,7 @@ class IsingBackbone:
         maximum output at the time slice 'time' in a given solution.
 
         Args:
-            gen: (str)
+            generator: (str)
                 The label of the generator.
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
