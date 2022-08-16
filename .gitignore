@@ -2,9 +2,10 @@
 venv/*
 *.pyc
 
-# pypsa input networks 
+# pypsa input networks
 networks/*
 !defaultnetwork.nc
+!network_4qubit_2_bus.nc
 
 # serialized pypsa networks except one for testing the service
 input/*.json
