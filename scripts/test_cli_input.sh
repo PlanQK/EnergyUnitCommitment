@@ -7,9 +7,8 @@
 
 # Build PlanQK service
 # --------------------
-# If you want to make the service on the actual platform you have to slightly adjust the 
-# PlanQK_requirements.txt file, changing the name to `requirements.txt`. and put it in a zip file with
-# the `src` folder
+# Zip the folder `src/` with the `requirements.txt` and upload it to the platform. If you want to build the 
+# image locally for testing, run `scripts/test_volume_input.sh` with the option `-b`
 
 # How to use
 # -----------

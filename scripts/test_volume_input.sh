@@ -4,8 +4,8 @@
 
 # Build PlanQK service
 # ------------------
-# If you want to make the service on the actual platform you have to slightly 
-# adjust the PlanQK_requirements.txt file, changing the name to `requirements.txt`
+# Zip the folder `src/` with the `requirements. If you want to build the image locally,
+# run this script with the option `-b`
 
 # How to use
 # ----------

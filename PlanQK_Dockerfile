@@ -21,4 +21,4 @@ RUN pip install minorminer==0.2.9
 
 COPY . ${USER_CODE_DIR}
 
-RUN pip install -r ${USER_CODE_DIR}/PlanQK_requirements.txt
+RUN pip install -r ${USER_CODE_DIR}/requirements.txt

@@ -71,8 +71,8 @@ into json files, which is the format used by the planqk service.
 
 
 ### Testing PlankQK service
-The folder `scripts` contains two short scripts to build the image similar to the one build by the platform. Further information can be found in these scripts. In order to
-build the service on the platform, you have to use `PlanQK_requirements.txt` and rename it as `requirements.txt`. When testing it with QAOA, keep in mind that it will 
+The folder `scripts` contains two short scripts to build the image similar to the one build by the platform. Further information can be found in these scripts. They will build an 
+image using the `PlankQK_Dockerfile`. When testing it with QAOA, keep in mind that it will 
 take forever if the network is not tiny. The result that is returned by the service when testing it locally, will be written to the 
 file `JobResponse` at the top level of the repository.
 
