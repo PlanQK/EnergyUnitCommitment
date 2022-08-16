@@ -1,11 +1,11 @@
 # This makefile is used for starting optimization runs. Using various parameters that can be set, it will generate
 # rules for the result files, and then generates them by starting a docker container. The possible recipes to be
 # made can be found at the bottom of the file.
-#
-# The optimization runs for which the rules are created by searching /networks for pypsa networks and /src/config
-# for config files. They can be specified using a glob expression. The result files will then consist of all combinations
-# networks and configs, and a string which indicates which parameters are overwritten by the makefile and the date when
-# the rule was created.
+
+# The optimization runs are initiated by searching /networks for pypsa networks and /src/config for config files.
+# These be specified using a glob expression. For each combination of these network and config files, a rule is
+# created for the result of an optimization using those as the input. A docker container running the optimization
+# is then started by executing those rules.
 
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
@@ -24,7 +24,7 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
 MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/configs,target=/energy/configs
-# only mount qpu results if there actually any results
+# only mount qpu results if there actually are any results. They are required for reusing annealer samples
 ifeq ("$(wildcard $(PROBLEMDIRECTORY)/results_qpu_sweep)", "")
 MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
 endif
@@ -35,22 +35,29 @@ MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURES
 # doesn't exist, it will be created. If no folder is specified, one will
 # be created using the name `results_general_sweep`
 # If specifiying your own folder, DON'T forget '/' for a valid folder name
-SAVE_FOLDER := 
+SAVE_FOLDER :=
 
 ###### define config file ######
 # this file is the default file which contains values for all valid configurations of all solvers.
-# Making will generate a run for each config file specified here. Other config files can be saved
+# Making the recipe will generate a run for each config file specified here. Other config files can be saved
 # in /src/configs
 CONFIGFILES = config-all.yaml
-# CONFIGFILES = almost_empty.yaml
-# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "config_[9][4-4].yaml" | sed 's!.*/!!' | sed 's!.po!!')
+
+# You can uncomment the line below adjust the glob expression to specify multiple config files
+# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "GLOB_EXPR" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
 # Choose a regex that will be used to search the networks folder for networks.
 # The default network is a randomly generated network containing 10 buses with
 # generators that produce integer valued power and a total load of 100
+
+# the default network with 10 buses that is in the repository
 NETWORKNAME = defaultnetwork.nc
-NETWORKNAME = network_4qubit_2_bus.nc
+# a network that is small enough for qaoa that is in the repository
+# NETWORKNAME = network_4qubit_2_bus.nc
+
+# a small network of pypsa-eur repo at https://github.com/PyPSA/pypsa-eur
+# some build networks can be found at https://zenodo.org/record/5521712
 # NETWORKNAME = elec_s_5.nc
 
 # lists networks to be used using NETWORKNAME
@@ -58,20 +65,22 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKN
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
-# possible options in src/configs.
+# possible options in src/configs. This part of the makefile is for overwriting config values
+# that are passed in the config file.
 # The name of the parameter has to be stored in a variable with the
 # PARAMETER_ prefix and the values for it in a variable with the
 # VAL_PARAMETER_ prefix. Only Parameters which have a name with the PARAMETER_ prefix
 # will be read and added to the config. You can enable/disable them by uncommenting them.
 #
-# Since there are multiple levels in the config dictionary the name has to
-# have the following pattern, indicating all levels:
-# "level1__level2__parameter". The value(s) on the other hand should be given
-# as a string separated by a "__".
-# E.g.	PARAMETER_KIRCHSCALEFACTOR = "ising_interface__kirchhoff__scale_factor"
-# 		VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0__2.0
-# Comment out any parameters not currently in use.
-# TODO logic for splitting up parameter values into multiple files to be made
+# Because a config dictionary is nested, the value of the name has to the keys by which
+# you have to descend into the dictionary to write the value. This is given by 
+# a string containing all keys and seperating them using `__`.
+#
+# For example, if the config file is empty, defining the parameters
+# 	PARAMETER_KIRCHSCALEFACTOR = ising_interface__kirchhoff__scale_factor
+# 	VAL_PARAMETER_KIRCHSCALEFACTOR = 1.0
+# would change the passed empty config file to the dictionary
+# 	{"ising_interface": {"kirchhoff" : {"scale_factor: 1.0}}}
 
 ### General Parameters
 # Uncommenting a line of the form #PARMETER_* will overwrite the value in the config
@@ -138,7 +147,7 @@ VAL_PARAMETER_TRANSVERSEFIELD = 8.0
 VAL_PARAMETER_SIQUAN_TEMP = 0.1
 
 # PARAMETER_TROTTERSLICES = sqa_backend__trotter_slices
-VAL_PARAMETER_TROTTERSLICES = 40__80
+VAL_PARAMETER_TROTTERSLICES = 80
 
 # PARAMETER_OPTIMIZATIONCYCLES = sqa_backend__optimization_cycles
 VAL_PARAMETER_OPTIMIZATIONCYCLES = 20
@@ -182,8 +191,9 @@ VAL_PARAMETER_PYPSASOLVERNAME = glpk
 VAL_PARAMETER_PYPSATIMEOUT = 60
 
 ###### extra parameter string generation ######
-
-join_with_underscore = $(subst $(eval) ,_,$(wildcard $1))
+# The parameters that will be overwritten are concatenated using `____` as a seperator
+# The method that starts the optimization run is able to parse a string which uses
+# `____` as seperators of nested entries and `__` as seperators of levels into a dictionary
 
 # combine each parameter name with its values, if it is not commented out
 EXTRAPARAMSEPARATE = $(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
@@ -193,6 +203,7 @@ EXTRAPARAMSEPARATE = $(foreach name, $(filter PARAMETER_%,$(.VARIABLES)), \
 # join all separate parameter___value pairs
 EXTRAPARAM = $(subst " ","____",$(foreach param, \
 				${EXTRAPARAMSEPARATE},$(param)))
+
 # if no Parameters are declared in the Makefile, the string will be set to an
 # empty string
 ifeq ($(EXTRAPARAM),)
@@ -231,36 +242,23 @@ $(foreach filename, $(SWEEPFILES), \
 # end of creating rules for results
 
 
-
 ###### Define further helper targets ######
 
 .docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
 
-
-# all plots are generated using the python plot_results script
-plots: $(VENV_NAME)/bin/activate
-	mkdir -p plots && . $(VENV_NAME)/bin/activate && python scripts/plot_results.py
-
-plt: $(VENV_NAME)/bin/activate
+# all plots are generated by running `scripts/make_plots.py`. This script uses scripts/plot_results.py
+plots: $(VENV_NAME)/bin/activate scripts/make_plots.py
 	mkdir -p plots && . $(VENV_NAME)/bin/activate && python scripts/make_plots.py
 
 $(VENV_NAME)/bin/activate: requirements.txt
 	test -d $(VENV_NAME) || python3.9 -m venv $(VENV_NAME)
-	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt
+	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn
 	touch $(VENV_NAME)/bin/activate
 
-# rules for making a sweep for a particular solver
+.PHONY: all plots general
 
-.PHONY: all clean plots quantumReadSweep general
-
-all: quantumReadSweep general
+all: general
 
 general: $(GENERAL_SWEEP_FILES)
 
-clean:
-	rm -rf Problemset/info*
-
-# create rules for make using a specific solver and setting the corresponding SAVE_FOLDER
-SOLVERS = classical sqa qpu qpu_read pypsa_glpk qaoa
-#TODO make rules
