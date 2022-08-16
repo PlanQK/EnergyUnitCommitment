@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  version: "1.0"
+  version: '1.0'
   title: Unit Commitment Problem
   description: |
     API description of the service solving the unit commitment problem
@@ -25,7 +25,7 @@ paths:
     post:
       tags:
         - Service API
-      summary: Asynchronous execution of a unit commitment solver
+      summary: Asynchronous execution of a unit commitment optimization run
       description: This starts the optimization of the unit commitment problem for a network. The location header of the response contains the URL which can be used to query the status and the result of the optimization.
       requestBody:
         required: true
@@ -48,7 +48,7 @@ paths:
                     backend_config:
                       type: object
                       default: {}
-                    API_token: 
+                    API_token:
                       type: object
                       properties:
                         IBMQ_API_token:
@@ -310,7 +310,7 @@ paths:
                     ]
                   }
                 }
-              } 
+              }
               params: {
                 "backend": "sqa",
                 "ising_interface": {
@@ -388,7 +388,7 @@ paths:
                 properties:
                   result:
                     type: object
-                    description: object containing a list of qubits which have spin -1 in the solution and additional information about the execution
+                    description: object containing a solution and various parameters about that solution
                   code:
                     type: string
                     description: service-specific error code representing the type of problem encountered
@@ -488,3 +488,15 @@ paths:
         "500":
           description: Internal server error
 
+components:
+  schemas:
+    job:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [UNKNOWN, PENDING, RUNNING, SUCCEEDED, FAILED]
+        createdAt:
+          type: string
