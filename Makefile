@@ -2,7 +2,7 @@
 # rules for the result files, and then generates them by starting a docker container. The possible recipes to be
 # made can be found at the bottom of the file.
 
-# The optimization runs are initiated by searching /networks for pypsa networks and /src/config for config files.
+# The optimization runs are initiated by searching /networks for pypsa networks and /config for config files.
 # These be specified using a glob expression. For each combination of these network and config files, a rule is
 # created for the result of an optimization using those as the input. A docker container running the optimization
 # is then started by executing those rules.
@@ -23,7 +23,7 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 # We also mount the folder containing the networks and the config files
 MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
 MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
-MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/configs,target=/energy/configs
+MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/configs,target=/energy/configs
 # only mount qpu results if there actually are any results. They are required for reusing annealer samples
 ifeq ("$(wildcard $(PROBLEMDIRECTORY)/results_qpu_sweep)", "")
 MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
@@ -40,11 +40,11 @@ SAVE_FOLDER :=
 ###### define config file ######
 # this file is the default file which contains values for all valid configurations of all solvers.
 # Making the recipe will generate a run for each config file specified here. Other config files can be saved
-# in /src/configs
+# in `configs`
 CONFIGFILES = config-all.yaml
 
 # You can uncomment the line below adjust the glob expression to specify multiple config files
-# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/src/configs -name "GLOB_EXPR" | sed 's!.*/!!' | sed 's!.po!!')
+# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "GLOB_EXPR" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
 # Choose a regex that will be used to search the networks folder for networks.
@@ -65,7 +65,7 @@ SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKN
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
-# possible options in src/configs. This part of the makefile is for overwriting config values
+# possible options in `configs`. This part of the makefile is for overwriting config values
 # that are passed in the config file.
 # The name of the parameter has to be stored in a variable with the
 # PARAMETER_ prefix and the values for it in a variable with the

@@ -20,8 +20,8 @@ results_*
 .docker.tmp
 
 # ignore yaml (config) files except the example
-src/configs/*.yaml
-!src/configs/config-all.yaml
+configs/*.yaml
+!configs/config-all.yaml
 
 # ignore zip file for service building and the test result of testing it
 *.zip

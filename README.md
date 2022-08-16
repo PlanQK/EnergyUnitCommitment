@@ -30,7 +30,7 @@ Currently, we support the following solvers for the unit commitment problem:
 The makefile contains variables that specify where the PyPSA network to be solved is stored, which config file to use, and can
 also be used to temporarily overwrite values in the config file. A brief overview of the parameters you can adjust are the following
 
-1. `CONFIGFILES` : This contains a glob which will be used to search the folder `src/configs/` for config files.
+1. `CONFIGFILES` : This contains a glob which will be used to search the folder `configs/` for config files.
 2. `NETWORKNAME` : This contains a glob which will be used to search the folder `networks/` for PyPSA networks.
 3. `SAVE_FOLDER` : This specifies a path relative to the repositiories's root where the results will be saved to.
 
@@ -40,7 +40,7 @@ and save it to `results_general_sweep`.
 
 ### Configuring a solver
 
-Which solver and which settings are used can be specified in a yaml file. The file `src/configs/config-all.yaml` contains information on all possible
+Which solver and which settings are used can be specified in a yaml file. The file `configs/config-all.yaml` contains information on all possible
 parameters that can be set for the various solvers, the structure that the config file has to have and the possibe values for each parameter. 
 
 
@@ -83,7 +83,7 @@ You can find further information on the PlanQK platform and [PyPSA](https://gith
 
 For more information on the solvers, you can have a look at `DESCRIPTION.md`, which is the description of the service on the platform and containts exlainations on the
 different solvers and configuration that you can use. The file `UseCaseDescription.md` gives a broad overview over the unit commitment problem. You can also find all valid 
-configuration parameters explained in the example file `src/configs/config-all.yaml`.
+configuration parameters explained in the example file `configs/config-all.yaml`.
 
 
 ## Contributing
