@@ -132,7 +132,7 @@ class AbstractDwaveSampler(BackendBase):
         ])
         self.output["results"] = {**self.output["results"], **result_info}
 
-    def transform_problem_for_optimizer(self) -> IsingBackbone:
+    def transform_problem_for_optimizer(self) -> None:
         """
         Initializes an ising_interface-instance, which encodes the Ising
         Spin Glass Problem, using the network to be optimized.

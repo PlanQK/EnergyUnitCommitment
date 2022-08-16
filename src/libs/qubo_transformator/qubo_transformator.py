@@ -28,8 +28,9 @@ class QuboTransformator:
                   "adding Kirchhoff constraint with Factor 1.0")
             self.config["kirchhoff"] = {"scale_factor": 1.0}
 
-        GeneratorEncoder.create_encoder(result, self.config.pop("generator_representation", "single_qubit")).encode_qubits()
-        LineEncoder.create_encoder(result, self.config.pop("line_representation","cutpowersoftwo")).encode_qubits()
+        GeneratorEncoder.create_encoder(result,
+                                        self.config.pop("generator_representation", "single_qubit")).encode_qubits()
+        LineEncoder.create_encoder(result, self.config.pop("line_representation", "cutpowersoftwo")).encode_qubits()
 
         for subproblem, subproblem_configuration in self.config.items():
             if subproblem not in self.subproblem_table:

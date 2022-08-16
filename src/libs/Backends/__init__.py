@@ -13,7 +13,7 @@ which serves as a layer of abstraction between the qubits and the network compon
 in conjunction with the `IsingSubproblem` interface, which can be used to encode a constraint in QUBO form.
 
 You can extend the networks that can be solved by extending the IsingBackbone class. In order to
-add a new constraint, you have a write a class that adheres to the `IsingSubproblem` interface. Then you pass
+add a new constraint, you have to write a class that adheres to the `IsingSubproblem` interface. Then you pass
 it as an entry to the `ising_backbone` value of the configuration.
 """
 

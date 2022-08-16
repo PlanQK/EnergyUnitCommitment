@@ -21,6 +21,7 @@ from typing import Union
 
 from .. import Backends
 
+
 class InputReader:
     """
     This class is a reader to obtain the configuration dictionary and

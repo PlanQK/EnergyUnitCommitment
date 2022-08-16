@@ -1,5 +1,5 @@
 """
-This small script converts configuration yamls and network netcdf4 files into
+This small script converts configuration yaml's and network netcdf4 files into
 json. In order to run, you have to install pypsa and PyYAML
 """
 
@@ -14,7 +14,7 @@ import pathlib
 
 usage_string = """
 This takes up to two arguments, one for the name of the file to be loaded, and one
-for the name of the file the json gets dumped to. Ommitting the last parameter will
+for the name of the file the json gets dumped to. Omitting the last parameter will
 set the save file name to the same name as the input but changing it to json
 
 networks are assumed to be in the folder sweetNetworks/
@@ -100,4 +100,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

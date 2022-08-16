@@ -1,6 +1,6 @@
 """This module uses IBM's qiskit runtime to implement the 
 QAOA (quantum approximate optimization algorithm). Using a noise model
-for the quantum circuit or using an actul quantum computer requires
+for the quantum circuit or using an actual quantum computer requires
 an API token"""
 
 import math
@@ -267,7 +267,7 @@ class QaoaAngleSupervisorGridSearch(QaoaAngleSupervisor):
 
     def transform_to_gridpoints(self, grid_dict):
         """
-        takes the dicitonary describing the initial angles of one layer of qaoa
+        takes the dictionary describing the initial angles of one layer of qaoa
         and constructs the corresponding list of angles
     
         Args:
@@ -303,7 +303,7 @@ class QaoaQiskit(BackendBase):
     @classmethod
     def create_optimizer(cls, reader: InputReader):
         """
-        A factory method for instantiaing the correct subclass of `QaoaQiskit`
+        A factory method for instantiating the correct subclass of `QaoaQiskit`
         which is the super class for all optimizer that perform QAOA.
 
         Args:
@@ -312,7 +312,7 @@ class QaoaQiskit(BackendBase):
                 of the solver and which optimizer to instantiate
 
         Returns:
-            (QaoaQiskit) An optimizer that perfoms QAOA using the settings passed
+            (QaoaQiskit) An optimizer that performs QAOA using the settings passed
                          in the `reader`.
         """
         if reader.config["backend_config"].setdefault("simulate", True):
@@ -440,8 +440,6 @@ class QaoaQiskit(BackendBase):
             (None)
                 The optimized solution is stored in the `self.output` dictionary.
         """
-        total_repetition = 0
-
         # create ParameterVector to be used as placeholder when creating the quantum circuit
         self.param_vector = ParameterVector("theta", self.num_angles)
         self.quantum_circuit = self.create_qc(theta=self.param_vector)
@@ -459,7 +457,7 @@ class QaoaQiskit(BackendBase):
             )
             # the objective function the classical optimizer optimizes. The value
             # is the expected value of the evaluating the parametrized quantum circuit 
-            # in regards to the kirchhoff measure as in `kirchhoff_score`
+            # with regard to the kirchhoff measure as in `kirchhoff_score`
             objective_function = self.get_circuit_objective_function(initial_guess)
 
             optimizer = self.get_classical_optimizer(self.max_iter)
@@ -930,7 +928,7 @@ class QaoaQiskit(BackendBase):
         rep_data = self.output["results"]["repetitions"]
         repetition_index_sorted_by_score = sorted(
             rep_data.keys(),
-            key=lambda repetition: rep_data[repetition]['optimized_result']["objective_function_value"]
+            key=lambda rep: rep_data[rep]['optimized_result']["objective_function_value"]
         )
         current_score_bracket = 0
         horizontal_break = "------------+---------+--" + self.num_angles * "------"
@@ -1068,7 +1066,7 @@ class QaoaQiskitCloudComputer(QaoaQiskitCloud):
 
         Returns:
             (dict)
-                A dicitonary containg the result of executing the circuit on
+                A dictionary containing the result of executing the circuit on
                 IBM's quantum hardware
         """
         # Submit job to real device and wait for results
