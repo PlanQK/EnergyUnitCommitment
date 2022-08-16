@@ -253,7 +253,7 @@ plots: $(VENV_NAME)/bin/activate scripts/make_plots.py
 
 $(VENV_NAME)/bin/activate: requirements.txt
 	test -d $(VENV_NAME) || python3.9 -m venv $(VENV_NAME)
-	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn
+	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn; python3.9 -m pip install pytest
 	touch $(VENV_NAME)/bin/activate
 
 .PHONY: all plots general

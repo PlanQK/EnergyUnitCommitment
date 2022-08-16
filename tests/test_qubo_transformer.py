@@ -1,22 +1,16 @@
 import pytest
 import typing
 
-import sys
-sys.path.append('../src')
-
 import pypsa
 
 import networkx as nx
 
-from libs.Backends.IsingPypsaInterface import IsingBackbone
+from src.libs.qubo_transformator import QuboTransformator
 
 
 @pytest.fixture(scope='session')
 def network_path():
-    network_path = "../networks/testNetwork4QubitIsing_2_0_20.nc"
-    network_path = "../networks/elec_s_5.nc"
-    # network_path = "../networks/20220629_network_5_0_20.nc"
-    # network_path = "../networks/20220629_network_3_0_20.nc"
+    network_path = "../networks/defaultnetwork.nc"
     return network_path
 
 
@@ -36,12 +30,12 @@ def network(network_path, num_snapshots):
 def config():
     config = {
         "backend": "sqa",
-        "ising_interface": {"formulation": "cutpowersoftwo"},
-        "snapshots": 4,
+        "ising_interface": {},
+        "snapshots": 3,
         "sqa_backend": {
             "transverse_field_schedule": "[8.0,0.0]",
             "temperature_schedule": "[0.1,iF,0.0001]",
-            "trotter_slices": 1500,
+            "trotter_slices": 1000,
             "optimization_cycles": 400,
         }
     }
@@ -49,6 +43,9 @@ def config():
 
 
 def ising_to_graph(interaction_list):
+    """
+    build the connected components of the ising interactions
+    """
     graph = nx.Graph()
     for interaction in interaction_list:
         if len(interaction) == 0:
@@ -60,14 +57,21 @@ def ising_to_graph(interaction_list):
     return nx.connected_components(graph)
 
 
-def test_kirchhoff(network, config):
-    ising_backbone = IsingBackbone.build_ising_problem(network, config["ising_interface"])
+def test_kirchhoff_distinct_snapshots(network, config):
+    """
+    test that without extra problems added, only the kirchhoff problem
+    is build and the interactions are distinct across snapshots
+    """
+    qubo_transformator = QuboTransformator(
+        network=network,
+        config=config["ising_interface"]
+    )
+    ising_backbone = qubo_transformator.transform_network_to_qubo()
     # only kirchhoff problem has been built
-    assert ising_backbone.problem == ising_backbone._subproblems["kirchhoff"].problem
-    # assert False
-    num_snapshots = len(network.snapshots)
-    connected_components_list = [comp for comp in ising_to_graph(ising_backbone.problem.keys())]
+    assert ising_backbone.ising_coefficients == ising_backbone._subproblems["kirchhoff"].ising_coefficients
 
-    # connected_components(ising_backbone.problem.keys())
+    # kirchhoff interactions are not connected across different snapshots
+    num_snapshots = len(network.snapshots)
+    connected_components_list = [comp for comp in ising_to_graph(ising_backbone.ising_coefficients.keys())]
     assert num_snapshots == len(connected_components_list)
     return
