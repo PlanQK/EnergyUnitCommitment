@@ -251,6 +251,10 @@ $(foreach filename, $(SWEEPFILES), \
 plots: $(VENV_NAME)/bin/activate scripts/make_plots.py
 	mkdir -p plots && . $(VENV_NAME)/bin/activate && python scripts/make_plots.py
 
+example_plots: $(VENV_NAME)/bin/activate scripts/make_plots_example.py
+	mkdir -p plots && mkdir -p results_csv && . $(VENV_NAME)/bin/activate && python scripts/make_plots_example.py
+
+
 $(VENV_NAME)/bin/activate: requirements.txt
 	test -d $(VENV_NAME) || python3.9 -m venv $(VENV_NAME)
 	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn; python3.9 -m pip install pytest
