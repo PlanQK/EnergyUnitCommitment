@@ -68,7 +68,6 @@ class InputReader:
                 configuration for the problem instances.
         """
         self.network, self.network_name = self.make_network(network)
-        self.network.snapshots = self.network.snapshots.astype(str)
         self.config = self.make_config(config)
         self.add_params_dict(params_dict)
         self.copy_to_backend_config()

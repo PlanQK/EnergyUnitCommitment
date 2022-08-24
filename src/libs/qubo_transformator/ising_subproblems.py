@@ -797,7 +797,11 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             kirchhoff_cost = 0.0
             for bus in self.network.buses.index:
                 kirchhoff_cost += self.calc_power_imbalance_at_bus_at_time(bus, time, solution) ** 2
-            result[time] = kirchhoff_cost
+            # cast to str if it is not admissable as a json key
+            if isinstance(time, int):
+                result[time] = kirchhoff_cost
+            else:
+                result[str(time)] = kirchhoff_cost
         return result
 
     def calc_kirchhoff_cost(self, solution: list) -> float:
