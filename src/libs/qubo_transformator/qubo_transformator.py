@@ -28,9 +28,13 @@ class QuboTransformator:
                   "adding Kirchhoff constraint with Factor 1.0")
             self.config["kirchhoff"] = {"scale_factor": 1.0}
 
+        # encode the network components into qubits
+        generator_representation = self.config.pop("generator_representation", "single_qubit")
+        line_representation = self.config.pop("line_representation", "cutpowersoftwo")
         GeneratorEncoder.create_encoder(result,
-                                        self.config.pop("generator_representation", "single_qubit")).encode_qubits()
-        LineEncoder.create_encoder(result, self.config.pop("line_representation", "cutpowersoftwo")).encode_qubits()
+                                        generator_representation).encode_qubits()
+        LineEncoder.create_encoder(result, 
+                                   line_representation).encode_qubits()
 
         for subproblem, subproblem_configuration in self.config.items():
             if subproblem not in self.subproblem_table:
@@ -48,5 +52,8 @@ class QuboTransformator:
         print("--- Finish generating Ising Problem with the following subproblems ---")
         for key in result._subproblems:
             print("--- - " + key)
+        # readd representation values to config for the result dict containing that info
+        self.config["generator_representation"] = generator_representation
+        self.config["line_representation"] = line_representation
 
         return result
