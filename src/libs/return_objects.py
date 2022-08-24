@@ -83,7 +83,6 @@ class ResultResponse(Response):
     def __init__(self, result: dict, metadata: dict = None):
         self.result = result
         self.metadata = metadata
-        self.file_name = result["file_name"]
 
     def dump_results(self, folder: str = "Problemset/"):
         """
@@ -96,5 +95,5 @@ class ResultResponse(Response):
         Returns:
             (None) Saves the optimization result to the mount point of the networks
         """
-        with open(f"{folder}{self.file_name}", "w") as write_file:
+        with open(f"{folder}{self.result['file_name']}", "w") as write_file:
             json.dump(self.result, write_file, indent=2, default=str)

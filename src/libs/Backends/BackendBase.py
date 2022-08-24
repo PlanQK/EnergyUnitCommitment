@@ -191,15 +191,17 @@ class BackendBase(abc.ABC):
                    insert results into later on.
         """
         start_time = self.get_time()
-        for backend, solverList in self.reader.backend_to_solver.items():
-            if self.config["backend"] in solverList:
+        for backend, solver_list in self.reader.backend_to_solver.items():
+            if self.config["backend"] in solver_list:
+                file_name = "_".join([self.config["backend"],
+                                      start_time + ".json"])
+                if self.network_name:
+                    file_name = "_".join([self.network_name,
+                                          file_name])
                 self.output = {
                     "start_time": start_time,
                     "end_time": "",
-                    "file_name": "_".join(
-                        [self.network_name, self.config["backend"],
-                         start_time + ".json"]
-                    ),
+                    "file_name": file_name,
                     "config": {
                         "backend": self.config["backend"],
                         "backend_type": backend,
