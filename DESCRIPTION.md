@@ -3,43 +3,45 @@ This service contains various solvers for optimizing a simplified version of the
 
 # Contents
 
-- [Input format](#Input_format)
+- [Input format](#Input_format_45)
 
-  - [Building the network in PyPSA](#Building_the_network_in_PyPSA)
+  - [Building the network in PyPSA](#Building_the_network_in_PyPSA_56)
 
-  - [Converting a network to JSON](#Converting_a_network_to_JSON)
+  - [Converting a network to JSON](#Converting_a_network_to_JSON_116)
 
-- [Service Configuration](#Service_Configuration)
+- [Service Configuration](#Service_Configuration_194)
 
-    - [Supported Solvers](#Supported_Solvers)
+    - [Supported Solvers](#Supported_Solvers_208)
 
-    - [Configuring the QUBO-model](#Configuring_the_QUBO-model)
+    - [Configuring the QUBO-model](#Configuring_the_QUBOmodel_249)
 
-        - [QUBO representation of a transmission line](#QUBO_representation_of_a_transmission_line)
+        - [QUBO representation of a transmission line](#QUBO_representation_of_a_transmission_line_275)
 
-        - [QUBO representation of a generator](#QUBO_representation_of_a_generator)
+        - [QUBO representation of a generator](#QUBO_representation_of_a_generator_289)
 
-    - [Encoding constraints](#Encoding_constraints)
+    - [Encoding constraints](#Encoding_constraints_318)
 
-        - [Kirchhoff constraint](#Kirchhoff_constraint)
+        - [Kirchhoff constraint](#Kirchhoff_constraint_333)
 
-        - [Marginal Costs](#Marginal_Costs)
+        - [Marginal Costs](#Marginal_Costs_352)
 
-    - [Solver Configuration](#Solver_Configuration)
+        - [Minimal power](#Minimal_power_398)
 
-        - [Simulated Quantum Annealing](#Simulated_Quantum_Annealing)
+    - [Solver Configuration](#Solver_Configuration_444)
 
-          - [Specifying a Schedule](#Specifying_a_Schedule)
+        - [Simulated Quantum Annealing](#Simulated_Quantum_Annealing_452)
 
-        - [Quantum Annealing](#Quantum_Annealing)
+          - [Specifying a Schedule](#Specifying_a_Schedule_471)
 
-        - [Quantum Approximation Optimization Algorithm (QAOA)](#Quantum_Approximation_Optimization_Algorithm_(QAOA))
+        - [Quantum Annealing](#Quantum_Annealing_501)
 
-        - [Mixed Integer Linear Programming](#Mixed_Integer_Linear_Programming)
+        - [Quantum Approximation Optimization Algorithm (QAOA)](#Quantum_Approximation_Optimization_Algorithm_QAOA_530)
 
-    - [API tokens](#API-token)
+        - [Mixed Integer Linear Programming](#Mixed_Integer_Linear_Programming_631)
 
-- [Output format](#Output-format)
+    - [API tokens](#APItoken_650)
+
+- [Output format](#Output_format_663)
 
 # Input format
 
@@ -219,16 +221,16 @@ The following solvers from [D-Waves ocean stack](https://docs.ocean.dwavesys.com
 
 The following table lists all supported solvers and how to choose them by passing the correct string to the `backend` field. 
 
-| solver            | keyword      | description                                                                               | uses QUBO | API token |
-|-------------------|--------------|-------------------------------------------------------------------------------------------|-----------|-----------|
-| sqa               | sqa          | performs simulated quantum annealing. Default solver if none is speficied                 | Yes       | None      |
-| annealing         | classical    | performs simulated annealing                                                              | Yes       | None      |
-| qaoa              | qaoa         | performs QAOA using IBM's qiskit by either simulating or accessing IBM's quantum computer | Yes       | IBMQ      |
-| glpk              | pypsa-glpk   | solves a mixed integer linear program obtained by pypsa using the GLPK solver             | No        | None      |
-| quantum annealing | dwave-qpu    | performs quantum annealing using d-waves quantum annealer                                 | Yes       | D-Wave    |
-| tabu search       | dwave-tabu   | performs tabu search                                                                      | Yes       | None      |
-| steepest decent   | dwave-greedy | performs steepest descent                                                                 | Yes       | None      |
-| hybrid solver     | dwave-hybrid | uses d-waves hybrid solver in the cloud                                                   | Yes       | D-Wave    |
+| solver              | keyword      | description                                                                               | uses QUBO | API token |
+|-------------------  |--------------|-------------------------------------------------------------------------------------------|-----------|-----------|
+| sqa                 | sqa          | performs simulated quantum annealing. Default solver if none is speficied                 | Yes       | None      |
+| simulated annealing | classical    | performs simulated annealing                                                              | Yes       | None      |
+| qaoa                | qaoa         | performs QAOA using IBM's qiskit by either simulating or accessing IBM's quantum computer | Yes       | IBMQ      |
+| glpk                | pypsa-glpk   | solves a mixed integer linear program obtained by pypsa using the GLPK solver             | No        | None      |
+| quantum annealing   | dwave-qpu    | performs quantum annealing using d-waves quantum annealer                                 | Yes       | D-Wave    |
+| tabu search         | dwave-tabu   | performs tabu search                                                                      | Yes       | None      |
+| steepest decent     | dwave-greedy | performs steepest descent                                                                 | Yes       | None      |
+| hybrid solver       | dwave-hybrid | uses d-waves hybrid solver in the cloud                                                   | Yes       | D-Wave    |
 
 Since the main focus of this service lies on (simulated) quantum annealing and the MILP reference solution, configuring tabu search, steepest descent and the hybrid algorithm will be added later. 
 By adding the example below to the `params` field, you can choose the simulated quantum annealing solver.
@@ -241,7 +243,7 @@ By adding the example below to the `params` field, you can choose the simulated 
 ```
 
 Because all solvers except the mixed integer linear program require a QUBO formulation, we will explain how to configure the QUBO model first.
-A good model has few and distinct low energy states, which leads to a high probability of sampling a good solution when using a heuristic.
+A good model has few and distinct low energy states, which leads to a high probability of sampling a good solution when using a heuristic solver.
 
 ----
 
@@ -250,9 +252,9 @@ A good model has few and distinct low energy states, which leads to a high proba
 The configuration of the model consists of two parts. First, you have to choose how network components, which can have various states, are represented as groups of variables. 
 Then, you have to specify for each constraint which method is used to encode it into the QUBO using the aforementioned variables.
 
-Each group of variables that represent a component has weights associated to them. These weights describe how much power
-a variable represents. Then the sum of all weighted involved variables represent how much power is associated to that component. 
-It depends on the type of the network component how it is interpreted in the context of different problem constraints. 
+Each group of variables that represent a component has weights associated to them. These weights describe how much power a variable represents. 
+Then the sum of all weighted involved variables represent how much power is associated to that component.
+It depends on the type of the network component how it is interpreted in the context of different problem constraints.
 Choosing different methods for encoding network components changes how many variables are used and how these weights are determined.
 
 #### Limiting snapshots
@@ -280,26 +282,26 @@ any subtotal of weights is smaller than the capacity of the line.
 The following table shows how to configure which transmission line representation to use when constructing the QUBO. The key in the `ising_interface` field is `line_representation` .
 All values are rounded to integers.
 
-| parameter value | description of line representation                                                   | additional information                                                                              |
-|-----------------|--------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| fullsplit       | each variable has a weight of 1 or -1                                                | scales linearly with line capacity, which results in a high runtime                                 |
-| customsplit     | compromise of minimizing number of variables and differences in magnitude of weights | only accepts capacity values between 1 and 4                                                        |
-| cutpowersoftwo  | binary representation in each direction with a cut off at the highest order          | cheapest option with regards to number variables , but has huge differences in magnitude of weights |
+| parameter value | description of line representation                                             | additional information                                                                              |
+|-----------------|--------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| fullsplit       | each variable has a weight of 1 or -1                                          | scales linearly with line capacity, which results in a high runtime                                 |
+| cutpowersoftwo  | binary representation in each direction with a cut off at the highest order    | cheapest option with regards to number variables , but has huge differences in magnitude of weights |
 
 #### QUBO representation of a generator
 
 Variables encoding a generator represent fixed amounts of generated power. The sum of all weights is equal to the maximal power it can produce.
 
-The unit commitment problem specifies a minimal power output for a generator. This can be archieved by transforming first-order interactions into second-order interactions with one qubit
-singled out as a status qubit, which has a weight equal to the minimal power output.
+The unit commitment problem specifies a minimal power output for a generator. This can be archieved by adding a constraint for every generator that turns the first qubit into a status qubit.
+This means that all states in which the status qubit of a generator is "off", but additional qubits are "on", are penalized while all other state are left unchanged.
 
 The following table shows how generators can be encoded. The key is `generator_representation`.
 All values are rounded to integers.
 
 | paramter value        | description of generator representation        |
 |-----------------------| ---------------------------------------------- |
-| single_qubit             | uses a single qubit with it's weight equal to the maximal power
+| single_qubit          | uses a single qubit with it's weight equal to the maximal power
 | integer_decomposition | binary decomposition of all integers in the range of maximal power. Ignores minimal power output
+| with_status           | similar to the option `integer_decomposition`, but first it adds a qubit with weight equal to the minimal power output to be used as a status qubit
 
 In total, choosing generator and transmission lines encodings add the following entries to the configuration:
 
@@ -307,7 +309,7 @@ In total, choosing generator and transmission lines encodings add the following 
 {
     "ising_interface": {
         "line_representation": "cutpowersoftwo",
-        "generator_representation": "single_qubit"
+        "generator_representation": "with_status"
     }
 }
 ```
@@ -316,9 +318,7 @@ In total, choosing generator and transmission lines encodings add the following 
 
 ### Encoding constraints
 
-Because a QUBO is by definition unconstrained, we have to turn the unit commitment contraints into a QUBO formulation similar to the method of [lagrangian multipliers](https://en.wikipedia.org/wiki/Lagrange_multiplier).
-For each constraint, the information how we transform it into a QUBO is written to the `ising_interface` field as another JSON-object. Each of these dictionaries have the key `scale_factor`
-which sets the lagrange multiplier when calculating the complete QUBO.
+Because a QUBO is by definition unconstrained, we have to turn the unit commitment constraints into a QUBO formulation similar to the method of [lagrangian multipliers](https://en.wikipedia.org/wiki/Lagrange_multiplier). For each constraint, the information how we transform it into a QUBO is written to the `ising_interface` field as another JSON-object. Each of these dictionaries have the key `scale_factor`, which sets the lagrange multiplier when calculating the complete QUBO.
 
 The following table describes all supported constraints. Each other key that is not listed in the colum of keywords in the `ising_interface` field is ignored.
 
@@ -326,8 +326,10 @@ The following table describes all supported constraints. Each other key that is 
 | -------------------- | ----------------------------------------------------
 | kirchhoff            | The kirchhoff constraint requires that the supplied energy is equal to the load at all buses
 | marginal_cost        | The marginal costs is to be minimal among all feasible solutions
+| minimal_power        | active generators have to produce a minimal amount of power, which is determined by the network
 
-We will now go over the various constraints, and how we can choose different approaches to encode it into a QUBO. While all these approaches are technically a correct way, they have different limitations and properties.
+We will now go over the various constraints, and how we can choose different approaches to encode it into a QUBO.
+While all these approaches are technically a correct way to encode a constraint, they have different limitations and properties with regard to their quality.
 
 #### Kirchhoff constraint
 
@@ -357,8 +359,8 @@ of the objective function.
 
 Therefore, this service implements the direct encoding, but also a second approach to describe the minimization of the marginal costs as a QUBO. The basic idea is that instead of encoding the objective
 function, we encode the squared distance of the objective function to an estimation. 
-The caveat is that the QUBO is technically only equivalent to the unit commitment problem if the estimation is close enough to the actual mininum.
-However, a solution of such a QUBO still gives us information how much the kirchhoff constraint had to be violated to get close enough to the estimation which lets us improve it.
+The caveat is that the QUBO is technically only equivalent to the unit commitment problem if the estimation is close enough to the actual minimum.
+However, a solution of such a QUBO still gives us information how much the kirchhoff constraint had to be violated to get close enough to the estimation which let's us improve it.
 
 The approach based on the estimation of the costs also has other benefits. First, the quadratic growth of the squared distance ensures that the constraint will always outscale the impact of the lagrange multipliers.
 The other benefit is that good estimations lead to well conditioned problems because the kirchhoff constraint and the marginal costs can be optimally solved by the same solution.
@@ -378,7 +380,7 @@ The parameter for configuring the estimation is `offset_factor`. When constructi
 are offset by the product of that factor and the cost of the most efficient generator. 
 Such an offset doesn't change the solution of the unit commitment problem because all feasible solution are offset by the same value.
 
-The estimation used to encode the marginal cost then assumes that the cost of the optimal solutin is zero with respect to the offset marginal costs.
+The estimation used to encode the marginal cost then assumes that the cost of the optimal solution is zero with respect to the offset marginal costs.
 Thus the estimated value for some `offset_factor` is the product of it, the marginal cost of the most efficient generator and the total load of the network.
 
 The strategy `global_cost_square_with_slack` has three more options on top of the `offset_factor`. It adds slack variables that act like generators that reduce marginal costs, but produce
@@ -393,6 +395,26 @@ The following table describes the parameters that are used to describe these sla
 |  slack_scale              | a float the scales all slack variable weights
 
 The only supported value for `slack_type` is `binary_power`, which configures weights of slack variables as ascending powers of two.  In conjuction with `slack_size`, which specifies how many slack variables are created, the slack in marginal costs can be set up as as any fixed length binary number. The `slack_scale` works similar to `scale_factor` scaling the weights of the slack variables.
+
+#### Minimal power
+
+The minimal power out is enforced by assuming that the first qubit at each time step is a status qubit.
+For each generator and timestep, second-order interactions of the involved qubits are added that add a penalty if and only if the first qubit is off and the other one is on.
+In order for this constraint to be accurate, you have to choose the `generator_representation` option `with_status`.
+
+You can add it to the QUBO by adding the following dictionary to the config:
+
+```
+{
+    "ising_interface": {
+        "minimal_power": {
+            "scale_factor": 1.0
+        }
+    }
+}
+```
+
+----
 
 In total, an example of a JSON-object for configuring the QUBO looks like this. 
 
@@ -409,6 +431,8 @@ In total, an example of a JSON-object for configuring the QUBO looks like this.
             "scale_factor": 0.3,
             "offset_factor": 1.0,
             "slack_type": "binary_power",
+
+
             "slack_scale": 0.1,
             "slack_size": 3,
         }
@@ -428,7 +452,7 @@ For each solver, a runtime duration is estimated and if exceeded, the optimizati
 
 #### Simulated Quantum Annealing
 This solver solves a QUBO using a monte carlo simulation of quantum annealing to find an optimal solution. You can find more information on simulated quantum annealing [here](https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/) and on quantum annealing [here](https://platform.planqk.de/algorithms/786e1ff5-991e-428d-a538-b8b99bc3d175/). More on the solver itself can be found [here](https://platform.lanqk.de/services/ff5c0cdd-4a87-4473-8086-cb658a9f85a2). 
-This service uses the same implementation as the SQA service, but also provides the translation of the unit commitment problem to a QUBO problem.
+This service uses the same implementation as the [SQA service](https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/), but also provides the translation of the unit commitment problem to a QUBO problem.
 
 The following table shows which  parameters can be adjusted.
 
@@ -442,14 +466,13 @@ seed                      | N/A               |  The seed used by the random num
 
 The first two parameters control how accurate the simulation is. This determines the quality of the solution, but also the runtime.
 The next two parameters describe a schedule. Thus, we explain what a schedule is and how it affects the solver. 
-Simulated quantum annealing simulates the continous evolution of a quantum state in multiple discrete time steps. A schedule determines the strength of a field in the simulation at each time step.
+Simulated quantum annealing simulates the continuous evolution of a quantum state in multiple discrete time steps.https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/ A schedule determines the strength of a field in the simulation at each time step.
 In our case, this is the temperature and the transverse field. The former is a measure of how much qubits can change their state, while the latter is the interaction strength between different trotter slices.
 
 ##### Specifying a Schedule
 
-A schedule is a function $f \colon [0,1] \rightarrow \mathbb{R}$ of the unit interval.  If the simulation consists of $n+1$ steps with the zeroth step $t_0 = 0$ and last step $t_n = 1$, the strength of a field according to that schedule at the $i$-th step is given as $f(\frac{i}{n})$.
-You can configure a schedule by passing a string, which are shorthands for refering to a member of a  family of functions.
-You can also concatenate different schedules in which case they get evenly distributed over the unit interval. The following table gives an overview over all admissable strings.
+A schedule is a function $f \colon [0,1] \rightarrow \mathbb{R}$ of the unit interval.  If the simulation consists of $n+1$ steps with the zeroth step $t_0 = 0$ and last step $t_n = 1$, the strength of a field according to that schedule at the $i$-th step is given as $f(\frac{i}{n})$. You can configure a schedule by passing a string, which are shorthands for refering to a member of a  family of functions.
+Different schedules can also be concatenated, in which case they get evenly distributed over the unit interval. The following table gives an overview over all admissable strings.
 
 Schedule String    |  Function                                                                                                        | Description
 ----------------   | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------
@@ -460,7 +483,7 @@ Schedule String    |  Function                                                  
 "[a,sF,b]"           |  $p \mapsto b + (a - b) \cdot (p-1)^2$                                                                           | A quadratic ramp from a to b that starts fast
 "[10,l,2,2,l,1]"     |  $p \mapsto \begin{cases} 10 - 16 \cdot p & p \leq \frac{1}{2} \\ 3 - 2 \cdot p & p \geq \frac{1}{2} \end{cases}$| first a linear ramp from 10 to 2 and then in the same time a linear ramp from 2 to 1
 
-Any string that adheres to the rules above is a valid value for the temperature or transverse field schedule. As general advice, both the number of trotter slices, as well as time steps increase the solution quality, but also increase the runtime linearly. Increasing them however has dimininishing returns on solution quality, with the number of time steps dminishing faster.
+Any string that adheres to the rules above is a valid value for the temperature or transverse field schedule. As general advice, both the number of trotter slices, as well as time steps increase the solution quality, but also increase the runtime linearly. Increasing them however has dimininishing returns on the solution quality.
 
 In total, a valid configuration for simulated quantum annealing looks like this.
 ```
@@ -480,7 +503,7 @@ In total, a valid configuration for simulated quantum annealing looks like this.
 
 Quantum Annealing uses D-Wave's advantage 4.1 quantum annealer to perform quantum annealing. Due to the hardware's limitations, problem size is significantly limited and solutions aren't as accurate as other solvers. You can find more information on the quantum annealer [here](https://docs.ocean.dwavesys.com/en/stable/overview/qpu.html) and more information on the parameters that the annealer accepts [here](https://docs.dwavesys.com/docs/latest/c_solver_parameters.html). The service builds the QUBO and commits it to D-Wave's cloud service. This solver requires a D-Wave API token.
 
-Only the parameters in the following table will be passed to the solver. The optimization itself doesn't have a time limit, but if the embedding onto the annealer's working graph takes to long, this service will cancel it.
+Only the parameters in the following table will be passed to the solver. The optimization itself doesn't have a time limit, but if the embedding onto the annealer's working graph takes to long, the execution will be cancelled.
 
 |  parameter       |  description  
 | ---------------- | ------------------------------------
@@ -497,7 +520,6 @@ In total, an example for the configuration of the quantum annealer looks like th
 
 ```
 "backend_config": {
-    timeout: 100,
     annealing_time: 50,
     num_reads: 200,
     chain_strength: 70
@@ -508,11 +530,11 @@ In total, an example for the configuration of the quantum annealer looks like th
 
 #### Quantum Approximation Optimization Algorithm (QAOA)
 
-The quantum approximation optimization algorithm build a parametrized quantum circuit to solve the problem. Then, it uses a classical optimizer to adjust the parameters so the circuit better fits the problem. You can find more information on QAOA and how it works [here](https://qiskit.org/textbook/ch-applications/qaoa.html). For the implementation of this service, you can choose to either simulate the circuit or access IBM's quantum computer to run it. If you want to use a quantum computer or the noise model of a quantum computer, you have to provide an API token.
+The quantum approximation optimization algorithm builds a parametrized quantum circuit to solve the problem. Then, it uses a classical optimizer to adjust the parameters so the circuit better fits the problem. You can find more information on QAOA and how it works [here](https://qiskit.org/textbook/ch-applications/qaoa.html). For the implementation of this service, you can choose to either simulate the circuit or access IBM's quantum computer to run it. If you want to use a quantum computer or the noise model of a quantum computer, you have to provide an API token.
 
-The problem Hamiltonian which is used to build the circuit can easily be obtained by transforming the QUBO that encodes the unit commitment problem into an equivalent ising spin-glass problem. Due to circuit-based architectures being extremely limited in size and a simulation of quantum circuits being, the problem size for this solver is also very limited.
+The problem Hamiltonian which is used to build the circuit can easily be obtained by transforming the QUBO that encodes the unit commitment problem into an equivalent ising spin-glass problem. Due to circuit-based architectures being extremely limited in size and a simulation of quantum circuits being computationally expensive, the problem size for this solver is also very limited.
 
-The following Table describes the various parameters that QAOA accepts.
+The following table describes the various parameters that QAOA accepts. An IBMQ token is requires unless no noise and a simulation of the circuit is chosen.
 
 |  parameter name       |  description                                                                                         |  possible values
 | --------------------  |  --------------------------------------------------------------------------------------------------  |  ----------------
@@ -564,12 +586,11 @@ The following JSON-object is an example for the a configuaration of QAOA using r
 
 ##### Grid Search
 
-|  initial_guess        |  a list of values used in choosing inital angles of the various layers of the quantum circuit        |  a list with floats or the string "rand" 
 
-The strategy `grid_search` initializes the angles from a grid of parameter values. For each layer of the quantum circuit, a lower and upper bound is given, aswell as the number of points to use.
+The strategy `grid_search` initializes the angles from a grid of parameter values. For each layer of the quantum circuit, a lower and upper bound is given, as well as the number of points to use.
 Then, the algorithm goes over all combination of points and uses them as inital angles for the layers.
 
-The only paremeter needed ist `inital_guess` which is a list of dictionaries, each specifying the grid for their respecitve layer of the circuit. The following table explains the entries these 
+The only paremeter needed is `inital_guess` which is a list of dictionaries, each specifying the grid for their respecitve layer of the circuit. The following table explains the entries these 
 dictionaries have:
 
 |  key             |   description                                                                                             |   type   |
@@ -606,11 +627,12 @@ The following JSON-object is an example for a configuration of the strategy `gri
 }
 ```
 
-This would start nine QAOA runs witha quantum circuit consisting of one layer with the initial angles being all combinations of the numbers $-2,0,2$.
+This would start nine QAOA runs with a quantum circuit consisting of one layer for the problem and one for the mixing hamiltonian with the initial angles being all combinations of the numbers $-2,0,2$.
 
 #### Mixed Integer Linear Programming
 
 The [mixed integer linear programming approach](https://en.wikipedia.org/wiki/Linear_programming) uses PyPSA's native method to cast the problem into a mixed integer linear program and solve it using GLPK. Because this is just a wrapper for PyPSA's native solving method, this has just one option for the maximal duration of the optimization.
+Keep in mind that the maximal optimization duration is already limited by the service.
 
 |   configuration key  |  impact            
 | -------------------- | ------------------ 
@@ -644,7 +666,6 @@ Using D-Wave's quantum hardware or using an IBM quantum computer for QAOA requir
 After a succesful calculation, this service returns a JSON object. This JSON-object has a field for storing all relevant result details. Is also saves the various parameters used to generate the result in order to give some context to the result and fills in default values that were used. The returned JSON has the following fields:
 
 - `results`: this contains information about the solution
-- `network`: the serialized network which's unit commitment problem was solved
 - `config`: the various configuration parameters that were passed to the solver
 - `start_time`, `end_time`: the start and end time in `yyyy-mm-dd-hh-mm-ss` format
 
