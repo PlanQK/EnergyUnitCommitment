@@ -88,5 +88,6 @@ configuration parameters explained in the example file `configs/config-all.yaml`
 
 ## Contributing
 
-If you wish to contribute, you can raise an [issue](https://github.com/PlanQK/UnitCommitment/issues) or get in touch with the owners of the repository via email.
+If you wish to contribute, you can raise an [issue](https://github.com/PlanQK/UnitCommitment/issues) or get in touch with the owners of the repository via email:
+daniel.herr@d-fine.ch, oliver.siccha@d-fine.de
 
