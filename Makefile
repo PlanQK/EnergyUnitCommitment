@@ -12,6 +12,10 @@ DOCKERCOMMAND := docker
 DOCKERFILE = Dockerfile
 DOCKERTAG = energy:1.0
 
+# For running multiple optimizations in parallel
+REPETITIONS = 4
+NUMBERS = $(shell seq 1 ${REPETITIONS})
+
 # a virtual environment to run stuff without a docker container
 VENV_NAME = venv
 
@@ -220,14 +224,15 @@ endif
 
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
-		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM}))
+		$(foreach number, ${NUMBERS}, \
+		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM}_${number})))
 
 
 ###### creating rules for result files ######
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
+${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
 	mkdir -p ${SAVE_FOLDER}
@@ -237,7 +242,8 @@ endef
 $(foreach filename, $(SWEEPFILES), \
 	$(foreach config, ${CONFIGFILES}, \
 	$(foreach extra, ${EXTRAPARAM}, \
-	$(eval $(call general, ${filename}, ${config}, ${extra})))))
+	$(foreach number, ${NUMBERS}, \
+	$(eval $(call general, ${filename}, ${config}, ${extra}, ${number}))))))
 
 # end of creating rules for results
 
