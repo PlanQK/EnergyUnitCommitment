@@ -17,6 +17,8 @@ import pypsa
 import xarray
 import yaml
 
+from os import environ
+
 from typing import Union
 
 from .. import Backends
@@ -121,7 +123,11 @@ class InputReader:
                 The network name.
         """
         if isinstance(network, str):
-            return pypsa.Network(f"Problemset/" + network), network
+            if environ.get("RUNNING_IN_DOCKER", False):
+                network_path = "Problemset/"
+            else:
+                network_path = "../networks/"
+            return pypsa.Network(network_path + network), network
         elif isinstance(network, dict):
             loaded_dataset = xarray.Dataset.from_dict(network)
             loaded_net = pypsa.Network()
@@ -164,7 +170,11 @@ class InputReader:
             except KeyError:
                 raise KeyError(f"The file format {filetype} doesn't match any supported "
                                f"format. The supported formats are {list(self.loaders.keys())}")
-            with open("configs/" + input_config) as file:
+            if environ.get("RUNNING_IN_DOCKER", False):
+                config_path = "configs/"
+            else:
+                config_path = "../configs/"
+            with open(config_path + input_config) as file:
                 result = loader(file)
         base_dict = {
             "API_token": {},
