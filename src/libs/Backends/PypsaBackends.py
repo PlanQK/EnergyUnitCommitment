@@ -49,6 +49,7 @@ class PypsaBackend(BackendBase):
 
         # avoid committing a generator and setting output to 0 
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
+        self.network.generators.p_min_pu = self.network.generators.p_max_pu
         self.transformed_problem = pypsa.opf.network_lopf_build_model(
             network=self.network,
             snapshots=self.network.snapshots,
@@ -127,7 +128,7 @@ class PypsaBackend(BackendBase):
             ).items():
                 total_cost += self.network.generators["marginal_cost"].loc[
                                  key[0]] * val
-                total_power += self.network.generators.p_nom.loc[key[0]] * val
+                total_power += val
             self.output["results"]["marginal_cost"] = total_cost
             self.output["results"]["total_power"] = total_power
 
