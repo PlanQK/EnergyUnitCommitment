@@ -7,7 +7,6 @@ API_token: # your token here
 
 # choose backend
 backend: "pypsa-glpk"
-backend: "sqa"
     # (string) the backend algorithm to be used. options are:
     # sqa based: "classical", "sqa", 
     # dwave based: "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
@@ -17,14 +16,13 @@ backend: "sqa"
 # all configuration data of the QUBO model of the network
 ising_interface:
     # values for specifiying network to qubit abstraction. all generator values are rounded to intgers
-    generator_representation: "single_qubit"
+    generator_representation: "with_status"
         # (string) name of the function how to model lines with qubits
         # choose between:
         #   - single_qubit (1 qubit per generator)
         #   - integer_decomposition (binary decomposition)
         #   - with_status (binary decomposition with correct status qubit)
     line_representation: "cutpowersoftwo"
-    line_representation: "fullsplit"
         # (string) name of the function how to model lines with qubits
         # choose between:
         #   - fullsplit (qubits of weight 1, -1)
@@ -37,27 +35,10 @@ ising_interface:
           # (float) weight of the kirchhoff subproblem in the QUBO
     # Adding Marginal cost optimization in the QUBO
     marginal_cost:
-        # 15 network
-        range_factor: 0.165
-        range_factor: 0.105
-        range_factor: 0.100
-        # offset: 0.19
-        # # 15 network
-        # offset: 0.39
-        # offset: 0.19
-        # offset: 0.031
-        target_cost: 037.8
-        target_cost: -0.0
-        target_cost: 377.8
-        # 15 network
-        target_cost: 627
-        target_cost: 1277.711612549044
-        scale_factor: 0.30
+        scale_factor: 0.6
           # (float) weight of the marginal cost optimization in the QUBO
         strategy: "global_cost_square"
-        # strategy: "global_cost_square_with_slack"
         # strategy: "global_cost_square"
-        # strategy:  marginal_as_penalty
             # (string) name of the class/procedure how to encode the marginal cost optimization
             # choose between:
             #   - global_cost_square,
@@ -69,29 +50,27 @@ ising_interface:
             # (string) this determines the method how slack variables weights are generated. this will generate powers of 2 as weights
             # choose between:
             #   - binary_power
-        slack_scale: 0.2
+        slack_scale: 0.1
             # (float) scalar factor for all slack variable weights
-        slack_size: 0
+        slack_size: 4
             # (int) number of slack variables to be used
         ### end *with_slack
         ### these values specifiy how costs are estimated if a formulation needs it (all but MarginalAsPenalty)
-        offset_factor: 1.325
-        # offset_factor: 1.0
-        # offset_factor: 1.315
+        offset_factor: 1.225
            # (float) factor that determines estimate of marginal cost. A Factor 1.0 corresponds to the estimation
            # obtained by using the most efficient rate for each unit of power that is required
         # these value only pertain the strategy "local_marginal_estimation"
-        # line_cost_factor: -1.0
+        line_cost_factor: -1.0
           # (double) factor how to consider line transmission in local costs
         ### end estimation config
 
     # This constraint turns the first qubit of each generator at at each time step into a status qubit. If the
     # generator_representation chosen is `with_status`, this will enforce the minimal output of committable generators
-    minimal_powera:
+    minimal_power:
         scale_factor: 1.0
           # (float) weight of he enforcement. status qubit are already scaled by the weight of the power interactions of non-status qubits
 
-    # snapshots: 1
+    snapshots: 1
     # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index
 
 qaoa_backend:
@@ -164,17 +143,16 @@ qaoa_backend:
 
 sqa_backend:
     # seed: 722225
-    # seed: 88367
         # (int) The initial seed of the sqa solver which is otherwise initialized randomly
     # schedule rules can be read in the platform description `DESCRIPTION.md`
     transverse_field_schedule: "[8.0,0.0]"
         # (string) transvere field schedule of the simulation
     temperature_schedule: "[0.1,iF,0.0001]"
         # (string) temperature schedule of the simultion
-    trotter_slices: 3600
+    trotter_slices: 500
         # (int) number of trotter slices to be used. The trotter slices are the discretization of the
         # continous quantum state
-    optimization_cycles: 450
+    optimization_cycles: 400
         # (int) number of discrete time steps to model the continous evolution
 
 
@@ -206,7 +184,7 @@ dwave_backend:
 
 
 pypsa_backend:
-    timeout: 180
+    timeout: 10
         # (int) how many second the MILP is allowed to calculate a solution. after this time, an (non-optimal) solution
         # will be returned
 

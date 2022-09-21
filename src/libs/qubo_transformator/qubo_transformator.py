@@ -48,6 +48,8 @@ class QuboTransformator:
             result._subproblems[subproblem] = subproblem_instance
             result.flush_cached_problem()
             subproblem_instance.encode_subproblem()
+            # print(subproblem)
+            # print(result.ising_coefficients_cached)
         print()
         print("--- Finish generating Ising Problem with the following subproblems ---")
         for key in result._subproblems:
@@ -55,5 +57,7 @@ class QuboTransformator:
         # readd representation values to config for the result dict containing that info
         self.config["generator_representation"] = generator_representation
         self.config["line_representation"] = line_representation
+        # print(result.get_hamiltonian_matrix())
+        # raise ValueError
 
         return result

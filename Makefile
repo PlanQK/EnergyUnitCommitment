@@ -13,6 +13,7 @@ DOCKERFILE = Dockerfile
 DOCKERTAG = energy:1.0
 
 # For running multiple optimizations in parallel
+REPETITIONS = 20
 REPETITIONS = 4
 NUMBERS = $(shell seq 1 ${REPETITIONS})
 
@@ -39,16 +40,19 @@ MOUNTALL := $(MOUNTSWEEPPATH) $(MOUNTLIBSPATH) $(MOUNTCONFIGSPATH) $(MOUNTQPURES
 # doesn't exist, it will be created. If no folder is specified, one will
 # be created using the name `results_general_sweep`
 # If specifiying your own folder, DON'T forget '/' for a valid folder name
-SAVE_FOLDER :=
+# SAVE_FOLDER := results_sqa_sweep/
 
 ###### define config file ######
 # this file is the default file which contains values for all valid configurations of all solvers.
 # Making the recipe will generate a run for each config file specified here. Other config files can be saved
 # in `configs`
 CONFIGFILES = config-all.yaml
+# CONFIGFILES = config-all?0.yaml
+# CONFIGFILES = almost_empty.yaml
+CONFIGFILES = config.yaml
 
 # You can uncomment the line below adjust the glob expression to specify multiple config files
-# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "GLOB_EXPR" | sed 's!.*/!!' | sed 's!.po!!')
+# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "$(CONFIGFILES)" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define sweep files ######
 # Choose a regex that will be used to search the networks folder for networks.
@@ -58,11 +62,20 @@ CONFIGFILES = config-all.yaml
 # the default network with 10 buses that is in the repository
 NETWORKNAME = defaultnetwork.nc
 # a network that is small enough for qaoa that is in the repository
-# NETWORKNAME = network_4qubit_2_bus.nc
+NETWORKNAME = network_4qubit_2_bus.nc
+NETWORKNAME = description_net_2_bus.nc
 
 # a small network of pypsa-eur repo at https://github.com/PyPSA/pypsa-eur
 # some build networks can be found at https://zenodo.org/record/5521712
-# NETWORKNAME = elec_s_5.nc
+NETWORKNAME = elec_s_5.nc
+
+NETWORKNAME = 20220908_network_3?_0_20.nc
+# NETWORKNAME = defaultnetwork.nc
+NETWORKNAME = 20220912_network_5_0_20.nc
+NETWORKNAME = 20220908_network_90_0_20.nc
+# NETWORKNAME = defaultnetwork.nc
+# NETWORKNAME = 20220907_network_15_0_20.nc
+NETWORKNAME = 20220908_network_30_0_20.nc
 
 # lists networks to be used using NETWORKNAME
 SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
@@ -97,6 +110,9 @@ VAL_PARAMETER_BACKEND = sqa
 ### Ising Model Parameters
 # Determines how network, constraints, and optimization goals are encoded
 # Used by any solver that uses a QUBO (sqa, dwave annealer, qaoa)
+
+# PARAMETER_FILE_NAME = file_name
+VAL_PARAMETER_FILE_NAME = example_name
 
 # PARAMETER_GENERATORREPRESENTATION = ising_interface__generator_representation
 VAL_PARAMETER_GENERATORREPRESENTATION = with_status
@@ -225,18 +241,20 @@ endif
 GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 		$(foreach config, ${CONFIGFILES}, \
 		$(foreach number, ${NUMBERS}, \
-		${SAVE_FOLDER}${filename}_${config}_${EXTRAPARAM}_${number})))
+		${SAVE_FOLDER}N${filename}_${config}_${number})))
 
+
+$(info ${EXTRAPARAM})
 
 ###### creating rules for result files ######
 # define general target
 
 define general
-${SAVE_FOLDER}$(strip $(1))_$(strip $(2))_$(strip $(3))_$(strip $(4)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
+${SAVE_FOLDER}N$(strip $(1))_$(strip $(2))_$(strip $(4)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
-	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) $(strip $(3))
+	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) file_name__N$(strip $(1))_$(strip $(2))_$(strip $(4))
 	mkdir -p ${SAVE_FOLDER}
-	mv $(PROBLEMDIRECTORY)/networks/$(strip $(1))_* ${SAVE_FOLDER}
+	mv $(PROBLEMDIRECTORY)/networks/N$(strip $(1))_$(strip $(2))_$(strip $(4)) ${SAVE_FOLDER}
 endef
 
 $(foreach filename, $(SWEEPFILES), \
@@ -247,6 +265,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 # end of creating rules for results
 
+# $(info ${GENERAL_SWEEP_FILES})
 
 ###### Define further helper targets ######
 
@@ -266,9 +285,12 @@ $(VENV_NAME)/bin/activate: requirements.txt
 	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn; python3.9 -m pip install pytest
 	touch $(VENV_NAME)/bin/activate
 
-.PHONY: all plots general
+.PHONY: all plots general clean_general
 
 all: general
 
-general: $(GENERAL_SWEEP_FILES)
+clean_general:
+	rm -f results_general_sweep/*
+
+general: clean_general $(GENERAL_SWEEP_FILES)
 

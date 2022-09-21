@@ -33,7 +33,7 @@ CONFIG = {
     # average generator cost per produced energy (this is a float)
     "av_marginal_cost": 5.0,
     # number of different time slices
-    "snapshots": 3,
+    "snapshots": 1,
     # scaling factor for line capacity in percent
     "line_scale": 20,
     # location where to save the network starting at git root
@@ -65,9 +65,9 @@ def normalize_output(output_list):
     Returns:
         (float, list[float]) The maximum entry of the list and the list divided by that
     """
+    if len(output_list) == 1:
+        return output_list[0], [1.0]
     max_element = max(*output_list)
-    print(f"max::{max_element}") 
-    print(f"output_list::{output_list}")
     return max_element, [value / float(max_element) for value in output_list]
 
 
@@ -242,10 +242,10 @@ def main():
     prefix = CONFIG.get('prefix', "")
     if CONFIG["prefix"] == "":
         prefix = f"{now.year}{now.month:02d}{now.day:02d}_network"
-    for num_buses in range(5, 6, 1):
+    for num_buses in range(5, 10, 2):
         CONFIG["num_buses"] = num_buses
         for i in range(int(sys.argv[1])):
-            current_networkname = f"{CONFIG['savepath']}/{prefix}_{CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}.nc"
+            current_networkname = f"../{CONFIG['savepath']}/{prefix}_{CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}.nc"
             if ospath.isfile(current_networkname):
                 print(f"skipping {prefix} with settings: {CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}")
                 continue

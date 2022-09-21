@@ -404,14 +404,19 @@ class IsingBackbone:
         """
         # constant contribution to cost function so that a configuration
         # that matches the target value has energy of 0
+        # print(set(label_dictionary.values()))
         self.add_interaction(global_factor * target ** 2)
 
         for first_component, first_factor in label_dictionary.items():
             factor = global_factor * first_factor
 
+        
             self.couple_component_with_constant(first_component,
                                                 - 2.0 * factor * target,
                                                 time=time)
+            # else:
+            #     # print(f"ENCODE::{target}")
+            #     pass
             for second_component, second_factor in label_dictionary.items():
                 current_factor = factor * second_factor
                 # attraction/repulsion term for different/same sign of power

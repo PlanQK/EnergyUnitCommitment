@@ -23,6 +23,8 @@ class BackendBase(abc.ABC):
         self.network = reader.get_network()
         self.network_name = reader.get_network_name()
         self.config = reader.get_config()
+        self.config_name = reader.get_config_name()
+        self.file_name = reader.get_file_name()
         self.setup_output_dict()
         self.transformed_problem = None
 
@@ -193,11 +195,13 @@ class BackendBase(abc.ABC):
         start_time = self.get_time()
         for backend, solver_list in self.reader.backend_to_solver.items():
             if self.config["backend"] in solver_list:
-                file_name = "_".join([self.config["backend"],
+                file_name = "_".join([self.config_name,
                                       start_time + ".json"])
                 if self.network_name:
                     file_name = "_".join([self.network_name,
                                           file_name])
+                if self.file_name:
+                    file_name = self.file_name
                 self.output = {
                     "start_time": start_time,
                     "end_time": "",

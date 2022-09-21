@@ -160,10 +160,13 @@ class InputReader:
             (dict)
                 The config stored in a dictionary.
         """
+        self.config_name = ""
         if isinstance(input_config, dict):
+            print("X")
             result = input_config
         else:
-            filetype = input_config.split(".")[-1]
+            filename, filetype = input_config.split(".")[-2:]
+            self.config_name = filename
             try:
                 # input_config is assumed to be the path if it is not a dict
                 loader = self.loaders[filetype]
@@ -244,6 +247,26 @@ class InputReader:
                 The self.config dictionary.
         """
         return self.config
+
+    def get_config_name(self) -> dict:
+        """
+        A getter for the config dictionary.
+
+        Returns:
+            (dict)
+                The self.config dictionary.
+        """
+        return self.config_name
+        
+    def get_file_name(self) -> dict:
+        """
+        A getter for the file the results gets dumped too
+
+        Returns:
+            (str)
+                the file name without path where the results are dumped
+        """
+        return self.config.get("file_name", "")
 
     def get_network(self) -> pypsa.Network:
         """
