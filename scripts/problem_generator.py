@@ -245,7 +245,7 @@ def main():
     for num_buses in range(5, 6, 1):
         CONFIG["num_buses"] = num_buses
         for i in range(int(sys.argv[1])):
-            current_networkname = f"{CONFIG['savepath']}/{prefix}_{CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}.nc"
+            current_networkname = f"../{CONFIG['savepath']}/{prefix}_{CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}.nc"
             if ospath.isfile(current_networkname):
                 print(f"skipping {prefix} with settings: {CONFIG['num_buses']}_{i}_{CONFIG['line_scale']}")
                 continue
