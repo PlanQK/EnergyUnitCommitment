@@ -400,7 +400,7 @@ class IsingBackbone:
         Returns:
             (None)
                 Modifies `self.ising_coefficients` and `self.cached_problem`
-        
+
         """
         # constant contribution to cost function so that a configuration
         # that matches the target value has energy of 0
@@ -618,7 +618,7 @@ class IsingBackbone:
         """
         Returns the dictionary that holds information on the encoding
         of the network into qubits.
-        
+
         Returns:
             (dict)
                 The dictionary with network component as keys and qubit
