@@ -254,6 +254,8 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
+.PHONY: all plots general clean_general
+
 .docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
 
@@ -270,9 +272,12 @@ $(VENV_NAME)/bin/activate: requirements.txt
 	. $(VENV_NAME)/bin/activate; python3.9 -m pip install -r requirements.txt; python3.9 -m pip install seaborn; python3.9 -m pip install pytest
 	touch $(VENV_NAME)/bin/activate
 
-.PHONY: all plots general
+venv: $(VENV_NAME)/bin/activate
 
 all: general
+
+clean_general:
+	rm -f results_general_sweep/*
 
 general: $(GENERAL_SWEEP_FILES)
 
