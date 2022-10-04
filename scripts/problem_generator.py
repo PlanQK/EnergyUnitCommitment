@@ -65,9 +65,9 @@ def normalize_output(output_list):
     Returns:
         (float, list[float]) The maximum entry of the list and the list divided by that
     """
+    if len(output_list) == 1:
+        return output_list[0], [1.0]
     max_element = max(*output_list)
-    print(f"max::{max_element}") 
-    print(f"output_list::{output_list}")
     return max_element, [value / float(max_element) for value in output_list]
 
 
