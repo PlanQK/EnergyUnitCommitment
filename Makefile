@@ -47,8 +47,12 @@ SAVE_FOLDER :=
 # in `configs`
 CONFIGFILES = config-all.yaml
 
-# You can uncomment the line below adjust the glob expression to specify multiple config files
-# CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "GLOB_EXPR" | sed 's!.*/!!' | sed 's!.po!!')
+# You can uncomment the CONFIGGLOB parameter below and adjust the glob expression to specify multiple config files
+# CONFIGGLOB = config*.yaml
+
+ifneq ($(CONFIGGLOB),)
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "$(CONFIGGLOB)" | sed 's!.*/!!' | sed 's!.po!!')
+endif
 
 ###### define sweep files ######
 # Choose a regex that will be used to search the networks folder for networks.
