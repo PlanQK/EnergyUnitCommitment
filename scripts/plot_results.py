@@ -20,7 +20,7 @@ import pandas as pd
 
 
 # the following methods are used for averaging data points. They all take a list, which are values
-# given by various optimization runs and returns a float.
+# given by various optimization runs and return a float.
 
 def mean_of_square_root(values: list) -> float:
     """
@@ -43,7 +43,7 @@ def mean_of_annealing_computing_cost(values: list) -> float:
     Returns the mean of the computing cost of a list of durations of quantum annealing
 
     This calculates the mean of the argument, but also provides scaling by a linear factor
-    that is read fom the environment variables because the cost depends on your contract
+    that is read from the environment variables because the cost depends on your contract
     In order to get the correct value, you have to export the `costperhour` variable with
     the correct price
 
@@ -201,7 +201,7 @@ class PlottingAgent:
         The files that are extracted can be specified in two ways. The `glob_dict`
         allows you to include json files, and the `constraints` argument allows you 
         to filter by runs with have specific values (usually configuration values)
-        
+
         Args:
             glob_dict: (dict)
                 a dictionary with solver names as keys and a list of glob expressions as values
@@ -286,7 +286,11 @@ class PlottingAgent:
 
     def aggregate_data(self, x_values: list, y_values: list, aggregation_methods: list):
         """
-        aggregation method for a list of y_values grouped by their corresponding xValue
+        Aggregates a list of y_values by their x_values.
+
+        The two arguments `x_values` and `y_values` have to have the same length. Each pair
+        of entries at the the same index are interpreted as one point, so the input
+        x_values=[0,1], y_values=[3,4] is interpreted as the two points (0,3) and (1,4)
 
         Args:
             x_values: (list)
@@ -295,6 +299,7 @@ class PlottingAgent:
                 list if y_values for points in a data set
             aggregation_methods: (list)
                 list of arguments that are accepted by pandas data frames' groupby as aggregation methods
+                They are either strings or functions that are defined at the beginning of this file
 
         Returns:
             (pd.DataFrame) A pd.DataFrame with x_values as indices of a groupby by the argument aggregation_methods
@@ -334,13 +339,12 @@ class PlottingAgent:
             split_fields: (list)
                 A list with keys by which the extracted data should be grouped.
             constraints: (dict)
-                A dictionary of values that the .json file has to have to be included in the plot. The key has to be identical
-                to the key in the .json file. In combination with it a list with all acceptable values has to be given. If a
-                .json file doesn't have this key or a listed value, it is ignored.
+                A dictionary of values that the .json file has to have to be included in the plot.
+                The key has to be identical to the key in the .json file. In combination with it a
+                list with all acceptable values has to be given. If a json file doesn't have this key
+                 or a listed value, it is ignored.
             aggregate_method: (str|callable)
-                The methd that the pandas.DatFrame acces to `agg` the y-values
-            reduction_method: (func)
-                The function to be used to reduce values into one float value.
+                The method that the pandas.DataFrame uses to aggregate a list of y-values into a value to plot
             error_method: (callable)
                 The function to be used to plot error bars.
             logscale_x: bool
@@ -355,6 +359,13 @@ class PlottingAgent:
                 Title of the plot
             plottype: (str)
                 a string indicating which kind of plot to make
+                 "line"
+                 "scatterplot"
+                 "histogramm"
+                 "boxplot"
+                 "cumulative"
+                 "density"
+
             regression: (bool)
                 Who knows that it does
 
@@ -655,19 +666,25 @@ class DataExtractor:
         """
         with open(file_name) as file:
             file_data = json.load(file)
-        # Data Frame containing a single row with columns as the data fields that every solver run
-        # contains. Additional solver dependent information is merged on this data frame
-        general_data = pd.DataFrame({"solver": solver,
-                                     **{key: [file_data[key]] for key in self.general_fields}
-                                     }
-                                    )
-        solver_dependent_data = [
-            self.expand_solver_dict(solverDependentKey, file_data[solverDependentKey])
-            for solverDependentKey in self.solver_keys[solver]
-        ]
-        for solver_dependent_field in solver_dependent_data:
-            general_data = pd.merge(general_data, pd.DataFrame(solver_dependent_field), how="cross")
-        return general_data
+
+        result_dict = {}
+        self.add_config(result_dict, file_data["config"])
+        self.add_result(result_dict, file_data["results"])
+        return pd.DataFrame(result_dict)
+
+    def add_config(self, result_dict, config):
+        result_dict["backend"] = config["backend"]
+        result_dict.update(config["backend_config"])
+        for subproblem, subproblem_config in config.get("ising_interface", {}).items():
+            try:
+                result_dict.update(
+                    {subproblem + "__" + key: [val] for key, val in subproblem_config.items()}
+                )
+            except AttributeError:
+                continue
+
+    def add_result(self, result_dict, result):
+        result_dict.update({key: [val] for key, val in result.items()})
 
 
 if __name__ == "__main__":
