@@ -17,7 +17,7 @@ This takes up to two arguments, one for the name of the file to be loaded, and o
 for the name of the file the json gets dumped to. Omitting the last parameter will
 set the save file name to the same name as the input but changing it to json
 
-networks are assumed to be in the folder sweetNetworks/
+networks are assumed to be in the folder networks/
 config files are assumed to be in the folder configs/
 
 convert_to_json some_network_or_config_with_ending save_file_without_json
@@ -61,7 +61,7 @@ def convert_config(input_name: str, output_name: str):
     """
     Takes the name of a config file in yaml format in `configs`, converts it 
     to json, and dumps it to `input` using the output_name
-    
+
     Args:
         input_name: (str)
             the name of the input configuration without the file extension
@@ -70,7 +70,7 @@ def convert_config(input_name: str, output_name: str):
     """
     input_path = os.path.join(path_prefix, "configs", input_name) + ".yaml"
     output_path = os.path.join(path_prefix, "input", output_name) + ".json"
-    
+
     with open(input_path, 'r') as yaml_input,  open(output_path, "w") as json_out:
         print("read configuration")
         yaml_object = yaml.safe_load(yaml_input)
@@ -82,7 +82,7 @@ def main():
     if len(sys.argv) == 1:
         print(usage_string)
         return
-    
+
     # setup file names
     set_path_prefix()
     input_name, file_extension = os.path.splitext(sys.argv[1])
