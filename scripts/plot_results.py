@@ -235,7 +235,7 @@ class PlottingAgent:
 
     def get_data_points(self,
                         x_field: str,
-                        y_field_list: str,
+                        y_field_list: list,
                         splitting_fields: list,
                         constraints: dict):
         """
@@ -257,8 +257,11 @@ class PlottingAgent:
         Returns:
             (dict) a dictonary over groupby indices with values being dictionaries over y_field labels
         """
-        data_frame = self.data_extractor.get_data(constraints)[[x_field] + y_field_list + splitting_fields]
         result = {}
+        try:
+            data_frame = self.data_extractor.get_data(constraints)[[x_field] + y_field_list + splitting_fields]
+        except KeyError:
+            return result
         if splitting_fields:
             grouped_data_frame = data_frame.groupby(splitting_fields, dropna=False).agg(list)
             for idx in grouped_data_frame.index:
@@ -268,8 +271,8 @@ class PlottingAgent:
                 else:
                     idx_tuple = idx
                 key = tuple([
-                    split_field + "=" + str(idx_tuple[counter])
-                    for counter, split_field in enumerate(splitting_fields)
+                    split_field + "=" + str(idx_tuple[split_field_index])
+                    for split_field_index, split_field in enumerate(splitting_fields)
                 ])
                 result[key] = {
                     y_field: (grouped_data_frame.loc[idx][x_field], grouped_data_frame.loc[idx][y_field])
@@ -367,14 +370,16 @@ class PlottingAgent:
             splitting_fields=split_fields
         )
 
-        for splitfieldKey, dataDictionary in data.items():
-            for yField, y_field_values in dataDictionary.items():
+        # Each loop corresponds to one group in the groupby the
+        # splitting fields
+        for splitfield_key, data_dictionary in data.items():
+            for y_field, y_field_values in data_dictionary.items():
                 x_coordinate_list = y_field_values[0]
                 y_coordinate_list = y_field_values[1]
-                if splitfieldKey:
-                    label = str(splitfieldKey) + "_" + yField
+                if splitfield_key:
+                    label = str(splitfield_key) + "_" + y_field
                 else:
-                    label = yField
+                    label = y_field
                 y_field_list_stripped = ", ".join(y_field_list)
 
                 if plottype == "line":
@@ -476,7 +481,6 @@ class DataExtractor:
     # list of all keys for data entries, that every result file of a solver has
     general_fields = [
         "file_name",
-        "input_file",
         "problem_size",
         "scale",
         "timeout",
@@ -524,6 +528,8 @@ class DataExtractor:
         agent = DataExtractor()
         agent.df = pd.read_csv(filename)
         agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        if agent.df.empty:
+            print("Data of optimization runs is empty!")
         return agent
 
     @classmethod
@@ -550,6 +556,8 @@ class DataExtractor:
             agent.df = agent.df.append(agent.extract_data(solver, glob_list, ))
         agent.df = agent.filter_by_constraint(constraints)
         agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        if agent.df.empty:
+            print("Data of optimization runs is empty!")
         return agent
 
     def expand_solver_dict(self, dict_key: str, dict_value: str):

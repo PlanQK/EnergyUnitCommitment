@@ -1,22 +1,22 @@
 """
-This file is an example how to use plot_results.py to generate plots of the optimization runs.
-This involves two step. First you have to load a data set. We can use that data to make PlotAgent
-which can generate plots based on the data you provided to it.
+This file is an example how to use plot_results.py to generate plots of the optimization
+runs. This involves two step. First you have to load a data set. We can use that data to
+make an instance of `PlotAgent` which can generate plots based on the data you provided to it.
 
-There are two ways to load the data which happens when you make a PlotAgent. The first way is to search
-the various results folders using glob expressions. You can also apply filters to the search results
-which will filter out all result files who don't have values specified you. If you have a lot of optimization
-runs, this will take a lot of time. Therefore, plot_results can also generate a PlotAgent by using a pandas
-dataframe. All plots will then be based on the data of that frame. If you use a glob to search the various
-json files, you can also save the pandas dataframe that you need to quickly reread the same data set. In the
-end all results will be saved in a pandas DataFrame.
+There are two ways to load the data which happens when you make a PlotAgent. The first way
+is to search the various results folders using glob expressions. You can also apply filters
+to the search results which will filter out all result files who don't have values specified by
+you. If you have a lot of optimization runs, this will take a lot of time. Therefore,
+`plot_results` can also generate a PlotAgent by using a pandas dataframe. All plots will then
+be based on that data frame. If you use a glob to search the various json files, you
+can also save the pandas dataframe that you need to quickly reread the same data set.
 
-After initializing a PlotAgent, you can then use that data to generate plots using `make_figure`. In general,
-this requires the name how you want to save the plot. More information on how to use it can be found in the
-documentation of that method.
+After initializing a PlotAgent, you can then use that data to generate plots using
+`make_figure`. In general, this requires the name how you want to save the plot. More information
+on how to use it can be found in the documentation of that method.
 
-You can then run the script `makePlots.py` by either running it directly, or making the recipe `plt` which 
-activates the appropriate environment for you.
+You can then run the script `make_plots.py` by either running it directly, or making the recipe
+`plots` which activates the appropriate environment for you.
 """
 
 from plot_results import *
