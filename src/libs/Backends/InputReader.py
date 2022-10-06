@@ -73,6 +73,8 @@ class InputReader:
         self.config = self.make_config(config)
         self.add_params_dict(params_dict)
         self.copy_to_backend_config()
+        if "snapshots" in self.config:
+            self.network.snapshots = self.network.snapshots[:self.config["snapshots"]]
         # print final config, but hide api tokens
         config_without_token = copy.deepcopy(self.config)
         for provider, token in self.config.get("API_token", {}).items():

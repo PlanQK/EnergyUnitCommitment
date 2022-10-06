@@ -133,17 +133,11 @@ class PypsaBackend(BackendBase):
             self.output["results"]["total_power"] = total_power
 
             self.output["results"]["unit_commitment"] = {
-                gen[0]: value for gen, value in
+                str(gen): value for gen, value in
                 self.transformed_problem.generator_status.get_values().items()
             }
-            # list of indices of active generators
-            self.output["results"]["state"] = [
-                idx for idx in range(len(self.network.generators))
-                if self.output["results"]["unit_commitment"][
-                       self.network.generators.index[idx]] == 1.0
-            ]
             self.output["results"]["powerflow"] = {
-                line[1]: value for line, value in
+                str(line[1:]): value for line, value in
                 self.transformed_problem.passive_branch_p.get_values().items()
             }
             # solver only allows feasible solutions 
