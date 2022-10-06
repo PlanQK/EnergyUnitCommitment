@@ -20,7 +20,7 @@ class Response:
         Returns:
             (str) The serialized response as a string
         """
-        return json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)), sort_keys=True)
+        return json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)), sort_keys=True, indent=2)
 
     @abstractmethod
     def dump_results(self, folder: str = "Problemset/"):
