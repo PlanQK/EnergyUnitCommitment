@@ -211,7 +211,7 @@
 	},
 	"params": {
 	  "APItoken": {
-		"IBMQ_API_token": "01db0f263e0ab5ec4214ca2652330899ea195c4a737139dda145d871b8a200e2d563ee839d9031153e10a3a5e32d223e39b11b17555d400aef5ed365861407dd",
+		"IBMQ_API_token": "",
 		"dWave_API_token": ""
 	  },
 	  "Backend": "qaoa",
