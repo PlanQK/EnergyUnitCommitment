@@ -1,15 +1,18 @@
+from unittest import result
+from urllib import response
 import streamlit as st
 import time
-
-from program import run
-
-import pypsa
+import requests
 
 import json
 import yaml
 
 from contextlib import redirect_stdout
 import io
+
+url = ""
+with open("/url.txt", "r") as f:
+    url = f.readline().strip()
 
 
 st.set_page_config(layout="wide")
@@ -26,8 +29,8 @@ if "init" not in state:
 
 def get_network(network_file):
     with open("hack_file.nc", 'wb') as f:
-        f.write(network.getvalue())
-    state.network = pypsa.Network("./hack_file.nc")
+        f.write(network_file.getvalue())
+    state.network = "./hack_file.nc"
 
 def get_config(config):
     state.config = yaml.safe_load(config)
@@ -68,12 +71,26 @@ else:
     if starter:
 
         with st.spinner('Wait for it...'):
-            f = io.StringIO()
-            with redirect_stdout(f):
-                response = run(data=state.network, params=state.config)
-            state.logs = f.getvalue()
-            state.result = response.to_json()
-            state.result_dict = response.result
+
+            files = {
+                'network':open("hack_file.nc", 'rb')
+            }
+            requests.request("POST", url + "upload_network", files=files, headers={}, data={})
+            print("uploaded network")
+            
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "network":"hack_file.nc",
+                "config":state.config
+            }
+            
+            response = requests.request("POST", url + "start", headers=headers, data=json.dumps(payload))
+
+            state.result = response.json()
+            state.logs = state.result['logs']
+            state.result_dict = state.result['result']
             st.success('Done!')
 
 if state.result is not None:
@@ -89,13 +106,4 @@ if state.result is not None:
         with st.expander("JSON Result"):
             st.json(state.result)
     with col2:
-        st.download_button("Download JSON", data=state.result, file_name="result.json")
-
-    if len(state.network.snapshots) > 1:
-        generator = st.selectbox("Choose a generator", list(state.network.generators.index))
-        snapshots = state.network.snapshots
-        unit_commitment = state.result_dict["results"]["unit_commitment"]
-        x_axis = [str((generator, snapshot)) for snapshot in snapshots]
-        y_axis = [unit_commitment[key] for key in x_axis]
-        st.line_chart(y_axis)
-
+        st.download_button("Download JSON", data=json.dumps(state.result), file_name="result.json")
