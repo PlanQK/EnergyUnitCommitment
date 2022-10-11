@@ -9,6 +9,8 @@ from typing import Union
 import pypsa
 from loguru import logger
 
+import traceback
+
 from os import environ
 
 try:
@@ -78,13 +80,8 @@ def run(
         logger.info("Calculation successfully executed")
         return ResultResponse(result=output)
     except Exception as e:
-        # reraise exception to get stack trace. if the environment variable exists,
-        # it is assumed that the program is running locally and not on the planqk service
-        if environ.get("RUNNING_IN_DOCKER", False):
-            raise e
-        error_code = "500"
-        error_detail = f"{type(e).__name__}: {e}"
-        logger.info("An error occurred")
-        logger.info(f"error code: {error_code}")
-        logger.info(f"details: {error_detail}")
-        return ErrorResponse(code=error_code, detail=error_detail)
+        logger.error(
+            "An error occured while processing. Error reads:"
+            "\n" + traceback.format_exc()
+        )
+        return ErrorResponse(code="500", detail=f"{type(e).__name__}: {e}")
