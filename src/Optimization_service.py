@@ -1,11 +1,12 @@
+from unittest import result
+from urllib import response
 import streamlit as st
 import time
 
-from program import run
-
-import pypsa
 import pandas as pd
 import altair as alt
+
+import requests
 
 import json
 import yaml
@@ -14,6 +15,12 @@ from contextlib import redirect_stdout
 import io
 
 from ast import literal_eval
+
+# TODO
+url = ""
+with open("/url.txt", "r") as f:
+    url = f.readline().strip()
+
 
 st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state
@@ -93,7 +100,8 @@ def get_network_info(post_response):
 def get_network(network_file, upload_id):
     with open("hack_file.nc", 'wb') as f:
         f.write(network_file.getvalue())
-    state.network = pypsa.Network("./hack_file.nc")
+    # TODO
+    state.network = "./hack_file.nc"
     get_network_info(
         dummy_response(state.network)
     )
@@ -143,12 +151,26 @@ else:
     if starter:
         get_network(network, network.id)
         with st.spinner('Wait for it...'):
-            f = io.StringIO()
-            with redirect_stdout(f):
-                response = run(data=state.network, params=state.config)
-            state.logs = f.getvalue()
-            state.result = response.to_json()
-            state.result_dict = response.result
+
+            files = {
+                'network':open("hack_file.nc", 'rb')
+            }
+            requests.request("POST", url + "upload_network", files=files, headers={}, data={})
+            print("uploaded network")
+            
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "network":"hack_file.nc",
+                "config":state.config
+            }
+            
+            response = requests.request("POST", url + "start", headers=headers, data=json.dumps(payload))
+
+            state.result = response.json()
+            state.logs = state.result['logs']
+            state.result_dict = state.result['result']
             st.success('Done!')
 
 
