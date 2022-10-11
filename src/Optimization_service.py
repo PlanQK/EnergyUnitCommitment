@@ -22,7 +22,7 @@ state = st.session_state
 # Process and display result data
 def transform_result_to_frame(result_dict, network_components):
     data_table = []
-    snapshots = state.network.snapshots
+    snapshots = get_network_snapshots()
     for component in network_components:
         keys = [str((component, snapshot)) for snapshot in snapshots]
         df_row = [component] + [result_dict[key] for key in keys]
@@ -31,13 +31,13 @@ def transform_result_to_frame(result_dict, network_components):
     df = df.set_index(df.columns[0])
     return df
 
-# @st.cache
+@st.cache(show_spinner=False)
 def create_generator_frame(result):
-    return transform_result_to_frame(result["results"]["unit_commitment"], state.network.generators.index)
+    return transform_result_to_frame(result["results"]["unit_commitment"], get_network_generators())
 
-# @st.cache
+@st.cache(show_spinner=False)
 def create_line_frame(result):
-    return transform_result_to_frame(result["results"]["powerflow"], state.network.lines.index)
+    return transform_result_to_frame(result["results"]["powerflow"], get_network_lines())
 
 def visualize_component_solution(component_list, data_frame, value_key):
     options = st.multiselect(
@@ -69,21 +69,49 @@ if "init" not in state:
     state.current_path = [None]
     state.current_scheme_index = None
 
-# @st.cache
-def get_network(network_file):
+
+def dummy_response(network):
+    return pd.DataFrame({
+        'json':[
+            list(network.generators.index),
+            list(network.lines.index),
+            list(network.snapshots)
+            ]
+        },
+        index=[
+            'generators',
+            'lines',
+            'snapshots',
+        ])
+
+def get_network_info(post_response):
+    state.generators = post_response.json['generators']
+    state.lines = post_response.json['lines']
+    state.snapshots = post_response.json['snapshots']
+
+@st.cache(show_spinner=False)
+def get_network(network_file, upload_id):
     with open("hack_file.nc", 'wb') as f:
         f.write(network_file.getvalue())
     state.network = pypsa.Network("./hack_file.nc")
+    get_network_info(
+        dummy_response(state.network)
+    )
+    return state.network
 
-# @st.cache
+@st.cache(show_spinner=False)
 def get_config(config):
     state.config = yaml.safe_load(config)
+    return state.config
 
 def get_network_generators():
-    return list(state.network.generators.index)
+    return state.generators
 
 def get_network_lines():
-    return list(state.network.lines.index)
+    return state.lines
+
+def get_network_snapshots():
+    return state.snapshots
 
 """
 # Optimization service of the unit commitment problem
@@ -111,9 +139,9 @@ if network is None:
     state.logs = None
     st.write("Waiting for an uploaded network")
 else:
-    get_network(network)
     starter = st.button(label="Run optimization")
     if starter:
+        get_network(network, network.id)
         with st.spinner('Wait for it...'):
             f = io.StringIO()
             with redirect_stdout(f):
