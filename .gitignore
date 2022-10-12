@@ -36,3 +36,6 @@ JobResponse
 make_plots.py
 plots/*
 
+# created in root when running gui test script
+url.txt
+

@@ -20,11 +20,18 @@ st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state
 
 # TODO
-url = "http://localhost:443"
-if os.path.isfile("/url.txt"):
-    with open("/url.txt", "r") as f:
-        url = f.readline().strip()
 
+def get_url():
+    url = "http://localhost:443"
+    if os.path.isfile("/url.txt"):
+        with open("/url.txt", "r") as f:
+            url = f.readline().strip()
+    elif os.path.isfile("./url.txt"):
+        with open("./url.txt", "r") as f:
+            url = f.readline().strip()
+    return url
+
+url = get_url()
 
 # Process and display result data
 def transform_result_to_frame(result_dict, network_components):
