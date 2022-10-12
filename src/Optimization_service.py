@@ -9,6 +9,7 @@ import requests
 
 import json
 import yaml
+import os
 
 from contextlib import redirect_stdout
 import io
@@ -19,11 +20,10 @@ st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state
 
 # TODO
-url = ""
-with open("./url.txt", "r") as f:
-    url = f.readline().strip()
-
-url
+url = "http://localhost:443"
+if os.path.isfile("/url.txt"):
+    with open("/url.txt", "r") as f:
+        url = f.readline().strip()
 
 
 # Process and display result data

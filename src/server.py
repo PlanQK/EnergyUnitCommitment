@@ -59,7 +59,7 @@ def upload_network():
     with open(path, 'wb') as f:
         f.write(file.getvalue())
 
-    network = pypsa.Network("./networks/network.nc")
+    network = pypsa.Network(path)
     response = {
             'filename': file.filename,
             'generators': list(network.generators.index),
@@ -68,6 +68,6 @@ def upload_network():
             }
     return json.dumps(response)
 
-port = os.environ['Port']
+port = os.environ.get('Port', 443)
 
 app.run(host='0.0.0.0', port=port)
