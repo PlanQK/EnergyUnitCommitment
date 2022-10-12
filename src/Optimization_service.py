@@ -1,4 +1,3 @@
-from unittest import result
 from urllib import response
 import streamlit as st
 import time
@@ -16,14 +15,15 @@ import io
 
 from ast import literal_eval
 
-# TODO
-url = ""
-with open("/url.txt", "r") as f:
-    url = f.readline().strip()
-
-
 st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state
+
+# TODO
+url = ""
+with open("./url.txt", "r") as f:
+    url = f.readline().strip()
+
+url
 
 
 # Process and display result data
@@ -77,35 +77,16 @@ if "init" not in state:
     state.current_scheme_index = None
 
 
-def dummy_response(network):
-    return pd.DataFrame({
-        'json':[
-            list(network.generators.index),
-            list(network.lines.index),
-            list(network.snapshots)
-            ]
-        },
-        index=[
-            'generators',
-            'lines',
-            'snapshots',
-        ])
-
 def get_network_info(post_response):
-    state.generators = post_response.json['generators']
-    state.lines = post_response.json['lines']
-    state.snapshots = post_response.json['snapshots']
+    state.generators = post_response['generators']
+    state.lines = post_response['lines']
+    state.snapshots = post_response['snapshots']
 
 @st.cache(show_spinner=False)
-def get_network(network_file, upload_id):
-    with open("hack_file.nc", 'wb') as f:
-        f.write(network_file.getvalue())
-    # TODO
-    state.network = "./hack_file.nc"
-    get_network_info(
-        dummy_response(state.network)
-    )
-    return state.network
+def get_network(response, upload_id):
+    response_dict = response.json()
+    get_network_info(response_dict)
+    return response_dict['filename']
 
 @st.cache(show_spinner=False)
 def get_config(config):
@@ -149,29 +130,27 @@ if network is None:
 else:
     starter = st.button(label="Run optimization")
     if starter:
-        get_network(network, network.id)
-        with st.spinner('Wait for it...'):
-
-            files = {
-                'network':open("hack_file.nc", 'rb')
-            }
-            requests.request("POST", url + "upload_network", files=files, headers={}, data={})
-            print("uploaded network")
-            
-            headers = {
-                'Content-Type': 'application/json'
-            }
-            payload = {
-                "network":"hack_file.nc",
-                "config":state.config
-            }
-            
-            response = requests.request("POST", url + "start", headers=headers, data=json.dumps(payload))
-
-            state.result = response.json()
-            state.logs = state.result['logs']
-            state.result_dict = state.result['result']
-            st.success('Done!')
+        files = {
+            'network': network.getvalue()
+        }
+        upload_post = requests.request("POST", 
+                                       url + "upload_network",
+                                       files=files,
+                                       headers={},
+                                       data={})
+        get_network(upload_post, network.id)
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            "network": "network.nc",
+            "config": state.config
+        }
+        response = requests.request("POST", url + "start", headers=headers, data=json.dumps(payload))
+        state.result = response.json()
+        state.logs = state.result['logs']
+        state.result_dict = json.loads(state.result['result'])['result']
+        st.success('Done!')
 
 
 # Download results
@@ -186,9 +165,9 @@ if state.result is not None:
     col1, col2 = st.columns([8,1])
     with col1:
         with st.expander("JSON Result"):
-            st.json(state.result)
+            st.json(state.result['result'])
     with col2:
-        st.download_button("Download JSON", data=state.result, file_name="result.json")
+        st.download_button("Download JSON", data=state.result['result'], file_name="result.json")
 
     # Extract and display result data
     try:
