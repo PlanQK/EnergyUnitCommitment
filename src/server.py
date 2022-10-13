@@ -1,3 +1,6 @@
+"""Starts a Flask server that can provided a REST API to the streamlit frontend
+for Unit Commitment optimziation"""
+
 from distutils.command.config import config
 from tokenize import String
 from flask import Flask
@@ -23,9 +26,6 @@ def get_root_path():
 
 @app.route('/start', methods=['POST'])
 def start_optimization():
-    #network = request.args['network']
-    #config = request.args['config']
-    #cli_params_dict = parse_cli_params(request.args.get('cli_params', ""))
 
     data = request.get_json()
 
@@ -35,15 +35,11 @@ def start_optimization():
         path = get_root_path() + secure_filename(network)
         network = pypsa.Network(path)
 
-    print("CONG")
-    print(config)
-    
     f = io.StringIO()
     if isinstance(config, str):
         config=json.loads(config)
     with redirect_stdout(f):
         result = run(data=network, params=config)
-    print(result.to_json())
     response = {
         'result': result.to_json(),
         'logs': f.getvalue()
