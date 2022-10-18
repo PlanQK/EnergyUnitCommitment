@@ -7,10 +7,13 @@ import networkx as nx
 
 from src.libs.qubo_transformator import QuboTransformator
 
+import os
+
 
 @pytest.fixture(scope='session')
 def network_path():
-    network_path = "../networks/defaultnetwork.nc"
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    network_path = dir_path + "/../networks/defaultnetwork.nc"
     return network_path
 
 
