@@ -86,8 +86,6 @@ class IsingBackbone:
 
         # contains ising coefficients
         self.ising_coefficients = {}
-        self.ising_coefficients_positive = {}
-        self.ising_coefficients_negative = {}
         # mirrors encodings of `self.ising_coefficients`, but is reset after encoding a
         # subproblem to get ising formulations of subproblems
         self.ising_coefficients_cached = {}
@@ -191,10 +189,6 @@ class IsingBackbone:
                 key = tuple([])
         # store interaction, wether it is positive or negative, and in the cache
         self.ising_coefficients[key] = self.ising_coefficients.get(key, 0) - interaction_strength
-        if interaction_strength > 0:
-            self.ising_coefficients_negative[key] = self.ising_coefficients_negative.get(key, 0) - interaction_strength
-        else:
-            self.ising_coefficients_positive[key] = self.ising_coefficients_positive.get(key, 0) - interaction_strength
         self.ising_coefficients_cached[key] = self.ising_coefficients_cached.get(key, 0) - interaction_strength
 
     def couple_component_with_constant(self, component: str,
@@ -410,7 +404,7 @@ class IsingBackbone:
             factor = global_factor * first_factor
 
             self.couple_component_with_constant(first_component,
-                                                - 2.0 * factor * target,
+                                                2.0 * factor * target,
                                                 time=time)
             for second_component, second_factor in label_dictionary.items():
                 current_factor = factor * second_factor
