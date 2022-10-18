@@ -639,7 +639,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
         self.network. If the initial solution is good, a warmstart can
         speed up flow optimization by about 30%, but if it was bad, a
         warmstart makes it slower. warmstart is used if lineValues is
-        not None.
+        not None. This only optimizes the first snapshot of the network
 
         Args:
             generator_state: (list)
@@ -675,7 +675,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
                 "super_source",
                 bus,
                 capacity=self.ising_backbone.calc_total_power_generated_at_bus(
-                    bus, generator_state)
+                    bus, generator_state, time=0)
             )
         for load in self.network.loads.index:
             graph.add_edge(
