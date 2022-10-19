@@ -15,27 +15,6 @@ import pypsa
 from numpy import ndarray
 
 
-def binary_power_and_rest(number: int):
-    """
-    Constructs a minimal list of positive integers which sum up to the passed
-    argument and such that for every smaller, positive number there exists
-    a subtotal of the list that is equal to it.
-
-    Args:
-        number: (int) 
-            the number to be decomposed into (mostly) powers of two
-    Returns:
-        (list)
-            a list of integers with sum equal to number
-    """
-    if number == 0:
-        return []
-    bit_length = number.bit_length()
-    positive_powers = [1 << idx for idx in range(bit_length - 1)]
-    already_filled = (1 << bit_length - 1) - 1
-    return positive_powers + [number - already_filled]
-
-
 class IsingBackbone:
     """
     This class implements the conversion of a unit commitment problem
@@ -62,9 +41,7 @@ class IsingBackbone:
     `AbstractIsingSubproblem` interface
     """
 
-    def __init__(self,
-                 network: pypsa.Network,
-                 configuration: dict):
+    def __init__(self, network: pypsa.Network):
         """
         Constructor for an Ising Backbone. It requires a network and
         the name of the function that defines how to encode lines. Then
@@ -74,14 +51,9 @@ class IsingBackbone:
         Args:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
-            configuration: (dict)
-                A dictionary containing all subproblems to be encoded
-                into an ising problem.
         """
         # network to be solved
         self.network = network
-        if "snapshots" in configuration:
-            self.network.snapshots = self.network.snapshots[:configuration.pop("snapshots")]
         self.snapshots = network.snapshots
 
         # contains ising coefficients
@@ -97,7 +69,7 @@ class IsingBackbone:
         self._qubit_weights = {}
         self.allocated_qubits = 0
 
-        # read configuration dict, store in _subproblems and apply encodings
+        # subproblems of the passed configuration are stored here
         self._subproblems = {}
         # dictionary of all support subproblems
 

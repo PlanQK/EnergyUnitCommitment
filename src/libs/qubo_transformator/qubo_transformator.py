@@ -14,8 +14,7 @@ class QuboTransformator:
         self.config = config
 
     def transform_network_to_qubo(self) -> IsingBackbone:
-        result = IsingBackbone(self.network, self.config)
-
+        result = IsingBackbone(self.network)
         print()
         print("--- Generating Ising problem ---")
         self.subproblem_table = {

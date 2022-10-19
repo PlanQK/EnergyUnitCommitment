@@ -34,8 +34,8 @@ def config():
 
 
 @pytest.fixture
-def backbone(network, config):
-    return IsingBackbone(network, config)
+def backbone(network):
+    return IsingBackbone(network)
 
 @pytest.fixture
 def generator_rep():
@@ -50,9 +50,9 @@ def line_rep():
     [3,4],
     [3,4,2],
 ])
-def test_generator_init(network_loads, generator_rep, config):
+def test_generator_init(network_loads, generator_rep):
     network = create_network(network_loads)
-    backbone = IsingBackbone(network, config)
+    backbone = IsingBackbone(network)
     snapshot_count = len(network_loads)
     encoder = GeneratorEncoder.create_encoder(backbone, generator_rep)
     assert encoder.backbone == backbone, "encoder references wrong backbone"

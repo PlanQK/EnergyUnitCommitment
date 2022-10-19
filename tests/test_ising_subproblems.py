@@ -15,7 +15,7 @@ from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
 
 @pytest.fixture
 def backbone():
-    backbone_result = IsingBackbone(create_network([3]), {})
+    backbone_result = IsingBackbone(create_network([3]))
     encoder = GeneratorEncoder.create_encoder(backbone_result, "single_qubit")
     encoder.encode_qubits()
     return backbone_result
