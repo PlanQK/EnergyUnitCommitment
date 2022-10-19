@@ -401,18 +401,15 @@ class GlobalCostSquare(MarginalCostSubproblem):
     def calc_transformed_target_value(self, time):
         return - (self.raw_target_cost * self.range_factor) + (self.backbone.get_total_load(time) * self.offset)
 
+    def calc_offset_cost(self, generator):
+        return self.network.generators["marginal_cost"][generator] * self.range_factor - self.offset
+
     def calc_transformed_marginal_costs(self) -> dict:
         """
         Returns a dictionary with generators as keys and the their offset marginal
         costs
         """
-        return {
-                generator: self.network.generators["marginal_cost"][generator]
-              * self.range_factor - self.offset
-                for generator in self.network.generators.index
-            }
-
-
+        return {generator: self.calc_offset_cost(generator) for generator in self.network.generators.index}
 
     def print_estimation_report(self, time: any) -> None:
         """

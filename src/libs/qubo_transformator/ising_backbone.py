@@ -403,8 +403,8 @@ class IsingBackbone:
         for first_component, first_factor in label_dictionary.items():
             factor = global_factor * first_factor
 
-            self.couple_component_with_constant(first_component,
-                                                2.0 * factor * target,
+            self.couple_component_with_constant(component=first_component,
+                                                coupling_strength=2.0 * factor * target,
                                                 time=time)
             for second_component, second_factor in label_dictionary.items():
                 current_factor = factor * second_factor
