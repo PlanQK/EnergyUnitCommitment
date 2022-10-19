@@ -40,6 +40,14 @@ def test_add_interaction(backbone):
     assert backbone.ising_coefficients == {(0,): 4.0, (1,): -6.0, (0,1): -6.0}
     backbone.add_interaction(0, 0, 1.0)
     assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    backbone.add_interaction(0, 0.0)
+    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    backbone.add_interaction(0,1, 0.0)
+    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    backbone.add_interaction(1, 0.0)
+    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    backbone.add_interaction(1, 0, -1.0, weighted_interaction=False)
+    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -5.0}
 
 
 def test_couple_components(backbone):
