@@ -51,8 +51,7 @@ class QuboTransformator:
         print("--- Finish generating Ising Problem with the following subproblems ---")
         for key in result._subproblems:
             print("--- - " + key)
-        # readd representation values to config for the result dict containing that info
+        # read representation values to config for the result dict containing that info
         self.config["generator_representation"] = generator_representation
         self.config["line_representation"] = line_representation
-
         return result
