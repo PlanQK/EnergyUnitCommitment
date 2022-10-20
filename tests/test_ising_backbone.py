@@ -65,6 +65,25 @@ def test_couple_component_with_constant(backbone):
     assert backbone.calc_cost([1]) == -6
     assert backbone.calc_cost([0, 1]) == -2
 
+@pytest.mark.parametrize("penalized_solution", [
+    [],
+    [0],
+    [1],
+    [0,1],
+])
+def test_add_basis_polynomial_interaction(penalized_solution, backbone):
+    backbone.add_basis_polynomial_interaction(0, 1, penalized_solution, 2.0)
+    print(backbone.calc_cost([]))
+    print(backbone.calc_cost([0]))
+    print(backbone.calc_cost([1]))
+    print(backbone.calc_cost([0,1]))
+    states =[[],[0],[1],[0,1]]
+    for state in states:
+        if state == penalized_solution:
+            assert backbone.calc_cost(state) == 2.0
+        else:
+            assert backbone.calc_cost(state) == 0.0
+
 def test_encode_squared_distance(backbone):
     label_dictionary={"gen_1": 1.0, "gen_2": 1.0}
     target = 0.0

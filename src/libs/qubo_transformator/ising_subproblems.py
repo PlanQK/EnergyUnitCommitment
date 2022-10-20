@@ -1046,8 +1046,8 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                 continue
             status_qubit = qubit_list[0]
             for qubit in qubit_list[1:]:
-                interaction_strength = self.scale_factor * self.backbone.ising_coefficients_positive[(qubit,)]
+                interaction_strength = abs(self.scale_factor * self.backbone.ising_coefficients[(qubit,)])
                 self.backbone.add_basis_polynomial_interaction(first_qubit=status_qubit,
                                                                second_qubit=qubit,
-                                                               zero_qubits_list=[qubit],
+                                                               zero_qubits_list=[status_qubit],
                                                                interaction_strength=interaction_strength)

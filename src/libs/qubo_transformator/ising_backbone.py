@@ -299,7 +299,7 @@ class IsingBackbone:
     def add_basis_polynomial_interaction(self,
                                          first_qubit: int = None,
                                          second_qubit: int = None,
-                                         zero_qubits_list: list = None,
+                                         solution_list: list = None,
                                          interaction_strength: float = 1.0):
         """
         For a given list of qubo variables, adds the term to the ising interactions
@@ -314,9 +314,10 @@ class IsingBackbone:
                 The first qubit variable that is involved in the polynomial
             second_qubit: (int)
                 The second qubit variable that is involved in the polynomial
-            zero_qubits_list: (list)
-                A list of qubits that are 0 (1 in the ising formulation) in the specified state
-                of the QUBO variables to which the cost is added to.
+            solution_list: (list)
+                A list of qubits that are 1 (1 in the ising formulation) in the specified state
+                of the QUBO variables to which the cost is added to. For our Ising formulation
+                they are the spin id's with spin -1
             interaction_strength: (float)
                 The magnitude of the term that is added to the QUBO
 
@@ -324,22 +325,18 @@ class IsingBackbone:
             (None)
                 Modifies the stored ising problem
         """
-        if zero_qubits_list is None:
-            zero_qubits_list = []
-
-        if first_qubit in zero_qubits_list:
-            first_sign = -1
-        else:
-            first_sign = 1
-        if second_qubit in zero_qubits_list:
-            second_sign = -1
-        else:
-            second_sign = 1
-
-        self.add_interaction(first_qubit, second_qubit, -0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_qubit, second_sign * -0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(second_qubit, first_sign * -0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_sign * second_sign * -0.25 * interaction_strength, weighted_interaction=False)
+        if solution_list is None:
+            solution_list = []
+        qubit_product = (-1) ** len(solution_list)
+        first_sign, second_sign = -1, -1
+        if first_qubit in solution_list:
+            first_sign *= -1
+        if second_qubit in solution_list:
+            second_sign *= -1
+        self.add_interaction(first_qubit, second_qubit, qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_qubit, second_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(second_qubit, first_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_sign * second_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
 
     def encode_squared_distance(self,
                                 label_dictionary: dict,
