@@ -16,13 +16,14 @@ backend: "pypsa-glpk"
 # all configuration data of the QUBO model of the network
 ising_interface:
     # values for specifiying network to qubit abstraction. all generator values are rounded to intgers
-    generator_representation: "with_status"
+    generator_representation: "single_qubit"
         # (string) name of the function how to model lines with qubits
         # choose between:
         #   - single_qubit (1 qubit per generator)
         #   - integer_decomposition (binary decomposition)
         #   - with_status (binary decomposition with correct status qubit)
     line_representation: "cutpowersoftwo"
+    line_representation: "fullsplit"
         # (string) name of the function how to model lines with qubits
         # choose between:
         #   - fullsplit (qubits of weight 1, -1)
@@ -35,7 +36,20 @@ ising_interface:
           # (float) weight of the kirchhoff subproblem in the QUBO
     # Adding Marginal cost optimization in the QUBO
     marginal_cost:
-        scale_factor: 0.6
+        range_factor: 1.0
+            # (float) a linear factor to linearly scale the marginal costs per power produced
+        # both following attributes set an offset of the marginal costs which in turn
+        # corresponds to a target marginal cost. Target cost will take precedence.
+        # There other corresponding value will be calculated such that the effective
+        # target in the QUBO after the transformation is 0. This means that the actual target
+        # can be calculated as: total_load * offset
+        # The offset is applied before the scaling by the range factor
+        offset: 1.0
+          # (float) offset of the marginal cost of generators per power unit produced
+        target_cost: 377.8
+          # (float) estimated cost from which to encode the squared distance before
+          # the linear transformation
+        scale_factor: 0.1
           # (float) weight of the marginal cost optimization in the QUBO
         strategy: "global_cost_square"
         # strategy: "global_cost_square"
@@ -70,8 +84,8 @@ ising_interface:
         scale_factor: 1.0
           # (float) weight of he enforcement. status qubit are already scaled by the weight of the power interactions of non-status qubits
 
-    snapshots: 1
-    # upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index
+snapshots: 1
+    # (int) upper limit of snapshots to be considered in qubo formulation. It does so by slicing the index
 
 qaoa_backend:
     shots: 200
