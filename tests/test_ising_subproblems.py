@@ -27,17 +27,27 @@ def test_network_cost(backbone):
     assert backbone.get_nominal_power("gen_1", time=0) == 4
     assert backbone.get_nominal_power("gen_2", time=0) == 3
 
-def test_global_cost_square_distance_encoding_no_offset(backbone):
+def test_global_cost_square_distance_encoding_by_target_cost(backbone):
     config = {"strategy": "global_cost_square",
               "target_cost": 40,
-              "offset": -10,
               }
     cost_encoder = GlobalCostSquare.build_subproblem(backbone, config)
     cost_encoder.encode_subproblem()
-    assert backbone.calc_cost([]) == 1600
+    assert backbone.calc_cost([]) == 0.0
+    assert backbone.calc_cost([0]) == 44.444444444444414
+    assert backbone.calc_cost([1]) == 100.00000000000003
+    assert backbone.calc_cost([0, 1]) ==  11.111111111111128
+
+def test_global_cost_square_distance_encoding_by_offset(backbone):
+    config = {"strategy": "global_cost_square",
+              "offset": 10,
+              }
+    cost_encoder = GlobalCostSquare.build_subproblem(backbone, config)
+    cost_encoder.encode_subproblem()
+    assert backbone.calc_cost([]) == 0.0
     assert backbone.calc_cost([0]) == 400
-    assert backbone.calc_cost([1]) == 100
-    assert backbone.calc_cost([0, 1]) == 2500
+    assert backbone.calc_cost([1]) == 0.0
+    assert backbone.calc_cost([0, 1]) == 400
 
 def test_global_cost_square_distance_encoding_min_gen_offset(backbone):
     config = {"strategy": "global_cost_square",

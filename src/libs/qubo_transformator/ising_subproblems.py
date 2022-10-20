@@ -362,10 +362,12 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         super().__init__(backbone, config)
         self.range_factor = self.get_range_factor(config)
-        self.raw_target_cost = config.setdefault("target_cost", 0.0)
-        self.offset = self.get_offset(config)
+        if "target_cost" in config:
+            self.set_from_target_cost(config["target_cost"])
+        else:
+            self.set_from_offset(config["offset"])
 
-    def get_range_factor(self, config):
+    def get_range_factor(self, config: dict):
         """
         Get linear factor of linear transformation of marginal costs
         defaults to a value of 1.0
@@ -376,35 +378,64 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         return config.setdefault("range_factor", 1.0)
 
-    def centered_offset(self, time):
-        return self.raw_target_cost * self.range_factor / float(self.backbone.get_total_load(time))
-
-    def get_offset(self, config):
+    def set_from_target_cost(self, target_cost: float):
         """
-        Get the constant offset of linear transformation of marginal costs.
-
-        An offset is always added in such a way, that the marginal cost
-        of the cheapest generator is offset to 0. The additional offset is
-        applied on top of this.
+        Calculates the corresponding marginal cost offset to the given
+        target and writes both as attributes to the object
 
         Args:
-            config: (dict)
-                the dict containing the configuration data
+            target_cost: (float)
+                The marginal cost to which to minimize the squared distance
         """
-        if "offset" in config:
-            return self.range_factor * (self.network.generators["marginal_cost"].min()
-                                  + config["offset"])
-        else:
-            return self.centered_offset(self.network.snapshots[0])
+        self.target_cost = target_cost
+        # not applicable for multisnapshot networks
+        self.offset = self.target_cost / float(self.backbone.get_total_load(self.network.snapshots[0]))
+        print(f"Target for marginal cost encoding: {target_cost}")
+        print(f"The equivalent offset is: {self.offset}")
 
+    def set_from_offset(self, offset: float):
+        """
+        Calculates the corresponding marginal cost target to a given
+        offset and writes both as attributes to the object
+
+        Args:
+            offset: (float)
+                A float by which to offset the marginal costs of generators
+                per unit of power produced
+        """
+        self.offset = offset
+        # not applicable for multisnapshot networks
+        self.target_cost = offset * float(self.backbone.get_total_load(self.network.snapshots[0]))
+        print(f"Using {offset} as offset of marginal costs")
+        print(f"The equivalent target marginal costs is: {self.target_cost}")
 
     def calc_transformed_target_value(self, time):
-        return - (self.raw_target_cost * self.range_factor) + (self.backbone.get_total_load(time) * self.offset)
+        """
+        Calculates the corresponding target value to the cost given in the
+        original configuration with respect to the linear transformation of
+        the marginal costs.
+
+        For this class, the only valid target after the transformation is `0.0`.
+        This corresponds to the cost given by the product of the total load
+        and the offset
+        """
+        return 0.0
 
     def calc_offset_cost(self, generator):
-        return self.network.generators["marginal_cost"][generator] * self.range_factor - self.offset
+        """
+        For a given generator, returns the marginal cost of that generator after
+        applying the linear transformation given in the config of this subproblem
 
-    def calc_transformed_marginal_costs(self) -> dict:
+        Args:
+            generator: (str)
+                The label of a self.network generator
+
+        Returns:
+            The transformed marginal cost of that generator
+        """
+        return (self.network.generators["marginal_cost"][generator] - self.offset) * self.range_factor 
+
+    def calc_transformed_marginal_costs(self, time) -> dict:
         """
         Returns a dictionary with generators as keys and the their offset marginal
         costs
@@ -466,7 +497,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         self.print_estimation_report(time=time)
         self.backbone.encode_squared_distance(
-            self.calc_transformed_marginal_costs(),
+            self.calc_transformed_marginal_costs(time),
             target=self.calc_transformed_target_value(time),
             global_factor=self.scale_factor,
             time=time,
