@@ -254,7 +254,7 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-.PHONY: all plots general clean_general
+.PHONY: all plots general clean_general clean
 
 .docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
@@ -281,3 +281,5 @@ clean_general:
 
 general: $(GENERAL_SWEEP_FILES)
 
+clean:
+	rm -f JobResponse url.txt EnergyUnitCommitment.zip results_general_sweep/*
