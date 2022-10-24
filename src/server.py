@@ -60,7 +60,8 @@ def upload_network():
             'filename': file.filename,
             'generators': list(network.generators.index),
             'lines': list(network.lines.index),
-            'snapshots': list(network.snapshots)
+            'snapshots': [str(snapshot) for snapshot in network.snapshots],
+            'buses': list(network.buses.index)
             }
     return json.dumps(response)
 

@@ -10,6 +10,7 @@ if [ -z "${Port}" ]; then
 fi
 
 export CONTAINERLESS=1
+export TRUSTED_USER=Yes
 
 echo "http://localhost:${Port}/" > ${GIT_ROOT}/url.txt
 
