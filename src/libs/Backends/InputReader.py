@@ -128,7 +128,7 @@ class InputReader:
             if environ.get("RUNNING_IN_DOCKER", False):
                 network_path = "Problemset/"
             else:
-                network_path = "../networks/"
+                network_path = "../input/networks/"
             return pypsa.Network(network_path + network), network
         elif isinstance(network, dict):
             loaded_dataset = xarray.Dataset.from_dict(network)
@@ -177,7 +177,7 @@ class InputReader:
             if environ.get("RUNNING_IN_DOCKER", False):
                 config_path = "configs/"
             else:
-                config_path = "../configs/"
+                config_path = "../input/configs/"
             with open(config_path + input_config) as file:
                 result = loader(file)
         base_dict = {

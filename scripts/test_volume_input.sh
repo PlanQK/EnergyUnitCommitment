@@ -16,7 +16,7 @@
 # set up some variables
 GIT_ROOT=`git rev-parse --show-toplevel`
 DOCKERTAG=energy:planqk
-SERVICE_DOCKERFILE=PlanQK_Dockerfile
+SERVICE_DOCKERFILE=input/PlanQK_Dockerfile
 
 # set up input network and parameter. 
 NETWORK=defaultnetwork

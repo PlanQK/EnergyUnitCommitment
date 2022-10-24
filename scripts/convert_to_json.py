@@ -17,8 +17,8 @@ This takes up to two arguments, one for the name of the file to be loaded, and o
 for the name of the file the json gets dumped to. Omitting the last parameter will
 set the save file name to the same name as the input but changing it to json
 
-networks are assumed to be in the folder networks/
-config files are assumed to be in the folder configs/
+networks are assumed to be in the folder input/networks/
+config files are assumed to be in the folder input/configs/
 
 convert_to_json some_network_or_config_with_ending save_file_without_json
                 some_network_or_config_with_ending
@@ -46,7 +46,7 @@ def convert_network(input_name: str, output_name: str):
         output_name: (str)
             the name out the output json without the file extension
     """
-    input_path = os.path.join(path_prefix, "networks", input_name) + ".nc"
+    input_path = os.path.join(path_prefix, "input/networks", input_name) + ".nc"
     output_path = os.path.join(path_prefix, "input", output_name) + ".json"
 
     print("reading network")
@@ -68,7 +68,7 @@ def convert_config(input_name: str, output_name: str):
         output_name: (str)
             the name out the output json without the file extension
     """
-    input_path = os.path.join(path_prefix, "configs", input_name) + ".yaml"
+    input_path = os.path.join(path_prefix, "input/configs", input_name) + ".yaml"
     output_path = os.path.join(path_prefix, "input", output_name) + ".json"
 
     with open(input_path, 'r') as yaml_input,  open(output_path, "w") as json_out:

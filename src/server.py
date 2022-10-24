@@ -19,9 +19,9 @@ app = Flask(__name__)
 
 def get_root_path():
     if os.environ.get('CONTAINERLESS', False):
-        path = os.getcwd() + '/networks/' 
+        path = os.getcwd() + '/input/networks/'
     else:
-        path = '/EnergyUnitCommitment/networks/' 
+        path = '/EnergyUnitCommitment/networks/'
     return path
 
 @app.route('/start', methods=['POST'])
