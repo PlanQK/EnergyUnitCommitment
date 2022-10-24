@@ -180,6 +180,46 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         print(f"\n--- Encoding marginal costs: {config['strategy']} ---")
         self.offset = self.choose_offset()
 
+    def set_from_target_cost(self, target_cost: float):
+        """
+        Calculates the corresponding marginal cost offset to the given
+        target and writes both as attributes to the object.
+
+        It is chosen in a way that a solution satisfying the kirchhoff constraint
+        with cost equal to the target with respect to the original cost function
+        incurs 0 cost with respect to the transformed function
+
+        Args:
+            target_cost: (float)
+                The marginal cost to which to minimize the squared distance
+        """
+        self.target_cost = target_cost
+        # not applicable for multisnapshot networks
+        self.offset = self.target_cost / float(self.backbone.get_total_load(self.network.snapshots[0]))
+        print(f"Target for marginal cost encoding: {target_cost}")
+        print(f"The equivalent offset is: {self.offset}")
+
+    def set_from_offset(self, offset: float):
+        """
+        Calculates the corresponding marginal cost target to a given
+        offset and writes both as attributes to the object
+
+        The target cost is calucalted such thata solution satisfying the kirchhoff 
+        constraint with cost equal to the target cost with respect to the original 
+        cost function incurs 0 cost with respect to the transformed function
+
+        Args:
+            offset: (float)
+                A float by which to offset the marginal costs of generators
+                per unit of power produced
+        """
+        self.offset = offset
+        # not applicable for multisnapshot networks
+        self.target_cost = offset * float(self.backbone.get_total_load(self.network.snapshots[0]))
+        print(f"Using {offset} as offset of marginal costs")
+        print(f"The equivalent target marginal costs is: {self.target_cost}")
+
+
     def choose_offset(self) -> float:
         """
         Calculates the offset, by which to offset all marginal costs.
@@ -377,37 +417,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 the dict containing the configuration data
         """
         return config.setdefault("range_factor", 1.0)
-
-    def set_from_target_cost(self, target_cost: float):
-        """
-        Calculates the corresponding marginal cost offset to the given
-        target and writes both as attributes to the object
-
-        Args:
-            target_cost: (float)
-                The marginal cost to which to minimize the squared distance
-        """
-        self.target_cost = target_cost
-        # not applicable for multisnapshot networks
-        self.offset = self.target_cost / float(self.backbone.get_total_load(self.network.snapshots[0]))
-        print(f"Target for marginal cost encoding: {target_cost}")
-        print(f"The equivalent offset is: {self.offset}")
-
-    def set_from_offset(self, offset: float):
-        """
-        Calculates the corresponding marginal cost target to a given
-        offset and writes both as attributes to the object
-
-        Args:
-            offset: (float)
-                A float by which to offset the marginal costs of generators
-                per unit of power produced
-        """
-        self.offset = offset
-        # not applicable for multisnapshot networks
-        self.target_cost = offset * float(self.backbone.get_total_load(self.network.snapshots[0]))
-        print(f"Using {offset} as offset of marginal costs")
-        print(f"The equivalent target marginal costs is: {self.target_cost}")
 
     def calc_transformed_target_value(self, time):
         """
