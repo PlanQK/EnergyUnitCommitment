@@ -398,7 +398,7 @@ class QaoaQiskit(BackendBase):
                 Doesn't return anything or has side effects, unless the limit 
                 of the runtime is exceeded. Then this raises a ValueError 
         """
-        runtime_factor = self.transformed_problem.num_interactions()
+        runtime_factor = self.transformed_problem.num_variables()
         if runtime_factor > 20:
             raise ValueError(f"the problem requires {runtime_factor} qubits, "
                              "but they are capped at 20")
