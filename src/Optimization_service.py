@@ -40,7 +40,7 @@ if "init" not in state:
 
 @st.cache(show_spinner=False)
 def get_url():
-    url = "http://localhost:443"
+    url = "http://localhost:443/"
     if os.path.isfile("/url.txt"):
         with open("/url.txt", "r") as f:
             url = f.readline().strip()

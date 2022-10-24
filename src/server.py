@@ -66,5 +66,6 @@ def upload_network():
     return json.dumps(response)
 
 port = os.environ.get('Port', 443)
+os.makedirs(get_root_path(), exist_ok=True)
 
 app.run(host='0.0.0.0', port=port)

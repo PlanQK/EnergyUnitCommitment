@@ -9,3 +9,4 @@ pylatexenc==2.10
 PyYAML==6.0
 loguru==0.6.0
 Flask==2.2.2
+streamlit==1.13
