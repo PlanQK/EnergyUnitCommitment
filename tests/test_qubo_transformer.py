@@ -12,22 +12,23 @@ import os
 
 @pytest.fixture(scope='session')
 def network_path():
+    """
+    Find the path of the networks folder independent of the working
+    directory of the pytest call
+    """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     network_path = dir_path + "/../networks/defaultnetwork.nc"
     return network_path
 
-
 @pytest.fixture(scope='session')
-def num_snapshots():
-    return 3
-
-
-@pytest.fixture(scope='session')
-def network(network_path, num_snapshots):
+def network(network_path):
+    """
+    Load the default network in the repo and cut any snapshot
+    after the first three
+    """
     network = pypsa.Network(network_path)
-    network.snapshots = network.snapshots[:num_snapshots]
+    network.snapshots = network.snapshots[:3]
     return network
-
 
 @pytest.fixture
 def config():
@@ -44,7 +45,6 @@ def config():
     }
     return config
 
-
 def ising_to_graph(interaction_list):
     """
     build the connected components of the ising interactions
@@ -58,7 +58,6 @@ def ising_to_graph(interaction_list):
         else:
             graph.add_edge(*interaction)
     return nx.connected_components(graph)
-
 
 def test_kirchhoff_distinct_snapshots(network, config):
     """

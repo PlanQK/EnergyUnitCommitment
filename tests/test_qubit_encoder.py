@@ -51,16 +51,20 @@ def line_rep():
     [3,4,2],
 ])
 def test_generator_init(network_loads, generator_rep):
+    """
+    Check that for various amount of snapshots, the generators get encoded correctly
+    into the backbone as qubits
+    """
     network = create_network(network_loads)
     backbone = IsingBackbone(network)
     snapshot_count = len(network_loads)
     encoder = GeneratorEncoder.create_encoder(backbone, generator_rep)
+    # check references in the backbone
     assert encoder.backbone == backbone, "encoder references wrong backbone"
     assert encoder.network == backbone.network, "encoder references wrong network"
-
+    # check that each value in each snapshots is encoded
     encoder.encode_qubits()
     for snapshot in network.snapshots:
-        print(backbone.get_representing_qubits("gen_1", snapshot), file=sys.stderr)
         assert backbone.get_representing_qubits("gen_1", snapshot) == [snapshot]
         assert backbone.get_representing_qubits("gen_2", snapshot) == [snapshot_count + snapshot]
         assert backbone._qubit_weights[snapshot] == 4

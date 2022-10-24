@@ -21,24 +21,21 @@ def backbone():
     return backbone_result
 
 def test_network_cost(backbone):
+    """
+    Test that the loaded network in the backbone has the correct values for the
+    following tests
+    """
     network = create_network([3])
     assert network.generators.marginal_cost.loc["gen_1"] == 15
     assert network.generators.marginal_cost.loc["gen_2"] == 10
     assert backbone.get_nominal_power("gen_1", time=0) == 4
     assert backbone.get_nominal_power("gen_2", time=0) == 3
 
-def test_global_cost_square_distance_encoding_by_target_cost(backbone):
-    config = {"strategy": "global_cost_square",
-              "target_cost": 40,
-              }
-    cost_encoder = GlobalCostSquare.build_subproblem(backbone, config)
-    cost_encoder.encode_subproblem()
-    assert backbone.calc_cost([]) == 0.0
-    assert backbone.calc_cost([0]) == 44.444444444444414
-    assert backbone.calc_cost([1]) == 100.00000000000003
-    assert backbone.calc_cost([0, 1]) ==  11.111111111111128
-
 def test_global_cost_square_distance_encoding_by_offset(backbone):
+    """
+    Test encoding the marginal costs by giving a generator cost offset, which
+    implcitly sets a target as the product of the offset and the total load
+    """
     config = {"strategy": "global_cost_square",
               "offset": 10,
               }
@@ -50,6 +47,9 @@ def test_global_cost_square_distance_encoding_by_offset(backbone):
     assert backbone.calc_cost([0, 1]) == 400
 
 def test_global_cost_square_distance_encoding_min_gen_offset(backbone):
+    """
+    Test that using the target_cost overrides the offset configuration key
+    """
     config = {"strategy": "global_cost_square",
               "target_cost": 30,
               "offset": 0,
@@ -63,6 +63,10 @@ def test_global_cost_square_distance_encoding_min_gen_offset(backbone):
 
 
 def test_global_cost_square_distance_encoding_zero_target_offset(backbone):
+    """
+    Test encoding the marginal cost by giving a target value of the cost
+    by checking the cost of all possible states and the ising coefficients
+    """
     config = {"strategy": "global_cost_square",
               "target_cost": 40,
               }
