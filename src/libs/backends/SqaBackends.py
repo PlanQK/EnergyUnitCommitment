@@ -17,7 +17,7 @@ from .BackendBase import BackendBase
 # try import from local .so
 # Error message for image: herrd1/siquan:latest
 # /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found
-# (required by /energy/libs/Backends/siquan.cpython-39-x86_64-linux-gnu.so)`
+# (required by /energy/libs/backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
     from . import siquan
     from ..qubo_transformator.ising_backbone import IsingBackbone

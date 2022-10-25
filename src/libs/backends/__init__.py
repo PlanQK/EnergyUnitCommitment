@@ -1,4 +1,4 @@
-"""The `Backends` module contains all solvers for the unit commitment problem. They all
+"""The `backends` module contains all solvers for the unit commitment problem. They all
 share the base class BackendBase with similar solvers grouped in their own file. Currently,
 these categories are:
     - SQA-based solvers,

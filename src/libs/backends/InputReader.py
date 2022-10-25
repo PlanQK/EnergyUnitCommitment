@@ -21,7 +21,7 @@ from os import environ
 
 from typing import Union
 
-from .. import Backends
+from .. import backends
 
 
 class InputReader:
@@ -226,16 +226,16 @@ class InputReader:
                 The optimizer class that corresponds to the config value
         """
         gan_backends = {
-            "classical": Backends.ClassicalBackend,
-            "sqa": Backends.SqaBackend,
-            "dwave-tabu": Backends.DwaveTabu,
-            "dwave-greedy": Backends.DwaveSteepestDescent,
-            "pypsa-glpk": Backends.PypsaGlpk,
-            "pypsa-fico": Backends.PypsaFico,
-            "dwave-hybrid": Backends.DwaveCloudHybrid,
-            "dwave-qpu": Backends.DwaveCloudDirectQPU,
-            "dwave-read-qpu": Backends.DwaveReadQPU,
-            "qaoa": Backends.QaoaQiskit,
+            "classical": backends.ClassicalBackend,
+            "sqa": backends.SqaBackend,
+            "dwave-tabu": backends.DwaveTabu,
+            "dwave-greedy": backends.DwaveSteepestDescent,
+            "pypsa-glpk": backends.PypsaGlpk,
+            "pypsa-fico": backends.PypsaFico,
+            "dwave-hybrid": backends.DwaveCloudHybrid,
+            "dwave-qpu": backends.DwaveCloudDirectQPU,
+            "dwave-read-qpu": backends.DwaveReadQPU,
+            "qaoa": backends.QaoaQiskit,
         }
         return gan_backends[self.config["backend"]]
 
