@@ -176,9 +176,14 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 construct an instance of the marginal costs problem.
         """
         super().__init__(backbone, config)
-        self.offset_factor = float(config.setdefault("offset_factor", 1.0))
+        self.range_factor = self.get_range_factor(config)
+        if "target_cost" in config:
+            self.set_from_target_cost(config["target_cost"])
+        else:
+            self.set_from_offset(config["offset"])
         print(f"\n--- Encoding marginal costs: {config['strategy']} ---")
-        self.offset = self.choose_offset()
+        print(f"Marginal cost offset: {self.offset}")
+        print(f"Equivalent offset fixed cost: {self.target_cost}\n")
 
     def set_from_target_cost(self, target_cost: float):
         """
@@ -196,8 +201,6 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         self.target_cost = target_cost
         # not applicable for multisnapshot networks
         self.offset = self.target_cost / float(self.backbone.get_total_load(self.network.snapshots[0]))
-        print(f"Target for marginal cost encoding: {target_cost}")
-        print(f"The equivalent offset is: {self.offset}")
 
     def set_from_offset(self, offset: float):
         """
@@ -216,21 +219,6 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         self.offset = offset
         # not applicable for multisnapshot networks
         self.target_cost = offset * float(self.backbone.get_total_load(self.network.snapshots[0]))
-        print(f"Using {offset} as offset of marginal costs")
-        print(f"The equivalent target marginal costs is: {self.target_cost}")
-
-
-    def choose_offset(self) -> float:
-        """
-        Calculates the offset, by which to offset all marginal costs.
-        The chosen offset is the minimal marginal cost of all generators.
-
-        Returns:
-            (float)
-                The value, by which to offset all marginal costs of the
-                network components.
-        """
-        return self.offset_factor * self.network.generators["marginal_cost"].min()
 
 
 class MarginalAsPenalty(MarginalCostSubproblem):
@@ -277,12 +265,11 @@ class MarginalAsPenalty(MarginalCostSubproblem):
                 interaction coefficient.
         """
         generators = self.backbone.get_bus_components(bus)['generators']
-        cost_offset = self.choose_offset()
         marginal_cost_df = self.network.generators["marginal_cost"]
         for generator in generators:
             self.backbone.couple_component_with_constant(
                 component=generator,
-                coupling_strength=self.scale_factor * (marginal_cost_df.loc[generator] - cost_offset),
+                coupling_strength=self.scale_factor * (marginal_cost_df.loc[generator] - self.offset),
                 time=time
             )
 
@@ -401,11 +388,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 construct an instance of the marginal costs problem.
         """
         super().__init__(backbone, config)
-        self.range_factor = self.get_range_factor(config)
-        if "target_cost" in config:
-            self.set_from_target_cost(config["target_cost"])
-        else:
-            self.set_from_offset(config["offset"])
 
     def get_range_factor(self, config: dict):
         """
@@ -442,7 +424,8 @@ class GlobalCostSquare(MarginalCostSubproblem):
         Returns:
             The transformed marginal cost of that generator
         """
-        return (self.network.generators["marginal_cost"][generator] - self.offset) * self.range_factor 
+        return (self.network.generators["marginal_cost"][generator] - self.offset)  \
+                * self.range_factor 
 
     def calc_transformed_marginal_costs(self, time) -> dict:
         """
@@ -450,31 +433,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
         costs
         """
         return {generator: self.calc_offset_cost(generator) for generator in self.network.generators.index}
-
-    def print_estimation_report(self, time: any) -> None:
-        """
-        Prints the estimated marginal cost and the offset of the cost
-        per MW produced at the speoified time step.
-
-        Args:
-            time: (any)
-                Index of the time slice for which to print the estimated
-                marginal costs and offset.
-
-        Returns:
-            (None)
-                Prints to stdout.
-        """
-        current_estimation = self.backbone.get_total_load(time) * self.offset
-        print()
-        print(f"--- Estimation Parameters at timestep {time} ---")
-        print(f"Offset factor: {self.offset_factor}")
-        print(f"Absolute offset: {self.offset}")
-        print(f"Baseline cost at {time}: "
-              f"{current_estimation / self.offset_factor}")
-        print(f"Current total estimation at {time}: "
-              f"{current_estimation}")
-        print("---")
 
     def encode_subproblem(self) -> None:
         """
@@ -504,7 +462,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
                 Modifies self.ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
-        self.print_estimation_report(time=time)
         self.backbone.encode_squared_distance(
             self.calc_transformed_marginal_costs(time),
             target=self.calc_transformed_target_value(time),
@@ -598,6 +555,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 construct an instance.
         """
         super().__init__(backbone=backbone, config=config)
+        print(f"--- Encoding kirchhoff constraints")
 
     @classmethod
     def build_subproblem(cls,
