@@ -15,13 +15,13 @@ from os import environ
 
 try:
     # import when building image for local use
-    import libs.backends as backends
-    from libs.backends.InputReader import InputReader
+    import libs.backends
+    from libs.backends.input_reader import InputReader
     from libs.return_objects import Response, ResultResponse, ErrorResponse
 except ImportError:
     # fall back to relative import when using PlanQK docker ##
     from .libs import backends
-    from .libs.backends.InputReader import InputReader
+    from .libs.backends.input_reader import InputReader
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
 

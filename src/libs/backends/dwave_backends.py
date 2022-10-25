@@ -24,8 +24,8 @@ from dwave.system import FixedEmbeddingComposite, EmbeddingComposite
 from tabu import TabuSampler
 
 # importing local QUBO modelling packages
-from .BackendBase import BackendBase
-from .InputReader import InputReader
+from .backend_base import BackendBase
+from .input_reader import InputReader
 
 try:
     from libs.qubo_transformator import QuboTransformator

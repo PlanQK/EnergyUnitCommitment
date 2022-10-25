@@ -4,7 +4,7 @@ various attributes that are all solvers use"""
 
 import abc
 
-from .InputReader import InputReader
+from .input_reader import InputReader
 from datetime import datetime
 
 

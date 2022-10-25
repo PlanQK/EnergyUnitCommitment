@@ -17,13 +17,13 @@ add a new constraint, you have to write a class that adheres to the `IsingSubpro
 it as an entry to the `ising_backbone` value of the configuration.
 """
 
-from .SqaBackends import ClassicalBackend, SqaBackend
-from .DwaveBackends import (
+from .sqa_backends import ClassicalBackend, SqaBackend
+from .dwave_backends import (
     DwaveTabu,
     DwaveSteepestDescent,
     DwaveCloudHybrid,
     DwaveCloudDirectQPU,
     DwaveReadQPU,
 )
-from .PypsaBackends import PypsaGlpk, PypsaFico
-from .QaoaBackend import QaoaQiskit
+from .pypsa_backends import PypsaGlpk, PypsaFico
+from .qaoa_backends import QaoaQiskit

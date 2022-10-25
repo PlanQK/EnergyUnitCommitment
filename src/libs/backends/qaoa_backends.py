@@ -13,11 +13,11 @@ import qiskit
 
 
 try:
-    from .BackendBase import BackendBase  # import for Docker run
+    from .backend_base import BackendBase  # import for Docker run
     from ..qubo_transformator.ising_backbone import IsingBackbone
     from ..qubo_transformator import QuboTransformator
 except ImportError:
-    from BackendBase import BackendBase  # import for local/debug run
+    from backend_base import BackendBase  # import for local/debug run
     from libs.qubo_transformator.ising_backbone import IsingBackbone
     from libs.qubo_transformator import QuboTransformator
 
@@ -33,7 +33,7 @@ from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
 from qiskit.circuit import Parameter, ParameterVector
 from scipy import stats
 
-from .InputReader import InputReader
+from .input_reader import InputReader
 
 
 class QaoaAngleSupervisor:

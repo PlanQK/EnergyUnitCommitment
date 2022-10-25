@@ -7,8 +7,8 @@ choices for optimizers are
 
 import pypsa
 
-from .BackendBase import BackendBase
-from .InputReader import InputReader
+from .backend_base import BackendBase
+from .input_reader import InputReader
 
 
 class PypsaBackend(BackendBase):

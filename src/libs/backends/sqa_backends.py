@@ -10,8 +10,8 @@ import time
 
 from ast import literal_eval
 
-from .InputReader import InputReader
-from .BackendBase import BackendBase
+from .input_reader import InputReader
+from .backend_base import BackendBase
 
 
 # try import from local .so
