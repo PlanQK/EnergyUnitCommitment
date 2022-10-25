@@ -17,7 +17,7 @@ def network_path():
     directory of the pytest call
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    network_path = dir_path + "/../networks/defaultnetwork.nc"
+    network_path = dir_path + "/../input/networks/defaultnetwork.nc"
     return network_path
 
 @pytest.fixture(scope='session')
