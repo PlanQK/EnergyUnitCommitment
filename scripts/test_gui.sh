@@ -14,7 +14,7 @@ export TRUSTED_USER=Yes
 
 echo "http://localhost:${Port}/" > ${GIT_ROOT}/url.txt
 
-trap 'trap " " SIGTERM; kill 0; wait; echo "Shutdown of flask and streamlit complete"' SIGINT SIGTERM
+trap 'trap " " SIGTERM; kill 0; rm ${GIT_ROOT}/url.txt; wait; echo "Shutdown of flask and streamlit complete"' SIGINT SIGTERM
 
 cd ${GIT_ROOT} && python3 ./src/server.py &
 cd ${GIT_ROOT} && streamlit run ./tosca_artifacts/service_streamlit_gui.py

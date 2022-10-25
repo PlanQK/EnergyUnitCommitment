@@ -281,5 +281,3 @@ clean_general:
 
 general: $(GENERAL_SWEEP_FILES)
 
-clean:
-	rm -f JobResponse url.txt EnergyUnitCommitment.zip results_general_sweep/*

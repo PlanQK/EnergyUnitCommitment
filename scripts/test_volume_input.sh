@@ -37,6 +37,6 @@ docker run -it \
     -e RUNNING_IN_DOCKER=Yes \
     -v ${GIT_ROOT}/input/${NETWORK}.json:/var/input/data/data.json \
     -v ${GIT_ROOT}/input/${CONFIG}.json:/var/input/params/params.json \
-    ${DOCKERTAG}  | tee  >(tail -n 1 > JobResponse)
+    ${DOCKERTAG}  | tee  >(tail -n 1 > results_general_sweep/job_response)
 
 exit 0
