@@ -197,13 +197,15 @@ network_json = json.dump(network_dict)
 In order to choose the solver and configure it's parameters, the field `params` is used to pass another JSON-object. Because there are multiple solvers and each solvers has some unique parameters, there are a lot of possible options to specify in that field. Therefore we will go through the structure of the JSON object and explain how you can configure the various aspects of the different solvers.
 
 The JSON-object contains these four fields: 
-- `backend`, 
-- `backend_config`, 
-- `ising_interface` 
-- `API_token`. 
+- `backend`,
+- `backend_config`,
+- `ising_interface`,
+- `snapshots`,
+- `API_token`.
 
 They specify which solver is going to be used and it's configuration. The field `backend` contains a string denoting which solver to use and `backend_config` contains configuration parameters of that solver. Most of the solvers require the unit commitment problem to be cast as a [quadratic unconstrained binary optimization problem (QUBO)](https://en.wikipedia.org/wiki/Quadratic_unconstrained_binary_optimization). If a solver requires a QUBO formulation of the unit commitment problem, 
-the field `ising_interface` specifies all relevant details on how the QUBO is built using another JSON-object.
+the field `ising_interface` specifies all relevant details on how the QUBO is built using another JSON-object. You can pass an integer to the `snapshots` field to specify how many snapshots of the 
+network are used in the optimziation problem. If this number is smaller than the number of snapshots given in the network file, the last excessive snapshots will be omitted.
 At last, the field `API_token` contains a JSON-object that can be used to pass API tokens of services which are used by solvers that access quantum hardware.
 
 ### Supported Solvers
@@ -245,7 +247,7 @@ By adding the example below to the `params` field, you can choose the simulated 
 Because all solvers except the mixed integer linear program require a QUBO formulation, we will explain how to configure the QUBO model first.
 A good model has few and distinct low energy states, which leads to a high probability of sampling a good solution when using a heuristic solver.
 
-----
+
 
 ### Configuring the QUBO-model
 
@@ -257,21 +259,6 @@ Then the sum of all weighted involved variables represent how much power is asso
 It depends on the type of the network component how it is interpreted in the context of different problem constraints.
 Choosing different methods for encoding network components changes how many variables are used and how these weights are determined.
 
-#### Limiting snapshots
-
-In order to limit the size of the QUBO, this service has an option to limit the number of snapshots that are considered for the unit commitment problem
-This can be done by passing an integer to the field `snapshots`.
-For example, adding the following entry to the configuration would limit the unit commitment problem to the first two snapshots.
-
-```
-{
-    "ising_interface": {
-        "snapshots": 2
-    }
-}
-```
-
-----
 
 #### QUBO representation of a transmission line
 
@@ -376,14 +363,9 @@ The following table describes various strategies to encode the marginal cost int
 
 ##### Configuring the estimation
 
-The parameter for configuring the estimation is `offset_factor`. When constructing the QUBO for the marginal costs, the marginal costs of each generator
-are offset by the product of that factor and the cost of the most efficient generator. 
-Such an offset doesn't change the solution of the unit commitment problem because all feasible solution are offset by the same value.
+The standard method for encoding marginal cost's is the `global_cost_square` strategy. It encodes the marginal cost minimization as the minimization of the squared distance of the incurred cost to some constant target. The parameters that can be used for configuring this  target are `offset` and `target_cost`, with the latter taking precedence if both are chosen. For a given `target_cost`, the offset can be calculated as the `target_cost` value divided by the total load of the network. The resulting QUBO encodes the squared distance of the marginal cost of a solution to the `target_cost` if the solution is feasible. For infeasible solutions, it encodes the distance to the `target_cost` plus some factor that depends on the total power output of a solution.
 
-The estimation used to encode the marginal cost then assumes that the cost of the optimal solution is zero with respect to the offset marginal costs.
-Thus the estimated value for some `offset_factor` is the product of it, the marginal cost of the most efficient generator and the total load of the network.
-
-The strategy `global_cost_square_with_slack` has three more options on top of the `offset_factor`. It adds slack variables that act like generators that reduce marginal costs, but produce
+The strategy `global_cost_square_with_slack` has three more options. It adds slack variables that act like generators that reduce marginal costs, but produce
 no power. This changes the estimation from a constant value to that constant plus the number represented by the slack variables.
 
 The following table describes the parameters that are used to describe these slack variables.
@@ -421,7 +403,7 @@ In total, an example of a JSON-object for configuring the QUBO looks like this.
 ```
 {
     "ising_interface": {
-        "generator_representation": "singleton",
+        "generator_representation": "single_qubit",
         "line_representation": "cutpowersoftwo",
         "kirchhoff": {
             "scale_factor": 1.0
@@ -431,8 +413,6 @@ In total, an example of a JSON-object for configuring the QUBO looks like this.
             "scale_factor": 0.3,
             "offset_factor": 1.0,
             "slack_type": "binary_power",
-
-
             "slack_scale": 0.1,
             "slack_size": 3,
         }
@@ -440,7 +420,7 @@ In total, an example of a JSON-object for configuring the QUBO looks like this.
 }
 ```
 
-----
+
 
 ### Solver Configuration
 
@@ -448,7 +428,7 @@ At last we describe the different solvers that this service provides, how to use
 If no solver has been specified, simulated quantum annealing will be used.
 For each solver, a runtime duration is estimated and if exceeded, the optimization will not be performed.
 
-----
+
 
 #### Simulated Quantum Annealing
 This solver solves a QUBO using a monte carlo simulation of quantum annealing to find an optimal solution. You can find more information on simulated quantum annealing [here](https://platform.planqk.de/algorithms/4ab6ed1f-9f5e-4caf-b0b2-59d1444340d1/) and on quantum annealing [here](https://platform.planqk.de/algorithms/786e1ff5-991e-428d-a538-b8b99bc3d175/). More on the solver itself can be found [here](https://platform.lanqk.de/services/ff5c0cdd-4a87-4473-8086-cb658a9f85a2). 
