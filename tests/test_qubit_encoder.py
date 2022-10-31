@@ -4,7 +4,7 @@ import sys
 import pypsa
 
 from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
-from src.libs.qubo_transformator.ising_backbone import IsingBackbone
+from src.libs.qubo_transformator.ising_backbone import NetworkIsingBackbone
 
 from .pypsa_networks import create_network
 
@@ -35,7 +35,7 @@ def config():
 
 @pytest.fixture
 def backbone(network):
-    return IsingBackbone(network)
+    return NetworkIsingBackbone(network)
 
 @pytest.fixture
 def generator_rep():
@@ -56,7 +56,7 @@ def test_generator_init(network_loads, generator_rep):
     into the backbone as qubits
     """
     network = create_network(network_loads)
-    backbone = IsingBackbone(network)
+    backbone = NetworkIsingBackbone(network)
     snapshot_count = len(network_loads)
     encoder = GeneratorEncoder.create_encoder(backbone, generator_rep)
     # check references in the backbone

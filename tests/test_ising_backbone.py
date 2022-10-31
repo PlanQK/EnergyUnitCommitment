@@ -3,7 +3,7 @@ import typing
 
 import pypsa
 
-from src.libs.qubo_transformator.ising_backbone import IsingBackbone
+from src.libs.qubo_transformator.ising_backbone import NetworkIsingBackbone
 
 # creates a networj with 2 generators at two buses. The first "gen_1" has a power output
 # of 4 and the second "gen_2" has a power output of 3
@@ -16,7 +16,7 @@ def backbone():
     """
     Create an ising backbone, that only has the generators encodes as qubits
     """
-    backbone_result = IsingBackbone(create_network([3]))
+    backbone_result = NetworkIsingBackbone(create_network([3]))
     encoder = GeneratorEncoder.create_encoder(backbone_result, "single_qubit")
     encoder.encode_qubits()
     return backbone_result
