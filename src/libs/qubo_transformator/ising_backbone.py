@@ -46,26 +46,23 @@ class IsingBackbone:
 
     def __init__(self):
         """
-        Constructor for an Ising Backbone. It requires a network and
-        the name of the function that defines how to encode lines. Then
-        it goes through the configuration dictionary and encodes all
-        sub-problem present into the instance.
-
-        Args:
-            network: (pypsa.Network)
-                The pypsa network which to encode into qubits.
+        Constructor for an Ising Backbone. It initializes various data structures
+        that are used for modelling a problem. In order to get a full problem
+        An Encoder has to encode problem components using string labels.
+        Then IsingSubproblem visit the Backbone instance and encode the QUBO
+        of the subproblem they model.
         """
         # list of time slices that are modelled in the qubo
         self.snapshots = [0]
 
         # contains ising coefficients
         self.ising_coefficients = {}
-        # mirrors encodings of `self.ising_coefficients`, but is reset after encoding a
-        # subproblem to get ising formulations of subproblems
+        # mirrors encodings of `self.ising_coefficients`, but can be reset after
+        # encoding a subproblem via the `flush_cached_problem` method
         self.ising_coefficients_cached = {}
 
-        # initializing data structures that encode the network into qubits
-        # the encoding dict contains the mapping of network components to qubits
+        # initializing data structures that encode the problem componetns into qubits
+        # the encoding dict contains the mapping of components via labels to qubits
         self._qubit_encoding = {}
         # the weights dictionary contains a mapping of qubits to their weights
         self._qubit_weights = {}
@@ -73,7 +70,6 @@ class IsingBackbone:
 
         # subproblems of the passed configuration are stored here
         self._subproblems = {}
-        # dictionary of all support subproblems
 
     def __getattr__(self, method_name: str) -> callable:
         """
@@ -192,7 +188,7 @@ class IsingBackbone:
         """
         if time is None:
             print("falling back default time in constant")
-            time = self.network.snapshots[0]
+            time = self.snapshots[0]
         component_adress = self.get_representing_qubits(component, time)
         for qubit in component_adress:
             # term with single spin after applying QUBO to Ising transformation
@@ -251,7 +247,7 @@ class IsingBackbone:
         # then figure out which qubits we want to couple based on the
         # component name and chosen time step
         if time is None:
-            time = self.network.snapshots[0]
+            time = self.snapshots[0]
         if additional_time is None:
             additional_time = time
         first_component_adress = self.get_representing_qubits(first_component, time)
@@ -329,16 +325,16 @@ class IsingBackbone:
         """
         if solution_list is None:
             solution_list = []
-        qubit_product = (-1) ** len(solution_list)
+        interaction_strength = (-1) ** len(solution_list) * 0.25 * interaction_strength
         first_sign, second_sign = -1, -1
         if first_qubit in solution_list:
             first_sign *= -1
         if second_qubit in solution_list:
             second_sign *= -1
-        self.add_interaction(first_qubit, second_qubit, qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_qubit, second_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(second_qubit, first_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_sign * second_sign * qubit_product * 0.25 * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_qubit, second_qubit, interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_qubit, second_sign * interaction_strength, weighted_interaction=False)
+        self.add_interaction(second_qubit, first_sign * interaction_strength, weighted_interaction=False)
+        self.add_interaction(first_sign * second_sign * interaction_strength, weighted_interaction=False)
 
     def encode_squared_distance(self,
                                 label_dictionary: dict,
@@ -456,13 +452,13 @@ class IsingBackbone:
         # snapshot_to_weight_dict dictionary
         snapshot_to_weight_dict = {
             snapshot: snapshot_to_weight_dict.get(snapshot, [])
-            for snapshot in self.network.snapshots
+            for snapshot in self.snapshots
         }
 
         # store component - snapshot - representing qubit relation
         self._qubit_encoding[component_name] = {
             snapshot: self.allocate_qubits_to_weight_list(snapshot_to_weight_dict[snapshot])
-            for snapshot in self.network.snapshots
+            for snapshot in self.snapshots
         }
         # expose qubit weights in `self._qubit_weights`
         for snapshot, qubit_list in self._qubit_encoding[component_name].items():
@@ -520,7 +516,7 @@ class IsingBackbone:
                 component.
         """
         if time is None:
-            time = self.network.snapshots[0]
+            time = self.snapshots[0]
         return self._qubit_encoding[component][time]
 
     def get_qubit_mapping(self, time: any = None) -> dict:
@@ -577,7 +573,7 @@ class IsingBackbone:
                 List of all qubits which have spin -1 in the solution.
             time: (any)
                 Index of time slice for which to retrieve the encoded value.
-                It has to be in the index self.network.snapshots
+                It has to be in the index self.snapshots
 
         Returns:
             (float)

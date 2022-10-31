@@ -3,7 +3,7 @@ from typing import Union
 
 import pypsa
 
-from .ising_backbone import IsingBackbone
+from .ising_backbone import IsingBackbone, NetworkIsingBackbone
 
 
 def binary_power_and_rest(number: int):
@@ -39,7 +39,6 @@ class QubitEncoder(ABC):
 
     def __init__(self, backbone: IsingBackbone):
         self.backbone = backbone
-        self.network = backbone.network
 
     @classmethod
     @abstractmethod
@@ -76,7 +75,7 @@ class QubitEncoder(ABC):
         """
         return {
                 time: self.get_weights(component, time)
-                for time in self.network.snapshots
+                for time in self.backbone.snapshots
                 }
 
     def get_weights(self, component: str, time: any) -> list:
@@ -104,7 +103,7 @@ class GeneratorEncoder(QubitEncoder):
         """
         Returns a list of all network generators
         """
-        return self.network.generators.index
+        return self.backbone.network.generators.index
 
     @classmethod
     def create_encoder(cls, backbone, config: str):
@@ -225,10 +224,10 @@ class LineEncoder(QubitEncoder):
         """
         Returns a list of all network transmission lines
         """
-        return self.network.lines.index
+        return self.backbone.network.lines.index
 
     @classmethod
-    def create_encoder(cls, backbone, config: str):
+    def create_encoder(cls, backbone: NetworkIsingBackbone, config: str):
         """
         A factory method for constructing an encoder for generators
 
@@ -272,7 +271,7 @@ class FullsplitLineEncoder(LineEncoder):
                 Returns a list of 1 and -1 with each number occuring equal
                 to the capacity of the transmission line at that timestep
         """
-        capacity = int(self.network.lines.loc[component].s_nom)
+        capacity = int(self.backbone.network.lines.loc[component].s_nom)
         return capacity * [1] + capacity * [-1]
 
 
@@ -298,7 +297,7 @@ class CutPowersOfTwoLineEncoder(LineEncoder):
                 A list of powers of two and a rest term with positive and
                 negative sign
         """
-        capacity = int(self.network.lines.loc[component].s_nom)
+        capacity = int(self.backbone.network.lines.loc[component].s_nom)
         return self.cut_powers_of_two(capacity)
 
     def cut_powers_of_two(self, capacity: float) -> list:
@@ -336,8 +335,8 @@ class NetworkEncoder(QubitEncoder):
         by applying the encoding methods of those
 
         Args:
-            backbone: (IsingBackbone)
-                The IsingBackbone instance on which to encode the network
+            backbone: (NetworkIsingBackbone)
+                The NetworkIsingBackbone instance on which to encode the network
             config: (dict)
                 A dictionary containing the config for the genrator and
                 transmission line encoding

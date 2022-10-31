@@ -61,7 +61,6 @@ def test_generator_init(network_loads, generator_rep):
     encoder = GeneratorEncoder.create_encoder(backbone, generator_rep)
     # check references in the backbone
     assert encoder.backbone == backbone, "encoder references wrong backbone"
-    assert encoder.network == backbone.network, "encoder references wrong network"
     # check that each value in each snapshots is encoded
     encoder.encode_qubits()
     for snapshot in network.snapshots:
