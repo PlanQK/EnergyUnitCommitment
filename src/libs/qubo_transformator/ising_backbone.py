@@ -17,19 +17,19 @@ from numpy import ndarray
 
 class IsingBackbone:
     """
-    This class implements the conversion of a unit commitment problem
-    given by a Pypsa network to an Ising spin glass problem.
+    This class implements the conversion of a optimization problem
+    instance into to an Ising spin glass problem.
 
     It acts as an endpoint to decode qubit configuration and encode
     coupling of QUBO variables into Ising interactions. For a specific
     problem instances, custom methods have to be written in a child class
     to access instance dependant information
 
-    It encodes
-    the various network components into qubits and provides methods to
-    interact with those qubits based on the label of the network
-    This class only acts as a problem agnostic data structure 
+    This class only acts as a problem agnostic data structure
     which other objects can use to model a specific constraint.
+    It uses labels for groups of qubits that model one problem component.
+    Those component can be indexed by a time slice, to model states of the
+    same component at different points in time.
 
     Modeling of various constraints is delegated to the instances of classes
     implementing the `IsingSubproblem` interface. An `IsingSubproblem`
@@ -44,7 +44,7 @@ class IsingBackbone:
     `AbstractIsingSubproblem` interface
     """
 
-    def __init__(self, network: pypsa.Network):
+    def __init__(self):
         """
         Constructor for an Ising Backbone. It requires a network and
         the name of the function that defines how to encode lines. Then
@@ -55,9 +55,8 @@ class IsingBackbone:
             network: (pypsa.Network)
                 The pypsa network which to encode into qubits.
         """
-        # network to be solved
-        self.network = network
-        self.snapshots = network.snapshots
+        # list of time slices that are modelled in the qubo
+        self.snapshots = [0]
 
         # contains ising coefficients
         self.ising_coefficients = {}
@@ -675,6 +674,23 @@ class NetworkIsingBackbone(IsingBackbone):
     It extends the ising backbone to get pypsa data like
     loads, generators at buses based on their label and so on.
     """
+
+    def __init__(self, network: pypsa.Network):
+        """
+        Constructor for an Ising Backbone. It requires a network and
+        the name of the function that defines how to encode lines. Then
+        it goes through the configuration dictionary and encodes all
+        sub-problem present into the instance.
+
+        Args:
+            network: (pypsa.Network)
+                The pypsa network which to encode into qubits.
+        """
+        super().__init__()
+        # network to be solved
+        self.network = network
+        # list of time slices that are modelled in the qubo
+        self.snapshots = self.network.snapshots
 
     # helper functions to set encoded values
     def set_output_network(self, solution: list) -> pypsa.Network:

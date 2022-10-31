@@ -1,6 +1,6 @@
 import pypsa
 
-from .ising_backbone import IsingBackbone
+from .ising_backbone import NetworkIsingBackbone
 from .qubit_encoder import NetworkEncoder
 from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput
 
@@ -13,8 +13,8 @@ class QuboTransformator:
         self.network = network
         self.config = config
 
-    def transform_network_to_qubo(self) -> IsingBackbone:
-        backbone_result = IsingBackbone(self.network)
+    def transform_network_to_qubo(self) -> NetworkIsingBackbone:
+        backbone_result = NetworkIsingBackbone(self.network)
         print()
         print("--- Generating Ising problem ---")
         self.subproblem_table = {
