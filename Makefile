@@ -254,7 +254,10 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-.PHONY: all plots general clean_general clean
+.PHONY: all plots general clean_general temp_general
+
+# used for repeated making of runs if discarding results is acceptable
+temp: clean_general general
 
 .docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp
