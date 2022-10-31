@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import typing
+from typing import Union
 
 import pypsa
 
@@ -43,7 +43,7 @@ class QubitEncoder(ABC):
 
     @classmethod
     @abstractmethod
-    def create_encoder(cls, backbone, config: str):
+    def create_encoder(cls, backbone, config: Union[str, dict]):
         """
         A factory method to be overwritten by the interface that
         extends this one. This method will be called to get the 
@@ -79,20 +79,20 @@ class QubitEncoder(ABC):
                 for time in self.network.snapshots
                 }
 
-    @abstractmethod
     def get_weights(self, component: str, time: any) -> list:
         """
         For the given component and snapshot this methods returns the
         weights of qubit that encode it. The component type is
         dependent of the subclass of the encoder
         """
+        raise NotImplementedError
 
-    @abstractmethod
     def get_components(self):
         """
         Returns an iterable of all components this instances transforms into
         qubits.
         """
+        raise NotImplementedError
 
 
 class GeneratorEncoder(QubitEncoder):
@@ -321,3 +321,39 @@ class CutPowersOfTwoLineEncoder(LineEncoder):
         positive_capacity = binary_power_and_rest(integer_capacity)
         negative_capacity = [- number for number in positive_capacity]
         return positive_capacity + negative_capacity
+
+
+class NetworkEncoder(QubitEncoder):
+    """
+    A class for transfoming the components of a pypsa Network into qubits.
+    """
+
+    @classmethod
+    def create_encoder(cls, backbone, config: dict):
+        """
+        This creates a NetworkEncoder by creating the network and generator
+        encoders as given in the config. Encoding the network is archieved
+        by applying the encoding methods of those
+
+        Args:
+            backbone: (IsingBackbone)
+                The IsingBackbone instance on which to encode the network
+            config: (dict)
+                A dictionary containing the config for the genrator and
+                transmission line encoding
+        """
+        generator_representation = config.get("generator_representation", "single_qubit")
+        line_representation = config.get("line_representation", "cutpowersoftwo")
+        network_encoder = NetworkEncoder(backbone)
+        network_encoder.generator_encoder = GeneratorEncoder.create_encoder(backbone,
+                                                                 generator_representation)
+        network_encoder.line_encoder = LineEncoder.create_encoder(backbone, 
+                                                       line_representation)
+        return network_encoder
+
+    def encode_qubits(self):
+        """
+        The entrypoint for the backbone to call to encode the network
+        """
+        self.generator_encoder.encode_qubits()
+        self.line_encoder.encode_qubits()
