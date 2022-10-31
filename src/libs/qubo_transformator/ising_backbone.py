@@ -21,12 +21,15 @@ class IsingBackbone:
     given by a Pypsa network to an Ising spin glass problem.
 
     It acts as an endpoint to decode qubit configuration and encode
-    coupling of network components into Ising interactions. It encodes
+    coupling of QUBO variables into Ising interactions. For a specific
+    problem instances, custom methods have to be written in a child class
+    to access instance dependant information
+
+    It encodes
     the various network components into qubits and provides methods to
     interact with those qubits based on the label of the network
-    component they represent. Therefore, it only acts as a data
-    structure which other objects can use to model a specific
-    constraint.
+    This class only acts as a problem agnostic data structure 
+    which other objects can use to model a specific constraint.
 
     Modeling of various constraints is delegated to the instances of classes
     implementing the `IsingSubproblem` interface. An `IsingSubproblem`
@@ -487,6 +490,192 @@ class IsingBackbone:
         self.allocated_qubits += num_new_allocated_qubits
         return allocated_qubit_list
 
+    # helper functions for getting encoded values
+    def get_qubit_encoding(self) -> dict:
+        """
+        Returns the dictionary that holds information on the encoding
+        of the network into qubits.
+
+        Returns:
+            (dict)
+                The dictionary with network component as keys and qubit
+                information as values
+        """
+        return self._qubit_encoding
+
+    def get_representing_qubits(self, component: str, time: any = None) -> list:
+        """
+        Returns a list of all qubits that are used to encode a network
+        component at a given time slice.
+
+        Args:
+            component: (str)
+                Label of the (network) component.
+            time: (any)
+                Index of time slice for which to get representing
+                qubits. This has to be in the network.snapshots index
+
+        Returns:
+            (list)
+                List of integers which are qubits that represent the
+                component.
+        """
+        if time is None:
+            time = self.network.snapshots[0]
+        return self._qubit_encoding[component][time]
+
+    def get_qubit_mapping(self, time: any = None) -> dict:
+        """
+        Returns a dictionary with all network components and which
+        qubits were used for representation in an Ising spin glass
+        problem.
+        
+        Args:
+            time: (any)
+                Index of time slice for which to get qubit map
+
+        Returns:
+            (dict)
+                Dictionary of all network components and their qubits.
+                Network components labels are the keys and the values
+                are the ranges of qubits used for their encoding.
+        """
+        return {component: self.get_representing_qubits(component=component,
+                                                        time=time)
+                for component in self._qubit_encoding.keys()
+                if isinstance(component, str)}
+
+    def get_interaction(self, *args) -> float:
+        """
+        Returns the interaction coefficient of a list of qubits.
+        
+        Args:
+            args: (int)
+                All qubits that are involved in this interaction.
+
+        Returns:
+            (float)
+                The interaction strength between all qubits in args.
+        """
+        sorted_unique_arguments = tuple(sorted(set(args)))
+        return self.ising_coefficients.get(sorted_unique_arguments, 0.0)
+
+    def get_encoded_value_of_component(self,
+                                       component: str,
+                                       solution: list,
+                                       time: any = 0) -> float:
+        """
+        Returns the encoded value of a component according to the spin
+        configuration in solution at a given time slice.
+        A component is represented by a list of weighted qubits. The
+        encoded value is the weighted sum of all active qubits.
+
+        Args:
+            component: (str)
+                Label of the network component for which to retrieve the
+                encoded value.
+            solution: (list)
+                List of all qubits which have spin -1 in the solution.
+            time: (any)
+                Index of time slice for which to retrieve the encoded value.
+                It has to be in the index self.network.snapshots
+
+        Returns:
+            (float)
+                Value of the component encoded in the spin configuration
+                of solution.
+        """
+        value = 0.0
+        for qubit in self._qubit_encoding[component][time]:
+            if qubit in solution:
+                value += self._qubit_weights[qubit]
+        return value
+
+    def calc_cost(self, solution: list,
+                  ising_interactions: dict = None) -> float:
+        """
+        Calculates the energy of a spin state including the constant
+        energy contribution.
+        The default Ising spin glass state that is used to calculate
+        the energy of a solution is the full problem stored in the
+        IsingBackbone. Ising subproblems can overwrite which Ising
+        interactions are used to calculate the energy to get subproblem
+        specific information. The assignment of qubits to the network is
+        still fixed.
+
+        Args:
+            solution: (list)
+                A list of all qubits which have spin -1 in the solution.
+            ising_interactions: (dict)
+                The Ising problem to be used to calculate the energy.
+
+        Returns:
+            (float)
+                The energy of the spin glass state in solution.
+        """
+        solution = set(solution)
+        if ising_interactions is None:
+            ising_interactions = self.ising_coefficients
+        total_cost = 0.0
+        for spins, weight in ising_interactions.items():
+            if len(spins) == 1:
+                factor = 1
+            else:
+                factor = -1
+            for spin in spins:
+                if spin in solution:
+                    factor *= -1
+            total_cost += factor * weight
+        return total_cost
+
+    # getter for encoded ising problem parameters
+    def siquan_format(self) -> list:
+        """
+        Returns the complete problem in the format required by the
+        siquan solver.
+
+        Returns:
+            (list)
+                A list of tuples of the form (interaction-coefficient,
+                list(qubits)).
+        """
+        return [(v, list(k)) for k, v in self.ising_coefficients.items() if
+                v != 0 and len(k) > 0]
+
+    def get_hamiltonian_matrix(self) -> list:
+        """
+        Returns a matrix containing the Ising hamiltonian
+
+        Returns:
+            (list)
+                A list of lists representing the hamiltonian matrix.
+        """
+        qubits = range(self.allocated_qubits)
+        hamiltonian = [
+            [self.get_interaction(i, j) for i in qubits] for j in qubits
+        ]
+        return hamiltonian
+
+    def get_hamiltonian_eigenvalues(self) -> tuple[ndarray, Any]:
+        """
+        Returns the eigenvalues and normalized eigenvectors of the
+        hamiltonian matrix.
+
+        Returns:
+            (np.ndarray)
+                A numpy array containing all eigenvalues.
+        """
+        return np.linalg.eigh(self.get_hamiltonian_matrix())
+
+
+class NetworkIsingBackbone(IsingBackbone):
+    """
+    This class implements the conversion of a unit commitment problem
+    given by a Pypsa network to an Ising spin glass problem.
+    It extends the ising backbone to get pypsa data like
+    loads, generators at buses based on their label and so on.
+    """
+
     # helper functions to set encoded values
     def set_output_network(self, solution: list) -> pypsa.Network:
         """
@@ -575,19 +764,6 @@ class IsingBackbone:
                     output_network.lines_t.p1[line] = p1
 
         return output_network
-
-    # helper functions for getting encoded values
-    def get_qubit_encoding(self) -> dict:
-        """
-        Returns the dictionary that holds information on the encoding
-        of the network into qubits.
-
-        Returns:
-            (dict)
-                The dictionary with network component as keys and qubit
-                information as values
-        """
-        return self._qubit_encoding
 
     def get_bus_components(self, bus: str) -> dict:
         """
@@ -796,94 +972,6 @@ class IsingBackbone:
             load += self.get_load(bus, time)
         return load
 
-    def get_representing_qubits(self, component: str, time: any = None) -> list:
-        """
-        Returns a list of all qubits that are used to encode a network
-        component at a given time slice.
-
-        Args:
-            component: (str)
-                Label of the (network) component.
-            time: (any)
-                Index of time slice for which to get representing
-                qubits. This has to be in the network.snapshots index
-
-        Returns:
-            (list)
-                List of integers which are qubits that represent the
-                component.
-        """
-        if time is None:
-            time = self.network.snapshots[0]
-        return self._qubit_encoding[component][time]
-
-    def get_qubit_mapping(self, time: any = None) -> dict:
-        """
-        Returns a dictionary with all network components and which
-        qubits were used for representation in an Ising spin glass
-        problem.
-        
-        Args:
-            time: (any)
-                Index of time slice for which to get qubit map
-
-        Returns:
-            (dict)
-                Dictionary of all network components and their qubits.
-                Network components labels are the keys and the values
-                are the ranges of qubits used for their encoding.
-        """
-        return {component: self.get_representing_qubits(component=component,
-                                                        time=time)
-                for component in self._qubit_encoding.keys()
-                if isinstance(component, str)}
-
-    def get_interaction(self, *args) -> float:
-        """
-        Returns the interaction coefficient of a list of qubits.
-        
-        Args:
-            args: (int)
-                All qubits that are involved in this interaction.
-
-        Returns:
-            (float)
-                The interaction strength between all qubits in args.
-        """
-        sorted_unique_arguments = tuple(sorted(set(args)))
-        return self.ising_coefficients.get(sorted_unique_arguments, 0.0)
-
-    def get_encoded_value_of_component(self,
-                                       component: str,
-                                       solution: list,
-                                       time: any = 0) -> float:
-        """
-        Returns the encoded value of a component according to the spin
-        configuration in solution at a given time slice.
-        A component is represented by a list of weighted qubits. The
-        encoded value is the weighted sum of all active qubits.
-
-        Args:
-            component: (str)
-                Label of the network component for which to retrieve the
-                encoded value.
-            solution: (list)
-                List of all qubits which have spin -1 in the solution.
-            time: (any)
-                Index of time slice for which to retrieve the encoded value.
-                It has to be in the index self.network.snapshots
-
-        Returns:
-            (float)
-                Value of the component encoded in the spin configuration
-                of solution.
-        """
-        value = 0.0
-        for qubit in self._qubit_encoding[component][time]:
-            if qubit in solution:
-                value += self._qubit_weights[qubit]
-        return value
-
     def generate_report(self, solution: list) -> dict:
         """
         For the given solution, calculates various properties of the
@@ -911,43 +999,6 @@ class IsingBackbone:
             "powerflow": self.get_flow_dictionary(solution=solution,
                                                   stringify=True),
         }
-
-    def calc_cost(self, solution: list,
-                  ising_interactions: dict = None) -> float:
-        """
-        Calculates the energy of a spin state including the constant
-        energy contribution.
-        The default Ising spin glass state that is used to calculate
-        the energy of a solution is the full problem stored in the
-        IsingBackbone. Ising subproblems can overwrite which Ising
-        interactions are used to calculate the energy to get subproblem
-        specific information. The assignment of qubits to the network is
-        still fixed.
-
-        Args:
-            solution: (list)
-                A list of all qubits which have spin -1 in the solution.
-            ising_interactions: (dict)
-                The Ising problem to be used to calculate the energy.
-
-        Returns:
-            (float)
-                The energy of the spin glass state in solution.
-        """
-        solution = set(solution)
-        if ising_interactions is None:
-            ising_interactions = self.ising_coefficients
-        total_cost = 0.0
-        for spins, weight in ising_interactions.items():
-            if len(spins) == 1:
-                factor = 1
-            else:
-                factor = -1
-            for spin in spins:
-                if spin in solution:
-                    factor *= -1
-            total_cost += factor * weight
-        return total_cost
 
     def individual_marginal_cost(self, solution: list) -> dict:
         """
@@ -1025,42 +1076,3 @@ class IsingBackbone:
         for marginal_cost_at_bus in self.individual_marginal_cost(solution=solution).values():
             marginal_cost += marginal_cost_at_bus
         return marginal_cost
-
-    # getter for encoded ising problem parameters
-    def siquan_format(self) -> list:
-        """
-        Returns the complete problem in the format required by the
-        siquan solver.
-
-        Returns:
-            (list)
-                A list of tuples of the form (interaction-coefficient,
-                list(qubits)).
-        """
-        return [(v, list(k)) for k, v in self.ising_coefficients.items() if
-                v != 0 and len(k) > 0]
-
-    def get_hamiltonian_matrix(self) -> list:
-        """
-        Returns a matrix containing the Ising hamiltonian
-
-        Returns:
-            (list)
-                A list of lists representing the hamiltonian matrix.
-        """
-        qubits = range(self.allocated_qubits)
-        hamiltonian = [
-            [self.get_interaction(i, j) for i in qubits] for j in qubits
-        ]
-        return hamiltonian
-
-    def get_hamiltonian_eigenvalues(self) -> tuple[ndarray, Any]:
-        """
-        Returns the eigenvalues and normalized eigenvectors of the
-        hamiltonian matrix.
-
-        Returns:
-            (np.ndarray)
-                A numpy array containing all eigenvalues.
-        """
-        return np.linalg.eigh(self.get_hamiltonian_matrix())
