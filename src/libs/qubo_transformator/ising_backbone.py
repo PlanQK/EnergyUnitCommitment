@@ -337,7 +337,8 @@ class IsingBackbone:
         self.add_interaction(first_sign * second_sign * interaction_strength, weighted_interaction=False)
 
     def encode_squared_distance(self,
-                                label_dictionary: dict,
+                                label_dictionary: dict = None,
+                                label_list: list = [],
                                 target: float = 0.0,
                                 global_factor: float = 1.0,
                                 time: any = None,
@@ -349,7 +350,9 @@ class IsingBackbone:
         Args:
             label_dictionary: (dict)
                 key, value pairs of all components involved in representing the
-                target value.
+                target value. The value is a float
+            label_list: (list)
+                List of labels that are added as an interaction with weight 1.0
             target: (float)
                 the value that is the target for the sum of the components
                 in the label_dictionary
@@ -363,6 +366,10 @@ class IsingBackbone:
                 Modifies `self.ising_coefficients` and `self.cached_problem`
 
         """
+        if label_dictionary is None:
+            label_dictionary = {}
+        label_dictionary = {**label_dictionary,
+                            **{label : 1.0 for label in label_list}}
         # constant contribution to cost function so that a configuration
         # that matches the target value has energy of 0
         self.add_interaction(global_factor * target ** 2)
@@ -661,6 +668,23 @@ class IsingBackbone:
                 A numpy array containing all eigenvalues.
         """
         return np.linalg.eigh(self.get_hamiltonian_matrix())
+
+    def generate_report(self, solution: list) -> dict:
+        """
+        For the given solution, calculates various properties of the
+        solution.
+
+        Args:
+            solution: (list)
+                List of all qubits that have spin -1 in a solution.
+        Returns:
+            (dict)
+                A dictionary containing general information about the
+                solution.
+        """
+        return {
+            "total_cost": self.calc_cost(solution=solution),
+        }
 
 
 class NetworkIsingBackbone(IsingBackbone):
