@@ -2,7 +2,7 @@ import pypsa
 
 from .ising_backbone import IsingBackbone, NetworkIsingBackbone
 from .qubit_encoder import NetworkEncoder
-from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput
+from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput, PowerOutputInvariant
 
 import typing
 
@@ -31,7 +31,8 @@ class QuboTransformator:
         self.subproblem_table = {
             "kirchhoff": KirchhoffSubproblem,
             "marginal_cost": MarginalCostSubproblem,
-            "minimal_power": MinimalGeneratorOutput
+            "minimal_power": MinimalGeneratorOutput,
+            "total_power": PowerOutputInvariant
         }
         if "kirchhoff" not in self.config:
             print("No Kirchhoff configuration found, "

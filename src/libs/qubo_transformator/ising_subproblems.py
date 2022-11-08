@@ -64,11 +64,7 @@ class AbstractIsingSubproblem:
                 construct an instance.
         """
         self.ising_coefficients = {}
-        try:
-            self.scale_factor = config["scale_factor"]
-        except KeyError:
-            print("Can't find value for 'scale_factor', fallback to '1.0'")
-            self.scale_factor = 1.0
+        self.scale_factor = config.setdefault("scale_factor", 1.0)
         self.backbone = backbone
         self.network = backbone.network
 
@@ -1018,3 +1014,68 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                                                                second_qubit=qubit,
                                                                zero_qubits_list=[status_qubit],
                                                                interaction_strength=interaction_strength)
+
+class PowerOutputInvariant(AbstractIsingSubproblem):
+    """
+    This constraint enforces that the total power output is equal to the total
+    load in the network. Due to the kirchhoff constraint being a local, bus-based
+    constraint, the implicit penalty on it is quasi linear. For bad marginal cost
+    estimations, this leads to very bad solutions. This also increases the performance
+    of the marginal cost encoding by explicitly adding the invariant it's encoding
+    relies on to be penalized quadratically
+    """
+
+    @classmethod
+    def build_subproblem(cls,
+                         backbone: IsingBackbone,
+                         configuration: dict):
+        """
+        A factory method for returning an instance that enforces the minimal
+        generator output.
+
+        Args:
+            backbone: (IsingBackbone)
+                The ising_backbone which to modify
+            configuration: (dict)
+                The config dict that contains the scale factor
+
+        Returns:
+            (MinimalGeneratorOutput)
+                An instance of this class
+        """
+        return PowerOutputInvariant(backbone, configuration)
+
+    def encode_subproblem(self) -> None:
+        """
+        Modifies the first order interactions of generator qubits into
+        second-oder interactions with a status qubit
+
+        Returns:
+            (None)
+                Modifies `self.backbone.ising_coefficients` and
+                `self.backbone.ising_coefficients_positive
+        """
+        for time in self.backbone.snapshots:
+            self.encode_total_power_invariant(time=time)
+
+    def encode_total_power_invariant(self, time=None):
+        """
+        Encodes that the total generated power is equal to the total load
+        at that time step
+
+        Args:
+            time: (any)
+                The snapshot at which to encode the constraint
+
+        Returns:
+            (None)
+                Modifies the attribute `self.backbone`
+        """
+        if time is None:
+            time = self.backbone.snapshots[0]
+        self.backbone.encode_squared_distance(
+            label_list=self.backbone.network.generators.index,
+            target=-self.backbone.get_total_load(time),
+            global_factor=self.scale_factor,
+            time=time,
+        )
