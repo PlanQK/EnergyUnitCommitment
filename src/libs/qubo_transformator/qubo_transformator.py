@@ -41,12 +41,14 @@ class QuboTransformator:
 
         # encode the network components into qubits
         NetworkEncoder.create_encoder(backbone_result, self.config).encode_qubits()
+        unmatched_subproblems = []
         for subproblem, subproblem_configuration in self.config.items():
             if subproblem in ["generator_representation", "line_representation"]:
                 continue
             if subproblem not in self.subproblem_table:
-                print(f"{subproblem} is not a valid subproblem, skipping "
+                print(f"{subproblem} is not a valid subproblem, deleting and skipping "
                       f"encoding")
+                unmatched_subproblems.append(subproblem)
                 continue
             if subproblem_configuration is None:
                 subproblem_configuration = {}
@@ -55,6 +57,8 @@ class QuboTransformator:
             backbone_result._subproblems[subproblem] = subproblem_instance
             backbone_result.flush_cached_problem()
             subproblem_instance.encode_subproblem()
+        for subproblem in unmatched_subproblems:
+            self.config.pop(subproblem)
         print()
         print("--- Finish generating Ising Problem with the following subproblems ---")
         for key in backbone_result._subproblems:
