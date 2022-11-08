@@ -8,6 +8,8 @@ transverse field to be 0 everywhere
 import random
 import time
 
+from numpy import sqrt
+
 from ast import literal_eval
 
 from .input_reader import InputReader
@@ -48,7 +50,7 @@ class ClassicalBackend(BackendBase):
                  of the network and configuration file.
         """
         super().__init__(reader=reader)
-        self.siquan_config = self.config["backend_config"]
+        self.siquan_config = self.config.setdefault("backend_config", {})
         self.siquan_config.setdefault("seed", random.randrange(10 ** 6))
         self.siquan_config["transverse_field_schedule"] = self.get_h_schedule()
         self.siquan_config.setdefault("temperature_schedule", "[0.1,iF,0.0001]")
@@ -237,3 +239,81 @@ class SqaBackend(ClassicalBackend):
         """
         return self.config["backend_config"].setdefault("transverse_field_schedule",
                                                         "[8.0,0.0]")
+
+class SqaIterator(BackendBase):
+    """
+    A class for solving the unit commitment problem using iterative qubos solved
+    by an annealer
+    """
+
+    def __init__(self, reader: InputReader):
+        """
+        Constructor for the ClassicalBackend class. It requires an
+        InputReader, which handles the loading of the network and
+        configuration file.
+
+        Args:
+            reader: (InputReader)
+                 Instance of an InputReader, which handled the loading
+                 of the network and configuration file.
+        """
+        super().__init__(reader=reader)
+        self.siquan_config = self.config["backend_config"]
+        self.solver = SqaBackend.create_optimizer(reader=reader) 
+        self.solver_marginal_config = self.solver.config["ising_interface"]["marginal_cost"]
+        self.solver.configure_solver()
+
+    def transform_problem_for_optimizer(self) -> None:
+        """
+        Initializes an IsingInterface-instance, which encodes the Ising
+        Spin Glass Problem, using the network to be optimized.
+
+        Returns:
+            (None)
+                Add the IsingInterface-instance to
+                self.transformed_problem.
+        """
+        print("transforming problem...")
+        self.iteration_step = 0
+        self.max_iteration = self.config["backend_config"]["max_iteration"]
+        self.current_estimation = self.solver_marginal_config["target_cost"]
+        self.iteration_results = []
+
+    def calculate_step(self, solution_cost):
+        return sqrt(solution_cost / self.solver_marginal_config["scale_factor"])
+
+    def optimize(self) -> None:
+        """
+        Optimizes the problem encoded in the IsingBackbone-Instance.
+        It uses the siquan solver which parameters can be set using
+        self.config. Configuration of the solver is delegated to a
+        method that can be overwritten in child classes.
+
+        Returns:
+            (None)
+                The optimized solution is stored in the `self.output`
+                dictionary.
+        """
+        tic = time.perf_counter()
+        for step in range(self.max_iteration):
+            print(f"\n ----------------------------------------")
+            print(f"\n -- Step {step} -- Estimation: {self.current_estimation} ")
+            print(f"\n ----------------------------------------")
+            self.solver_marginal_config["target_cost"] = self.current_estimation
+            self.solver.transform_problem_for_optimizer()
+            self.solver.optimize()
+            self.solver.print_report()
+            current_result = self.solver.get_output()
+            self.current_estimation += self.calculate_step(current_result['results']['total_cost'])
+            self.iteration_results.append(current_result)
+            if current_result['results']['kirchhoff_cost'] == 0.0:
+                print(f" \n--- Found feasible solution ---\n")
+                break
+
+        self.output["results"]["optimization_time"] = time.perf_counter() - tic
+        # parse the entry in "state" before using it
+        result = current_result
+        result["state"] = literal_eval(result["state"])
+        self.write_results_to_output(result)
+        print("done")
+

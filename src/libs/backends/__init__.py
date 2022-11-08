@@ -17,7 +17,7 @@ add a new constraint, you have to write a class that adheres to the `IsingSubpro
 it as an entry to the `ising_backbone` value of the configuration.
 """
 
-from .sqa_backends import ClassicalBackend, SqaBackend
+from .sqa_backends import ClassicalBackend, SqaBackend, SqaIterator
 from .dwave_backends import (
     DwaveTabu,
     DwaveSteepestDescent,

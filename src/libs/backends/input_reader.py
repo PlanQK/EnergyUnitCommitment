@@ -42,7 +42,7 @@ class InputReader:
             "dwave-read-qpu",
         ],
         "pypsa_backend": ["pypsa-glpk", "pypsa-fico"],
-        "sqa_backend": ["sqa", "classical"],
+        "sqa_backend": ["sqa", "classical", "iterative-sqa"],
         "qaoa_backend": ["qaoa"],
     }
     loaders = {
@@ -228,6 +228,7 @@ class InputReader:
         gan_backends = {
             "classical": backends.ClassicalBackend,
             "sqa": backends.SqaBackend,
+            "iterative-sqa": backends.SqaIterator,
             "dwave-tabu": backends.DwaveTabu,
             "dwave-greedy": backends.DwaveSteepestDescent,
             "pypsa-glpk": backends.PypsaGlpk,
