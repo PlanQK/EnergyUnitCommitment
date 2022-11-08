@@ -515,17 +515,17 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
             snapshot_to_weight_dict=snapshot_to_slack_dict
         )
 
-    def get_generator_to_cost_dict(self) -> dict:
+    def calc_transformed_marginal_costs(self, time) -> dict:
         """
         Returns a dictionary with generators as keys and the their offset marginal
-        costs and en entry for the slack variables
-
+        costs. Adds the slack variable as if it was a generator
+        i
         Return:
             (dict)
                 A dictionary with generators, the slack component and associated
                 marginal costs as values
         """
-        result = super().calc_transformed_marginal_costs()
+        result = super().calc_transformed_marginal_costs(time=time)
         result["slack_marginal_cost"] = self.slack_scale
         return result
 
