@@ -8,7 +8,7 @@ API_token: # your token here
 # choose backend
 backend: "pypsa-glpk"
     # (string) the backend algorithm to be used. options are:
-    # sqa based: "classical", "sqa", 
+    # sqa based: "classical", "sqa", "iterative-sqa"
     # dwave based: "dwave-tabu", "dwave-greedy", "dwave-hybrid", "dwave-qpu", "dwave-read-qpu",
     # milp based: "pypsa-glpk", "pypsa-fico"
     # qiskit based: "qaoa"
@@ -35,6 +35,8 @@ ising_interface:
         scale_factor: 1.0
           # (float) weight of the kirchhoff subproblem in the QUBO
     # Adding Marginal cost optimization in the QUBO
+    total_power:
+        scale_factor: 1
     marginal_cost:
         range_factor: 1.0
             # (float) a linear factor to linearly scale the marginal costs per power produced
@@ -204,4 +206,9 @@ pypsa_backend:
 
 # The following entry can also contain config data, but is used by all solvers
 backend_config:
+    timeout: 60
+    max_iteration: 10
+    # (int)
+    # choose how many steps the iterative qubo algorithm can do before stopping without finding
+    # a feasible solution
 
