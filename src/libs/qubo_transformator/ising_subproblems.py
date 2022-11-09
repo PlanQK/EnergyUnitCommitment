@@ -512,7 +512,7 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
         # adding slack qubits with the label `slack_marginal_cost`
         self.backbone.create_qubit_entries_for_component(
             component_name="slack_marginal_cost",
-            snapshot_to_weight_dict=snapshot_to_slack_dict
+            snapshot_to_weight=snapshot_to_slack_dict
         )
 
     def calc_transformed_marginal_costs(self, time) -> dict:

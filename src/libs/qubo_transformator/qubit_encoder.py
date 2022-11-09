@@ -65,7 +65,7 @@ class QubitEncoder(ABC):
         for component in self.get_components():
             self.backbone.create_qubit_entries_for_component(
                 component_name=component,
-                snapshot_to_weight_dict=self.encoding_method(component)
+                snapshot_to_weight=self.encoding_method(component)
                 )
 
     def encoding_method(self, component: str) -> dict:
