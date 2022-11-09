@@ -23,7 +23,7 @@ class Response:
         return json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)), sort_keys=True, indent=2)
 
     @abstractmethod
-    def dump_results(self, folder: str = "Problemset/"):
+    def dump_results(self, folder: str = "problemset/"):
         """
         An abstract method to be overwritten in child classes. The behaviour of the method
         is to write the contents of the response to the disk. This is needed for saving the 
@@ -51,7 +51,7 @@ class ErrorResponse(Response):
         self.code = code
         self.detail = detail
 
-    def dump_results(self, folder: str = "Problemset/"):
+    def dump_results(self, folder: str = "problemset/"):
         """
         saves the thrown error to the disk. Instead of using the name specified
         in the config for the result, this will instead use a name using the
@@ -84,7 +84,7 @@ class ResultResponse(Response):
         self.result = result
         self.metadata = metadata
 
-    def dump_results(self, folder: str = "Problemset/"):
+    def dump_results(self, folder: str = "problemset/"):
         """
         Saves the result of the local optimization in a docker container.
     

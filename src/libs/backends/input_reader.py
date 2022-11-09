@@ -107,7 +107,7 @@ class InputReader:
         """
         Opens a pypsa.Network using the provided network argument. If a
         string is given it is interpreted as the network name. It has to
-        be stored in the folder "Problemset". If a dictionary is given,
+        be stored in the folder "problemset". If a dictionary is given,
         it will be assumed to be the dictionary representation of a
         netCDF format and will be converted into a pypsa.Network.
         Lastly, if a pypsa.Network is provided it will just be passed
@@ -126,7 +126,7 @@ class InputReader:
         """
         if isinstance(network, str):
             if environ.get("RUNNING_IN_DOCKER", False):
-                network_path = "Problemset/"
+                network_path = "problemset/"
             else:
                 network_path = "../input/networks/"
             return pypsa.Network(network_path + network), network
@@ -142,7 +142,7 @@ class InputReader:
                         "representing the netCDF format of a pypsa.Network, "
                         "an actual pypsa.Network, or a string with the name "
                         "of the pypsa.Network, which has to be stored in the "
-                        "Problemset folder.")
+                        "problemset folder.")
 
     def make_config(self, input_config: Union[str, dict]) -> dict:
         """

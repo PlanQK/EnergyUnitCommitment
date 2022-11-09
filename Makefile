@@ -25,7 +25,7 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 ###### set mount paths ######
 # for development purposes, we don't build the entire image, but mount the the code that is changed often.
 # We also mount the folder containing the networks and the config files
-MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/input/networks/,target=/energy/Problemset
+MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/input/networks/,target=/energy/problemset
 MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
 MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/input/configs,target=/energy/configs
 # only mount qpu results if there actually are any results. They are required for reusing annealer samples
