@@ -10,13 +10,40 @@ import typing
 class TspTransformator:
 
     def __init__(self, graph_dict, config):
-        self.graph = graph
+        self.graph = graph_dict
+        self.nodes = self.get_nodes()
+        self.edges = [str(edge) for edge in self.graph]
         self.config = config
+
+    def get_nodes(self):
+        nodes = []
+        for edge in self.graph:
+            nodes += edge
+        return list(set(nodes))
+
+    def get_adjacent_edges(self, node):
+        return [str(edge) for edge in self.graph if node in edge]
 
     def transform_network_to_qubo(self) -> IsingBackbone:
         backbone_result = IsingBackbone()
         print()
         print("--- Generating Ising problem ---")
+        GraphEncoder.create_encoder(backbone_result, self.graph).encode_qubits()
+        backbone_result.encode_squared_distance(
+                label_list=self.edges,
+                target=-len(self.nodes))
+        for node in self.nodes:
+            adj_edges = self.get_adjacent_edges(node)
+            backbone_result.encode_squared_distance(
+                    label_list=adj_edges,
+                    target=-2)
+        # weight function
+        target = -4.0
+        backbone_result.encode_squared_distance(
+                label_dictionary={str(edge) : weight for edge, weight in self.graph.items()},
+                target=target,
+                )
+        return backbone_result
 
 class QuboTransformator:
 

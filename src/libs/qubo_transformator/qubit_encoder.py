@@ -356,3 +356,37 @@ class NetworkEncoder(QubitEncoder):
         """
         self.generator_encoder.encode_qubits()
         self.line_encoder.encode_qubits()
+
+class GraphEncoder(QubitEncoder):
+
+    def __init__(self, backbone: IsingBackbone, graph):
+        super().__init__(backbone)
+        self.graph = graph
+        self.edges = self.get_components()
+
+    @classmethod
+    def create_encoder(cls, backbone, graph):
+        """
+        This creates a GraphEncoder
+
+        Args:
+            backbone: (IsingBackbone)
+                The IsingBackbone instance on which to encode the TSP problem
+            graph: (dict)
+                The dict containing edges (tuples) as keys and their weight as value
+        """
+        graph_encoder = GraphEncoder(backbone, graph)
+        return graph_encoder
+
+    def get_components(self):
+        """
+        Returns an iterable of all edges as string labels
+        """
+        return [str(edge) for edge in self.graph]
+
+    def get_weights(self, component: str, time: any) -> list:
+        """
+        All edges has weight one since the hamiltonian cycle constraints
+        are of a combinatorial nature
+        """
+        return [1]

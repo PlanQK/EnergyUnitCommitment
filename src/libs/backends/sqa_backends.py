@@ -23,11 +23,11 @@ from .backend_base import BackendBase
 try:
     from . import siquan
     from ..qubo_transformator.ising_backbone import IsingBackbone
-    from ..qubo_transformator import QuboTransformator
+    from ..qubo_transformator import QuboTransformator, TspTransformator
 # try import from installed module siquan
 except ImportError:
     from libs.qubo_transformator.ising_backbone import IsingBackbone
-    from libs.qubo_transformator import QuboTransformator
+    from libs.qubo_transformator import QuboTransformator, TspTransformator
     import siquan
 
 
@@ -74,6 +74,13 @@ class ClassicalBackend(BackendBase):
             network=self.network,
             config=self.config["ising_interface"]
         )
+        # qubo_transformator = TspTransformator({(0,1): 1,
+        #                                        (1,2): 1, 
+        #                                        (2,3): 1,
+        #                                        (3,0): 1,
+        #                                        (2,0): 0,
+        #                                        (1,3): 0,
+                                               # },{})
         self.transformed_problem = qubo_transformator.transform_network_to_qubo()
 
     def transform_solution_to_network(self) -> None:
@@ -170,6 +177,12 @@ class ClassicalBackend(BackendBase):
         print(f"Sqa runtime: {self.output['results']['runtime_sec']}")
         print(f"Sqa runtime cycles: {self.output['results']['runtime_cycles']}")
         print(f"Ising Interactions: {self.transformed_problem.num_interactions()}")
+        # print("Ham path")
+        # print([edge 
+        # for (edge, qubit_list) in self.transformed_problem.get_qubit_mapping().items()
+        # if qubit_list[0] in self.output['results']['state']])
+        # print(self.transformed_problem.get_qubit_mapping())
+        # print(self.output['results'])
 
     def write_results_to_output(self, result: dict) -> None:
         """
