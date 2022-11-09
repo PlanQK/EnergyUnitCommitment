@@ -47,7 +47,7 @@ class AbstractIsingSubproblem:
         a (factory) classmethod to choose the correct subclass and call this
         constructor. The attributes set here are the minimal attributes
         that are expected. The attributes we set have the following purpose:
-            ising_coefficients: (dict) this contains the qubo formulation of just the
+            _ising_coefficients: (dict) this contains the qubo formulation of just the
                 subproblem
             scale_factor: (float) this contains a linear factor to scale the
                 problem with 
@@ -63,7 +63,7 @@ class AbstractIsingSubproblem:
                 A dict containing all necessary configurations to
                 construct an instance.
         """
-        self.ising_coefficients = {}
+        self._ising_coefficients = {}
         self.scale_factor = config.setdefault("scale_factor", 1.0)
         self.backbone = backbone
         self.network = backbone.network
@@ -113,7 +113,7 @@ class AbstractIsingSubproblem:
                 The energy of the spin glass state.
         """
         return self.backbone.calc_cost(solution=solution,
-                                       ising_interactions=self.ising_coefficients)
+                                       ising_interactions=self._ising_coefficients)
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
@@ -257,7 +257,7 @@ class MarginalAsPenalty(MarginalCostSubproblem):
 
         Returns:
             (None)
-                Modifies self.ising_coefficients. Adds to previously written
+                Modifies self._ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         generators = self.backbone.get_bus_components(bus)['generators']
@@ -455,7 +455,7 @@ class GlobalCostSquare(MarginalCostSubproblem):
 
         Returns:
             (None)
-                Modifies self.ising_coefficients. Adds to previously written
+                Modifies self._ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         self.backbone.encode_squared_distance(
@@ -592,7 +592,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 self.encode_kirchhoff_constraint(ising_backbone=self.backbone,
                                                  bus=bus,
                                                  time=time)
-        self.ising_coefficients = self.backbone.ising_coefficients_cached
+        self._ising_coefficients = self.backbone._ising_coefficients_cached
 
     def encode_kirchhoff_constraint(self,
                                     ising_backbone: IsingBackbone,
@@ -626,7 +626,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
 
         Returns:
             (None)
-                Modifies self.ising_coefficients. Adds to previously written
+                Modifies self._ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         components = ising_backbone.get_bus_components(bus)
@@ -984,12 +984,12 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
 
         Returns:
             (None)
-                Modifies `self.backbone.ising_coefficients` and
-                `self.backbone.ising_coefficients_positive
+                Modifies `self.backbone._ising_coefficients` and
+                `self.backbone._ising_coefficients_positive
         """
         for generator in self.network.generators.index:
             self.modifiy_positive_interactions(generator=generator)
-        self.ising_coefficients = self.backbone.ising_coefficients_cached
+        self._ising_coefficients = self.backbone._ising_coefficients_cached
 
     def modifiy_positive_interactions(self, generator: str):
         """
@@ -1009,7 +1009,7 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                 continue
             status_qubit = qubit_list[0]
             for qubit in qubit_list[1:]:
-                interaction_strength = abs(self.scale_factor * self.backbone.ising_coefficients[(qubit,)])
+                interaction_strength = abs(self.scale_factor * self.backbone._ising_coefficients[(qubit,)])
                 self.backbone.add_basis_polynomial_interaction(first_qubit=status_qubit,
                                                                second_qubit=qubit,
                                                                zero_qubits_list=[status_qubit],
@@ -1052,10 +1052,10 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
 
         Returns:
             (None)
-                Modifies `self.backbone.ising_coefficients` and
-                `self.backbone.ising_coefficients_positive
+                Modifies `self.backbone._ising_coefficients` and
+                `self.backbone._ising_coefficients_positive
         """
-        for time in self.backbone.snapshots:
+        for time in self.backbone._snapshots:
             self.encode_total_power_invariant(time=time)
 
     def encode_total_power_invariant(self, time=None):
@@ -1072,7 +1072,7 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
                 Modifies the attribute `self.backbone`
         """
         if time is None:
-            time = self.backbone.snapshots[0]
+            time = self.backbone._snapshots[0]
         self.backbone.encode_squared_distance(
             label_list=self.backbone.network.generators.index,
             target=-self.backbone.get_total_load(time),

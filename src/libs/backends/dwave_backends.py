@@ -164,14 +164,14 @@ class AbstractDwaveSampler(BackendBase):
         # representations
         linear = {
             spins[0]: strength
-            for spins, strength in self.ising_backbone.ising_coefficients.items()
+            for spins, strength in self.ising_backbone._ising_coefficients.items()
             if len(spins) == 1
         }
         # the convention is different to the sqa solver:
         # need to add a minus to the couplings
         quadratic = {
             spins: -strength
-            for spins, strength in self.ising_backbone.ising_coefficients.items()
+            for spins, strength in self.ising_backbone._ising_coefficients.items()
             if len(spins) == 2
         }
         return dimod.BinaryQuadraticModel(

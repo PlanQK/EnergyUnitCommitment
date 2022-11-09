@@ -25,7 +25,7 @@ def test_backbone_init(backbone):
     """
     Check that the qubit-network encoding data in the backbone is correct
     """
-    assert backbone.ising_coefficients == {}
+    assert backbone._ising_coefficients == {}
     assert backbone.get_representing_qubits("gen_1") == [0]
     assert backbone.get_representing_qubits("gen_2") == [1]
     assert backbone.get_nominal_power("gen_1", time=0) == 4
@@ -38,25 +38,25 @@ def test_add_interaction(backbone):
     in the interaction for adding positive weights is a due to a convention
     """
     backbone.add_interaction(0, 1.0)
-    assert backbone.ising_coefficients == {(0,): -4.0}
+    assert backbone._ising_coefficients == {(0,): -4.0}
     backbone.add_interaction(1,2.0)
-    assert backbone.ising_coefficients == {(0,): -4.0, (1,): -6.0, }
+    assert backbone._ising_coefficients == {(0,): -4.0, (1,): -6.0, }
     backbone.add_interaction(0, 1, 1.0)
-    assert backbone.ising_coefficients == {(0,): -4.0, (1,): -6.0, (0,1): -12.0}
+    assert backbone._ising_coefficients == {(0,): -4.0, (1,): -6.0, (0, 1): -12.0}
     backbone.add_interaction(0, -2.0)
-    assert backbone.ising_coefficients == {(0,): 4.0, (1,): -6.0, (0,1): -12.0}
+    assert backbone._ising_coefficients == {(0,): 4.0, (1,): -6.0, (0, 1): -12.0}
     backbone.add_interaction(0, 1, -0.5)
-    assert backbone.ising_coefficients == {(0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    assert backbone._ising_coefficients == {(0,): 4.0, (1,): -6.0, (0, 1): -6.0}
     backbone.add_interaction(0, 0, 1.0)
-    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    assert backbone._ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0, 1): -6.0}
     backbone.add_interaction(0, 0.0)
-    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    assert backbone._ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0, 1): -6.0}
     backbone.add_interaction(0,1, 0.0)
-    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    assert backbone._ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0, 1): -6.0}
     backbone.add_interaction(1, 0.0)
-    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -6.0}
+    assert backbone._ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0, 1): -6.0}
     backbone.add_interaction(1, 0, -1.0, weighted_interaction=False)
-    assert backbone.ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0,1): -5.0}
+    assert backbone._ising_coefficients == {():  -16.0, (0,): 4.0, (1,): -6.0, (0, 1): -5.0}
 
 
 def test_couple_components(backbone):
@@ -64,7 +64,7 @@ def test_couple_components(backbone):
     Test that coupling network components by their labels gets resolved correctly
     """
     backbone.couple_components("gen_1", "gen_2", coupling_strength=2.0)
-    assert backbone.ising_coefficients == {(): -6.0, (0,): -6.0, (0, 1): -6.0, (1,): -6.0}
+    assert backbone._ising_coefficients == {(): -6.0, (0,): -6.0, (0, 1): -6.0, (1,): -6.0}
 
 
 def test_couple_component_with_constant(backbone):
@@ -72,7 +72,7 @@ def test_couple_component_with_constant(backbone):
     Test that adding a first order interaction to all qubits of a network component works
     """
     backbone.couple_component_with_constant("gen_1", coupling_strength=1.0)
-    # assert backbone.ising_coefficients == {(): -2.0, (0,): -2.0}
+    # assert backbone._ising_coefficients == {(): -2.0, (0,): -2.0}
     assert backbone.calc_cost([]) == 0
     assert backbone.calc_cost([0]) == 4
     backbone.couple_component_with_constant("gen_2", coupling_strength=-2.0)
@@ -110,12 +110,12 @@ def test_encode_squared_distance(backbone):
     backbone.encode_squared_distance(label_dictionary,
                                     global_factor=1.0,
                                     target = 0.0)
-    assert backbone.ising_coefficients == {(): -18.5, (0,): -14.0, (0, 1): -6.0, (1,): -10.5}
+    assert backbone._ising_coefficients == {(): -18.5, (0,): -14.0, (0, 1): -6.0, (1,): -10.5}
     assert backbone.calc_cost([]) == 0.0
     assert backbone.calc_cost([0]) == 16.0
     assert backbone.calc_cost([1]) == 9.0
     assert backbone.calc_cost([0,1]) == 49.0
-    backbone.ising_coefficients = {}
+    backbone._ising_coefficients = {}
     backbone.encode_squared_distance(label_dictionary,
                                     global_factor=1.0,
                                     target = -3.0)
@@ -123,7 +123,7 @@ def test_encode_squared_distance(backbone):
     # assert backbone.calc_cost([0]) == 1.0
     assert backbone.calc_cost([1]) == 0.0
     assert backbone.calc_cost([0, 1]) == 16.0
-    backbone.ising_coefficients = {}
+    backbone._ising_coefficients = {}
     backbone.encode_squared_distance(label_dictionary,
                                     global_factor=1.0,
                                     target = 3.0)

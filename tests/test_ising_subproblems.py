@@ -72,7 +72,7 @@ def test_global_cost_square_distance_encoding_zero_target_offset(backbone):
               }
     cost_encoder = GlobalCostSquare.build_subproblem(backbone, config)
     cost_encoder.encode_subproblem()
-    assert backbone.ising_coefficients == {
+    assert backbone._ising_coefficients == {
             (): -38.88888888888889,
             (0,): 11.111111111111121,
             (0, 1): 33.33333333333333,

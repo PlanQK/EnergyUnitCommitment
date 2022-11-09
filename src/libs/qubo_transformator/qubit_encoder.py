@@ -75,7 +75,7 @@ class QubitEncoder(ABC):
         """
         return {
                 time: self.get_weights(component, time)
-                for time in self.backbone.snapshots
+                for time in self.backbone._snapshots
                 }
 
     def get_weights(self, component: str, time: any) -> list:

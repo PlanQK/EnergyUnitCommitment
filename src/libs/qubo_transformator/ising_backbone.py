@@ -17,8 +17,8 @@ from numpy import ndarray
 
 class IsingBackbone:
     """
-    This class implements the conversion of a optimization problem
-    instance into to an Ising spin glass problem.
+    This class implements the data structre for converting an optimization
+    problem instance to an Ising spin glass problem.
 
     It acts as an endpoint to decode qubit configuration and encode
     coupling of QUBO variables into Ising interactions. For a specific
@@ -27,46 +27,88 @@ class IsingBackbone:
 
     This class only acts as a problem agnostic data structure
     which other objects can use to model a specific constraint.
-    It uses labels for groups of qubits that model one problem component.
+    It uses labels for groups of qubits that model one component of the problem.
     Those component can be indexed by a time slice, to model states of the
-    same component at different points in time.
+    same component at different points in time. Each qubit is designated a weight.
+    The value of some encoded component is interpreted as the weighted sum of it's
+    qubits.
 
     Modeling of various constraints is delegated to the instances of classes
     implementing the `IsingSubproblem` interface. An `IsingSubproblem`
     provides a method which adds the Ising representation of the constraint
-    it models to the stored Ising problem in this class.
+    it models to the stored Ising problem in this class using the visitor pattern.
 
-    Extending the Ising model of the network can be done in two ways. If
-    you want to extend which kinds of networks can be read, you have to
-    extend this class with methods that convert values of the network
-    into qubits and write appropriate access methods. If you want to
-    add a new constraint, you have to write a class that adheres to the
-    `AbstractIsingSubproblem` interface
+    Extending the Ising model can be done in two ways. If you want to implement
+    problem specific methods, you can extend this class and add methods that
+    additional access methods for interpreting states of qubits.
+
+    You can add a new constraint by writing a class that adheres to the
+    `AbstractIsingSubproblem` interface and have the instance of the qubo_transformator
+    instantiate it in order to visit the the data structure for encoding of the
+    subproblem
+
+    Attributes
+        ----------
+        _snapshots : list
+            Contains a list of keys that are used for indexing the component qubits
+            with a time component
+
+        # contains ising coefficients
+        _ising_coefficients : dict
+            Contains the ising coefficients of the ising problem. The keys are ordered
+            tupels containing the qubits of the respective interaction and strenght as 
+            it's value
+            
+        _ising_coefficients_cached : dict
+            This mirrors all encodings into `self._ising_coefficients` but is considering
+            a working copy. This means that the complete ising problem will not use this.
+            It is meant to be reset after an IsingSubproblem visits an instance of this class
+        _qubit_encoding : dict
+            This contains the mapping of components via their labels to qubits. Each key
+            is the label of the component and the value is a dictionary. That dictionary
+            has the values of the _snapshots attribute as the keys, and the list of qubits
+            that represent the component at that snapshot.
+        _qubit_weights  : dict
+            A dictionary with integers as keys, which represent qubits, and their respective
+            weight as the value. The weight of a qubit is a factor that is added multiplicatively
+            to any interaction this qubit is involved in unless it is explicitly turned off.
+        _allocated_qubits : int 
+            The number of qubits that has been allocated to represent problem components
+        _subproblems  : list
+            A list of all `IsingSubproblem` instances that have visited this instance for
+            encoding their subproblem into the ising model
     """
 
     def __init__(self):
         """
         Constructor for an Ising Backbone. It initializes various data structures
-        that are used for modelling a problem. In order to get a full problem
-        An Encoder has to encode problem components using string labels.
-        Then IsingSubproblem visit the Backbone instance and encode the QUBO
-        of the subproblem they model.
+        that are used for modelling a problem but doesn't fill any of them. This has
+        to be done by an `qubit_encoder.Encoder`, which can consume a data structure
+        specifiying an optimization problem and convert it's components into qubits
+        using string labels.
+
+        Visiting `IsingSubproblem` instance encode the various constraints and the objective
+        function of the optimization problem
         """
-        # list of time slices that are modelled in the qubo
-        self.snapshots = [0]
+        # list of time slices that are modelled in the qubo. This assumes that the
+        # problem components are time-independent.
+        self._snapshots = [0]
 
         # contains ising coefficients
-        self.ising_coefficients = {}
-        # mirrors encodings of `self.ising_coefficients`, but can be reset after
-        # encoding a subproblem via the `flush_cached_problem` method
-        self.ising_coefficients_cached = {}
+        self._ising_coefficients = {}
+        # contains qubo coefficients
+        self._qubo_coefficients = {}
+        # mirrors all encodings into `self._ising_coefficients`. Resetting this to an empty
+        # dictionary allows visiting subproblems to obtain an ising model of the subproblem
+        # that it encodes
+        self._ising_coefficients_cached = {}
 
-        # initializing data structures that encode the problem componetns into qubits
+        # initializing data structures that encode the problem components into qubits
         # the encoding dict contains the mapping of components via labels to qubits
         self._qubit_encoding = {}
         # the weights dictionary contains a mapping of qubits to their weights
         self._qubit_weights = {}
-        self.allocated_qubits = 0
+        self._allocated_qubits = 0
 
         # subproblems of the passed configuration are stored here
         self._subproblems = {}
@@ -75,8 +117,11 @@ class IsingBackbone:
         """
         This function delegates method calls to an IsingBackbone to a
         subproblem instance if IsingBackbone doesn't have such a method.
-        We can use this by calling subproblem methods from the backbone
-        instance. If the name of the method is not unique among all
+
+        We can use this by calling methods of IsingSubproblem instances
+        that encoded their subproblem into this data structure. This delegates
+        subproblem specific interpretation of qubit states to the IsingSubproblem
+        If the name of the method is not unique among all
         subproblems it will raise an attribute error.
 
         Args:
@@ -109,7 +154,7 @@ class IsingBackbone:
         Returns:
             (None)
         """
-        self.ising_coefficients_cached = {}
+        self._ising_coefficients_cached = {}
 
     # functions to couple components. The couplings are interpreted as
     # multiplications of QUBO polynomials. The final interactions are
@@ -118,13 +163,14 @@ class IsingBackbone:
         """
         This method is used for adding a new Ising interactions between
         multiple qubits to the problem.
+
         The interaction is scaled by all qubits specific weights. For
         higher order interactions, it performs substitutions of qubits
         that occur multiple times, which would be constant in an Ising
-        spin glass problem. Interactions are stored in the attribute
-        `problem`, which is a dictionary. Keys of that dictionary are
-        tuples of involved qubits and a value, which is a float.
-        The method can take an arbitrary number of arguments, where the
+        spin problem. Interactions are stored using an ordered tuple
+        of the involved qubits and a float as the value
+
+        The method can take an arbitrary number of arguments. The
         last argument is the interaction strength. All previous
         arguments are assumed to contain spin ids.
 
@@ -134,11 +180,14 @@ class IsingBackbone:
                 weights.
             args[:-1]: (list)
                 All qubits that are involved in this interaction.
+            weighted_interaction: (bool)
+                A flag for turning off application of qubit weights to
+                the interaction
+
         Returns:
             (None)
-                Modifies self.ising_coefficients by adding the strength of the
-                interaction if an interaction coefficient is already
-                set.
+                Modifies self._ising_coefficients by adding the strength of the
+                interaction to it
         """
         if len(args) > 3:
             raise ValueError(
@@ -158,18 +207,20 @@ class IsingBackbone:
             if key[0] == key[1]:
                 key = tuple([])
         # store interaction, wether it is positive or negative, and in the cache
-        self.ising_coefficients[key] = self.ising_coefficients.get(key, 0) - interaction_strength
-        self.ising_coefficients_cached[key] = self.ising_coefficients_cached.get(key, 0) - interaction_strength
+        self._ising_coefficients[key] = self._ising_coefficients.get(key, 0) - interaction_strength
+        self._ising_coefficients_cached[key] = self._ising_coefficients_cached.get(key, 0) - interaction_strength
 
-    def couple_component_with_constant(self, component: str,
-                                       coupling_strength: float = 1,
-                                       time: any = None) -> None:
+    def couple_component_with_constant(self,
+                                       component: str,
+                                       coupling_strength: float = 1.0,
+                                       time: any = None
+                                       ) -> None:
         """
         Performs a QUBO multiplication involving a single variable on
         all qubits which are logically grouped to represent a component
         at a given time slice. This QUBO multiplication is translated
         into Ising interactions and then added to the currently stored
-        Ising spin glass problem.
+        Ising problem.
 
         Args:
             component: (str)
@@ -183,12 +234,11 @@ class IsingBackbone:
 
         Returns:
             (None)
-                Modifies self.ising_coefficients. Adds to previously written
+                Modifies self._ising_coefficients. Adds to previously written
                 interaction coefficient.
         """
         if time is None:
-            print("falling back default time in constant")
-            time = self.snapshots[0]
+            time = self._snapshots[0]
         component_adress = self.get_representing_qubits(component, time)
         for qubit in component_adress:
             # term with single spin after applying QUBO to Ising transformation
@@ -202,7 +252,7 @@ class IsingBackbone:
                           second_component: str,
                           coupling_strength: float = 1,
                           time: any = None,
-                          additional_time: int = None
+                          additional_time: any = None
                           ) -> None:
         """
         This method couples two labeled groups of qubits as a product
@@ -212,42 +262,48 @@ class IsingBackbone:
         represent these components at a given time slice. This QUBO
         multiplication is translated into Ising interactions, scaled by
         the coupling_strength and the respective weights of the qubits
-        and then added to the currently stored Ising spin glass problem.
+        and then added to the currently stored Ising problem.
 
         Args:
             first_component: (str)
-                Label of the first network component.
+                The label of the first problem component.
             second_component: (str)
-                Label of the second network component.
+                The label of the second problem component.
             coupling_strength: (float)
-                Coefficient of QUBO multiplication by which to scale all
+                The scalar of QUBO multiplication by which to multiply all
                 interactions.
             time: (any)
-                Index of time slice of the first component for which to
-                couple qubits representing it.
+                The index of time slice of the first component for which to
+                couple qubits representing it. It defaults to the first time step
+                if no value is passed
             additional_time: (any)
-                Index of time slice of the second component for which
+                The index of time slice of the second component for which
                 to couple qubits representing it. The default parameter
                 'None' is used if the time slices of both components
                 are the same.
+
         Returns:
             (None)
-                Modifies `self.ising_coefficients`. Adds to previously written
-                interaction coefficient.
+                Modifies `self._ising_coefficients`
 
         Example:
-            Let X_1, X_2 be the qubits representing first_component and
-            Y_1, Y_2 the qubits representing second_component. The QUBO
-            product the method translates into Ising spin glass
-            coefficients is:
-            (X_1 + X_2) * (Y_1 + Y_2) = X_1 * Y_1 + X_1 * Y_2
-                                        + X_2 * Y_1 + X_2 * Y_2
+            Let 'x' and 'y' be the labels of two problem componets. The
+            component 'x' is represented by two qubits: x_1 and x_2. The
+            component 'y' is represented by the qubits: y_1 and y_2. The
+            method call
+                `self.couple_components('x', 'y', 2.0)`
+            will add the QUBO given by
+            2 * (x_1 + x_2) * (y_1 + y_2) =   2 * x_1 * y_1
+                                            + 2 * x_1 * y_2
+                                            + 2 * x_2 * y_1
+                                            + 2 * x_2 * y_2
+            after translating it to interactions of the ising model.
         """
         # Replace None default values with their intended network component and
         # then figure out which qubits we want to couple based on the
         # component name and chosen time step
         if time is None:
-            time = self.snapshots[0]
+            time = self._snapshots[0]
         if additional_time is None:
             additional_time = time
         first_component_adress = self.get_representing_qubits(first_component, time)
@@ -363,7 +419,7 @@ class IsingBackbone:
 
         Returns:
             (None)
-                Modifies `self.ising_coefficients` and `self.cached_problem`
+                Modifies `self._ising_coefficients` and `self.cached_problem`
 
         """
         if label_dictionary is None:
@@ -402,7 +458,7 @@ class IsingBackbone:
             (int)
                 The number of qubits already allocated.
         """
-        return self.allocated_qubits
+        return self._allocated_qubits
 
     def num_interactions(self) -> int:
         """
@@ -412,7 +468,7 @@ class IsingBackbone:
             (int)
                 number of ising interactions
         """
-        return len(self.ising_coefficients)
+        return len(self._ising_coefficients)
 
     def create_qubit_entries_for_component(self,
                                            component_name: str,
@@ -447,7 +503,7 @@ class IsingBackbone:
 
         Returns:
             (None)
-                Modifies self.data and self.allocated_qubits
+                Modifies self.data and self._allocated_qubits
         """
         if isinstance(component_name, int):
             raise ValueError("Component names mustn't be of type int")
@@ -459,13 +515,13 @@ class IsingBackbone:
         # snapshot_to_weight_dict dictionary
         snapshot_to_weight_dict = {
             snapshot: snapshot_to_weight_dict.get(snapshot, [])
-            for snapshot in self.snapshots
+            for snapshot in self._snapshots
         }
 
         # store component - snapshot - representing qubit relation
         self._qubit_encoding[component_name] = {
             snapshot: self.allocate_qubits_to_weight_list(snapshot_to_weight_dict[snapshot])
-            for snapshot in self.snapshots
+            for snapshot in self._snapshots
         }
         # expose qubit weights in `self._qubit_weights`
         for snapshot, qubit_list in self._qubit_encoding[component_name].items():
@@ -475,7 +531,7 @@ class IsingBackbone:
     def allocate_qubits_to_weight_list(self, weight_list: list):
         """
         For a given list of weights, returns a list of qubits which will we mapped
-        to these weights, starting at the qubit `self.allocated_qubits` and increasing
+        to these weights, starting at the qubit `self._allocated_qubits` and increasing
         that counter appropriately
 
         Args:
@@ -487,9 +543,9 @@ class IsingBackbone:
                     mapped to the weight list. Also increases internal qubit count
         """
         num_new_allocated_qubits = len(weight_list)
-        allocated_qubit_list = list(range(self.allocated_qubits,
-                                          self.allocated_qubits + num_new_allocated_qubits))
-        self.allocated_qubits += num_new_allocated_qubits
+        allocated_qubit_list = list(range(self._allocated_qubits,
+                                          self._allocated_qubits + num_new_allocated_qubits))
+        self._allocated_qubits += num_new_allocated_qubits
         return allocated_qubit_list
 
     # helper functions for getting encoded values
@@ -523,7 +579,7 @@ class IsingBackbone:
                 component.
         """
         if time is None:
-            time = self.snapshots[0]
+            time = self._snapshots[0]
         return self._qubit_encoding[component][time]
 
     def get_qubit_mapping(self, time: any = None) -> dict:
@@ -560,7 +616,7 @@ class IsingBackbone:
                 The interaction strength between all qubits in args.
         """
         sorted_unique_arguments = tuple(sorted(set(args)))
-        return self.ising_coefficients.get(sorted_unique_arguments, 0.0)
+        return self._ising_coefficients.get(sorted_unique_arguments, 0.0)
 
     def get_encoded_value_of_component(self,
                                        component: str,
@@ -580,7 +636,7 @@ class IsingBackbone:
                 List of all qubits which have spin -1 in the solution.
             time: (any)
                 Index of time slice for which to retrieve the encoded value.
-                It has to be in the index self.snapshots
+                It has to be in the index self._snapshots
 
         Returns:
             (float)
@@ -617,7 +673,7 @@ class IsingBackbone:
         """
         solution = set(solution)
         if ising_interactions is None:
-            ising_interactions = self.ising_coefficients
+            ising_interactions = self._ising_coefficients
         total_cost = 0.0
         for spins, weight in ising_interactions.items():
             if len(spins) == 1:
@@ -641,7 +697,7 @@ class IsingBackbone:
                 A list of tuples of the form (interaction-coefficient,
                 list(qubits)).
         """
-        return [(v, list(k)) for k, v in self.ising_coefficients.items() if
+        return [(v, list(k)) for k, v in self._ising_coefficients.items() if
                 v != 0 and len(k) > 0]
 
     def get_hamiltonian_matrix(self) -> list:
@@ -652,7 +708,7 @@ class IsingBackbone:
             (list)
                 A list of lists representing the hamiltonian matrix.
         """
-        qubits = range(self.allocated_qubits)
+        qubits = range(self._allocated_qubits)
         hamiltonian = [
             [self.get_interaction(i, j) for i in qubits] for j in qubits
         ]
@@ -710,7 +766,7 @@ class NetworkIsingBackbone(IsingBackbone):
         # network to be solved
         self.network = network
         # list of time slices that are modelled in the qubo
-        self.snapshots = self.network.snapshots
+        self._snapshots = self.network.snapshots
 
     # helper functions to set encoded values
     def set_output_network(self, solution: list) -> pypsa.Network:
@@ -731,7 +787,7 @@ class NetworkIsingBackbone(IsingBackbone):
         """
         output_network = self.network.copy()
         # get Generator/Line Status
-        for time in self.snapshots:
+        for time in self._snapshots:
             for generator in output_network.generators.index:
                 # set value in status-dataframe in generators_t dictionary
                 status = int(
@@ -919,7 +975,7 @@ class NetworkIsingBackbone(IsingBackbone):
         """
         result = {}
         for generator in self.network.generators.index:
-            for time in self.snapshots:
+            for time in self._snapshots:
                 key = (generator, time)
                 if stringify:
                     key = str(key)
@@ -953,7 +1009,7 @@ class NetworkIsingBackbone(IsingBackbone):
         """
         result = {}
         for lineId in self.network.lines.index:
-            for time in self.snapshots:
+            for time in self._snapshots:
                 key = (lineId, time)
                 if stringify:
                     key = str(key)
@@ -1081,7 +1137,7 @@ class NetworkIsingBackbone(IsingBackbone):
                 bus at this time slice.
         """
         contrib = {}
-        for time in self.snapshots:
+        for time in self._snapshots:
             marginal_cost = 0.0
             components = self.get_bus_components(bus)
             for generator in components['generators']:
