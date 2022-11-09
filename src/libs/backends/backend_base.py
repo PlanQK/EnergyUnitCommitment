@@ -67,7 +67,6 @@ class BackendBase(abc.ABC):
         """
         self.output["results"]["postprocessing_time"] = 0.0
 
-    @abc.abstractmethod
     def transform_solution_to_network(self):
         """
         This writes the solution of the optimization run into a copy of
@@ -215,3 +214,4 @@ class BackendBase(abc.ABC):
                     "results": {},
                 }
                 return
+        raise ValueError("The specified backend didn't resolve to a valid backend")
