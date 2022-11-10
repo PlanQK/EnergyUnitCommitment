@@ -1,8 +1,4 @@
-import typing
-
 from abc import ABC
-
-import pypsa
 
 from .ising_backbone import IsingBackbone
 
@@ -69,8 +65,10 @@ class AbstractIsingSubproblem:
         self.network = backbone.network
 
     @classmethod
-    def build_subproblem(cls, backbone: IsingBackbone,
-                         configuration: dict) -> 'AbstractIsingSubproblem':
+    def build_subproblem(cls, 
+                         backbone: IsingBackbone,
+                         configuration: dict
+                         ) -> 'AbstractIsingSubproblem':
         """
         Returns an instance of the class set up according to the
         configuration. This is done by choosing the corresponding subclass
@@ -91,7 +89,7 @@ class AbstractIsingSubproblem:
         """
         raise NotImplementedError
 
-    def encode_subproblem(self):
+    def encode_subproblem(self) -> None:
         """
         This encodes the problem an instance of a subclass is describing
         into the ising_backbone instance. After this call, the
@@ -126,8 +124,10 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
     """
 
     @classmethod
-    def build_subproblem(cls, backbone: IsingBackbone,
-                         configuration: dict) -> 'MarginalCostSubproblem':
+    def build_subproblem(cls, 
+                         backbone: IsingBackbone,
+                         configuration: dict
+                         ) -> 'MarginalCostSubproblem':
         """
         A factory method for obtaining the marginal cost model specified
         in configuration.
@@ -169,7 +169,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 The backbone on which to encode the marginal cost problem.
             config: (dict)
                 A dict containing all necessary configurations to
-                construct an instance of the marginal costs problem.
+                construct an instance of the marginal cost problem.
         """
         super().__init__(backbone, config)
         self.range_factor = self.get_range_factor(config)
@@ -181,7 +181,7 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
         print(f"Marginal cost offset: {self.offset}")
         print(f"Equivalent offset fixed cost: {self.target_cost}\n")
 
-    def set_from_target_cost(self, target_cost: float):
+    def set_from_target_cost(self, target_cost: float) -> None:
         """
         Calculates the corresponding marginal cost offset to the given
         target and writes both as attributes to the object.
@@ -195,15 +195,15 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 The marginal cost to which to minimize the squared distance
         """
         self.target_cost = target_cost
-        # not applicable for multisnapshot networks
+        # not applicable for networks with multiple snapshots
         self.offset = self.target_cost / float(self.backbone.get_total_load(self.network.snapshots[0]))
 
-    def set_from_offset(self, offset: float):
+    def set_from_offset(self, offset: float) -> None:
         """
         Calculates the corresponding marginal cost target to a given
         offset and writes both as attributes to the object
 
-        The target cost is calucalted such thata solution satisfying the kirchhoff 
+        The target cost is calculated such that solution satisfying the kirchhoff
         constraint with cost equal to the target cost with respect to the original 
         cost function incurs 0 cost with respect to the transformed function
 
@@ -213,8 +213,19 @@ class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
                 per unit of power produced
         """
         self.offset = offset
-        # not applicable for multisnapshot networks
+        # not applicable for networks with multiple snapshots
         self.target_cost = offset * float(self.backbone.get_total_load(self.network.snapshots[0]))
+
+    def get_range_factor(self, config: dict) -> float:
+        """
+        Get linear factor of linear transformation of marginal costs
+        defaults to a value of 1.0
+
+        Args:
+            config: (dict)
+                the dict containing the configuration data
+        """
+        return config.setdefault("range_factor", 1.0)
 
 
 class MarginalAsPenalty(MarginalCostSubproblem):
@@ -288,7 +299,7 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
                 The backbone on which to encode the marginal cost problem.
             config: (dict)
                 A dict containing all necessary configurations to
-                construct an instance of the marginal costs problem.
+                construct an instance of the marginal cost problem.
         """
         super().__init__(backbone, config)
         self.line_cost_factor = config.setdefault("line_cost_factor", 1.0)
@@ -312,7 +323,7 @@ class LocalMarginalEstimation(MarginalCostSubproblem):
     def get_generator_to_cost_dict(self, bus: str) -> dict:
         """
         Returns a dictionary with generators of the specified bus as keys and 
-        the their offset marginal costs
+        their offset marginal costs
 
         Args:
             bus: (str)
@@ -369,34 +380,16 @@ class GlobalCostSquare(MarginalCostSubproblem):
     A subproblem class that models the minimization of the marginal
     costs. It does this by estimating it and then modelling the squared
     distance of the actual cost to the estimated cost.
+
+    The cost get transformed using the invariant of the total produced power
+    in feasible solutions. This turn the linear cost encoding into a
+    quadratic one
+
+    Currently, this class doesn't support cost encodings over multiple time
+    steps
     """
 
-    def __init__(self, backbone: IsingBackbone, config: dict):
-        """
-        Since all marginal cost use an offset of the marginal cost to center
-        it around zero, initializing the offset from the config is done here.
-
-        Args:
-            backbone: (IsingBackbone)
-                The backbone on which to encode the marginal cost problem.
-            config: (dict)
-                A dict containing all necessary configurations to
-                construct an instance of the marginal costs problem.
-        """
-        super().__init__(backbone, config)
-
-    def get_range_factor(self, config: dict):
-        """
-        Get linear factor of linear transformation of marginal costs
-        defaults to a value of 1.0
-
-        Args:
-            config: (dict)
-                the dict containing the configuration data
-        """
-        return config.setdefault("range_factor", 1.0)
-
-    def calc_transformed_target_value(self, time):
+    def calc_transformed_target_value(self, time: any) -> float:
         """
         Calculates the corresponding target value to the cost given in the
         original configuration with respect to the linear transformation of
@@ -408,22 +401,21 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         return 0.0
 
-    def calc_offset_cost(self, generator):
+    def calc_offset_cost(self, generator: str) -> float:
         """
         For a given generator, returns the marginal cost of that generator after
         applying the linear transformation given in the config of this subproblem
 
         Args:
             generator: (str)
-                The label of a self.network generator
+                The label of a network generator
 
         Returns:
             The transformed marginal cost of that generator
         """
-        return (self.network.generators["marginal_cost"][generator] - self.offset)  \
-                * self.range_factor 
+        return (self.network.generators["marginal_cost"][generator] - self.offset) * self.range_factor
 
-    def calc_transformed_marginal_costs(self, time) -> dict:
+    def calc_transformed_marginal_costs(self, time: any) -> dict:
         """
         Returns a dictionary with generators as keys and the their offset marginal
         costs
@@ -441,7 +433,6 @@ class GlobalCostSquare(MarginalCostSubproblem):
         """
         for time in self.network.snapshots:
             self.encode_marginal_costs(time=time)
-
 
     def encode_marginal_costs(self, time: any) -> None:
         """
@@ -515,11 +506,11 @@ class GlobalCostSquareWithSlack(GlobalCostSquare):
             snapshot_to_weight=snapshot_to_slack_dict
         )
 
-    def calc_transformed_marginal_costs(self, time) -> dict:
+    def calc_transformed_marginal_costs(self, time: any) -> dict:
         """
-        Returns a dictionary with generators as keys and the their offset marginal
+        Returns a dictionary with generators as keys and their offset marginal
         costs. Adds the slack variable as if it was a generator
-        i
+
         Return:
             (dict)
                 A dictionary with generators, the slack component and associated
@@ -745,9 +736,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 component=generator, solution=solution, time=time)
         return total_power
 
-    def calc_total_power_generated(self,
-                                   solution: list,
-                                   ) -> float:
+    def calc_total_power_generated(self, solution: list) -> float:
         """
         Calculates how much power is generated using generators across
         the entire network at a time slice with index 'time'.
@@ -841,7 +830,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
             kirchhoff_cost = 0.0
             for bus in self.network.buses.index:
                 kirchhoff_cost += self.calc_power_imbalance_at_bus_at_time(bus, time, solution) ** 2
-            # cast to str if it is not admissable as a json key
+            # cast to str if it is not admissible as a json key
             if isinstance(time, int):
                 result[time] = kirchhoff_cost
             else:
@@ -869,9 +858,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 kirchhoff_cost += val ** 2
         return kirchhoff_cost
 
-    def individual_cost_contribution(self,
-                                     solution: list,
-                                     ) -> dict:
+    def individual_cost_contribution(self, solution: list) -> dict:
         """
         Returns a dictionary which contains the kirchhoff costs incurred
         at all busses for every time slice, scaled by the
@@ -895,7 +882,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 bus=bus, result=solution)}
         return contrib
 
-    def individual_kirchhoff_cost(self, solution):
+    def individual_kirchhoff_cost(self, solution: list) -> dict:
         """
         Returns a dictionary which contains the kirchhoff cost incurred
         at every bus at every time slice, without being scaled by the
@@ -921,9 +908,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 solution=solution).items()
         }
 
-    def individual_power_imbalance(self,
-                                   solution: list,
-                                   ) -> dict:
+    def individual_power_imbalance(self, solution: list) -> dict:
         """
         Returns a dictionary which contains the power imbalance at each
         bus at every time slice with respect to their type (too much or
@@ -959,7 +944,7 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
     @classmethod
     def build_subproblem(cls,
                          backbone: IsingBackbone,
-                         configuration: dict):
+                         configuration: dict) -> 'MinimalGeneratorOutput':
         """
         A factory method for returning an instance that enforces the minimal
         generator output.
@@ -988,10 +973,10 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                 `self.backbone._ising_coefficients_positive
         """
         for generator in self.network.generators.index:
-            self.modifiy_positive_interactions(generator=generator)
+            self.modify_positive_interactions(generator=generator)
         self._ising_coefficients = self.backbone._ising_coefficients_cached
 
-    def modifiy_positive_interactions(self, generator: str):
+    def modify_positive_interactions(self, generator: str) -> None:
         """
         Modifies the first-order ising interactions of the generator
         at the given time slice
@@ -1012,8 +997,9 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
                 interaction_strength = abs(self.scale_factor * self.backbone._ising_coefficients[(qubit,)])
                 self.backbone.add_basis_polynomial_interaction(first_qubit=status_qubit,
                                                                second_qubit=qubit,
-                                                               zero_qubits_list=[status_qubit],
+                                                               solution_list=[status_qubit],
                                                                interaction_strength=interaction_strength)
+
 
 class PowerOutputInvariant(AbstractIsingSubproblem):
     """
@@ -1028,7 +1014,8 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
     @classmethod
     def build_subproblem(cls,
                          backbone: IsingBackbone,
-                         configuration: dict):
+                         configuration: dict
+                         ) -> 'PowerOutputInvariant':
         """
         A factory method for returning an instance that enforces the minimal
         generator output.
@@ -1040,7 +1027,7 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
                 The config dict that contains the scale factor
 
         Returns:
-            (MinimalGeneratorOutput)
+            (PowerOutputInvariant)
                 An instance of this class
         """
         return PowerOutputInvariant(backbone, configuration)
@@ -1058,7 +1045,7 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
         for time in self.backbone._snapshots:
             self.encode_total_power_invariant(time=time)
 
-    def encode_total_power_invariant(self, time=None):
+    def encode_total_power_invariant(self, time: any = None):
         """
         Encodes that the total generated power is equal to the total load
         at that time step
