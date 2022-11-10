@@ -41,3 +41,7 @@ plots/*
 # created in root when running gui test script
 url.txt
 
+# additional files that are not ready to be published
+statistics
+tosca_artifacts
+scripts/*plot*.py
