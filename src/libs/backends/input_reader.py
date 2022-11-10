@@ -250,9 +250,9 @@ class InputReader:
         """
         return self.config
 
-    def get_config_name(self) -> dict:
+    def get_config_name(self) -> str:
         """
-        A getter for the config dictionary.
+        A getter for the config dictionary name.
 
         Returns:
             (dict)
