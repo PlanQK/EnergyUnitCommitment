@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union
 
-import pypsa
 
 from .ising_backbone import IsingBackbone, NetworkIsingBackbone
 
@@ -38,11 +37,22 @@ class QubitEncoder(ABC):
     """
 
     def __init__(self, backbone: IsingBackbone):
+        """
+        The only reference a generic encoder requires is to a
+        backbone instance on which to encode components as qubits
+
+        Args:
+            backbone: (NetworkIsingBackbone)
+                The backbone which is used to encode qubits
+        """
         self.backbone = backbone
 
     @classmethod
     @abstractmethod
-    def create_encoder(cls, backbone, config: Union[str, dict]):
+    def create_encoder(cls,
+                       backbone: IsingBackbone,
+                       config: Union[str, dict]
+                       ) -> 'QubitEncoder':
         """
         A factory method to be overwritten by the interface that
         extends this one. This method will be called to get the 
@@ -57,7 +67,7 @@ class QubitEncoder(ABC):
                 for generator encoding
         """
 
-    def encode_qubits(self):
+    def encode_qubits(self) -> None:
         """
         The entrypoint for the backbone to call to encode the network
         component that is specific to the class of the instance.
@@ -80,7 +90,7 @@ class QubitEncoder(ABC):
 
     def get_weights(self, component: str, time: any) -> list:
         """
-        For the given component and snapshot this methods returns the
+        For the given component and snapshot, this methods returns the
         weights of qubit that encode it. The component type is
         dependent of the subclass of the encoder
         """
@@ -94,23 +104,26 @@ class QubitEncoder(ABC):
         raise NotImplementedError
 
 
-class GeneratorEncoder(QubitEncoder):
+class GeneratorEncoder(QubitEncoder, ABC):
     """
     An encoder for transforming generators into groups of qubits.
     """
 
-    def get_components(self):
+    def get_components(self) -> list:
         """
         Returns a list of all network generators
         """
-        return self.backbone.network.generators.index
+        return list(self.backbone.network.generators.index)
 
     @classmethod
-    def create_encoder(cls, backbone, config: str):
+    def create_encoder(cls,
+                       backbone: NetworkIsingBackbone,
+                       config: str
+                       ) -> 'GeneratorEncoder':
         """
         A factory method for constructing an encoder for generators
 
-        Admissable string for the config are:
+        Admissible string for the config are:
             - `"single_qubit"`
             - `"integer_decomposition"`
             - `"with_status"`
@@ -140,7 +153,7 @@ class SingleQubitGeneratorEncoder(GeneratorEncoder):
 
     def get_weights(self, component: str, time: any) -> list:
         """
-        Returns a list with it's only entry being the maximal powerout
+        Returns a list with its only entry being the maximal powerout
         of the generator at the time step
 
         Args:
@@ -195,7 +208,7 @@ class WithStatusQubitGeneratorEncoder(GeneratorEncoder):
     def get_weights(self, component: str, time: any) -> list:
         """
         Returns a list with the first entry as the minimal output of
-        the generator and the range up to the maxium output being being 
+        the generator and the range up to the maximum output being
         filled using binary powers and a rest.
 
         Args:
@@ -215,29 +228,32 @@ class WithStatusQubitGeneratorEncoder(GeneratorEncoder):
         return [minimal_power] + binary_power_and_rest(max_power - minimal_power)
 
 
-class LineEncoder(QubitEncoder):
+class LineEncoder(QubitEncoder, ABC):
     """
     An encoder for transforming transmission lines into groups of qubits.
     """
 
-    def get_components(self):
+    def get_components(self) -> list:
         """
         Returns a list of all network transmission lines
         """
-        return self.backbone.network.lines.index
+        return list(self.backbone.network.lines.index)
 
     @classmethod
-    def create_encoder(cls, backbone: NetworkIsingBackbone, config: str):
+    def create_encoder(cls, 
+                       backbone: NetworkIsingBackbone,
+                       config: str
+                       ) -> 'LineEncoder':
         """
         A factory method for constructing an encoder for generators
 
-        Admissable string for the config are:
+        Admissible string for the config are:
             - `"single_qubit"`
             - `"integer_decomposition"`
 
         Args:
-            backbone: (IsingBackbone)
-                The IsingBackbone instance on which to encode the 
+            backbone: (NetworkIsingBackbone)
+                The NetworkIsingBackbone instance on which to encode the 
                 network component
             config: (str)
                 A string describing which subclass to instantiate
@@ -255,7 +271,7 @@ class FullsplitLineEncoder(LineEncoder):
     Transform a transmission line by using only qubits of weight 1 or -1
     """
 
-    def get_weights(self, component, time):
+    def get_weights(self, component: str, time: any) -> list:
         """
         Split up a transmission line using the smallest integer-valued weights
         as possible
@@ -268,7 +284,7 @@ class FullsplitLineEncoder(LineEncoder):
 
         Returns:
             (list) 
-                Returns a list of 1 and -1 with each number occuring equal
+                Returns a list of 1 and -1 with each number occurring equal
                 to the capacity of the transmission line at that timestep
         """
         capacity = int(self.backbone.network.lines.loc[component].s_nom)
@@ -281,7 +297,7 @@ class CutPowersOfTwoLineEncoder(LineEncoder):
     each direction of the flow
     """
 
-    def get_weights(self, component, time):
+    def get_weights(self, component: str, time: any) -> list:
         """
         Split up a transmission line using powers of two and a rest for
         each direction
@@ -324,33 +340,54 @@ class CutPowersOfTwoLineEncoder(LineEncoder):
 
 class NetworkEncoder(QubitEncoder):
     """
-    A class for transfoming the components of a pypsa Network into qubits.
+    A class for transforming the components of a pypsa Network into qubits.
     """
 
+    def __init__(self,
+                 backbone: NetworkIsingBackbone,
+                 generator_encoder: GeneratorEncoder,
+                 line_encoder: LineEncoder):
+        """
+        Args:
+           backbone: (NetworkIsingBackbone)
+               The backbone that organizes qubits that represent network components
+           generator_encoder: (GeneratorEncoder)
+               A qubit encoder that reads the network generators and encodes
+               them as qubits into the backbone
+           line_encoder: (LineEncoder)
+               A qubit encoder that reads the transmission lines and encodes
+               them as qubits into the backbone
+        """
+        super().__init__(backbone)
+        self.generator_encoder = generator_encoder
+        self.line_encoder = line_encoder
+
     @classmethod
-    def create_encoder(cls, backbone, config: dict):
+    def create_encoder(cls, 
+                       backbone: NetworkIsingBackbone,
+                       config: dict
+                       ) -> 'NetworkEncoder':
         """
         This creates a NetworkEncoder by creating the network and generator
-        encoders as given in the config. Encoding the network is archieved
+        encoders as given in the config. Encoding the network is archived
         by applying the encoding methods of those
 
         Args:
             backbone: (NetworkIsingBackbone)
                 The NetworkIsingBackbone instance on which to encode the network
             config: (dict)
-                A dictionary containing the config for the genrator and
+                A dictionary containing the config for the generator and
                 transmission line encoding
         """
         generator_representation = config.get("generator_representation", "single_qubit")
         line_representation = config.get("line_representation", "cutpowersoftwo")
-        network_encoder = NetworkEncoder(backbone)
-        network_encoder.generator_encoder = GeneratorEncoder.create_encoder(backbone,
-                                                                 generator_representation)
-        network_encoder.line_encoder = LineEncoder.create_encoder(backbone, 
-                                                       line_representation)
-        return network_encoder
+        generator_encoder = GeneratorEncoder.create_encoder(backbone,
+                                                            generator_representation)
+        line_encoder = LineEncoder.create_encoder(backbone,
+                                                  line_representation)
+        return NetworkEncoder(backbone, generator_encoder, line_encoder)
 
-    def encode_qubits(self):
+    def encode_qubits(self) -> None:
         """
         The entrypoint for the backbone to call to encode the network
         """
