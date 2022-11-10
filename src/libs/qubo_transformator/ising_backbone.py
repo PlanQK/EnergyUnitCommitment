@@ -17,7 +17,7 @@ from numpy import ndarray
 
 class IsingBackbone:
     """
-    This class implements the data structre for converting an optimization
+    This class implements the data structure for converting an optimization
     problem instance to an Ising spin glass problem.
 
     It acts as an endpoint to decode qubit configuration and encode
@@ -44,7 +44,7 @@ class IsingBackbone:
 
     You can add a new constraint by writing a class that adheres to the
     `AbstractIsingSubproblem` interface and have the instance of the qubo_transformator
-    instantiate it in order to visit the the data structure for encoding of the
+    instantiate it in order to visit the data structure for encoding of the
     subproblem
 
     Attributes
@@ -56,7 +56,7 @@ class IsingBackbone:
         # contains ising coefficients
         _ising_coefficients : dict
             Contains the ising coefficients of the ising problem. The keys are ordered
-            tupels containing the qubits of the respective interaction and strenght as 
+            tuples containing the qubits of the respective interaction and strength as
             it's value
             
         _ising_coefficients_cached : dict
@@ -70,7 +70,7 @@ class IsingBackbone:
             that represent the component at that snapshot.
         _qubit_weights  : dict
             A dictionary with integers as keys, which represent qubits, and their respective
-            weight as the value. The weight of a qubit is a factor that is added multiplicatively
+            weight as the value. The weight of a qubit is a factor that is multiplied
             to any interaction this qubit is involved in unless it is explicitly turned off.
         _allocated_qubits : int 
             The number of qubits that has been allocated to represent problem components
@@ -84,7 +84,7 @@ class IsingBackbone:
         Constructor for an Ising Backbone. It initializes various data structures
         that are used for modelling a problem but doesn't fill any of them. This has
         to be done by an `qubit_encoder.Encoder`, which can consume a data structure
-        specifiying an optimization problem and convert it's components into qubits
+        specifying an optimization problem and convert its components into qubits
         using string labels.
 
         Visiting `IsingSubproblem` instance encode the various constraints and the objective
@@ -106,7 +106,7 @@ class IsingBackbone:
         # initializing data structures that encode the problem components into qubits
         # the encoding dict contains the mapping of components via labels to qubits
         self._qubit_encoding = {}
-        # the weights dictionary contains a mapping of qubits to their weights
+        # this dictionary contains a mapping of qubits to their weights
         self._qubit_weights = {}
         self._allocated_qubits = 0
 
@@ -206,7 +206,7 @@ class IsingBackbone:
         if len(key) == 2:
             if key[0] == key[1]:
                 key = tuple([])
-        # store interaction, wether it is positive or negative, and in the cache
+        # store interaction, whether it is positive or negative, and in the cache
         self._ising_coefficients[key] = self._ising_coefficients.get(key, 0) - interaction_strength
         self._ising_coefficients_cached[key] = self._ising_coefficients_cached.get(key, 0) - interaction_strength
 
@@ -239,8 +239,8 @@ class IsingBackbone:
         """
         if time is None:
             time = self._snapshots[0]
-        component_adress = self.get_representing_qubits(component, time)
-        for qubit in component_adress:
+        component_address = self.get_representing_qubits(component, time)
+        for qubit in component_address:
             # term with single spin after applying QUBO to Ising transformation
             self.add_interaction(qubit, 0.5 * coupling_strength)
             # term with constant cost contribution after applying QUBO to
@@ -287,7 +287,7 @@ class IsingBackbone:
                 Modifies `self._ising_coefficients`
 
         Example:
-            Let 'x' and 'y' be the labels of two problem componets. The
+            Let 'x' and 'y' be the labels of two problem components. The
             component 'x' is represented by two qubits: x_1 and x_2. The
             component 'y' is represented by the qubits: y_1 and y_2. The
             method call
@@ -307,18 +307,18 @@ class IsingBackbone:
             time = self._snapshots[0]
         if additional_time is None:
             additional_time = time
-        first_component_adress = self.get_representing_qubits(first_component, time)
-        second_component_adress = self.get_representing_qubits(second_component,
+        first_component_address = self.get_representing_qubits(first_component, time)
+        second_component_address = self.get_representing_qubits(second_component,
                                                                additional_time)
         # components with 0 weight (power, capacity) vanish in the QUBO
         # formulation
-        if (not first_component_adress) or (not second_component_adress):
+        if (not first_component_address) or (not second_component_address):
             return
         # retrieving corresponding qubits is done. Now perform qubo
         # multiplication by expanding the product and add each summand
         # individually.
-        for first_qubit in first_component_adress:
-            for second_qubit in second_component_adress:
+        for first_qubit in first_component_address:
+            for second_qubit in second_component_address:
                 # The body of this loop corresponds to the multiplication of
                 # two QUBO variables. According to the QUBO - Ising
                 # translation rule x = (sigma-1)/2 one QUBO multiplication
@@ -365,7 +365,7 @@ class IsingBackbone:
         QUBOs is thus generated by the polynomials of the form
             (X_i - x_i)(X_j - x_j) for x_i, x_j in {0,1} and X_i, X_j arbitrary QUBO variables.
         Adding a polynomial of that form to the QUBO adds no cost if any of the qubits is a root
-        of that polynomial. Only if this is not the case is a non zero cost incurred
+        of that polynomial. Only if this is not the case is a non-zero cost incurred
 
         Args:
             first_qubit: (int)
@@ -493,16 +493,16 @@ class IsingBackbone:
                                            ) -> None:
         """
         A function to create qubits in the data structure that can be accessed
-        as a group via it's label.
+        as a group via its label.
 
         The method places several restriction on what it accepts in
         order to generate a valid QUBO later on. The checks are intended
         to prevent name or qubit collision.
 
         Allocating qubits for a component modifies the attributes
-            `_qubit_encoding, _qubit_weight, _allocated_qbuits`
+            `_qubit_encoding, _qubit_weight, _allocated_qubits`
         and requires to specify how many qubits with which weight represents
-        the component. It raises an error if the label has already beein used
+        the component. It raises an error if the label has already being used
         for a group of qubits.
 
         The number of qubits and weights can be specified as:
@@ -517,7 +517,7 @@ class IsingBackbone:
             component_name: (str)
                 The string used to couple the component with qubits.
             snapshot_to_weight: (dict|list)
-                A dictionary or list to specifiy qubit weights at each snapshot
+                A dictionary or list to specify qubit weights at each snapshot
 
         Returns:
             (None)
@@ -552,7 +552,7 @@ class IsingBackbone:
             for idx, qubit in enumerate(qubit_list):
                 self._qubit_weights[qubit] = snapshot_to_weight_dict[snapshot][idx]
 
-    def allocate_qubits_to_weight_list(self, weight_list: list) -> None:
+    def allocate_qubits_to_weight_list(self, weight_list: list) -> list:
         """
         For a given list of weights, returns a list of qubits which will we mapped
         to these weights, starting at the qubit `self._allocated_qubits` and increasing
@@ -806,9 +806,9 @@ class NetworkIsingBackbone(IsingBackbone):
 
         Returns:
             (pypsa.Network)
-                A copy of self.network in which time-dependant values
-                for the generators and lines are set according to the
-                given solution.
+                A copy of the attribute `network` in which time-dependant
+                values for the generators and lines are set according to
+                the given solution.
         """
         output_network = self.network.copy()
         # get Generator/Line Status
@@ -897,16 +897,16 @@ class NetworkIsingBackbone(IsingBackbone):
         Returns:
             (dict)
                 A dictionary with the three following keys:
-                'generators':       A list of labels of generators that
-                                    are at the bus.
-                'positive_lines':    A list of labels of lines that end
-                                    in this bus.
-                'negative_lines':    A list of labels of lines that start
-                                    in this bus.
+                    'generators': A list of labels of generators that
+                                  are at the bus.
+                    'positive_lines': A list of labels of lines that end
+                                      in this bus.
+                    'negative_lines': A list of labels of lines that start
+                                      in this bus.
         """
         if bus not in self.network.buses.index:
             raise ValueError("the bus " + bus + " doesn't exist")
-        result = {
+        return {
             "generators":
                 list(self.network.generators[
                          self.network.generators.bus == bus
@@ -920,7 +920,6 @@ class NetworkIsingBackbone(IsingBackbone):
                          self.network.lines.bus0 == bus
                          ].index),
         }
-        return result
 
     def get_nominal_power(self, generator: str, time: any) -> float:
         """
@@ -928,15 +927,14 @@ class NetworkIsingBackbone(IsingBackbone):
         
         Args:
             generator: (str)
-                The generator label.
+                The generator label
             time: (any)
-                Index of time slice for which to get nominal power. Has to
-                be in the index self.network.snapshots
+                The snapshot at which to get the nominal power. It has to be
+                in the network.snapshot index
 
         Returns:
             (float)
-                Nominal power available at 'generator' at time slice
-                'time'
+                Nominal power available at `generator` at time slice `time`
         """
         try:
             p_max_pu = self.network.generators_t.p_max_pu[generator].loc[time]
@@ -944,9 +942,21 @@ class NetworkIsingBackbone(IsingBackbone):
             p_max_pu = 1.0
         return max(self.network.generators.p_nom[generator] * p_max_pu, 0.0)
 
-    def get_minimal_power(self, generator: str, time: any):
+    def get_minimal_power(self, generator: str, time: any) -> float:
         """
         Returns the minimal power output of a generator at a time step
+
+        Args:
+            generator: (str)
+                The generator label
+            time: (any)
+                The snapshot at which to get the minimal power output. It 
+                has to be in the network.snapshot index
+
+        Returns:
+            (float)
+                Minimal power output of `generator` at time slice `time` if
+                it is committed
         """
         try:
             p_min_pu = self.network.generators_t.p_min_pu[generator].loc[time]
@@ -965,8 +975,13 @@ class NetworkIsingBackbone(IsingBackbone):
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
             time: (any)
-                Index of time slice for which to get the generator
-                status. This has to be in the network.snapshots index
+                Index of time slice for which to get the generator status. 
+                This has to be in the network.snapshots index
+
+        Return: 
+            (float)
+                The percentage of the nominal power output of the generator
+                at the time step according to the given qubit solution
         """
         maximum_output = self.get_nominal_power(generator, time)
         if maximum_output == 0.0:
@@ -976,8 +991,10 @@ class NetworkIsingBackbone(IsingBackbone):
                                                               time=time)
         return generated_power / maximum_output
 
-    def get_generator_dictionary(self, solution: list,
-                                 stringify: bool = True) -> dict:
+    def get_generator_dictionary(self,
+                                 solution: list,
+                                 stringify: bool = True
+                                 ) -> dict:
         """
         Builds a dictionary containing the status of all generators at
         all time slices for a given solution of qubit spins.
@@ -986,7 +1003,7 @@ class NetworkIsingBackbone(IsingBackbone):
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
             stringify: (bool)
-                If this is true, dictionary keys are cast to strings, so
+                If this is true, dictionary keys are cast as strings, so
                 they can for json
 
         Returns:
@@ -994,7 +1011,7 @@ class NetworkIsingBackbone(IsingBackbone):
                 A dictionary containing the status of all generators at
                 all time slices. The keys are either tuples of the
                 label of the generator and the index of the time slice,
-                or these tuples typecast to strings, depending on the
+                or these tuples typecast as strings, depending on the
                 'stringify' argument. The values are booleans, encoding
                 the status of the generators at the time slice.
         """
@@ -1010,8 +1027,10 @@ class NetworkIsingBackbone(IsingBackbone):
                         time=time)
         return result
 
-    def get_flow_dictionary(self, solution: list,
-                            stringify: bool = True) -> dict:
+    def get_flow_dictionary(self,
+                            solution: list,
+                            stringify: bool = True
+                            ) -> dict:
         """
         Builds a dictionary containing all power flows at all time
         slices for a given solution of qubit spins.
@@ -1020,7 +1039,7 @@ class NetworkIsingBackbone(IsingBackbone):
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
             stringify: (bool)
-                If this is true, dictionary keys are cast to strings, so
+                If this is true, dictionary keys are cast as strings, so
                 they can for json
 
         Returns:
@@ -1028,7 +1047,7 @@ class NetworkIsingBackbone(IsingBackbone):
                 A dictionary containing the flow of all lines at
                 all time slices. The keys are either tuples of the
                 label of the generator and the index of the time slice,
-                or these tuples typecast to strings, depending on the
+                or these tuples typecast as strings, depending on the
                 'stringify' argument. The values are floats,
                 representing the flow of the lines at the time slice.
         """
@@ -1056,7 +1075,7 @@ class NetworkIsingBackbone(IsingBackbone):
 
         Returns:
             (float)
-                The total load at 'bus' at time slice 'time'.
+                The total load at 'bus' at time step 'time'.
         """
         loads_at_current_bus = self.network.loads[
             self.network.loads.bus == bus
@@ -1070,7 +1089,7 @@ class NetworkIsingBackbone(IsingBackbone):
             all_loads = self.network.loads['p_set']
             result = all_loads[all_loads.index.isin(loads_at_current_bus)].sum()
         if result < 0:
-            raise ValueError("negative Load at current Bus")
+            raise ValueError("negative Load at current bus")
         return result
 
     def get_total_load(self, time: any) -> float:
@@ -1080,6 +1099,7 @@ class NetworkIsingBackbone(IsingBackbone):
         Args:
             time: (any)
                 Index of time slice at which to return the load.
+
         Returns:
             (float)
                 The total load of the network at time slice `time`.
@@ -1097,6 +1117,7 @@ class NetworkIsingBackbone(IsingBackbone):
         Args:
             solution: (list)
                 List of all qubits that have spin -1 in a solution.
+
         Returns:
             (dict)
                 A dictionary containing general information about the
