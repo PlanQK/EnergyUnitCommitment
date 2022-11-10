@@ -70,11 +70,8 @@ class ClassicalBackend(BackendBase):
                 self.transformed_problem.
         """
         print("transforming problem...")
-        qubo_transformator = QuboTransformator(
-            network=self.network,
-            config=self.config["ising_interface"]
-        )
-        self.transformed_problem = qubo_transformator.transform_network_to_qubo()
+        self.transformed_problem = QuboTransformator.transform_network_to_qubo(self.network,
+                                                                               self.config["ising_interface"])
 
     def transform_solution_to_network(self) -> None:
         """

@@ -64,11 +64,7 @@ def test_kirchhoff_distinct_snapshots(network, config):
     test that without extra problems added, only the kirchhoff problem
     is build and the interactions are distinct across snapshots
     """
-    qubo_transformator = QuboTransformator(
-        network=network,
-        config=config["ising_interface"]
-    )
-    ising_backbone = qubo_transformator.transform_network_to_qubo()
+    ising_backbone = QuboTransformator.transform_network_to_qubo(network, config["ising_interface"])
     # only kirchhoff problem has been built
     assert ising_backbone._ising_coefficients == ising_backbone._subproblems["kirchhoff"]._ising_coefficients
 

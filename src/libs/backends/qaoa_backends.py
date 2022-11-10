@@ -418,11 +418,8 @@ class QaoaQiskit(BackendBase):
             (None)
                 Add the ising_interface-instance to self.transformed_problem.
         """
-        qubo_transformator = QuboTransformator(
-            network=self.network,
-            config=self.config["ising_interface"]
-        )
-        self.transformed_problem = qubo_transformator.transform_network_to_qubo()
+        self.transformed_problem = QuboTransformator.transform_network_to_qubo(self.network,
+                                                                               self.config["ising_interface"])
         self.hamiltonian = self.transformed_problem.get_hamiltonian_matrix()
         self.num_qubits = len(self.hamiltonian)
         self.output["results"]["qubit_map"] = \
