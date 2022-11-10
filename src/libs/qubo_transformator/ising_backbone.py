@@ -309,7 +309,7 @@ class IsingBackbone:
             additional_time = time
         first_component_address = self.get_representing_qubits(first_component, time)
         second_component_address = self.get_representing_qubits(second_component,
-                                                               additional_time)
+                                                                additional_time)
         # components with 0 weight (power, capacity) vanish in the QUBO
         # formulation
         if (not first_component_address) or (not second_component_address):
