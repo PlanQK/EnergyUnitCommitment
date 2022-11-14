@@ -147,10 +147,9 @@ class ClassicalBackend(BackendBase):
 
     def print_solver_specific_report(self) -> None:
         """
-        Prints additional information about the solution that is solver
-        specific.
-        The only non-generic information is the energy of the solution
-        regarding the Ising spin glass formulation.
+        Prints additional information about the solution that is solver specific.
+        The only non-generic information is the energy of the solution regarding
+        the Ising spin glass formulation.
         
         Returns:
             (None)
@@ -169,8 +168,6 @@ class ClassicalBackend(BackendBase):
         """
         This writes solution specific values of the optimizer result
         and the Ising spin glass problem solution the self.output.
-        Parse the value to the key "state" via literal_eval before
-        calling this function.
         
         Args:
             result: (dict)
@@ -277,7 +274,7 @@ class SqaIterator(BackendBase):
 
     def calculate_step(self, solution_cost: float) -> float:
         """
-        For the crrent ising problem and the calculated solution, this calculates the step size
+        For the current ising problem and the calculated solution, this calculates the step size
         of the next estimation of the marginal costs to construct the next ising problem
 
         Args:
@@ -318,9 +315,6 @@ class SqaIterator(BackendBase):
                 break
 
         self.output["results"]["optimization_time"] = time.perf_counter() - tic
-        # parse the entry in "state" before using it
-        result = current_result
-        result["state"] = literal_eval(result["state"])
-        self.write_results_to_output(result)
+        self.write_results_to_output(current_resul)
         print("done")
 

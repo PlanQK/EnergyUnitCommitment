@@ -16,7 +16,7 @@ You can extend the networks that can be solved by extending the IsingBackbone cl
 add a new constraint, you have to write a class that adheres to the `IsingSubproblem` interface. Then you pass
 it as an entry to the `ising_backbone` value of the configuration.
 """
-
+from .backend_base import BackendBase
 from .sqa_backends import ClassicalBackend, SqaBackend, SqaIterator
 from .dwave_backends import (
     DwaveTabu,

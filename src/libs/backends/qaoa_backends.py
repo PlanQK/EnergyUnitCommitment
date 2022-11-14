@@ -14,11 +14,11 @@ import qiskit
 
 try:
     from .backend_base import BackendBase  # import for Docker run
-    from ..qubo_transformator.ising_backbone import IsingBackbone
+    from ..qubo_transformator.ising_backbone import NetworkIsingBackbone
     from ..qubo_transformator import QuboTransformator
 except ImportError:
     from backend_base import BackendBase  # import for local/debug run
-    from libs.qubo_transformator.ising_backbone import IsingBackbone
+    from libs.qubo_transformator.ising_backbone import NetworkIsingBackbone
     from libs.qubo_transformator import QuboTransformator
 
 from datetime import datetime
