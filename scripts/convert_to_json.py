@@ -3,14 +3,15 @@ This small script converts configuration yaml's and network netcdf4 files into
 json. In order to run, you have to install pypsa and PyYAML
 """
 
-import yaml
 import json
-import pypsa
-
 import sys
 import os
-
 import pathlib
+
+import yaml
+import pypsa
+
+
 
 usage_string = """
 This takes up to two arguments, one for the name of the file to be loaded, and one

@@ -1,13 +1,13 @@
-import pytest
 import typing
+import os
 
+import pytest
 import pypsa
 
 import networkx as nx
 
 from src.libs.qubo_transformator import QuboTransformator
 
-import os
 
 
 @pytest.fixture(scope='session')

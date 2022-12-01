@@ -10,11 +10,13 @@ For simplification no floating point values are used.
 I recommend thinking very carefully before changing the parameters.
 """
 import sys
-import pypsa
 import random
 from os import path as ospath
 
 from datetime import datetime
+
+import pypsa
+
 
 CONFIG = {
     # the variance indicates how different the random variables are to each other

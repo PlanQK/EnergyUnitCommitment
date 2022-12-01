@@ -3,9 +3,9 @@ a solver of the unit commitment problem has to satisfy. It also sets up
 various attributes that are all solvers use"""
 
 import abc
+from datetime import datetime
 
 from .input_reader import InputReader
-from datetime import datetime
 
 
 class BackendBase(abc.ABC):

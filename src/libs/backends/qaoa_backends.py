@@ -4,6 +4,8 @@ for the quantum circuit or using an actual quantum computer requires
 an API token"""
 
 import math
+from datetime import datetime
+
 from itertools import product
 
 from typing import Iterator
@@ -11,17 +13,6 @@ from typing import Iterator
 import numpy as np
 import qiskit
 
-
-try:
-    from .backend_base import BackendBase  # import for Docker run
-    from ..qubo_transformator.ising_backbone import IsingBackbone
-    from ..qubo_transformator import QuboTransformator
-except ImportError:
-    from backend_base import BackendBase  # import for local/debug run
-    from libs.qubo_transformator.ising_backbone import IsingBackbone
-    from libs.qubo_transformator import QuboTransformator
-
-from datetime import datetime
 from numpy import median
 from qiskit import QuantumCircuit
 from qiskit import Aer, IBMQ, execute
@@ -32,6 +23,17 @@ from qiskit.providers.ibmq import least_busy
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM
 from qiskit.circuit import Parameter, ParameterVector
 from scipy import stats
+
+try:
+    from .backend_base import BackendBase  # import for Docker run
+    from ..qubo_transformator.ising_backbone import IsingBackbone
+    from ..qubo_transformator import QuboTransformator
+except ImportError:
+    from backend_base import BackendBase  # import for local/debug run
+    from libs.qubo_transformator.ising_backbone import IsingBackbone
+    from libs.qubo_transformator import QuboTransformator
+
+
 
 from .input_reader import InputReader
 

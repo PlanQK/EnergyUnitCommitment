@@ -4,12 +4,13 @@ This is done by initializing an appropriate IsingBackbone subclassinstace, creat
 encode the problem components via a QubitEncoder, and then using IsingSubproblem instances
 to encode the various constraints and the objective function.
 """
+import pypsa
+
 
 from .ising_backbone import NetworkIsingBackbone
 from .qubit_encoder import NetworkEncoder
 from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput, PowerOutputInvariant
 
-import pypsa
 
 class QuboTransformator:
     """

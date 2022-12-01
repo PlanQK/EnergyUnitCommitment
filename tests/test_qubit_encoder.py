@@ -1,6 +1,5 @@
-import pytest
 import sys
-
+import pytest
 import pypsa
 
 from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder

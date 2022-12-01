@@ -1,17 +1,17 @@
-import pytest
 import typing
-
+import pytest
 import pypsa
 
 from src.libs.qubo_transformator.ising_backbone import NetworkIsingBackbone
 
 from src.libs.qubo_transformator.ising_subproblems import GlobalCostSquare
 
+from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
+
 # creates a network with 2 generators at two buses. The first "gen_1" has a power output
 # of 4 and the second "gen_2" has a power output of 3
 from .pypsa_networks import create_network
 
-from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
 
 @pytest.fixture
 def backbone():

@@ -1,21 +1,20 @@
-import streamlit as st
 import time
 
-import pandas as pd
-import altair as alt
-
-import requests
-
 import json
-import yaml
 import os
 
 from json import JSONDecodeError
-
 from contextlib import redirect_stdout
 import io
-
 from ast import literal_eval
+
+import yaml
+import requests
+
+
+import pandas as pd
+import altair as alt
+import streamlit as st
 
 st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state

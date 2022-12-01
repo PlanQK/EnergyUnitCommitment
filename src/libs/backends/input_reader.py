@@ -10,16 +10,15 @@ when calling the script that initiates the optimization
 - so far, output is saved in the backends using a dictionary, or by creating
 a response object
 """
+from os import environ
+
+from typing import Union
 
 import copy
 import json
 import pypsa
 import xarray
 import yaml
-
-from os import environ
-
-from typing import Union
 
 from .. import backends
 

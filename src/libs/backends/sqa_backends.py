@@ -7,10 +7,9 @@ transverse field to be 0 everywhere
 
 import random
 import time
+from ast import literal_eval
 
 from numpy import sqrt
-
-from ast import literal_eval
 
 from .input_reader import InputReader
 from .backend_base import BackendBase

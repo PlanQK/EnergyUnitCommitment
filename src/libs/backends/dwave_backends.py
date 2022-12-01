@@ -13,9 +13,18 @@ import abc
 
 import time
 
+# import packages for reading files
+from os import path
+from glob import glob
+import json
+
 import pandas
 import dimod
 import greedy
+
+# import packages for flow optimization
+import networkx as nx
+from networkx.algorithms.flow import edmonds_karp
 
 # importing d-wave packages
 from dwave.system import LeapHybridSampler, DWaveSampler
@@ -34,14 +43,9 @@ except ImportError:
     from ..qubo_transformator.ising_backbone import IsingBackbone
 
 
-# import packages for flow optimization
-import networkx as nx
-from networkx.algorithms.flow import edmonds_karp
 
-# import packages for reading files
-from os import path
-from glob import glob
-import json
+
+
 
 
 class AbstractDwaveSampler(BackendBase):

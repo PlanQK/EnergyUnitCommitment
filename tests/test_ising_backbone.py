@@ -1,6 +1,5 @@
-import pytest
 import typing
-
+import pytest
 import pypsa
 
 from src.libs.qubo_transformator.ising_backbone import NetworkIsingBackbone

@@ -9,12 +9,13 @@ import typing
 import glob
 import json
 import collections
+from os import path, getenv, sep
+
 
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path, getenv, sep
 
 import pandas as pd
 

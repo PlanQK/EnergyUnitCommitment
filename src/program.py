@@ -5,13 +5,13 @@ to a request and the local execution of an optimization uses the provided values
 in the makefile to call this method."""
 
 from typing import Union
+import traceback
+from os import environ
 
 import pypsa
 from loguru import logger
 
-import traceback
 
-from os import environ
 
 try:
     # import when building image for local use

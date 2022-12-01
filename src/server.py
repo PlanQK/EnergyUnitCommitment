@@ -3,16 +3,21 @@ for Unit Commitment optimziation"""
 
 from distutils.command.config import config
 from tokenize import String
-from flask import Flask
-from flask import request
-from run import parse_cli_params
-from program import run
-from werkzeug.utils import secure_filename
+
 from contextlib import redirect_stdout
 import io
 import json
-import pypsa
 import os
+
+from werkzeug.utils import secure_filename
+
+import pypsa
+from flask import Flask
+from flask import request
+
+
+from run import parse_cli_params
+from program import run
 
 app = Flask(__name__)
 
