@@ -52,7 +52,7 @@ def upload_network():
 
     path = get_root_path() + secure_filename(file.filename) + ".nc"
 
-    with open(path, 'wb') as f:
+    with open(path, 'wb', encoding='utf-8') as f:
         f.write(file.getvalue())
 
     network = pypsa.Network(path)

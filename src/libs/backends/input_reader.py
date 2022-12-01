@@ -178,7 +178,7 @@ class InputReader:
                 config_path = "configs/"
             else:
                 config_path = "../input/configs/"
-            with open(config_path + input_config) as file:
+            with open(config_path + input_config, encoding='utf-8') as file:
                 result = loader(file)
         base_dict = {
             "API_token": {},

@@ -805,6 +805,6 @@ class DwaveReadQPU(DwaveCloudDirectQPU):
                 The d-wave sample read from the given filepath.
         """
         print(f"reading from {self.input_file_path}")
-        with open(self.input_file_path) as input_file:
+        with open(self.input_file_path, encoding='utf-8') as input_file:
             self.input_data = json.load(input_file)
         return dimod.SampleSet.from_serializable(self.input_data["serial"])

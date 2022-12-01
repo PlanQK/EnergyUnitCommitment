@@ -53,7 +53,7 @@ def convert_network(input_name: str, output_name: str):
     network = pypsa.Network(input_path)
     print("write converted file")
     network_xarray = network.export_to_netcdf()
-    with open(output_path, "w") as write_file:
+    with open(output_path, "w", encoding='utf-8') as write_file:
         json.dump(network_xarray.to_dict(), write_file, indent=2)
 
 
@@ -71,7 +71,7 @@ def convert_config(input_name: str, output_name: str):
     input_path = os.path.join(path_prefix, "input/configs", input_name) + ".yaml"
     output_path = os.path.join(path_prefix, "input", output_name) + ".json"
 
-    with open(input_path, 'r') as yaml_input,  open(output_path, "w") as json_out:
+    with open(input_path, 'r', encoding='utf-8') as yaml_input,  open(output_path, "w", encoding='utf-8') as json_out:
         print("read configuration")
         yaml_object = yaml.safe_load(yaml_input)
         print("write converted file")

@@ -68,7 +68,7 @@ class ErrorResponse(Response):
                  "message": self.detail}
         now = datetime.today()
         date_time_str = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
-        with open(f"{folder}error_code_{self.code}_{date_time_str}.json", "w") as write_file:
+        with open(f"{folder}error_code_{self.code}_{date_time_str}.json", "w", encoding='utf-8') as write_file:
             json.dump(error, write_file, indent=2, default=str)
 
 
@@ -97,5 +97,5 @@ class ResultResponse(Response):
         Returns:
             (None) Saves the optimization result to the mount point of the networks
         """
-        with open(f"{folder}{self.result['file_name']}", "w") as write_file:
+        with open(f"{folder}{self.result['file_name']}", "w", 'utf-8') as write_file:
             json.dump(self.result, write_file, indent=2, default=str)
