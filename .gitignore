@@ -45,3 +45,6 @@ url.txt
 statistics
 tosca_artifacts
 scripts/*plot*.py
+
+# editor generated files
+.vscode/**

@@ -41,10 +41,10 @@ if "init" not in state:
 def get_url():
     url = "http://localhost:443/"
     if os.path.isfile("/url.txt"):
-        with open("/url.txt", "r") as f:
+        with open("/url.txt", "r", encoding='utf-8') as f:
             url = f.readline().strip()
     elif os.path.isfile("./url.txt"):
-        with open("./url.txt", "r") as f:
+        with open("./url.txt", "r", encoding='utf-8') as f:
             url = f.readline().strip()
     return url
 
