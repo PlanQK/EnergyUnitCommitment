@@ -13,7 +13,6 @@ import abc
 
 import time
 
-import networkx
 import pandas
 import dimod
 import greedy
@@ -489,7 +488,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
             sampleset = self.sampler.sample(**sample_arguments)
         except ValueError:
             print("no embedding found in given time limit")
-            raise ValueError("no embedding onto qpu was found")
+            raise ValueError("no embedding onto qpu was found") from None
         print("Waiting for server response...")
         while True:
             if sampleset.done():
@@ -628,7 +627,7 @@ class DwaveCloudDirectQPU(DwaveCloudSampler):
     def build_flow_problem(self,
                            generator_state: list,
                            line_values: dict = None
-                           ) -> networkx.DiGraph:
+                           ) -> nx.DiGraph:
         """
         Build a self.networkx model to further optimise power flow.
         If using a warmstart, it uses the solution of the quantum
