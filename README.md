@@ -13,7 +13,7 @@ start a docker container. Various settings can be adjusted in either the makefil
 file which can be used right away. The recipe will start an optimization run for every combination of network, config file and setting found by in the makefile. 
 The result of the optimization will be saved as a JSON file.
 
-This repository also contains some auxiliary scripts to generate problem instance and analyze results. Using those will be explained later.
+This repository also contains some auxiliary scripts to generate problem instances and analyze results. Using those will be explained later.
 
 
 ### Available solvers
@@ -21,7 +21,7 @@ Currently, we support the following solvers for the unit commitment problem:
 
 1. Mixed Integer Linear Programming using GLPK. The linear programm is obtained via PyPSA.
 2. Simulated Quantum Annealing. More information on this solver can be found [here](https://github.com/PlanQK/SimulatedQuantumAnnealing)
-3. QAOA via IBM's [Qiskit](https://qiskit.org) runtime. This is extremly limited in problemsize. Some parts require an API-Token
+3. QAOA via IBM's [Qiskit](https://qiskit.org) runtime. This is extremely limited in problemsize. Some parts require an API-Token
 4. D-Wave's cloud solvers. These require an API-Token and include quantum annealing and a hybrid solver.
 
 

@@ -1052,13 +1052,13 @@ class NetworkIsingBackbone(IsingBackbone):
                 representing the flow of the lines at the time slice.
         """
         result = {}
-        for lineId in self.network.lines.index:
+        for line_id in self.network.lines.index:
             for time in self._snapshots:
-                key = (lineId, time)
+                key = (line_id, time)
                 if stringify:
                     key = str(key)
                 result[key] = self.get_encoded_value_of_component(
-                    component=lineId, solution=solution, time=time)
+                    component=line_id, solution=solution, time=time)
         return result
 
     def get_load(self, bus: str, time: any, silent: bool = True) -> float:

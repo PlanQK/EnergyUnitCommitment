@@ -665,7 +665,7 @@ class DataExtractor:
         Returns:
             (pd.DataFrame) a pandas data frame containing a row for every run saved in the file
         """
-        with open(file_name) as file:
+        with open(file_name, encoding='utf-8') as file:
             file_data = json.load(file)
 
         result_dict = {}
