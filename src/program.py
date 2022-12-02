@@ -1,4 +1,4 @@
-"""This file provides the entrypoint for starting an optimization run via the 
+"""This file provides the entrypoint for starting an optimization run via the
 function `run`. It returns a response object containing information on the result
 of the optimization. The PlanQK service uses this method to generate the response
 to a request and the local execution of an optimization uses the provided values
@@ -10,7 +10,6 @@ from os import environ
 
 import pypsa
 from loguru import logger
-
 
 
 try:
@@ -25,9 +24,11 @@ except ImportError:
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
 
-def run(data: Union[pypsa.Network, dict, str] = None,
-        params: Union[dict, str] = None,
-        params_dict: dict = None) -> Response:
+def run(
+    data: Union[pypsa.Network, dict, str] = None,
+    params: Union[dict, str] = None,
+    params_dict: dict = None,
+) -> Response:
     """
     This is the entrypoint for starting an optimization run. data is used to provide
     the network and params the default way to give solver parameters. These are used
@@ -37,17 +38,17 @@ def run(data: Union[pypsa.Network, dict, str] = None,
     Args:
         data: (pypsa.Network|str)
             The network to be optimized. This is either a pypsa network, a dictionary
-            containing a serialized pypsa network or the path to a netcdf file 
+            containing a serialized pypsa network or the path to a netcdf file
             containing the network
         params: (dict|str)
-            The default argument for giving optimizer parameters. They are either 
+            The default argument for giving optimizer parameters. They are either
             given directly as a dict, or a path to a config file
         params_dict: (dict)
-            A python dictionary containing configuration parameters that are 
+            A python dictionary containing configuration parameters that are
             added after the params argument has been processed. This allows overwriting
             values that were passed in the config file that was read in params
     Returns:
-        (ResultResponse) 
+        (ResultResponse)
             The response that contains the metadata and results of the optimization
     """
     try:
