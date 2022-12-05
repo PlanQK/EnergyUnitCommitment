@@ -14,18 +14,15 @@ from numpy import sqrt
 from .input_reader import InputReader
 from .backend_base import BackendBase
 
-
 # try import from local .so
 # Error message for image: herrd1/siquan:latest
 # /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found
 # (required by /energy/libs/backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
     from . import siquan
-    from ..qubo_transformator.ising_backbone import IsingBackbone
     from ..qubo_transformator import QuboTransformator
 # try import from installed module siquan
 except ImportError:
-    from libs.qubo_transformator.ising_backbone import IsingBackbone
     from libs.qubo_transformator import QuboTransformator
     import siquan
 
@@ -149,10 +146,9 @@ class ClassicalBackend(BackendBase):
 
     def print_solver_specific_report(self) -> None:
         """
-        Prints additional information about the solution that is solver
-        specific.
-        The only non-generic information is the energy of the solution
-        regarding the Ising spin glass formulation.
+        Prints additional information about the solution that is solver specific.
+        The only non-generic information is the energy of the solution regarding
+        the Ising spin glass formulation.
         
         Returns:
             (None)
@@ -171,8 +167,6 @@ class ClassicalBackend(BackendBase):
         """
         This writes solution specific values of the optimizer result
         and the Ising spin glass problem solution the self.output.
-        Parse the value to the key "state" via literal_eval before
-        calling this function.
         
         Args:
             result: (dict)
@@ -192,7 +186,7 @@ class ClassicalBackend(BackendBase):
             )
         }
 
-    def check_input_size(self, limit: float = 60.0):
+    def check_input_size(self, limit: float = 60.0) -> None:
         """
         Checks if the estimated runtime is longer than the given limit
 
@@ -202,9 +196,8 @@ class ClassicalBackend(BackendBase):
                 This is not a limit in seconds because that depends on
                 the hardware this is running on
 
-        Returns: 
-            Doesn't return anything but raises an Error if it would take
-            too long
+        Returns: (None)
+            Raises an Error if the calculation would take too long
         """
         runtime_factor = self.transformed_problem.num_interactions() * 0.001
         runtime_factor *= self.siquan_config["trotter_slices"] * 0.001
@@ -236,6 +229,7 @@ class SqaBackend(ClassicalBackend):
         return self.config["backend_config"].setdefault("transverse_field_schedule",
                                                         "[8.0,0.0]")
 
+
 class SqaIterator(BackendBase):
     """
     A class for solving the unit commitment problem using iterative qubos solved
@@ -255,7 +249,7 @@ class SqaIterator(BackendBase):
         """
         super().__init__(reader=reader)
         self.siquan_config = self.config["backend_config"]
-        self.solver = SqaBackend.create_optimizer(reader=reader) 
+        self.solver = SqaBackend.create_optimizer(reader=reader)
         self.solver_marginal_config = self.solver.config["ising_interface"]["marginal_cost"]
         self.solver.configure_solver()
 
@@ -272,10 +266,23 @@ class SqaIterator(BackendBase):
         print("transforming problem...")
         self.iteration_step = 0
         self.max_iteration = self.config["backend_config"]["max_iteration"]
+        if self.max_iteration <= 0:
+            raise ValueError(f"Number of iteration steps {self.max_iteration} is not positive")
         self.current_estimation = self.solver_marginal_config["target_cost"]
         self.iteration_results = []
 
-    def calculate_step(self, solution_cost):
+    def calculate_step(self, solution_cost: float) -> float:
+        """
+        For the current ising problem and the calculated solution, this calculates the step size
+        of the next estimation of the marginal costs to construct the next ising problem
+
+        Args:
+            solution_cost: (float)
+                The calculated cost QUBO cost of the solution of the last iteration step
+
+        Returns: (float)
+            The step size for the next estimation of the marginal cost
+        """
         return sqrt(solution_cost / self.solver_marginal_config["scale_factor"])
 
     def optimize(self) -> None:
@@ -307,9 +314,6 @@ class SqaIterator(BackendBase):
                 break
 
         self.output["results"]["optimization_time"] = time.perf_counter() - tic
-        # parse the entry in "state" before using it
-        result = current_result
-        result["state"] = literal_eval(result["state"])
-        self.write_results_to_output(result)
+        self.write_results_to_output(current_resul)
         print("done")
 

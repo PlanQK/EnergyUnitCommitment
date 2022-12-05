@@ -12,11 +12,13 @@ from .qubit_encoder import NetworkEncoder
 from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput, PowerOutputInvariant
 
 
+
 class QuboTransformator:
     """
     This class is a collection of transformation methods for transformation various
     optimization problems into QUBO form
     """
+
     @classmethod
     def transform_network_to_qubo(cls,
                                   network: pypsa.Network,

@@ -19,6 +19,19 @@ class BackendBase(abc.ABC):
     """
 
     def __init__(self, reader: InputReader):
+        """
+        Sets up the solver for a unit commitment problem by consuming
+        an InputReader
+
+        The input reader serves as an adapter for different forms of input
+        like  REST request or by reading if from disc. It contains a
+        `pypsa.Network` object and a dictionary of all relevant configuration
+        entries
+
+        Args:
+            reader: (InputReader):
+                An adapter for different network and config formats
+        """
         self.output = None
         self.reader = reader
         self.network = reader.get_network()
@@ -27,6 +40,8 @@ class BackendBase(abc.ABC):
         self.config_name = reader.get_config_name()
         self.file_name = reader.get_file_name()
         self.setup_output_dict()
+        # this can hold either a QUBO formulation (as an NetworkIsingBackbone)
+        # or a pyomo model using pypsa's lopf formulation
         self.transformed_problem = None
 
     @abc.abstractmethod
@@ -47,8 +62,7 @@ class BackendBase(abc.ABC):
     def optimize(self) -> None:
         """
         This method calls the optimization method of the solver after
-        the unit commitment problem has been transformed. The result is
-        written to the attribute `self.result`
+        the unit commitment problem has been transformed.
 
         Returns:
             (None)
@@ -76,7 +90,7 @@ class BackendBase(abc.ABC):
         pass
 
     @classmethod
-    def create_optimizer(cls, reader: InputReader):
+    def create_optimizer(cls, reader: InputReader) -> 'BackendBase':
         """
         A class method to instantiate the correct subclass of the
         optimizer based on the configuration in the reader.
@@ -92,22 +106,22 @@ class BackendBase(abc.ABC):
         """
         return cls(reader)
 
-    def check_input_size(self, limit: int):
+    def check_input_size(self, limit: int) -> None:
         """
-        Check if the size of the problem is currently allowed or if
-        an estimation of the runtime exceeds some arbitrary limit
-        stop the run.
+        Check if the size of the problem instance exceeds a runtime limit.
+
+        This is done by approximating the runtime based on problem size
+        and chosen configuration parameters. If the estimated time is too high,
+        this will raise an error before the actual optimization starts
 
         Args:
             limit: (int)
-                A parameter for the upper limit that an optimization run is
-                allowed to take. This is not meant to be how many seconds
-                it can take.
+                The upper limit of an optimization run. This is not how many
+                seconds it can take.
 
         Returns:
-            (None)
-                If the input takes to long to optimize, this raises
-                an error.
+            (None) 
+                No side effect, unless the input problem takes to long to optimize
         """
         pass
 
@@ -144,7 +158,7 @@ class BackendBase(abc.ABC):
         self.output["end_time"] = self.get_time()
         return self.output
 
-    def print_solver_specific_report(self):
+    def print_solver_specific_report(self) -> None:
         """
         A subclass may overwrite this method in order to print
         additional information after the generic information about
