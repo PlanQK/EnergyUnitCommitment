@@ -12,11 +12,13 @@ from .qubit_encoder import NetworkEncoder
 from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput, PowerOutputInvariant
 
 
+
 class QuboTransformator:
     """
     This class is a collection of transformation methods for transformation various
     optimization problems into QUBO form
     """
+
     @classmethod
     def transform_network_to_qubo(cls,
                                   network: pypsa.Network,
@@ -67,7 +69,9 @@ class QuboTransformator:
         for subproblem in unmatched_subproblems:
             config.pop(subproblem)
         print()
-        print("--- Finish generating Ising Problem with the following subproblems ---")
+        print("--- Finish generating Ising Problem with\n"
+              f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
+              "and the following subproblems ---\n")
         for key in backbone_result._subproblems:
             print("--- - " + key)
         return backbone_result
