@@ -1,8 +1,8 @@
 """This file is the entrypoint for the docker run command of the docker image build from the Dockerfile.
-The base image is `herrd1/siquan:latest`, which contains the simulated quantum annealing solver. 
-The docker container loads the pypsa model and performs the optimization of the unit commitment problem. 
+The base image is `herrd1/siquan:latest`, which contains the simulated quantum annealing solver.
+The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
 The result will be written to a json file  in a location that the Makefile will mount to the host's drive.
-In order to do that, it transforms the arguments to call the `run` method, which will return an object 
+In order to do that, it transforms the arguments to call the `run` method, which will return an object
 containing the information of the optimization.
 
 For this the docker run needs at least 2 and up to 3 arguments.
@@ -18,6 +18,10 @@ from program import run
 
 
 def main():
+    """
+    The entrypoint which hands the parameters to the main function run and
+    writes the results afterwards.
+    """
     # reading input files
     network = sys.argv[1]
     params = sys.argv[2]
@@ -32,9 +36,11 @@ def main():
     response.dump_results(folder="problemset/")
 
 
-def parse_cli_params(param_string: str,
-                     keyword_seperator: str = "__",
-                     params_seperator: str = "____",) -> dict:
+def parse_cli_params(
+    param_string: str,
+    keyword_seperator: str = "__",
+    params_seperator: str = "____",
+) -> dict:
     """
     Parse the input of the command line that contains configuration values
 
@@ -69,11 +75,9 @@ def parse_cli_params(param_string: str,
     return result
 
 
-def insert_value(key_chain: list, 
-                 value: any,
-                 current_level: dict) -> None:
+def insert_value(key_chain: list, value: any, current_level: dict) -> None:
     """
-    Insert the passed value into the dictionary by descending 
+    Insert the passed value into the dictionary by descending
     the list of keys
 
     Args:
