@@ -9,21 +9,24 @@ import pypsa
 
 from .ising_backbone import NetworkIsingBackbone
 from .qubit_encoder import NetworkEncoder
-from .ising_subproblems import KirchhoffSubproblem, MarginalCostSubproblem, MinimalGeneratorOutput, PowerOutputInvariant
-
+from .ising_subproblems import (
+    KirchhoffSubproblem,
+    MarginalCostSubproblem,
+    MinimalGeneratorOutput,
+    PowerOutputInvariant,
+)
 
 
 class QuboTransformator:
     """
-    This class is a collection of transformation methods for transformation various
+    This class is a collection of transformation methods for transforming various
     optimization problems into QUBO form
     """
 
     @classmethod
-    def transform_network_to_qubo(cls,
-                                  network: pypsa.Network,
-                                  config: dict
-                                  ) -> NetworkIsingBackbone:
+    def transform_network_to_qubo(
+        cls, network: pypsa.Network, config: dict
+    ) -> NetworkIsingBackbone:
         """
         Transforms the unit commitment problem of a pypsa.Network into a QUBO
 
@@ -41,11 +44,13 @@ class QuboTransformator:
             "kirchhoff": KirchhoffSubproblem,
             "marginal_cost": MarginalCostSubproblem,
             "minimal_power": MinimalGeneratorOutput,
-            "total_power": PowerOutputInvariant
+            "total_power": PowerOutputInvariant,
         }
         if "kirchhoff" not in config:
-            print("No Kirchhoff configuration found, "
-                  "adding Kirchhoff constraint with Factor 1.0")
+            print(
+                "No Kirchhoff configuration found, "
+                "adding Kirchhoff constraint with Factor 1.0"
+            )
             config["kirchhoff"] = {"scale_factor": 1.0}
 
         # encode the network components into qubits
@@ -55,23 +60,28 @@ class QuboTransformator:
             if subproblem in ["generator_representation", "line_representation"]:
                 continue
             if subproblem not in subproblem_table:
-                print(f"{subproblem} is not a valid subproblem, deleting and skipping "
-                      f"encoding")
+                print(
+                    f"{subproblem} is not a valid subproblem, deleting and skipping "
+                    f"encoding"
+                )
                 unmatched_subproblems.append(subproblem)
                 continue
             if subproblem_configuration is None:
                 subproblem_configuration = {}
-            subproblem_instance = subproblem_table[
-                subproblem].build_subproblem(backbone_result, subproblem_configuration)
+            subproblem_instance = subproblem_table[subproblem].build_subproblem(
+                backbone_result, subproblem_configuration
+            )
             backbone_result.get_subproblems()[subproblem] = subproblem_instance
             backbone_result.flush_cached_problem()
             subproblem_instance.encode_subproblem()
         for subproblem in unmatched_subproblems:
             config.pop(subproblem)
         print()
-        print("--- Finish generating Ising Problem with\n"
-              f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
-              "and the following subproblems ---\n")
+        print(
+            "--- Finish generating Ising Problem with\n"
+            f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
+            "and the following subproblems ---\n"
+        )
         for key in backbone_result.get_subproblems():
             print("--- - " + key)
         return backbone_result

@@ -23,6 +23,9 @@ app = Flask(__name__)
 
 
 def get_root_path():
+    """
+    Returns the path to the network files.
+    """
     if os.environ.get('CONTAINERLESS', False):
         path = os.getcwd() + '/input/networks/'
     else:
@@ -31,6 +34,10 @@ def get_root_path():
 
 @app.route('/start', methods=['POST'])
 def start_optimization():
+    """
+    Starts the optimization with the data obtained from the request and return a json string
+    with the results.
+    """
 
     data = request.get_json()
 
@@ -48,11 +55,14 @@ def start_optimization():
     response = {
         'result': result.to_json(),
         'logs': f.getvalue()
-    } 
+    }
     return json.dumps(response)
 
 @app.route('/upload_network', methods=['POST'])
 def upload_network():
+    """
+    Turns network from request into json string.
+    """
     file = request.files['network']
 
     path = get_root_path() + secure_filename(file.filename) + ".nc"
