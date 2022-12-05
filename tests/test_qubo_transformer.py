@@ -66,10 +66,10 @@ def test_kirchhoff_distinct_snapshots(network, config):
     """
     ising_backbone = QuboTransformator.transform_network_to_qubo(network, config["ising_interface"])
     # only kirchhoff problem has been built
-    assert ising_backbone._ising_coefficients == ising_backbone._subproblems["kirchhoff"]._ising_coefficients
+    assert ising_backbone.get_ising_coefficients() == ising_backbone.get_subproblems()["kirchhoff"]._ising_coefficients
 
     # kirchhoff interactions are not connected across different snapshots
     num_snapshots = len(network.snapshots)
-    connected_components_list = [comp for comp in ising_to_graph(ising_backbone._ising_coefficients.keys())]
+    connected_components_list = [comp for comp in ising_to_graph(ising_backbone.get_ising_coefficients().keys())]
     assert num_snapshots == len(connected_components_list)
     return

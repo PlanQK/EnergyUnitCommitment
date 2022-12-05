@@ -599,7 +599,7 @@ class KirchhoffSubproblem(AbstractIsingSubproblem):
                 self.encode_kirchhoff_constraint(
                     ising_backbone=self.backbone, bus=bus, time=time
                 )
-        self._ising_coefficients = self.backbone._ising_coefficients_cached
+        self._ising_coefficients = self.backbone.get_ising_coefficients_cached()
 
     def encode_kirchhoff_constraint(
         self, ising_backbone: IsingBackbone, bus: str, time: any
@@ -996,7 +996,7 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
         """
         for generator in self.network.generators.index:
             self.modify_positive_interactions(generator=generator)
-        self._ising_coefficients = self.backbone._ising_coefficients_cached
+        self._ising_coefficients = self.backbone.get_ising_coefficients_cached()
 
     def modify_positive_interactions(self, generator: str) -> None:
         """
@@ -1010,14 +1010,14 @@ class MinimalGeneratorOutput(AbstractIsingSubproblem):
             (None)
                 Modifies the attribute `self.backbone`
         """
-        generator_qubit_map = self.backbone._qubit_encoding[generator]
+        generator_qubit_map = self.backbone.get_qubit_encoding()[generator]
         for qubit_list in generator_qubit_map.values():
             if not qubit_list:
                 continue
             status_qubit = qubit_list[0]
             for qubit in qubit_list[1:]:
                 interaction_strength = abs(
-                    self.scale_factor * self.backbone._ising_coefficients[(qubit,)]
+                    self.scale_factor * self.backbone.get_ising_coefficients()[(qubit,)]
                 )
                 self.backbone.add_basis_polynomial_interaction(
                     first_qubit=status_qubit,
@@ -1067,7 +1067,7 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
                 Modifies `self.backbone._ising_coefficients` and
                 `self.backbone._ising_coefficients_positive
         """
-        for time in self.backbone._snapshots:
+        for time in self.backbone.get_snapshots():
             self.encode_total_power_invariant(time=time)
 
     def encode_total_power_invariant(self, time: any = None):
@@ -1084,7 +1084,7 @@ class PowerOutputInvariant(AbstractIsingSubproblem):
                 Modifies the attribute `self.backbone`
         """
         if time is None:
-            time = self.backbone._snapshots[0]
+            time = self.backbone.get_snapshots()[0]
         self.backbone.encode_squared_distance(
             label_list=self.backbone.network.generators.index,
             target=-self.backbone.get_total_load(time),

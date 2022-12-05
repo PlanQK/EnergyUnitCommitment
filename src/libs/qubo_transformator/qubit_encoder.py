@@ -87,7 +87,7 @@ class QubitEncoder(ABC):
         for all time steps
         """
         return {
-            time: self.get_weights(component, time) for time in self.backbone._snapshots
+            time: self.get_weights(component, time) for time in self.backbone.get_snapshots()
         }
 
     def get_weights(self, component: str, time: any) -> list:

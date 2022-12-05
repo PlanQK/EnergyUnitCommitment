@@ -65,5 +65,5 @@ def test_generator_init(network_loads, generator_rep):
     for snapshot in network.snapshots:
         assert backbone.get_representing_qubits("gen_1", snapshot) == [snapshot]
         assert backbone.get_representing_qubits("gen_2", snapshot) == [snapshot_count + snapshot]
-        assert backbone._qubit_weights[snapshot] == 4
-        assert backbone._qubit_weights[snapshot_count + snapshot] == 3
+        assert backbone.get_qubit_weights()[snapshot] == 4
+        assert backbone.get_qubit_weights()[snapshot_count + snapshot] == 3

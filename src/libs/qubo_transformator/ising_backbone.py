@@ -795,7 +795,55 @@ class IsingBackbone:
             "total_cost": self.calc_cost(solution=solution),
             "spectral_gap": self.get_spectral_gap()
         }
+    def get_snapshots(self) -> list:
+        """
+        Returns the list of time slices modeled in the qubo.
 
+        Returns:
+            (list)
+                The list of indices indexing the time slices modeled.
+        """
+        return self._snapshots
+    def get_ising_coefficients(self) -> dict:
+        """
+        Returns the dictionary storing the Ising coefficients.
+
+        Returns:
+            (dict)
+                The dictionary with ordered tuples of qubits as keys and their
+                Ising coefficients as values.
+        """
+        return self._ising_coefficients
+    def get_ising_coefficients_cached(self) -> dict:
+        """
+        Returns the dictionary storing the cached version of the Ising coefficients.
+
+        Returns:
+            (dict)
+                The dictionary with ordered tuples of qubits as keys and their
+                cached Ising coefficients as values.
+        """
+        return self._ising_coefficients_cached
+    def get_qubit_weights(self) -> dict:
+        """
+        Returns the dictionary storing the weight of each qubit.
+
+        Returns:
+            (dict)
+                The dictionary with qubits as keys and their respective
+                weight as values.
+        """
+        return self._qubit_weights
+    def get_subproblems(self) -> list:
+        """
+        Returns the list storing all Ising subproblems that have visited this
+        instance for encoding their subproblem.
+
+        Returns:
+            (list)
+                The list of IsingSubproblem instances which have been encoded.
+        """
+        return self._subproblems
 
 class NetworkIsingBackbone(IsingBackbone):
     """

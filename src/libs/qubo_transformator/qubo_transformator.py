@@ -63,7 +63,7 @@ class QuboTransformator:
                 subproblem_configuration = {}
             subproblem_instance = subproblem_table[
                 subproblem].build_subproblem(backbone_result, subproblem_configuration)
-            backbone_result._subproblems[subproblem] = subproblem_instance
+            backbone_result.get_subproblems()[subproblem] = subproblem_instance
             backbone_result.flush_cached_problem()
             subproblem_instance.encode_subproblem()
         for subproblem in unmatched_subproblems:
@@ -72,6 +72,6 @@ class QuboTransformator:
         print("--- Finish generating Ising Problem with\n"
               f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
               "and the following subproblems ---\n")
-        for key in backbone_result._subproblems:
+        for key in backbone_result.get_subproblems():
             print("--- - " + key)
         return backbone_result
