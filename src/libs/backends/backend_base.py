@@ -120,7 +120,7 @@ class BackendBase(abc.ABC):
                 seconds it can take.
 
         Returns:
-            (None) 
+            (None)
                 No side effect, unless the input problem takes to long to optimize
         """
         pass

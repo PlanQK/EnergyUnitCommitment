@@ -1,5 +1,5 @@
-"""This module serves as a wrapper for the simulated quantum annealing solver. 
-You can find more information on the implementation of it at 
+"""This module serves as a wrapper for the simulated quantum annealing solver.
+You can find more information on the implementation of it at
 https://doi.org/10.5905/ethz-1007-127
 It also provides a solver implementing classical annealing by adjusting the
 transverse field to be 0 everywhere
@@ -47,7 +47,7 @@ class ClassicalBackend(BackendBase):
         """
         super().__init__(reader=reader)
         self.siquan_config = self.config.setdefault("backend_config", {})
-        self.siquan_config.setdefault("seed", random.randrange(10 ** 6))
+        self.siquan_config.setdefault("seed", random.randrange(10**6))
         self.siquan_config["transverse_field_schedule"] = self.get_h_schedule()
         self.siquan_config.setdefault("temperature_schedule", "[0.1,iF,0.0001]")
         self.siquan_config.setdefault("trotter_slices", 32)
@@ -66,8 +66,9 @@ class ClassicalBackend(BackendBase):
                 self.transformed_problem.
         """
         print("transforming problem...")
-        self.transformed_problem = QuboTransformator.transform_network_to_qubo(self.network,
-                                                                               self.config["ising_interface"])
+        self.transformed_problem = QuboTransformator.transform_network_to_qubo(
+            self.network, self.config["ising_interface"]
+        )
 
     def transform_solution_to_network(self) -> None:
         """
@@ -82,7 +83,8 @@ class ClassicalBackend(BackendBase):
                 Modifies `self.output` with the output_network.
         """
         output_network = self.transformed_problem.set_output_network(
-            solution=self.output["results"]["state"])
+            solution=self.output["results"]["state"]
+        )
         output_dataset = output_network.export_to_netcdf()
         self.output["network"] = output_dataset.to_dict()
 
@@ -116,7 +118,7 @@ class ClassicalBackend(BackendBase):
         configuration. For classical annealing, there is no transverse
         field, so it always returns the same config string. Overwriting
         this method can be used to get non-zero transverse field.
-        
+
         Returns:
             (str)
                 The configuration string for the transverse field of the
@@ -133,7 +135,7 @@ class ClassicalBackend(BackendBase):
         problems. Since classical annealing and simulated quantum
         annealing only differs in the transverse field, setting that
         field is in its own method, so it can be overwritten.
-        
+
         Returns:
             (None)
                 Modifies `self.solver` and sets hyperparameters
@@ -149,7 +151,7 @@ class ClassicalBackend(BackendBase):
         Prints additional information about the solution that is solver specific.
         The only non-generic information is the energy of the solution regarding
         the Ising spin glass formulation.
-        
+
         Returns:
             (None)
                 Prints information to stdout.
@@ -167,7 +169,7 @@ class ClassicalBackend(BackendBase):
         """
         This writes solution specific values of the optimizer result
         and the Ising spin glass problem solution the self.output.
-        
+
         Args:
             result: (dict)
                 The python dictionary returned from the sqa solver.
@@ -181,9 +183,7 @@ class ClassicalBackend(BackendBase):
             self.output["results"][key] = result[key]
         self.output["results"] = {
             **self.output["results"],
-            **self.transformed_problem.generate_report(
-                result["state"]
-            )
+            **self.transformed_problem.generate_report(result["state"]),
         }
 
     def check_input_size(self, limit: float = 60.0) -> None:
@@ -226,8 +226,9 @@ class SqaBackend(ClassicalBackend):
                 The configuration of the 'transverseFieldSchedule', to
                 set in siquan solver, according to self.config.
         """
-        return self.config["backend_config"].setdefault("transverse_field_schedule",
-                                                        "[8.0,0.0]")
+        return self.config["backend_config"].setdefault(
+            "transverse_field_schedule", "[8.0,0.0]"
+        )
 
 
 class SqaIterator(BackendBase):
@@ -250,10 +251,16 @@ class SqaIterator(BackendBase):
         super().__init__(reader=reader)
         self.siquan_config = self.config["backend_config"]
         self.solver = SqaBackend.create_optimizer(reader=reader)
-        self.solver_marginal_config = self.solver.config["ising_interface"]["marginal_cost"]
+        self.solver_marginal_config = self.solver.config["ising_interface"][
+            "marginal_cost"
+        ]
         self.solver.configure_solver()
         self.intermediary_results = {}
         self.current_step = 0
+        self.iteration_step = 0
+        self.max_iteration = 0
+        self.current_estimation = 0
+        self.iteration_results = []
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -269,7 +276,9 @@ class SqaIterator(BackendBase):
         self.iteration_step = 0
         self.max_iteration = self.config["backend_config"]["max_iteration"]
         if self.max_iteration <= 0:
-            raise ValueError(f"Number of iteration steps {self.max_iteration} is not positive")
+            raise ValueError(
+                f"Number of iteration steps {self.max_iteration} is not positive"
+            )
         self.current_estimation = self.solver_marginal_config["target_cost"]
         self.iteration_results = []
 
@@ -300,10 +309,14 @@ class SqaIterator(BackendBase):
             A dictionary of the sqa run with fields that don't change over
             mutiple steps being ommitted.
         """
-        result = sqa_result['results']
-        result['offset'] = sqa_result['config']['ising_interface']['marginal_cost']['offset']
-        result['target_cost'] = sqa_result['config']['ising_interface']['marginal_cost']['target_cost']
-        result['current_step'] = self.current_step
+        result = sqa_result["results"]
+        result["offset"] = sqa_result["config"]["ising_interface"]["marginal_cost"][
+            "offset"
+        ]
+        result["target_cost"] = sqa_result["config"]["ising_interface"][
+            "marginal_cost"
+        ]["target_cost"]
+        result["current_step"] = self.current_step
         return result
 
     def optimize(self) -> None:
@@ -320,30 +333,32 @@ class SqaIterator(BackendBase):
         """
         tic = time.perf_counter()
         for step in range(self.max_iteration):
-            print(f"\n ----------------------------------------")
+            print("\n ----------------------------------------")
             print(f"\n -- Step {step} -- Estimation: {self.current_estimation} ")
-            print(f"\n ----------------------------------------")
+            print("\n ----------------------------------------")
             self.solver_marginal_config["target_cost"] = self.current_estimation
             self.solver.transform_problem_for_optimizer()
             self.solver.optimize()
             self.solver.print_report()
             current_result = self.solver.get_output()
-            self.intermediary_results[self.current_step] = self.extract_from_sqa(current_result)
+            self.intermediary_results[self.current_step] = self.extract_from_sqa(
+                current_result
+            )
             self.current_step += 1
             self.current_estimation += self.calculate_step(
-                current_result['results']['total_cost']
+                current_result["results"]["total_cost"]
             )
 
             # Results that incurr kirchhoff costs below 1.0 count as "feasible"
             # in case of imprecisions due to float values
-            if current_result['results']['kirchhoff_cost'] < 1.0:
+            if current_result["results"]["kirchhoff_cost"] < 1.0:
                 self.output["results"]["termination_condition"] = "feasible"
-                print(f" \n--- Found feasible solution ---\n")
+                print(" \n--- Found feasible solution ---\n")
                 break
 
         self.output["results"]["optimization_time"] = time.perf_counter() - tic
-        if current_result['results']['kirchhoff_cost'] >= 1.0:
-            print(f"Didn't find a feasible solution in allotted number of iterations")
+        if current_result["results"]["kirchhoff_cost"] >= 1.0:
+            print("Didn't find a feasible solution in allotted number of iterations")
             self.output["results"]["termination_condition"] = "max_steps"
         current_result["intermediary_results"] = self.intermediary_results
 
@@ -372,5 +387,5 @@ class SqaIterator(BackendBase):
             **self.output["results"],
             **self.solver.transformed_problem.generate_report(
                 result["results"]["state"]
-            )
+            ),
         }

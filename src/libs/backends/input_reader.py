@@ -20,10 +20,7 @@ import pypsa
 import xarray
 import yaml
 
-from os import environ
 from werkzeug.utils import secure_filename
-
-from typing import Union
 
 from .. import backends
 
@@ -49,16 +46,14 @@ class InputReader:
         "sqa_backend": ["sqa", "classical", "iterative-sqa"],
         "qaoa_backend": ["qaoa"],
     }
-    loaders = {
-        "json": json.load,
-        "yaml": yaml.safe_load
-    }
+    loaders = {"json": json.load, "yaml": yaml.safe_load}
 
-    def __init__(self,
-                 network: Union[str, dict, pypsa.Network],
-                 config: Union[str, dict],
-                 params_dict: dict = None,
-                 ):
+    def __init__(
+        self,
+        network: Union[str, dict, pypsa.Network],
+        config: Union[str, dict],
+        params_dict: dict = None,
+    ):
         """
         Obtain the configuration dictionary and pypsa.Network,
         dependent on the input format of network and config. The
@@ -77,8 +72,9 @@ class InputReader:
         self.config = self.make_config(config)
         self.add_params_dict(params_dict)
         self.copy_to_backend_config()
-        self.network.snapshots = self.network.snapshots[:self.config.get("snapshots",
-                                                                         len(self.network.snapshots))]
+        self.network.snapshots = self.network.snapshots[
+            : self.config.get("snapshots", len(self.network.snapshots))
+        ]
         # print final config, but hide api tokens
         config_without_token = copy.deepcopy(self.config)
         for provider, token in self.config.get("API_token", {}).items():
@@ -96,7 +92,7 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
-        self.config["backend"] = self.config.get("backend", "sqa").replace('_', '-')
+        self.config["backend"] = self.config.get("backend", "sqa").replace("_", "-")
         for backend_type, solver_list in self.backend_to_solver.items():
             if self.config["backend"] in solver_list:
                 # expansion has guards for passing None objects as config dicts
@@ -106,9 +102,9 @@ class InputReader:
                 }
                 return
 
-    def make_network(self,
-                     network: Union[str, dict, pypsa.Network]
-                     ) -> [pypsa.Network, str]:
+    def make_network(
+        self, network: Union[str, dict, pypsa.Network]
+    ) -> [pypsa.Network, str]:
         """
         Opens a pypsa.Network using the provided network argument.
 
@@ -142,19 +138,20 @@ class InputReader:
         elif isinstance(network, dict):
             loaded_dataset = xarray.Dataset.from_dict(network)
             loaded_net = pypsa.Network()
-            pypsa.Network.import_from_netcdf(network=loaded_net,
-                                             path=loaded_dataset)
+            pypsa.Network.import_from_netcdf(network=loaded_net, path=loaded_dataset)
             return loaded_net, network["attrs"].get("network_name", "network_from_dict")
 
         # the network has been build in a previous step
         elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
 
-        raise TypeError("The network has to be given as a dictionary, "
-                        "representing the netCDF format of a pypsa.Network, "
-                        "an actual pypsa.Network, or a string with the name "
-                        "of the pypsa.Network, which denotes the folder it is "
-                        "stored in.")
+        raise TypeError(
+            "The network has to be given as a dictionary, "
+            "representing the netCDF format of a pypsa.Network, "
+            "an actual pypsa.Network, or a string with the name "
+            "of the pypsa.Network, which denotes the folder it is "
+            "stored in."
+        )
 
     def make_config(self, input_config: Union[str, dict]) -> dict:
         """
@@ -189,13 +186,15 @@ class InputReader:
             try:
                 loader = self.loaders[filetype]
             except KeyError:
-                raise KeyError(f"The file format {filetype} doesn't match any supported "
-                               f"format. The supported formats are {list(self.loaders.keys())}")
+                raise KeyError(
+                    f"The file format {filetype} doesn't match any supported "
+                    f"format. The supported formats are {list(self.loaders.keys())}"
+                )
             if environ.get("RUNNING_IN_DOCKER", False):
                 config_path = "configs/"
             else:
                 config_path = "../input/configs/"
-            with open(config_path + input_config, encoding='utf-8') as file:
+            with open(config_path + input_config, encoding="utf-8") as file:
                 result = loader(file)
         base_dict = {
             "API_token": {},
@@ -205,7 +204,9 @@ class InputReader:
         }
         return {**base_dict, **result}
 
-    def add_params_dict(self, params_dict: dict = None, current_level: dict = None) -> None:
+    def add_params_dict(
+        self, params_dict: dict = None, current_level: dict = None
+    ) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
@@ -229,11 +230,13 @@ class InputReader:
             current_level = self.config
         for config_key, config_value in params_dict.items():
             if isinstance(config_value, dict):
-                self.add_params_dict(config_value, current_level.setdefault(config_key, {}))
+                self.add_params_dict(
+                    config_value, current_level.setdefault(config_key, {})
+                )
             else:
                 current_level[config_key] = config_value
 
-    def get_optimizer_class(self) -> 'backends.BackendBase':
+    def get_optimizer_class(self) -> "backends.BackendBase":
         """
         Returns the corresponding optimizer class that is specified
         in the `config` attribute of this instance

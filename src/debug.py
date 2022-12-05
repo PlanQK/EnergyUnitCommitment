@@ -6,6 +6,7 @@ from program import run
 
 
 def main():
+    """The main function used as an entrypoint for debugging"""
     network = "defaultnetwork.nc"
     params = "config-all.yaml"
 
