@@ -69,7 +69,9 @@ class QuboTransformator:
         for subproblem in unmatched_subproblems:
             config.pop(subproblem)
         print()
-        print("--- Finish generating Ising Problem with the following subproblems ---")
+        print("--- Finish generating Ising Problem with\n"
+              f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
+              "and the following subproblems ---\n")
         for key in backbone_result._subproblems:
             print("--- - " + key)
         return backbone_result

@@ -767,6 +767,17 @@ class IsingBackbone:
         """
         return np.linalg.eigh(self.get_hamiltonian_matrix())
 
+    def get_spectral_gap(self):
+        """
+        Calculates the difference of the smallest eigenvalues of
+        the problem hamiltonian
+
+        Returns: (float)
+            The spectral gap of the problem hamiltonian
+        """
+        sorted_eigenvalues = sorted(self.get_hamiltonian_eigenvalues()[0])
+        return sorted_eigenvalues[1] - sorted_eigenvalues[0]
+
     def generate_report(self, solution: list) -> dict:
         """
         For the given solution, calculates various properties of the
@@ -782,6 +793,7 @@ class IsingBackbone:
         """
         return {
             "total_cost": self.calc_cost(solution=solution),
+            "spectral_gap": self.get_spectral_gap()
         }
 
 
@@ -1131,8 +1143,8 @@ class NetworkIsingBackbone(IsingBackbone):
                 A dictionary containing general information about the
                 solution.
         """
-        return {
-            "total_cost": self.calc_cost(solution=solution),
+        return {**super().generate_report(solution=solution),
+            # "total_cost": self.calc_cost(solution=solution),
             "kirchhoff_cost": self.calc_kirchhoff_cost(solution=solution),
             "kirchhoff_cost_by_time": self.calc_kirchhoff_cost_by_time(
                 solution=solution

@@ -252,6 +252,8 @@ class SqaIterator(BackendBase):
         self.solver = SqaBackend.create_optimizer(reader=reader)
         self.solver_marginal_config = self.solver.config["ising_interface"]["marginal_cost"]
         self.solver.configure_solver()
+        self.intermediary_results = {}
+        self.current_step = 0
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -285,6 +287,25 @@ class SqaIterator(BackendBase):
         """
         return sqrt(solution_cost / self.solver_marginal_config["scale_factor"])
 
+    def extract_from_sqa(self, sqa_result: dict) -> dict:
+        """
+        This extracts the relevant result data from an sqa run and strips
+        information that is not relevant
+
+        Args:
+            sqa_result: (dict)
+                The result of using the sqa solver to solve an intermediary QUBO
+
+        Returns: (dict)
+            A dictionary of the sqa run with fields that don't change over
+            mutiple steps being ommitted.
+        """
+        result = sqa_result['results']
+        result['offset'] = sqa_result['config']['ising_interface']['marginal_cost']['offset']
+        result['target_cost'] = sqa_result['config']['ising_interface']['marginal_cost']['target_cost']
+        result['current_step'] = self.current_step
+        return result
+
     def optimize(self) -> None:
         """
         Optimizes the problem encoded in the IsingBackbone-Instance.
@@ -307,13 +328,49 @@ class SqaIterator(BackendBase):
             self.solver.optimize()
             self.solver.print_report()
             current_result = self.solver.get_output()
-            self.current_estimation += self.calculate_step(current_result['results']['total_cost'])
-            self.iteration_results.append(current_result)
-            if current_result['results']['kirchhoff_cost'] == 0.0:
+            self.intermediary_results[self.current_step] = self.extract_from_sqa(current_result)
+            self.current_step += 1
+            self.current_estimation += self.calculate_step(
+                current_result['results']['total_cost']
+            )
+
+            # Results that incurr kirchhoff costs below 1.0 count as "feasible"
+            # in case of imprecisions due to float values
+            if current_result['results']['kirchhoff_cost'] < 1.0:
+                self.output["results"]["termination_condition"] = "feasible"
                 print(f" \n--- Found feasible solution ---\n")
                 break
 
         self.output["results"]["optimization_time"] = time.perf_counter() - tic
-        self.write_results_to_output(current_resul)
-        print("done")
+        if current_result['results']['kirchhoff_cost'] >= 1.0:
+            print(f"Didn't find a feasible solution in allotted number of iterations")
+            self.output["results"]["termination_condition"] = "max_steps"
+        current_result["intermediary_results"] = self.intermediary_results
 
+        self.write_results_to_output(current_result)
+
+    def write_results_to_output(self, result: dict) -> None:
+        """
+        This writes solution specific values of the optimizer result
+        and used ising spin problems and their solutions to the `output`
+        attribute
+
+        Args:
+            result: (dict)
+                The python dictionary returned from the sqa solver.
+
+        Returns:
+            (None)
+                Modifies `self.output` with solution specific parameters
+                and values.
+        """
+        for key in result:
+            if key == "results":
+                continue
+            self.output["results"][key] = result[key]
+        self.output["results"] = {
+            **self.output["results"],
+            **self.solver.transformed_problem.generate_report(
+                result["results"]["state"]
+            )
+        }
