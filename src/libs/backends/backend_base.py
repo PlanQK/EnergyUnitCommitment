@@ -11,12 +11,13 @@ from .input_reader import InputReader
 class BackendBase(abc.ABC):
     """
     The BackendBase class is an interface that the solvers of the unit
-    commitment problem have to adhere it. It also initializes some 
+    commitment problem have to adhere it. It also initializes some
     attributes that are the same for all solvers.
 
     How an object that inherits from this class is used to formulate and
     optimize the unit commitment problem can be seen in `program.py`
     """
+
     def __init__(self, reader: InputReader):
         self.output = None
         self.reader = reader
@@ -33,10 +34,10 @@ class BackendBase(abc.ABC):
         """
         This transforms the problem given as a pypsa network
         into the corresponding data structure the algorithm this
-        class implements 
-    
+        class implements
+
         Returns:
-            (None) 
+            (None)
                 This sets the attribute `self.transformed_problem`
                 to the correct value
         """
@@ -50,7 +51,7 @@ class BackendBase(abc.ABC):
         written to the attribute `self.result`
 
         Returns:
-            (None) 
+            (None)
                 Modifies `self.output` and can have side effects on other
                 attributes.
         """
@@ -61,7 +62,7 @@ class BackendBase(abc.ABC):
         A hook for postprocessing of the solution if this is required
 
         Returns:
-            (type) 
+            (type)
                 Returns nothing, but can have side effects if this method
                 is overwritten is a subclass.
         """
@@ -77,8 +78,8 @@ class BackendBase(abc.ABC):
     @classmethod
     def create_optimizer(cls, reader: InputReader):
         """
-        A class method to instantiate the correct subclass of the 
-        optimizer based on the configuration in the reader. 
+        A class method to instantiate the correct subclass of the
+        optimizer based on the configuration in the reader.
 
         This method returns an instance of the calling class. If the optimizer
         are organized as subclasses of an abstract class, this method has
@@ -104,7 +105,7 @@ class BackendBase(abc.ABC):
                 it can take.
 
         Returns:
-            (None) 
+            (None)
                 If the input takes to long to optimize, this raises
                 an error.
         """
@@ -128,8 +129,9 @@ class BackendBase(abc.ABC):
             (str) The current time in the format YYYY-MM-DD_hh-mm-ss
         """
         now = datetime.today()
-        return f"{now.year}-{now.month}-{now.day}" \
-               f"_{now.hour}-{now.minute}-{now.second}"
+        return (
+            f"{now.year}-{now.month}-{now.day}" f"_{now.hour}-{now.minute}-{now.second}"
+        )
 
     def get_output(self) -> dict:
         """
@@ -147,7 +149,7 @@ class BackendBase(abc.ABC):
         A subclass may overwrite this method in order to print
         additional information after the generic information about
         the optimization run.
-    
+
         Returns:
             (None) prints additional output when `print_report` is called
         """
@@ -161,19 +163,31 @@ class BackendBase(abc.ABC):
         Returns:
             (None)
         """
-        print(f"\n--- General information of the solution ---")
-        print(f'Kirchhoff cost at each bus: '
-              f'{self.output["results"].get("individual_kirchhoff_cost","N/A")}')
-        print(f'Kirchhoff cost at each time step: '
-              f'{self.output["results"].get("kirchhoff_cost_by_time","N/A")}')
-        print(f'Total Kirchhoff cost: '
-              f'{self.output["results"].get("kirchhoff_cost","N/A")}')
-        print(f'Total power imbalance: '
-              f'{self.output["results"].get("power_imbalance","N/A")}')
-        print(f'Total Power generated: '
-              f'{self.output["results"].get("total_power","N/A")}')
-        print(f'Total marginal cost: '
-              f'{self.output["results"].get("marginal_cost","N/A")}')
+        print("\n--- General information of the solution ---")
+        print(
+            f"Kirchhoff cost at each bus: "
+            f'{self.output["results"].get("individual_kirchhoff_cost","N/A")}'
+        )
+        print(
+            f"Kirchhoff cost at each time step: "
+            f'{self.output["results"].get("kirchhoff_cost_by_time","N/A")}'
+        )
+        print(
+            f"Total Kirchhoff cost: "
+            f'{self.output["results"].get("kirchhoff_cost","N/A")}'
+        )
+        print(
+            f"Total power imbalance: "
+            f'{self.output["results"].get("power_imbalance","N/A")}'
+        )
+        print(
+            f"Total Power generated: "
+            f'{self.output["results"].get("total_power","N/A")}'
+        )
+        print(
+            f"Total marginal cost: "
+            f'{self.output["results"].get("marginal_cost","N/A")}'
+        )
         self.print_solver_specific_report()
         print("---")
 
@@ -194,11 +208,9 @@ class BackendBase(abc.ABC):
         start_time = self.get_time()
         for backend, solver_list in self.reader.backend_to_solver.items():
             if self.config["backend"] in solver_list:
-                file_name = "_".join([self.config_name,
-                                      start_time + ".json"])
+                file_name = "_".join([self.config_name, start_time + ".json"])
                 if self.network_name:
-                    file_name = "_".join([self.network_name,
-                                          file_name])
+                    file_name = "_".join([self.network_name, file_name])
                 if self.file_name:
                     file_name = self.file_name
                 self.output = {

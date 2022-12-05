@@ -31,6 +31,7 @@ class PypsaBackend(BackendBase):
         super().__init__(reader=reader)
         if self.config["backend_config"].get("timeout", -1) < 0:
             self.config["backend_config"]["timeout"] = 3600
+        self.opt = None
 
     def transform_problem_for_optimizer(self) -> None:
         """
@@ -38,7 +39,7 @@ class PypsaBackend(BackendBase):
         programming formulation.
         The optimizer can be accessed at `self.opt` and then linear
         program can be accessed at `self.transformed_problem`.
-        
+
         Returns:
             (None)
                 Modifies `self.opt` and `self.transformed_problem`.
@@ -47,17 +48,18 @@ class PypsaBackend(BackendBase):
         self.network.generators.committable = True
         self.network.generators.p_nom_extendable = False
 
-        # avoid committing a generator and setting output to 0 
+        # avoid committing a generator and setting output to 0
         self.network.generators_t.p_min_pu = self.network.generators_t.p_max_pu
         self.network.generators.p_min_pu = self.network.generators.p_max_pu
         self.transformed_problem = pypsa.opf.network_lopf_build_model(
             network=self.network,
             snapshots=self.network.snapshots,
-            formulation="kirchhoff"
+            formulation="kirchhoff",
         )
         self.opt = pypsa.opf.network_lopf_prepare_solver(
             network=self.network,
-            solver_name=self.config["backend_config"].get("solver_name", "glpk"))
+            solver_name=self.config["backend_config"].get("solver_name", "glpk"),
+        )
         self.opt.options["tmlim"] = self.config["backend_config"]["timeout"]
 
     def check_input_size(self, limit: float = 60.0):
@@ -66,15 +68,14 @@ class PypsaBackend(BackendBase):
 
         Args:
             limit: the upper limit on run time. In this case, it doesn't stop
-            the optimization, but sets an option in the solver to stop 
+            the optimization, but sets an option in the solver to stop
             the optimization after the limit is exceeded
 
         Returns:
             (None)
                 Sets the timelimit of the MILP solver
         """
-        self.opt.options["tmlim"] = min(limit,
-                                        self.config["backend_config"]["timeout"])
+        self.opt.options["tmlim"] = min(limit, self.config["backend_config"]["timeout"])
 
     def transform_solution_to_network(self) -> pypsa.Network:
         """
@@ -95,9 +96,9 @@ class PypsaBackend(BackendBase):
         """
         Prints a short report with general information if the problem is feasible
         and a message that it is infeasible if it is not feasible
-    
+
         Returns:
-            (None) 
+            (None)
         """
         if self.output["results"]["termination_condition"] == "infeasible":
             print("no feasible solution was found, stop writing to network")
@@ -108,7 +109,7 @@ class PypsaBackend(BackendBase):
         """
         Write the solution and information about it into the `self.output`
         dictionary.
-    
+
         Args:
             solverstring: (str)
                 The string information (in string format) returned by
@@ -117,30 +118,30 @@ class PypsaBackend(BackendBase):
             (None)
                 Modifies `self.output["results"]`.
         """
-        self.output["results"]["optimizationTime"] \
-            = solverstring.splitlines()[-1].split()[1]
-        self.output["results"]["termination_condition"] \
-            = solverstring.splitlines()[-7].split()[2]
+        self.output["results"]["optimizationTime"] = solverstring.splitlines()[
+            -1
+        ].split()[1]
+        self.output["results"]["termination_condition"] = solverstring.splitlines()[
+            -7
+        ].split()[2]
         if self.output["results"]["termination_condition"] != "infeasible":
             total_cost = 0
             total_power = 0
-            for key, val in self.transformed_problem.generator_p.get_values(
-            ).items():
-                total_cost += self.network.generators["marginal_cost"].loc[
-                                 key[0]] * val
+            for key, val in self.transformed_problem.generator_p.get_values().items():
+                total_cost += self.network.generators["marginal_cost"].loc[key[0]] * val
                 total_power += val
             self.output["results"]["marginal_cost"] = total_cost
             self.output["results"]["total_power"] = total_power
 
             self.output["results"]["unit_commitment"] = {
-                str(gen): value for gen, value in
-                self.transformed_problem.generator_status.get_values().items()
+                str(gen): value
+                for gen, value in self.transformed_problem.generator_status.get_values().items()
             }
             self.output["results"]["powerflow"] = {
-                str(line[1:]): value for line, value in
-                self.transformed_problem.passive_branch_p.get_values().items()
+                str(line[1:]): value
+                for line, value in self.transformed_problem.passive_branch_p.get_values().items()
             }
-            # solver only allows feasible solutions 
+            # solver only allows feasible solutions
             self.output["results"]["kirchhoff_cost"] = 0
             self.output["results"]["power_imbalance"] = 0
 
@@ -148,7 +149,7 @@ class PypsaBackend(BackendBase):
         """
         Solves the linear program stored in self using the solver stored
         in self.
-        
+
         Returns:
             (None)
                 Writes the solution into self.output["results"].

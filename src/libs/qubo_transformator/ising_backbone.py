@@ -4,7 +4,7 @@ It provides the data structure that contains the transformation
 of network components into qubits and interactions of qubits
 
 Expanding on the type of networks that can be modelled is achieved by
-extending the `IsingBackbone`. 
+extending the `IsingBackbone`.
 """
 
 from typing import Any, Union
@@ -58,7 +58,7 @@ class IsingBackbone:
             Contains the ising coefficients of the ising problem. The keys are ordered
             tuples containing the qubits of the respective interaction and strength as
             it's value
-            
+
         _ising_coefficients_cached : dict
             This mirrors all encodings into `self._ising_coefficients` but is considering
             a working copy. This means that the complete ising problem will not use this.
@@ -72,7 +72,7 @@ class IsingBackbone:
             A dictionary with integers as keys, which represent qubits, and their respective
             weight as the value. The weight of a qubit is a factor that is multiplied
             to any interaction this qubit is involved in unless it is explicitly turned off.
-        _allocated_qubits : int 
+        _allocated_qubits : int
             The number of qubits that has been allocated to represent problem components
         _subproblems  : list
             A list of all `IsingSubproblem` instances that have visited this instance for
@@ -139,13 +139,15 @@ class IsingBackbone:
                     unique_resolution = False
                     method = getattr(subproblem_instance, method_name)
                 else:
-                    raise AttributeError(f"{method_name} didn't resolve to "
-                                         f"unique subproblem")
+                    raise AttributeError(
+                        f"{method_name} didn't resolve to " f"unique subproblem"
+                    )
         if method:
             return method
         else:
-            raise AttributeError(f"{method_name} was not found in any stored "
-                                 f"subproblem")
+            raise AttributeError(
+                f"{method_name} was not found in any stored " f"subproblem"
+            )
 
     def flush_cached_problem(self) -> None:
         """
@@ -190,9 +192,7 @@ class IsingBackbone:
                 interaction to it
         """
         if len(args) > 3:
-            raise ValueError(
-                "Too many arguments for an interaction"
-            )
+            raise ValueError("Too many arguments for an interaction")
         *key, interaction_strength = args
         key = tuple(sorted(key))
         if weighted_interaction:
@@ -207,14 +207,16 @@ class IsingBackbone:
             if key[0] == key[1]:
                 key = tuple([])
         # store interaction, whether it is positive or negative, and in the cache
-        self._ising_coefficients[key] = self._ising_coefficients.get(key, 0) - interaction_strength
-        self._ising_coefficients_cached[key] = self._ising_coefficients_cached.get(key, 0) - interaction_strength
+        self._ising_coefficients[key] = (
+            self._ising_coefficients.get(key, 0) - interaction_strength
+        )
+        self._ising_coefficients_cached[key] = (
+            self._ising_coefficients_cached.get(key, 0) - interaction_strength
+        )
 
-    def couple_component_with_constant(self,
-                                       component: str,
-                                       coupling_strength: float = 1.0,
-                                       time: any = None
-                                       ) -> None:
+    def couple_component_with_constant(
+        self, component: str, coupling_strength: float = 1.0, time: any = None
+    ) -> None:
         """
         Performs a QUBO multiplication involving a single variable on
         all qubits which are logically grouped to represent a component
@@ -247,13 +249,14 @@ class IsingBackbone:
             # Ising transformation
             self.add_interaction(0.5 * coupling_strength * self._qubit_weights[qubit])
 
-    def couple_components(self,
-                          first_component: str,
-                          second_component: str,
-                          coupling_strength: float = 1,
-                          time: any = None,
-                          additional_time: any = None
-                          ) -> None:
+    def couple_components(
+        self,
+        first_component: str,
+        second_component: str,
+        coupling_strength: float = 1,
+        time: any = None,
+        additional_time: any = None,
+    ) -> None:
         """
         This method couples two labeled groups of qubits as a product
         according to their weight and the selected time step.
@@ -308,8 +311,9 @@ class IsingBackbone:
         if additional_time is None:
             additional_time = time
         first_component_address = self.get_representing_qubits(first_component, time)
-        second_component_address = self.get_representing_qubits(second_component,
-                                                               additional_time)
+        second_component_address = self.get_representing_qubits(
+            second_component, additional_time
+        )
         # components with 0 weight (power, capacity) vanish in the QUBO
         # formulation
         if (not first_component_address) or (not second_component_address):
@@ -329,34 +333,34 @@ class IsingBackbone:
                 # add a constant cost.
                 # add_interaction performs substitution of spin with a constant
                 self.add_interaction(
-                    first_qubit,
-                    second_qubit,
-                    coupling_strength * 0.25
+                    first_qubit, second_qubit, coupling_strength * 0.25
                 )
                 # terms with single spins after applying QUBO to Ising
                 # transformation
                 self.add_interaction(
                     first_qubit,
-                    coupling_strength * self._qubit_weights[second_qubit] * 0.25
+                    coupling_strength * self._qubit_weights[second_qubit] * 0.25,
                 )
                 self.add_interaction(
                     second_qubit,
-                    coupling_strength * self._qubit_weights[first_qubit] * 0.25
+                    coupling_strength * self._qubit_weights[first_qubit] * 0.25,
                 )
                 # term with constant cost contribution after applying QUBO to
                 # Ising transformation
                 self.add_interaction(
                     self._qubit_weights[first_qubit]
                     * self._qubit_weights[second_qubit]
-                    * coupling_strength * 0.25
+                    * coupling_strength
+                    * 0.25
                 )
 
-    def add_basis_polynomial_interaction(self,
-                                         first_qubit: int = None,
-                                         second_qubit: int = None,
-                                         solution_list: list = None,
-                                         interaction_strength: float = 1.0
-                                         ) -> None:
+    def add_basis_polynomial_interaction(
+        self,
+        first_qubit: int = None,
+        second_qubit: int = None,
+        solution_list: list = None,
+        interaction_strength: float = 1.0,
+    ) -> None:
         """
         For two specified qubits, add an interaction that incurs no cost except if the two
         qubits have a particular state.
@@ -404,18 +408,27 @@ class IsingBackbone:
             first_sign *= -1
         if second_qubit in solution_list:
             second_sign *= -1
-        self.add_interaction(first_qubit, second_qubit, interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_qubit, second_sign * interaction_strength, weighted_interaction=False)
-        self.add_interaction(second_qubit, first_sign * interaction_strength, weighted_interaction=False)
-        self.add_interaction(first_sign * second_sign * interaction_strength, weighted_interaction=False)
+        self.add_interaction(
+            first_qubit, second_qubit, interaction_strength, weighted_interaction=False
+        )
+        self.add_interaction(
+            first_qubit, second_sign * interaction_strength, weighted_interaction=False
+        )
+        self.add_interaction(
+            second_qubit, first_sign * interaction_strength, weighted_interaction=False
+        )
+        self.add_interaction(
+            first_sign * second_sign * interaction_strength, weighted_interaction=False
+        )
 
-    def encode_squared_distance(self,
-                                label_dictionary: dict = None,
-                                label_list: list = None,
-                                target: float = 0.0,
-                                global_factor: float = 1.0,
-                                time: any = None,
-                                ) -> None:
+    def encode_squared_distance(
+        self,
+        label_dictionary: dict = None,
+        label_list: list = None,
+        target: float = 0.0,
+        global_factor: float = 1.0,
+        time: any = None,
+    ) -> None:
         """
         Encodes the squared distance of all components in the `label_dictionary` and
         label_list to the value `target` with respect to the factors given in keys.
@@ -442,26 +455,30 @@ class IsingBackbone:
             label_dictionary = {}
         if label_list is None:
             label_list = []
-        label_dictionary = {**label_dictionary,
-                            **{label: 1.0 for label in label_list}}
+        label_dictionary = {**label_dictionary, **{label: 1.0 for label in label_list}}
         # constant contribution to cost function so that a configuration
         # that matches the target value has energy of 0
-        self.add_interaction(global_factor * target ** 2)
+        self.add_interaction(global_factor * target**2)
 
         for first_component, first_factor in label_dictionary.items():
             factor = global_factor * first_factor
 
-            self.couple_component_with_constant(component=first_component,
-                                                coupling_strength=2.0 * factor * target,
-                                                time=time)
+            self.couple_component_with_constant(
+                component=first_component,
+                coupling_strength=2.0 * factor * target,
+                time=time,
+            )
             for second_component, second_factor in label_dictionary.items():
                 current_factor = factor * second_factor
                 # attraction/repulsion term for different/same sign of power
                 # at components
-                self.couple_components(first_component,
-                                       second_component,
-                                       coupling_strength=current_factor,
-                                       time=time)
+                self.couple_components(
+                    first_component,
+                    second_component,
+                    coupling_strength=current_factor,
+                    time=time,
+                )
+
     # end of coupling functions
 
     def num_variables(self) -> int:
@@ -487,10 +504,11 @@ class IsingBackbone:
         """
         return len(self._ising_coefficients)
 
-    def create_qubit_entries_for_component(self,
-                                           component_name: str,
-                                           snapshot_to_weight: Union[dict, list] = None,
-                                           ) -> None:
+    def create_qubit_entries_for_component(
+        self,
+        component_name: str,
+        snapshot_to_weight: Union[dict, list] = None,
+    ) -> None:
         """
         A function to create qubits in the data structure that can be accessed
         as a group via its label.
@@ -506,9 +524,9 @@ class IsingBackbone:
         for a group of qubits.
 
         The number of qubits and weights can be specified as:
-            - a dictionary of lists with snapshots as keys and the corresponding value being the 
-              weights of the qubits representing the component at that snapshot. 
-            - a list of weights. It is assumed that the number of representing qubits 
+            - a dictionary of lists with snapshots as keys and the corresponding value being the
+              weights of the qubits representing the component at that snapshot.
+            - a list of weights. It is assumed that the number of representing qubits
               and their weights are constant across all snapshots
             - the default value `None`. This means that the component is represented
               by a single qubit with weight `1.0` at each snapshot
@@ -527,14 +545,10 @@ class IsingBackbone:
             raise ValueError("Component name has already been used")
 
         if snapshot_to_weight is None:
-            snapshot_to_weight_dict = {
-                snapshot: 1.0 
-                for snapshot in self._snapshots
-            }
+            snapshot_to_weight_dict = {snapshot: 1.0 for snapshot in self._snapshots}
         elif isinstance(snapshot_to_weight, list):
             snapshot_to_weight_dict = {
-                snapshot: snapshot_to_weight 
-                for snapshot in self._snapshots
+                snapshot: snapshot_to_weight for snapshot in self._snapshots
             }
         else:
             snapshot_to_weight_dict = {
@@ -544,7 +558,9 @@ class IsingBackbone:
 
         # store component - snapshot - representing qubit relation
         self._qubit_encoding[component_name] = {
-            snapshot: self.allocate_qubits_to_weight_list(snapshot_to_weight_dict[snapshot])
+            snapshot: self.allocate_qubits_to_weight_list(
+                snapshot_to_weight_dict[snapshot]
+            )
             for snapshot in self._snapshots
         }
         # expose qubit weights in `self._qubit_weights`
@@ -559,17 +575,21 @@ class IsingBackbone:
         that counter appropriately
 
         Args:
-            weight_list: (list[float]) 
+            weight_list: (list[float])
                 A list of floats, which describes weights to be mapped to newly allocated qubits
 
         Returns:
-            (list[int]) 
-                a list of consecutive integers, which represent qubits which are mapped 
+            (list[int])
+                a list of consecutive integers, which represent qubits which are mapped
                 to the weight list. Also increases the internal qubit count
         """
         num_new_allocated_qubits = len(weight_list)
-        allocated_qubit_list = list(range(self._allocated_qubits,
-                                          self._allocated_qubits + num_new_allocated_qubits))
+        allocated_qubit_list = list(
+            range(
+                self._allocated_qubits,
+                self._allocated_qubits + num_new_allocated_qubits,
+            )
+        )
         self._allocated_qubits += num_new_allocated_qubits
         return allocated_qubit_list
 
@@ -609,9 +629,9 @@ class IsingBackbone:
 
     def get_qubit_mapping(self, time: any = None) -> dict:
         """
-        Returns the dictionary with all labels and the qubits were used for 
+        Returns the dictionary with all labels and the qubits were used for
         representation in an ising problem for a particular time step
-        
+
         Args:
             time: (any)
                 Index of time slice for which to get qubit map
@@ -622,9 +642,10 @@ class IsingBackbone:
                 labels are the keys and the list of qubits for that label
                 at the specified time step are the values
         """
-        return {component: self.get_representing_qubits(component=component,
-                                                        time=time)
-                for component in self._qubit_encoding.keys()}
+        return {
+            component: self.get_representing_qubits(component=component, time=time)
+            for component in self._qubit_encoding.keys()
+        }
 
     def get_interaction(self, *qubits) -> float:
         """
@@ -640,11 +661,9 @@ class IsingBackbone:
         """
         return self._ising_coefficients.get(tuple(sorted(set(qubits))), 0.0)
 
-    def get_encoded_value_of_component(self,
-                                       component: str,
-                                       solution: list,
-                                       time: any = 0
-                                       ) -> float:
+    def get_encoded_value_of_component(
+        self, component: str, solution: list, time: any = 0
+    ) -> float:
         """
         Returns the encoded value of a component according to the spin
         configuration in the solution at a given time slice.
@@ -671,17 +690,14 @@ class IsingBackbone:
                 value += self._qubit_weights[qubit]
         return value
 
-    def calc_cost(self, 
-                  solution: list,
-                  ising_interactions: dict = None
-                  ) -> float:
+    def calc_cost(self, solution: list, ising_interactions: dict = None) -> float:
         """
         Calculates the energy of a spin state including the constant
         energy contribution.
 
         The default ising spin glass state that is used to calculate
         the energy of a solution is the full problem stored in the
-        IsingBackbone. If an interaction map is passed via the 
+        IsingBackbone. If an interaction map is passed via the
         `ising_interactions` argument, those are used instead to
         evaluate the cost of a solution.
 
@@ -722,8 +738,11 @@ class IsingBackbone:
                 A list of tuples of the form (interaction-coefficient,
                 list(qubits)).
         """
-        return [(v, list(k)) for k, v in self._ising_coefficients.items() if
-                v != 0 and len(k) > 0]
+        return [
+            (v, list(k))
+            for k, v in self._ising_coefficients.items()
+            if v != 0 and len(k) > 0
+        ]
 
     def get_hamiltonian_matrix(self) -> list:
         """
@@ -734,9 +753,7 @@ class IsingBackbone:
                 A list of lists representing the hamiltonian matrix.
         """
         qubits = range(self._allocated_qubits)
-        hamiltonian = [
-            [self.get_interaction(i, j) for i in qubits] for j in qubits
-        ]
+        hamiltonian = [[self.get_interaction(i, j) for i in qubits] for j in qubits]
         return hamiltonian
 
     def get_hamiltonian_eigenvalues(self) -> tuple[ndarray, Any]:
@@ -816,32 +833,32 @@ class NetworkIsingBackbone(IsingBackbone):
             for generator in output_network.generators.index:
                 # set value in status-dataframe in generators_t dictionary
                 status = int(
-                    self.get_generator_status(generator=generator,
-                                              solution=solution,
-                                              time=time))
+                    self.get_generator_status(
+                        generator=generator, solution=solution, time=time
+                    )
+                )
                 column_status = list(output_network.generators_t.status.columns)
                 if generator in column_status:
                     index_generator = column_status.index(generator)
                     output_network.generators_t.status.iloc[
-                        time, index_generator] = status
+                        time, index_generator
+                    ] = status
                 else:
                     output_network.generators_t.status[generator] = status
 
                 # set value in p-dataframe in generators_t dictionary
-                p = self.get_encoded_value_of_component(component=generator,
-                                                        solution=solution,
-                                                        time=time)
+                p = self.get_encoded_value_of_component(
+                    component=generator, solution=solution, time=time
+                )
                 columns_p = list(output_network.generators_t.p.columns)
                 if generator in columns_p:
                     index_generator = columns_p.index(generator)
-                    output_network.generators_t.p.iloc[
-                        time, index_generator] = p
+                    output_network.generators_t.p.iloc[time, index_generator] = p
                 else:
                     output_network.generators_t.p[generator] = p
 
                 # set value in p_max_pu-dataframe in generators_t dictionary
-                columns_p_max_pu = list(
-                    output_network.generators_t.p_max_pu.columns)
+                columns_p_max_pu = list(output_network.generators_t.p_max_pu.columns)
                 p_nom = output_network.generators.loc[generator, "p_nom"]
                 if p == 0:
                     p_max_pu = 0.0
@@ -850,15 +867,15 @@ class NetworkIsingBackbone(IsingBackbone):
                 if generator in columns_p_max_pu:
                     index_generator = columns_p_max_pu.index(generator)
                     output_network.generators_t.p_max_pu.iloc[
-                        time, index_generator] = p_max_pu
+                        time, index_generator
+                    ] = p_max_pu
                 else:
                     output_network.generators_t.p_max_pu[generator] = p_max_pu
 
             for line in output_network.lines.index:
                 encoded_val = self.get_encoded_value_of_component(
-                    component=line,
-                    solution=solution,
-                    time=time)
+                    component=line, solution=solution, time=time
+                )
                 # p0 - Active power at bus0 (positive if branch is withdrawing
                 # power from bus0).
                 # p1 - Active power at bus1 (positive if branch is withdrawing
@@ -907,24 +924,21 @@ class NetworkIsingBackbone(IsingBackbone):
         if bus not in self.network.buses.index:
             raise ValueError("the bus " + bus + " doesn't exist")
         return {
-            "generators":
-                list(self.network.generators[
-                         self.network.generators.bus == bus
-                         ].index),
-            "positive_lines":
-                list(self.network.lines[
-                         self.network.lines.bus1 == bus
-                         ].index),
-            "negative_lines":
-                list(self.network.lines[
-                         self.network.lines.bus0 == bus
-                         ].index),
+            "generators": list(
+                self.network.generators[self.network.generators.bus == bus].index
+            ),
+            "positive_lines": list(
+                self.network.lines[self.network.lines.bus1 == bus].index
+            ),
+            "negative_lines": list(
+                self.network.lines[self.network.lines.bus0 == bus].index
+            ),
         }
 
     def get_nominal_power(self, generator: str, time: any) -> float:
         """
-        Returns the nominal power of a generator at a time step 
-        
+        Returns the nominal power of a generator at a time step
+
         Args:
             generator: (str)
                 The generator label
@@ -950,7 +964,7 @@ class NetworkIsingBackbone(IsingBackbone):
             generator: (str)
                 The generator label
             time: (any)
-                The snapshot at which to get the minimal power output. It 
+                The snapshot at which to get the minimal power output. It
                 has to be in the network.snapshot index
 
         Returns:
@@ -975,10 +989,10 @@ class NetworkIsingBackbone(IsingBackbone):
             solution: (list)
                 A list of all qubits which have spin -1 in the solution.
             time: (any)
-                Index of time slice for which to get the generator status. 
+                Index of time slice for which to get the generator status.
                 This has to be in the network.snapshots index
 
-        Return: 
+        Return:
             (float)
                 The percentage of the nominal power output of the generator
                 at the time step according to the given qubit solution
@@ -986,15 +1000,12 @@ class NetworkIsingBackbone(IsingBackbone):
         maximum_output = self.get_nominal_power(generator, time)
         if maximum_output == 0.0:
             return 0.0
-        generated_power = self.get_encoded_value_of_component(component=generator,
-                                                              solution=solution,
-                                                              time=time)
+        generated_power = self.get_encoded_value_of_component(
+            component=generator, solution=solution, time=time
+        )
         return generated_power / maximum_output
 
-    def get_generator_dictionary(self,
-                                 solution: list,
-                                 stringify: bool = True
-                                 ) -> dict:
+    def get_generator_dictionary(self, solution: list, stringify: bool = True) -> dict:
         """
         Builds a dictionary containing the status of all generators at
         all time slices for a given solution of qubit spins.
@@ -1022,15 +1033,11 @@ class NetworkIsingBackbone(IsingBackbone):
                 if stringify:
                     key = str(key)
                 result[key] = self.get_generator_status(
-                        generator=generator,
-                        solution=solution,
-                        time=time)
+                    generator=generator, solution=solution, time=time
+                )
         return result
 
-    def get_flow_dictionary(self,
-                            solution: list,
-                            stringify: bool = True
-                            ) -> dict:
+    def get_flow_dictionary(self, solution: list, stringify: bool = True) -> dict:
         """
         Builds a dictionary containing all power flows at all time
         slices for a given solution of qubit spins.
@@ -1058,7 +1065,8 @@ class NetworkIsingBackbone(IsingBackbone):
                 if stringify:
                     key = str(key)
                 result[key] = self.get_encoded_value_of_component(
-                    component=line_id, solution=solution, time=time)
+                    component=line_id, solution=solution, time=time
+                )
         return result
 
     def get_load(self, bus: str, time: any, silent: bool = True) -> float:
@@ -1077,16 +1085,16 @@ class NetworkIsingBackbone(IsingBackbone):
             (float)
                 The total load at 'bus' at time step 'time'.
         """
-        loads_at_current_bus = self.network.loads[
-            self.network.loads.bus == bus
-            ].index
-        all_loads = self.network.loads_t['p_set'].loc[time]
+        loads_at_current_bus = self.network.loads[self.network.loads.bus == bus].index
+        all_loads = self.network.loads_t["p_set"].loc[time]
         result = all_loads[all_loads.index.isin(loads_at_current_bus)].sum()
         if result == 0:
             if not silent:
-                print(f"Warning: No load at {bus} at timestep {time}.\n"
-                      f"Falling back to constant load")
-            all_loads = self.network.loads['p_set']
+                print(
+                    f"Warning: No load at {bus} at timestep {time}.\n"
+                    f"Falling back to constant load"
+                )
+            all_loads = self.network.loads["p_set"]
             result = all_loads[all_loads.index.isin(loads_at_current_bus)].sum()
         if result < 0:
             raise ValueError("negative Load at current bus")
@@ -1126,16 +1134,19 @@ class NetworkIsingBackbone(IsingBackbone):
         return {
             "total_cost": self.calc_cost(solution=solution),
             "kirchhoff_cost": self.calc_kirchhoff_cost(solution=solution),
-            "kirchhoff_cost_by_time": self.calc_kirchhoff_cost_by_time(solution=solution),
+            "kirchhoff_cost_by_time": self.calc_kirchhoff_cost_by_time(
+                solution=solution
+            ),
             "power_imbalance": self.calc_power_imbalance(solution=solution),
             "total_power": self.calc_total_power_generated(solution=solution),
             "marginal_cost": self.calc_marginal_cost(solution=solution),
             "individual_kirchhoff_cost": self.individual_cost_contribution(
-                solution=solution),
-            "unit_commitment": self.get_generator_dictionary(solution=solution,
-                                                             stringify=True),
-            "powerflow": self.get_flow_dictionary(solution=solution,
-                                                  stringify=True),
+                solution=solution
+            ),
+            "unit_commitment": self.get_generator_dictionary(
+                solution=solution, stringify=True
+            ),
+            "powerflow": self.get_flow_dictionary(solution=solution, stringify=True),
         }
 
     def individual_marginal_cost(self, solution: list) -> dict:
@@ -1157,10 +1168,10 @@ class NetworkIsingBackbone(IsingBackbone):
         """
         contrib = {}
         for bus in self.network.buses.index:
-            contrib = {**contrib,
-                       **self.calc_marginal_cost_at_bus(bus=bus,
-                                                        solution=solution)
-                       }
+            contrib = {
+                **contrib,
+                **self.calc_marginal_cost_at_bus(bus=bus, solution=solution),
+            }
         return contrib
 
     def calc_marginal_cost_at_bus(self, bus: str, solution: list) -> dict:
@@ -1186,14 +1197,14 @@ class NetworkIsingBackbone(IsingBackbone):
         for time in self._snapshots:
             marginal_cost = 0.0
             components = self.get_bus_components(bus)
-            for generator in components['generators']:
+            for generator in components["generators"]:
                 power_output_at_current_time = self.get_encoded_value_of_component(
-                    component=generator,
-                    solution=solution,
-                    time=time
+                    component=generator, solution=solution, time=time
                 )
-                marginal_cost += power_output_at_current_time \
+                marginal_cost += (
+                    power_output_at_current_time
                     * self.network.generators["marginal_cost"].loc[generator]
+                )
             contrib[str((bus, time))] = marginal_cost
         return contrib
 
@@ -1211,6 +1222,8 @@ class NetworkIsingBackbone(IsingBackbone):
                 scaling.
         """
         marginal_cost = 0.0
-        for marginal_cost_at_bus in self.individual_marginal_cost(solution=solution).values():
+        for marginal_cost_at_bus in self.individual_marginal_cost(
+            solution=solution
+        ).values():
             marginal_cost += marginal_cost_at_bus
         return marginal_cost

@@ -27,7 +27,7 @@ class QuboTransformator:
 
         Args:
             network: (pypsa.Network)
-                The network that contains the unit commitment problem 
+                The network that contains the unit commitment problem
             config: (dict)
                 A configuration that describes how generators and transmission
                 lines are encoded and which constraints are added to the QUBO
