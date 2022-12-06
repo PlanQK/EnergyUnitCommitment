@@ -1,7 +1,6 @@
 """Starts a Flask server that can provided a REST API to the streamlit frontend
 for Unit Commitment optimziation"""
 
-from distutils.command.config import config
 from tokenize import String
 
 from contextlib import redirect_stdout
