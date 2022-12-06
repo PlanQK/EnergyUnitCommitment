@@ -25,5 +25,5 @@ from .dwave_backends import (
     DwaveCloudDirectQPU,
     DwaveReadQPU,
 )
-from .pypsa_backends import PypsaGlpk, PypsaFico
+from .pypsa_backends import PypsaGlpk
 from .qaoa_backends import QaoaQiskit

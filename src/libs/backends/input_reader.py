@@ -42,7 +42,7 @@ class InputReader:
             "dwave-qpu",
             "dwave-read-qpu",
         ],
-        "pypsa_backend": ["pypsa-glpk", "pypsa-fico"],
+        "pypsa_backend": ["pypsa-glpk"],
         "sqa_backend": ["sqa", "classical", "iterative-sqa"],
         "qaoa_backend": ["qaoa"],
     }
@@ -252,7 +252,6 @@ class InputReader:
             "dwave-tabu": backends.DwaveTabu,
             "dwave-greedy": backends.DwaveSteepestDescent,
             "pypsa-glpk": backends.PypsaGlpk,
-            "pypsa-fico": backends.PypsaFico,
             "dwave-hybrid": backends.DwaveCloudHybrid,
             "dwave-qpu": backends.DwaveCloudDirectQPU,
             "dwave-read-qpu": backends.DwaveReadQPU,
