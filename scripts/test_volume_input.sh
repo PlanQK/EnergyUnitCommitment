@@ -16,7 +16,7 @@
 # set up some variables
 GIT_ROOT=`git rev-parse --show-toplevel`
 DOCKERTAG=energy:planqk
-SERVICE_DOCKERFILE=PlanQK_Dockerfile
+SERVICE_DOCKERFILE=input/PlanQK_Dockerfile
 
 # set up input network and parameter. 
 NETWORK=defaultnetwork
@@ -37,6 +37,6 @@ docker run -it \
     -e RUNNING_IN_DOCKER=Yes \
     -v ${GIT_ROOT}/input/${NETWORK}.json:/var/input/data/data.json \
     -v ${GIT_ROOT}/input/${CONFIG}.json:/var/input/params/params.json \
-    ${DOCKERTAG}  | tee  >(tail -n 1 > JobResponse)
+    ${DOCKERTAG}  | tee  >(tail -n 1 > results_general_sweep/job_response)
 
 exit 0

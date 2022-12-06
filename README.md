@@ -13,7 +13,7 @@ start a docker container. Various settings can be adjusted in either the makefil
 file which can be used right away. The recipe will start an optimization run for every combination of network, config file and setting found by in the makefile. 
 The result of the optimization will be saved as a JSON file.
 
-This repository also contains some auxiliary scripts to generate problem instance and analyze results. Using those will be explained later.
+This repository also contains some auxiliary scripts to generate problem instances and analyze results. Using those will be explained later.
 
 
 ### Available solvers
@@ -21,7 +21,7 @@ Currently, we support the following solvers for the unit commitment problem:
 
 1. Mixed Integer Linear Programming using GLPK. The linear programm is obtained via PyPSA.
 2. Simulated Quantum Annealing. More information on this solver can be found [here](https://github.com/PlanQK/SimulatedQuantumAnnealing)
-3. QAOA via IBM's [Qiskit](https://qiskit.org) runtime. This is extremly limited in problemsize. Some parts require an API-Token
+3. QAOA via IBM's [Qiskit](https://qiskit.org) runtime. This is extremely limited in problemsize. Some parts require an API-Token
 4. D-Wave's cloud solvers. These require an API-Token and include quantum annealing and a hybrid solver.
 
 
@@ -30,8 +30,8 @@ Currently, we support the following solvers for the unit commitment problem:
 The makefile contains variables that specify where the PyPSA network to be solved is stored, which config file to use, and can
 also be used to temporarily overwrite values in the config file. A brief overview of the parameters you can adjust are the following
 
-1. `CONFIGFILES` : This contains a glob which will be used to search the folder `configs/` for config files.
-2. `NETWORKNAME` : This contains a glob which will be used to search the folder `networks/` for PyPSA networks.
+1. `CONFIGFILES` : This contains a glob which will be used to search the folder `input/configs/` for config files.
+2. `NETWORKNAME` : This contains a glob which will be used to search the folder `input/networks/` for PyPSA networks.
 3. `SAVE_FOLDER` : This specifies a path relative to the repositiories's root where the results will be saved to.
 
 Overwriting values of the config files is further explained in the Makefile. Additional information on the variables above can also be found in the makefile.
@@ -40,8 +40,8 @@ and save it to `results_general_sweep`.
 
 ### Configuring a solver
 
-Which solver and which settings are used can be specified in a yaml file. The file `configs/config-all.yaml` contains information on all possible
-parameters that can be set for the various solvers, the structure that the config file has to have and the possibe values for each parameter. 
+Which solver and which settings are used can be specified in a yaml file. The file `input/configs/config-all.yaml` contains information on all possible
+parameters that can be set for the various solvers, the structure that the config file has to have and the possibe values for each parameter.
 
 
 ### Dependencies

@@ -9,18 +9,20 @@ import typing
 import glob
 import json
 import collections
+from os import path, getenv, sep
+
 
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from os import path, getenv, sep
 
 import pandas as pd
 
 
 # the following methods are used for averaging data points. They all take a list, which are values
 # given by various optimization runs and return a float.
+
 
 def mean_of_square_root(values: list) -> float:
     """
@@ -54,9 +56,9 @@ def mean_of_annealing_computing_cost(values: list) -> float:
     Returns:
         (float) The mean of the duration scaled by the cost per hour
     """
-    computing_cost_per_hour = getenv('costperhour', 1000)
+    computing_cost_per_hour = getenv("costperhour", "1000")
     print(f"Using a cost of {computing_cost_per_hour} for an hour of quantum annealing")
-    return np.mean([computing_cost_per_hour * value for value in values])
+    return np.mean([float(computing_cost_per_hour) * value for value in values])
 
 
 def deviation_of_the_mean(values: list) -> float:
@@ -95,7 +97,7 @@ def average_of_better_than_median(values: list) -> float:
         if val > median:
             continue
         count += 1
-        result = + val
+        result = +val
     return float(result) / count
 
 
@@ -129,7 +131,7 @@ def average_of_best_percent(values: list, percentage: float) -> float:
         (float) The reduced value.
     """
     values.sort()
-    return np.mean(values[:int(percentage * len(values))])
+    return np.mean(values[: int(percentage * len(values))])
 
 
 def cumulative_distribution(values: list) -> list:
@@ -155,7 +157,7 @@ def cumulative_distribution(values: list) -> list:
 
 class PlottingAgent:
     """
-    class for creating plots. on initialization reads and prepares data files. Plots 
+    class for creating plots. on initialization reads and prepares data files. Plots
     based on that data can then be created and written by calling `make_figure`
     """
 
@@ -163,7 +165,7 @@ class PlottingAgent:
         """
         A constructor for a plotting agent. This should be called by the class method
         which handles the correct initialization of the data_extractor, which contains
-        the data the plots are based on. After complete initialization, all plots are 
+        the data the plots are based on. After complete initialization, all plots are
         based on the data in the pandas DataFrame `self.data_extractor.df`
 
         Args:
@@ -179,13 +181,13 @@ class PlottingAgent:
         constructor method to set up the data to be plotted by reading a csv file
 
         Args:
-            csv_file: (str) 
+            csv_file: (str)
                 name and location of the file
-            fileformat: (str) 
+            fileformat: (str)
                 fileformat of the plots that an instance makes
 
         Returns:
-            (PlottingAgent) 
+            (PlottingAgent)
                 a PlottingAgent initialized with the data in the csv file
         """
         agent = PlottingAgent(fileformat)
@@ -199,7 +201,7 @@ class PlottingAgent:
         of the runs that are to be plotted
 
         The files that are extracted can be specified in two ways. The `glob_dict`
-        allows you to include json files, and the `constraints` argument allows you 
+        allows you to include json files, and the `constraints` argument allows you
         to filter by runs with have specific values (usually configuration values)
 
         Args:
@@ -217,7 +219,8 @@ class PlottingAgent:
         """
         agent = PlottingAgent(fileformat)
         agent.data_extractor = DataExtractor.extract_from_json(
-            glob_dict=glob_dict, constraints=constraints,
+            glob_dict=glob_dict,
+            constraints=constraints,
         )
         return agent
 
@@ -233,11 +236,13 @@ class PlottingAgent:
         """
         self.data_extractor.df.to_csv(filename)
 
-    def get_data_points(self,
-                        x_field: str,
-                        y_field_list: list,
-                        splitting_fields: list,
-                        constraints: dict):
+    def get_data_points(
+        self,
+        x_field: str,
+        y_field_list: list,
+        splitting_fields: list,
+        constraints: dict,
+    ):
         """
         returns all stored data points with x-value in x_field and y-values in y_field_list.
         The result is a dictonary with keys being the index of the groupby by the
@@ -259,28 +264,40 @@ class PlottingAgent:
         """
         result = {}
         try:
-            data_frame = self.data_extractor.get_data(constraints)[[x_field] + y_field_list + splitting_fields]
+            data_frame = self.data_extractor.get_data(constraints)[
+                [x_field] + y_field_list + splitting_fields
+            ]
         except KeyError:
             return result
         if splitting_fields:
-            grouped_data_frame = data_frame.groupby(splitting_fields, dropna=False).agg(list)
+            grouped_data_frame = data_frame.groupby(splitting_fields, dropna=False).agg(
+                list
+            )
             for idx in grouped_data_frame.index:
                 # if there is only 1 split_field, the index is not a multiindex
                 if len(splitting_fields) == 1:
                     idx_tuple = [idx]
                 else:
                     idx_tuple = idx
-                key = tuple([
-                    split_field + "=" + str(idx_tuple[split_field_index])
-                    for split_field_index, split_field in enumerate(splitting_fields)
-                ])
+                key = tuple(
+                    [
+                        split_field + "=" + str(idx_tuple[split_field_index])
+                        for split_field_index, split_field in enumerate(
+                            splitting_fields
+                        )
+                    ]
+                )
                 result[key] = {
-                    y_field: (grouped_data_frame.loc[idx][x_field], grouped_data_frame.loc[idx][y_field])
+                    y_field: (
+                        grouped_data_frame.loc[idx][x_field],
+                        grouped_data_frame.loc[idx][y_field],
+                    )
                     for y_field in y_field_list
                 }
         else:
             result[tuple()] = {
-                y_field: (data_frame[x_field], data_frame[y_field]) for y_field in y_field_list
+                y_field: (data_frame[x_field], data_frame[y_field])
+                for y_field in y_field_list
             }
         return result
 
@@ -309,25 +326,29 @@ class PlottingAgent:
         df = pd.DataFrame({"x_field": x_values, "y_field": y_values})
         y_values_df = df[df["y_field"].notna()]
         na_values_df = df[df["x_field"].isna()]
-        return y_values_df.groupby("x_field").agg(aggregation_methods)["y_field"], \
-            na_values_df["y_field"]
+        return (
+            y_values_df.groupby("x_field").agg(aggregation_methods)["y_field"],
+            na_values_df["y_field"],
+        )
 
-    def make_figure(self,
-                    plotname: str,
-                    x_field: str = "problem_size",
-                    y_field_list: list = ["total_cost"],
-                    split_fields: list = [],
-                    constraints: dict = {},
-                    aggregate_method=None,
-                    error_method=None,
-                    logscale_x: bool = False,
-                    logscale_y: bool = False,
-                    xlabel: str = None,
-                    ylabel: str = None,
-                    title: str = None,
-                    plottype: str = "line",
-                    regression: bool = True,
-                    **kwargs):
+    def make_figure(
+        self,
+        plotname: str,
+        x_field: str = "problem_size",
+        y_field_list: list = ["total_cost"],
+        split_fields: list = [],
+        constraints: dict = {},
+        aggregate_method=None,
+        error_method=None,
+        logscale_x: bool = False,
+        logscale_y: bool = False,
+        xlabel: str = None,
+        ylabel: str = None,
+        title: str = None,
+        plottype: str = "line",
+        regression: bool = True,
+        **kwargs,
+    ):
         """
         Args:
             plotname: (str)
@@ -378,7 +399,7 @@ class PlottingAgent:
             x_field=x_field,
             y_field_list=y_field_list,
             constraints=constraints,
-            splitting_fields=split_fields
+            splitting_fields=split_fields,
         )
 
         # Each loop corresponds to one group in the groupby the
@@ -395,7 +416,7 @@ class PlottingAgent:
 
                 if plottype == "line":
                     if aggregate_method is None:
-                        aggregate_method = 'mean'
+                        aggregate_method = "mean"
                     if error_method is None:
                         error_method = deviation_of_the_mean
 
@@ -404,11 +425,13 @@ class PlottingAgent:
                         y_coordinate_list,
                         [aggregate_method, error_method],
                     )
-                    ax.errorbar(y_values.index,
-                                y_values.iloc[:, 0],
-                                label=label,
-                                yerr=y_values.iloc[:, 1],
-                                **kwargs)
+                    ax.errorbar(
+                        y_values.index,
+                        y_values.iloc[:, 0],
+                        label=label,
+                        yerr=y_values.iloc[:, 1],
+                        **kwargs,
+                    )
 
                     ax.axhline(np.mean(na_values))
 
@@ -416,13 +439,20 @@ class PlottingAgent:
                 #                    ax.hline()
 
                 if plottype == "scatterplot":
-                    if 's' not in kwargs:
-                        kwargs['s'] = 7
-                    ax.scatter(x_coordinate_list, y_coordinate_list, **kwargs, label=label)
+                    if "s" not in kwargs:
+                        kwargs["s"] = 7
+                    ax.scatter(
+                        x_coordinate_list, y_coordinate_list, **kwargs, label=label
+                    )
                     # linear regression
                     if regression:
                         m, b = np.polyfit(x_coordinate_list, y_coordinate_list, 1)
-                        ax.plot(x_coordinate_list, [m * z + b for z in x_coordinate_list], color='red', label=label)
+                        ax.plot(
+                            x_coordinate_list,
+                            [m * z + b for z in x_coordinate_list],
+                            color="red",
+                            label=label,
+                        )
 
                 if plottype == "histogramm":
                     ax.hist(y_coordinate_list, label=label, **kwargs)
@@ -448,7 +478,7 @@ class PlottingAgent:
                     sns.kdeplot(
                         list(y_coordinate_list),
                         label=label,
-                        clip=(0.0, max(y_coordinate_list))
+                        clip=(0.0, max(y_coordinate_list)),
                     )
                     if xlabel is None:
                         xlabel = y_field_list_stripped
@@ -487,7 +517,7 @@ class DataExtractor:
         "qpu": ["dwave_backend", "ising_interface", "cut_samples"],
         "qpu_read": ["dwave_backend", "ising_interface", "cut_samples"],
         "pypsa_glpk": ["pypsa_backend"],
-        "classical": []
+        "classical": [],
     }
     # list of all keys for data entries, that every result file of a solver has
     general_fields = [
@@ -507,7 +537,7 @@ class DataExtractor:
         """
         Constructor for a DataExtractor. Don't call this directly but use a class method
         to initialize the DataFrame that contains the data.
-        
+
         Data files specified in glob_dict are read, filtered by constraints and then saved
         into a pandas data frame. stored data can be queried by a getter for a given solver,
         the data is read from the folder f"{solver}_results_{suffix}"
@@ -519,7 +549,8 @@ class DataExtractor:
                 A suffix of the folder in which to search for json files
         """
         self.path_dictionary = {
-            solver: "_".join([prefix, solver, suffix]) for solver in self.solver_keys.keys()
+            solver: "_".join([prefix, solver, suffix])
+            for solver in self.solver_keys.keys()
         }
         self.df = None
 
@@ -538,7 +569,7 @@ class DataExtractor:
         """
         agent = DataExtractor()
         agent.df = pd.read_csv(filename)
-        agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        agent.df = agent.df.apply(pd.to_numeric, errors="ignore")
         if agent.df.empty:
             print("Data of optimization runs is empty!")
         return agent
@@ -564,9 +595,14 @@ class DataExtractor:
         agent = DataExtractor()
         agent.df = pd.DataFrame()
         for solver, glob_list in glob_dict.items():
-            agent.df = agent.df.append(agent.extract_data(solver, glob_list, ))
+            agent.df = agent.df.append(
+                agent.extract_data(
+                    solver,
+                    glob_list,
+                )
+            )
         agent.df = agent.filter_by_constraint(constraints)
-        agent.df = agent.df.apply(pd.to_numeric, errors='ignore')
+        agent.df = agent.df.apply(pd.to_numeric, errors="ignore")
         if agent.df.empty:
             print("Data of optimization runs is empty!")
         return agent
@@ -588,13 +624,7 @@ class DataExtractor:
         # normal return value if no special case for expansion applies
         result = [dict_value]
         if dict_key == "cut_samples":
-            result = [
-                {
-                    "sample_id": key,
-                    **value
-                }
-                for key, value in dict_value.items()
-            ]
+            result = [{"sample_id": key, **value} for key, value in dict_value.items()]
         return result
 
     def filter_by_constraint(self, constraints):
@@ -605,7 +635,7 @@ class DataExtractor:
 
         Args:
             constraints: (dict)
-                a parameter that describes by which rules to filter the data frame. 
+                a parameter that describes by which rules to filter the data frame.
 
         Returns:
             (pd.DataFrame) a data frame filtered accoring to the given constraints
@@ -617,11 +647,11 @@ class DataExtractor:
 
     def get_data(self, constraints: dict = None):
         """
-        getter for accessing result data. The results are filtered by constraints. 
+        getter for accessing result data. The results are filtered by constraints.
 
         Args:
             constraints: (dict)
-                a dictionary with data frame columns indices as key and lists of values. The data frame 
+                a dictionary with data frame columns indices as key and lists of values. The data frame
                 is filtered by rows that contain such a value in that columns
 
         Returns:
@@ -629,9 +659,13 @@ class DataExtractor:
         """
         return self.filter_by_constraint(constraints)
 
-    def extract_data(self, solver, glob_list, ):
+    def extract_data(
+        self,
+        solver,
+        glob_list,
+    ):
         """
-        extracts all relevant data to be saved in a pandas DataFrame from the results of a given solver. 
+        extracts all relevant data to be saved in a pandas DataFrame from the results of a given solver.
         The result files to be read are specified in a list of globs expressions
 
         Args:
@@ -646,11 +680,22 @@ class DataExtractor:
         # plotData = collections.defaultdict(collections.defaultdict)
         result = pd.DataFrame()
         for glob_expr in glob_list:
-            for file_name in glob.glob(path.join(self.path_dictionary[solver], glob_expr)):
-                result = result.append(self.extract_data_from_file(solver, file_name, ))
+            for file_name in glob.glob(
+                path.join(self.path_dictionary[solver], glob_expr)
+            ):
+                result = result.append(
+                    self.extract_data_from_file(
+                        solver,
+                        file_name,
+                    )
+                )
         return result
 
-    def extract_data_from_file(self, solver, file_name, ):
+    def extract_data_from_file(
+        self,
+        solver,
+        file_name,
+    ):
         """
         reads the result file of a solver and builds a pandas data frame containing a entry for
         each run saved in the file
@@ -664,7 +709,7 @@ class DataExtractor:
         Returns:
             (pd.DataFrame) a pandas data frame containing a row for every run saved in the file
         """
-        with open(file_name) as file:
+        with open(file_name, encoding="utf-8") as file:
             file_data = json.load(file)
 
         result_dict = {}
@@ -678,14 +723,13 @@ class DataExtractor:
         for subproblem, subproblem_config in config.get("ising_interface", {}).items():
             try:
                 result_dict.update(
-                    {subproblem + "__" + key: [val] for key, val in subproblem_config.items()}
+                    {
+                        subproblem + "__" + key: [val]
+                        for key, val in subproblem_config.items()
+                    }
                 )
             except AttributeError:
                 continue
 
     def add_result(self, result_dict, result):
         result_dict.update({key: [val] for key, val in result.items()})
-
-
-if __name__ == "__main__":
-    main()

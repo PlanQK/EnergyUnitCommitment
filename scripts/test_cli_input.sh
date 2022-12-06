@@ -35,7 +35,7 @@ do
     case $1 in
 
         -b)
-            docker build -f ${GIT_ROOT}/${SERVICE_DOCKERFILE} -t ${DOCKERTAG} ${GIT_ROOT}
+            docker build -f ${GIT_ROOT}/${PATH_PREFIX}${SERVICE_DOCKERFILE} -t ${DOCKERTAG} ${GIT_ROOT}
             ;;
 
         *)

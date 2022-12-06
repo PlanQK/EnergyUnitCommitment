@@ -1,4 +1,4 @@
-"""The `Backends` module contains all solvers for the unit commitment problem. They all
+"""The `backends` module contains all solvers for the unit commitment problem. They all
 share the base class BackendBase with similar solvers grouped in their own file. Currently,
 these categories are:
     - SQA-based solvers,
@@ -16,14 +16,14 @@ You can extend the networks that can be solved by extending the IsingBackbone cl
 add a new constraint, you have to write a class that adheres to the `IsingSubproblem` interface. Then you pass
 it as an entry to the `ising_backbone` value of the configuration.
 """
-
-from .SqaBackends import ClassicalBackend, SqaBackend
-from .DwaveBackends import (
+from .backend_base import BackendBase
+from .sqa_backends import ClassicalBackend, SqaBackend, SqaIterator
+from .dwave_backends import (
     DwaveTabu,
     DwaveSteepestDescent,
     DwaveCloudHybrid,
     DwaveCloudDirectQPU,
     DwaveReadQPU,
 )
-from .PypsaBackends import PypsaGlpk, PypsaFico
-from .QaoaBackend import QaoaQiskit
+from .pypsa_backends import PypsaGlpk
+from .qaoa_backends import QaoaQiskit

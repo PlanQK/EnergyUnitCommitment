@@ -1,21 +1,20 @@
-import streamlit as st
 import time
 
-import pandas as pd
-import altair as alt
-
-import requests
-
 import json
-import yaml
 import os
 
 from json import JSONDecodeError
-
 from contextlib import redirect_stdout
 import io
-
 from ast import literal_eval
+
+import yaml
+import requests
+
+
+import pandas as pd
+import altair as alt
+import streamlit as st
 
 st.set_page_config(page_title="Unit Commitment Optimization", layout="wide")
 state = st.session_state
@@ -42,10 +41,10 @@ if "init" not in state:
 def get_url():
     url = "http://localhost:443/"
     if os.path.isfile("/url.txt"):
-        with open("/url.txt", "r") as f:
+        with open("/url.txt", "r", encoding='utf-8') as f:
             url = f.readline().strip()
     elif os.path.isfile("./url.txt"):
-        with open("./url.txt", "r") as f:
+        with open("./url.txt", "r", encoding='utf-8') as f:
             url = f.readline().strip()
     return url
 

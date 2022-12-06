@@ -10,7 +10,7 @@
 SHELL := /bin/bash
 DOCKERCOMMAND := docker
 DOCKERFILE = Dockerfile
-DOCKERTAG = energy:1.0
+DOCKERTAG = energy:latest
 
 # For running multiple optimizations in parallel
 REPETITIONS = 1
@@ -25,9 +25,9 @@ PROBLEMDIRECTORY := $(shell git rev-parse --show-toplevel)
 ###### set mount paths ######
 # for development purposes, we don't build the entire image, but mount the the code that is changed often.
 # We also mount the folder containing the networks and the config files
-MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/networks/,target=/energy/Problemset
+MOUNTSWEEPPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/input/networks/,target=/energy/problemset
 MOUNTLIBSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/src/libs,target=/energy/libs
-MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/configs,target=/energy/configs
+MOUNTCONFIGSPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/input/configs,target=/energy/configs
 # only mount qpu results if there actually are any results. They are required for reusing annealer samples
 ifeq ("$(wildcard $(PROBLEMDIRECTORY)/results_qpu_sweep)", "")
 MOUNTQPURESULTPATH := --mount type=bind,source=$(PROBLEMDIRECTORY)/results_qpu_sweep,target=/energy/results_qpu
@@ -51,7 +51,7 @@ CONFIGFILES = config-all.yaml
 # CONFIGGLOB = config*.yaml
 
 ifneq ($(CONFIGGLOB),)
-CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/configs -name "$(CONFIGGLOB)" | sed 's!.*/!!' | sed 's!.po!!')
+CONFIGFILES = $(shell find $(PROBLEMDIRECTORY)/input/configs -name "$(CONFIGGLOB)" | sed 's!.*/!!' | sed 's!.po!!')
 endif
 
 ###### define sweep files ######
@@ -69,7 +69,7 @@ NETWORKNAME = defaultnetwork.nc
 # NETWORKNAME = elec_s_5.nc
 
 # lists networks to be used using NETWORKNAME
-SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/networks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
+SWEEPFILES = $(shell find $(PROBLEMDIRECTORY)/input/networks -name "$(strip $(NETWORKNAME))" | sed 's!.*/!!' | sed 's!.po!!')
 
 ###### define extra parameter ######
 # Please check the current config-all.yaml for a list and description of all
@@ -236,11 +236,11 @@ GENERAL_SWEEP_FILES = $(foreach filename, $(SWEEPFILES), \
 # define general target
 
 define general
-${SAVE_FOLDER}N$(strip $(1))_$(strip $(2))_$(strip $(4)): $(PROBLEMDIRECTORY)/networks/$(strip $(1)) .docker.tmp
+${SAVE_FOLDER}N$(strip $(1))_$(strip $(2))_$(strip $(4)): $(PROBLEMDIRECTORY)/input/networks/$(strip $(1)) .docker.tmp
 	$(DOCKERCOMMAND) run $(MOUNTALL) \
 	$(DOCKERTAG) $(strip $(1)) $(strip $(2)) file_name__N$(strip $(1))_$(strip $(2))_$(strip $(4))
 	mkdir -p ${SAVE_FOLDER}
-	mv $(PROBLEMDIRECTORY)/networks/N$(strip $(1))_$(strip $(2))_$(strip $(4)) ${SAVE_FOLDER}
+	mv $(PROBLEMDIRECTORY)/input/networks/N$(strip $(1))_$(strip $(2))_$(strip $(4)) ${SAVE_FOLDER}
 endef
 
 $(foreach filename, $(SWEEPFILES), \
@@ -254,7 +254,10 @@ $(foreach filename, $(SWEEPFILES), \
 
 ###### Define further helper targets ######
 
-.PHONY: all plots general clean_general
+.PHONY: all plots general clean_general temp_general
+
+# used for repeated making of runs if discarding results is acceptable
+temp: clean_general general
 
 .docker.tmp: $(DOCKERFILE) src/run.py requirements.txt src/program.py src/libs/return_objects.py
 	$(DOCKERCOMMAND) build -t $(DOCKERTAG) -f $(DOCKERFILE) . && touch .docker.tmp

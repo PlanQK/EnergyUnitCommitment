@@ -2,10 +2,6 @@
 venv/*
 *.pyc
 
-# pypsa input networks
-networks/*
-!defaultnetwork.nc
-!network_4qubit_2_bus.nc
 
 # serialized pypsa networks except one for testing the service
 input/*.json
@@ -13,15 +9,21 @@ input/*.json
 !input/test_service_input.json
 !input/config.json
 
+# pypsa input networks
+input/networks/*
+input/!defaultnetwork.nc
+input/!network_4qubit_2_bus.nc
+
+# ignore yaml (config) files except the example
+input/configs/*.yaml
+input/!configs/config-all.yaml
+
 # local optimization results
 results_*
 
 # indicator file for the last time the docker image was built
 .docker.tmp
 
-# ignore yaml (config) files except the example
-configs/*.yaml
-!configs/config-all.yaml
 
 # ignore zip file for service building and the test result of testing it
 *.zip
@@ -39,3 +41,10 @@ plots/*
 # created in root when running gui test script
 url.txt
 
+# additional files that are not ready to be published
+statistics
+tosca_artifacts
+scripts/*plot*.py
+
+# editor generated files
+.vscode/**

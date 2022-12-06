@@ -1,31 +1,42 @@
 """Starts a Flask server that can provided a REST API to the streamlit frontend
 for Unit Commitment optimziation"""
 
-from distutils.command.config import config
 from tokenize import String
-from flask import Flask
-from flask import request
-from run import parse_cli_params
-from program import run
-from werkzeug.utils import secure_filename
+
 from contextlib import redirect_stdout
 import io
 import json
-import pypsa
 import os
+
+from werkzeug.utils import secure_filename
+
+import pypsa
+from flask import Flask
+from flask import request
+
+
+from run import parse_cli_params
+from program import run
 
 app = Flask(__name__)
 
 
 def get_root_path():
+    """
+    Returns the path to the network files.
+    """
     if os.environ.get('CONTAINERLESS', False):
-        path = os.getcwd() + '/networks/' 
+        path = os.getcwd() + '/input/networks/'
     else:
-        path = '/EnergyUnitCommitment/networks/' 
+        path = '/EnergyUnitCommitment/networks/'
     return path
 
 @app.route('/start', methods=['POST'])
 def start_optimization():
+    """
+    Starts the optimization with the data obtained from the request and return a json string
+    with the results.
+    """
 
     data = request.get_json()
 
@@ -43,16 +54,19 @@ def start_optimization():
     response = {
         'result': result.to_json(),
         'logs': f.getvalue()
-    } 
+    }
     return json.dumps(response)
 
 @app.route('/upload_network', methods=['POST'])
 def upload_network():
+    """
+    Turns network from request into json string.
+    """
     file = request.files['network']
 
     path = get_root_path() + secure_filename(file.filename) + ".nc"
 
-    with open(path, 'wb') as f:
+    with open(path, 'wb', encoding='utf-8') as f:
         f.write(file.getvalue())
 
     network = pypsa.Network(path)

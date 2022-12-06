@@ -23,6 +23,9 @@ from plot_results import *
 
 
 def main():
+    """
+    Example function demonstrating the use of the PlottingAgent class.
+    """
     plt.style.use("seaborn")
 
     # In order to search the result folders, the plot_agent requires a dictionary when instantiating it.
@@ -36,32 +39,35 @@ def main():
     # network in it's name with any additional ending. All sqa results which weren't run with the trotter
     # slices config config of either 100, 150 or 200 will be discarded.
     networkbatch = "defaultnetwork.nc"
-    plot_agent = PlottingAgent.extract_from_json({
-        "sqa": [networkbatch +"*"],
+    plot_agent = PlottingAgent.extract_from_json(
+        {
+            "sqa": [networkbatch + "*"],
         },
         # constraints={"trotter_slices": [100,150,200]}
-        )
+    )
 
     # This will create a plot nammed "first_figure" with the trotter slices on the x-axis and
     # two lines: one for the average kirchhoff cost and one for the average marginal costs
     # The empty `split_fields` means that the results aren't grouped by the value of a third
     # parameter
-    plot_agent.make_figure("first_figure",
-                            x_field = "trotter_slices",
-                            y_field_list = ["kirchhoff_cost", "marginal_cost"],
-                            split_fields = []
-                            )
+    plot_agent.make_figure(
+        "first_figure",
+        x_field="trotter_slices",
+        y_field_list=["kirchhoff_cost", "marginal_cost"],
+        split_fields=[],
+    )
 
     # This dump the underlying pandas DataFrame as a csv file with the git root as the current directory
     plot_agent.to_csv("results_csv/some_results.csv")
 
     # We can remake a plot_agent with the same data set by reading the dumped csv
     plot_agend = plot_agent.read_csv("results_csv/some_results.csv")
-    plot_agent.make_figure("same_figure_from_same_csv",
-                            x_field = "trotter_slices",
-                            y_field_list = ["kirchhoff_cost", "marginal_cost"],
-                            split_fields = []
-                            )
+    plot_agend.make_figure(
+        "same_figure_from_same_csv",
+        x_field="trotter_slices",
+        y_field_list=["kirchhoff_cost", "marginal_cost"],
+        split_fields=[],
+    )
     return
 
 

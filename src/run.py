@@ -1,27 +1,28 @@
-"""This file is the entrypoint for the docker run command for the image build from the Dockerfile.
-The base image is `herrd1/siquan:latest`. The docker container loads the pypsa model and performs the
-optimization of the unit commitment problem. The result will be written to a json file  in a location
-that the Makefile will mount to the host's drive. In order to do that, it transforms the arguments
-to call the `run` method, which will return an object containing the information of the optimization.
+"""This file is the entrypoint for the docker run command of the docker image build from the Dockerfile.
+The base image is `herrd1/siquan:latest`, which contains the simulated quantum annealing solver.
+The docker container loads the pypsa model and performs the optimization of the unit commitment problem.
+The result will be written to a json file  in a location that the Makefile will mount to the host's drive.
+In order to do that, it transforms the arguments to call the `run` method, which will return an object
+containing the information of the optimization.
 
 For this the docker run needs at least 2 and up to 3 arguments.
         sys.argv[1]: (str) path of the network file
         sys.argv[2]: (str) path of the config file
-        sys.argv[3]: (str||None) string containing extra parameters that are not specified in config file
+        sys.argv[3]: (str|None) A string containing extra parameters that are not specified in config file
 """
 
 import sys
+import ast
 
 from program import run
 
-import ast
-
-keyword_seperator = "__"
-params_seperator = "____"
-
 
 def main():
-    # reading input
+    """
+    The entrypoint which hands the parameters to the main function run and
+    writes the results afterwards.
+    """
+    # reading input files
     network = sys.argv[1]
     params = sys.argv[2]
     # the sys.argv[3] string contains configuration parameter so the makefile
@@ -31,23 +32,33 @@ def main():
         cli_params_dict = parse_cli_params(sys.argv[3])
 
     response = run(data=network, params=params, params_dict=cli_params_dict)
-    response.dump_results()
+    # dump the result json in `problemset/`, which has to mounted to the host
+    response.dump_results(folder="problemset/")
 
 
-def parse_cli_params(param_string: str):
+def parse_cli_params(
+    param_string: str,
+    keyword_seperator: str = "__",
+    params_seperator: str = "____",
+) -> dict:
     """
     Parse the input of the command line that contains configuration values
 
-    Takes a string containing a parameter and which values you want to use
-    and parses that into a pair of lists. The first list contains the list
-    of keys which to descent into the config dictionary, and the second list
-    contains the list of python values (str, int, float) that are going to be used
+    Takes the string and converts into a nested dict. Different entries are
+    separated by the default separator `"____"` and the keys for the different
+    levels are separated by the default separator `"__"`.
 
     Args:
         param_string: (str)
             A string containing entries of a nested dictionary to be parsed.
-            Different Parameters are separated by `params_seperator`. The keys
-            and the value are separated by `keyword_seperator`
+        keyword_seperator: (str)
+            The string by which to split the string containing the nested keys
+        params_seperator: (str)
+            The string by which to split the various parameters, that will be
+            inserted into the nested dictionary
+
+    Returns: (dict)
+        A nested dictionary of configuration entries
     """
     if not param_string:
         return {}
@@ -64,9 +75,10 @@ def parse_cli_params(param_string: str):
     return result
 
 
-def insert_value(key_chain: list, value: any, current_level: dict):
+def insert_value(key_chain: list, value: any, current_level: dict) -> None:
     """
-    insert a value in the dictionary by descending the keychain
+    Insert the passed value into the dictionary by descending
+    the list of keys
 
     Args:
         key_chain: (list)
@@ -76,7 +88,7 @@ def insert_value(key_chain: list, value: any, current_level: dict):
         current_level: (dict)
             The dictionary in which to write the value
 
-    Returns:
+    Returns: (None)
         Modifies the passed dictionary and returns `None`.
     """
     for key in key_chain[:-1]:

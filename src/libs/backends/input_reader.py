@@ -10,6 +10,9 @@ when calling the script that initiates the optimization
 - so far, output is saved in the backends using a dictionary, or by creating
 a response object
 """
+from os import environ
+
+from typing import Union
 
 import copy
 import json
@@ -17,11 +20,9 @@ import pypsa
 import xarray
 import yaml
 
-from os import environ
+from werkzeug.utils import secure_filename
 
-from typing import Union
-
-from .. import Backends
+from .. import backends
 
 
 class InputReader:
@@ -41,20 +42,18 @@ class InputReader:
             "dwave-qpu",
             "dwave-read-qpu",
         ],
-        "pypsa_backend": ["pypsa-glpk", "pypsa-fico"],
-        "sqa_backend": ["sqa", "classical"],
+        "pypsa_backend": ["pypsa-glpk"],
+        "sqa_backend": ["sqa", "classical", "iterative-sqa"],
         "qaoa_backend": ["qaoa"],
     }
-    loaders = {
-        "json": json.load,
-        "yaml": yaml.safe_load
-    }
+    loaders = {"json": json.load, "yaml": yaml.safe_load}
 
-    def __init__(self,
-                 network: Union[str, dict, pypsa.Network],
-                 config: Union[str, dict],
-                 params_dict: dict = None,
-                 ):
+    def __init__(
+        self,
+        network: Union[str, dict, pypsa.Network],
+        config: Union[str, dict],
+        params_dict: dict = None,
+    ):
         """
         Obtain the configuration dictionary and pypsa.Network,
         dependent on the input format of network and config. The
@@ -73,8 +72,9 @@ class InputReader:
         self.config = self.make_config(config)
         self.add_params_dict(params_dict)
         self.copy_to_backend_config()
-        if "snapshots" in self.config:
-            self.network.snapshots = self.network.snapshots[:self.config["snapshots"]]
+        self.network.snapshots = self.network.snapshots[
+            : self.config.get("snapshots", len(self.network.snapshots))
+        ]
         # print final config, but hide api tokens
         config_without_token = copy.deepcopy(self.config)
         for provider, token in self.config.get("API_token", {}).items():
@@ -92,7 +92,7 @@ class InputReader:
             (None)
                 Modifies self.config.
         """
-        self.config["backend"] = self.config.get("backend", "sqa").replace('_', '-')
+        self.config["backend"] = self.config.get("backend", "sqa").replace("_", "-")
         for backend_type, solver_list in self.backend_to_solver.items():
             if self.config["backend"] in solver_list:
                 # expansion has guards for passing None objects as config dicts
@@ -102,12 +102,14 @@ class InputReader:
                 }
                 return
 
-    def make_network(self, network: Union[str, dict, pypsa.Network]) \
-            -> [pypsa.Network, str]:
+    def make_network(
+        self, network: Union[str, dict, pypsa.Network]
+    ) -> [pypsa.Network, str]:
         """
-        Opens a pypsa.Network using the provided network argument. If a
-        string is given it is interpreted as the network name. It has to
-        be stored in the folder "Problemset". If a dictionary is given,
+        Opens a pypsa.Network using the provided network argument.
+
+        If a string is given it is interpreted as the network name. It has to
+        be stored in the folder "problemset". If a dictionary is given,
         it will be assumed to be the dictionary representation of a
         netCDF format and will be converted into a pypsa.Network.
         Lastly, if a pypsa.Network is provided it will just be passed
@@ -124,34 +126,45 @@ class InputReader:
             (str)
                 The network name.
         """
+        # load from disk
         if isinstance(network, str):
             if environ.get("RUNNING_IN_DOCKER", False):
-                network_path = "Problemset/"
+                network_path = "problemset/"
             else:
-                network_path = "../networks/"
+                network_path = "../input/networks/"
             return pypsa.Network(network_path + network), network
+
+        # load from serialized network
         elif isinstance(network, dict):
             loaded_dataset = xarray.Dataset.from_dict(network)
             loaded_net = pypsa.Network()
-            pypsa.Network.import_from_netcdf(network=loaded_net,
-                                             path=loaded_dataset)
+            pypsa.Network.import_from_netcdf(network=loaded_net, path=loaded_dataset)
             return loaded_net, network["attrs"].get("network_name", "network_from_dict")
+
+        # the network has been build in a previous step
         elif isinstance(network, pypsa.Network):
             return network, "no_name_network"
-        raise TypeError("The network has to be given as a dictionary, "
-                        "representing the netCDF format of a pypsa.Network, "
-                        "an actual pypsa.Network, or a string with the name "
-                        "of the pypsa.Network, which has to be stored in the "
-                        "Problemset folder.")
+
+        raise TypeError(
+            "The network has to be given as a dictionary, "
+            "representing the netCDF format of a pypsa.Network, "
+            "an actual pypsa.Network, or a string with the name "
+            "of the pypsa.Network, which denotes the folder it is "
+            "stored in."
+        )
 
     def make_config(self, input_config: Union[str, dict]) -> dict:
         """
-        Converts an inputConfig file into a dictionary. If the input is
-        a dictionary it will be passed through to the output. If it is
-        a string, the filetype will be determined, the file opened and
-        stored in a dictionary. Currently .json and .yaml files are
-        supported. Before being returned, it is checked if the key
-        "backend_config" is present, if not it will be created.
+        Converts an input_config file into a dictionary.
+
+        If the input is a dictionary it will be passed as the output.
+        If it is a string, the filetype will be determined, the file opened and
+        stored in a dictionary.
+        If the environment variable "RUNNING_IN_DOCKER",
+        is set, it is assumed that program runs in the container made by the
+        dockerfile in this repo and the folder containing the file has been mounted
+        to `/energy/configs`. Otherwise, the files in `input/configs` are searched.
+        The supported filetypes are json and yaml.
 
         Args:
             input_config: (Union[str, dict])
@@ -166,19 +179,22 @@ class InputReader:
         if isinstance(input_config, dict):
             result = input_config
         else:
+            # input_config is assumed to be the path if it is not a dict
+            input_config = secure_filename(input_config)
             filename, filetype = input_config.split(".")[-2:]
             self.config_name = filename
             try:
-                # input_config is assumed to be the path if it is not a dict
                 loader = self.loaders[filetype]
             except KeyError:
-                raise KeyError(f"The file format {filetype} doesn't match any supported "
-                               f"format. The supported formats are {list(self.loaders.keys())}")
+                raise KeyError(
+                    f"The file format {filetype} doesn't match any supported "
+                    f"format. The supported formats are {list(self.loaders.keys())}"
+                )
             if environ.get("RUNNING_IN_DOCKER", False):
                 config_path = "configs/"
             else:
-                config_path = "../configs/"
-            with open(config_path + input_config) as file:
+                config_path = "../input/configs/"
+            with open(config_path + input_config, encoding="utf-8") as file:
                 result = loader(file)
         base_dict = {
             "API_token": {},
@@ -188,7 +204,9 @@ class InputReader:
         }
         return {**base_dict, **result}
 
-    def add_params_dict(self, params_dict: dict = None, current_level: dict = None) -> None:
+    def add_params_dict(
+        self, params_dict: dict = None, current_level: dict = None
+    ) -> None:
         """
         Writes extra parameters into the config dictionary, overwriting
         already existing data.
@@ -212,11 +230,13 @@ class InputReader:
             current_level = self.config
         for config_key, config_value in params_dict.items():
             if isinstance(config_value, dict):
-                self.add_params_dict(config_value, current_level.setdefault(config_key, {}))
+                self.add_params_dict(
+                    config_value, current_level.setdefault(config_key, {})
+                )
             else:
                 current_level[config_key] = config_value
 
-    def get_optimizer_class(self):
+    def get_optimizer_class(self) -> "backends.BackendBase":
         """
         Returns the corresponding optimizer class that is specified
         in the `config` attribute of this instance
@@ -226,16 +246,16 @@ class InputReader:
                 The optimizer class that corresponds to the config value
         """
         gan_backends = {
-            "classical": Backends.ClassicalBackend,
-            "sqa": Backends.SqaBackend,
-            "dwave-tabu": Backends.DwaveTabu,
-            "dwave-greedy": Backends.DwaveSteepestDescent,
-            "pypsa-glpk": Backends.PypsaGlpk,
-            "pypsa-fico": Backends.PypsaFico,
-            "dwave-hybrid": Backends.DwaveCloudHybrid,
-            "dwave-qpu": Backends.DwaveCloudDirectQPU,
-            "dwave-read-qpu": Backends.DwaveReadQPU,
-            "qaoa": Backends.QaoaQiskit,
+            "classical": backends.ClassicalBackend,
+            "sqa": backends.SqaBackend,
+            "iterative-sqa": backends.SqaIterator,
+            "dwave-tabu": backends.DwaveTabu,
+            "dwave-greedy": backends.DwaveSteepestDescent,
+            "pypsa-glpk": backends.PypsaGlpk,
+            "dwave-hybrid": backends.DwaveCloudHybrid,
+            "dwave-qpu": backends.DwaveCloudDirectQPU,
+            "dwave-read-qpu": backends.DwaveReadQPU,
+            "qaoa": backends.QaoaQiskit,
         }
         return gan_backends[self.config["backend"]]
 
@@ -249,9 +269,9 @@ class InputReader:
         """
         return self.config
 
-    def get_config_name(self) -> dict:
+    def get_config_name(self) -> str:
         """
-        A getter for the config dictionary.
+        A getter for the config dictionary name.
 
         Returns:
             (dict)
@@ -259,7 +279,7 @@ class InputReader:
         """
         return self.config_name
 
-    def get_file_name(self) -> dict:
+    def get_file_name(self) -> str:
         """
         A getter for the file the results gets dumped too
 

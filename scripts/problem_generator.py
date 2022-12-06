@@ -10,11 +10,13 @@ For simplification no floating point values are used.
 I recommend thinking very carefully before changing the parameters.
 """
 import sys
-import pypsa
 import random
 from os import path as ospath
 
 from datetime import datetime
+
+import pypsa
+
 
 CONFIG = {
     # the variance indicates how different the random variables are to each other
@@ -37,7 +39,7 @@ CONFIG = {
     # scaling factor for line capacity in percent
     "line_scale": 20,
     # location where to save the network starting at git root
-    "savepath": "networks",
+    "savepath": "input/networks",
     # prefix of the filename. If this is empty the prefix will be set to
     # {date}_network , with the date win yyyymmdd format
     "prefix": "",
@@ -161,8 +163,8 @@ class ProblemInstance:
                 ).return_partition()
             )
         gen_output_index = 0
-        for bus_id in range(len(generators_per_bus)):
-            for generator_id in range(generators_per_bus[bus_id]):
+        for bus_id, value in enumerate(generators_per_bus):
+            for generator_id in range(value):
                 p_nom, p_max_pu = normalize_output(
                     [element[gen_output_index] for element in generator_output]
                 )
@@ -225,15 +227,19 @@ class ProblemInstance:
         self.network.export_to_netcdf(file_name)
 
 
-usage_string = """
+USAGE_STRING = """
 usage: problemGenerator.py num_problems
        problemGenerator.py num_problems scale
 """
 
 
 def main():
+    """
+    The main function of the script generating a number of problem instances
+    given in the parameters.
+    """
     if len(sys.argv) == 1 or len(sys.argv) > 3:
-        print(usage_string)
+        print(USAGE_STRING)
         exit(1)
     global CONFIG
     if len(sys.argv) == 3:

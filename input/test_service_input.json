@@ -213,8 +213,12 @@
 	  "APItoken": {
 		"IBMQ_API_token": "",
 		"dWave_API_token": ""
-		}
+		},
 	"backend": "qaoa",
+        "ising_interface": {
+                "generator_representation": "single_qubit",
+                "line_representation": "cutpowersoftwo"
+        },
 	"backend_config": {
 		}
 	}

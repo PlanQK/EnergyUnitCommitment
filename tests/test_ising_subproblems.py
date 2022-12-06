@@ -1,21 +1,28 @@
-import pytest
+"""
+This module contains tests concerning the functionality of the GlobalCostSquare
+class derived from IsingSubproblem.
+"""
 import typing
-
+import pytest
 import pypsa
 
-from src.libs.qubo_transformator.ising_backbone import IsingBackbone
+from src.libs.qubo_transformator.ising_backbone import NetworkIsingBackbone
 
 from src.libs.qubo_transformator.ising_subproblems import GlobalCostSquare
+
+from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
 
 # creates a network with 2 generators at two buses. The first "gen_1" has a power output
 # of 4 and the second "gen_2" has a power output of 3
 from .pypsa_networks import create_network
 
-from src.libs.qubo_transformator.qubit_encoder import GeneratorEncoder
 
 @pytest.fixture
-def backbone():
-    backbone_result = IsingBackbone(create_network([3]))
+def create_backbone():
+    """
+    Create an ising backbone, that only has the generators encodes as qubits
+    """    
+    backbone_result = NetworkIsingBackbone(create_network([3]))
     encoder = GeneratorEncoder.create_encoder(backbone_result, "single_qubit")
     encoder.encode_qubits()
     return backbone_result
@@ -72,7 +79,7 @@ def test_global_cost_square_distance_encoding_zero_target_offset(backbone):
               }
     cost_encoder = GlobalCostSquare.build_subproblem(backbone, config)
     cost_encoder.encode_subproblem()
-    assert backbone.ising_coefficients == {
+    assert backbone.get_ising_coefficients() == {
             (): -38.88888888888889,
             (0,): 11.111111111111121,
             (0, 1): 33.33333333333333,
