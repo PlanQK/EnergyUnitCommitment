@@ -189,7 +189,7 @@ class InputReader:
                 raise KeyError(
                     f"The file format {filetype} doesn't match any supported "
                     f"format. The supported formats are {list(self.loaders.keys())}"
-                )
+                ) from None
             if environ.get("RUNNING_IN_DOCKER", False):
                 config_path = "configs/"
             else:
