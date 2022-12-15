@@ -7,13 +7,15 @@ to encode the various constraints and the objective function.
 import pypsa
 
 
-from .ising_backbone import NetworkIsingBackbone
+from .ising_backbone import NetworkIsingBackbone, GraphIsingBackbone
 from .qubit_encoder import NetworkEncoder
 from .ising_subproblems import (
     KirchhoffSubproblem,
     MarginalCostSubproblem,
     MinimalGeneratorOutput,
     PowerOutputInvariant,
+    HamiltonianPathSubproblem,
+    TspCostSubproblem
 )
 
 class TspTransformator:
@@ -23,8 +25,8 @@ class TspTransformator:
         self.edges = [str(edge) for edge in self.graph]
         self.config = config
 
-    def transform_network_to_qubo(self) -> IsingBackbone:
-        backbone_result = IsingBackbone()
+    def transform_network_to_qubo(self) -> GraphIsingBackbone:
+        backbone_result = GraphIsingBackbone()
         print()
         print("--- Generating Ising problem ---")
         subproblem_table = {

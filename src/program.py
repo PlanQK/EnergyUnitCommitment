@@ -15,12 +15,12 @@ from loguru import logger
 try:
     # import when building image for local use
     import libs.backends
-    from libs.backends.input_reader import InputReader
+    from libs.backends.input_reader import InputReader, GraphReader
     from libs.return_objects import Response, ResultResponse, ErrorResponse
 except ImportError:
     # fall back to relative import. Necessary for the PlanQK service ##
     from .libs import backends
-    from .libs.backends.input_reader import InputReader
+    from .libs.backends.input_reader import InputReader, GraphReader
     from .libs.return_objects import Response, ResultResponse, ErrorResponse
 
 

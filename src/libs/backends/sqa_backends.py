@@ -11,7 +11,7 @@ from ast import literal_eval
 
 from numpy import sqrt
 
-from .input_reader import InputReader
+from .input_reader import InputReader, GraphReader
 from .backend_base import BackendBase
 
 # try import from local .so
@@ -20,10 +20,10 @@ from .backend_base import BackendBase
 # (required by /energy/libs/backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
     from . import siquan
-    from ..qubo_transformator import QuboTransformator
+    from ..qubo_transformator import QuboTransformator, TspTransformator
 # try import from installed module siquan
 except ImportError:
-    from libs.qubo_transformator import QuboTransformator
+    from libs.qubo_transformator import QuboTransformator, TspTransformator
     import siquan
 
 

@@ -5,7 +5,7 @@ various attributes that are all solvers use"""
 import abc
 from datetime import datetime
 
-from .input_reader import InputReader
+from .input_reader import InputReader, GraphReader
 
 
 class BackendBase(abc.ABC):

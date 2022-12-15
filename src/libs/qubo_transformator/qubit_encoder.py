@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 
 
-from .ising_backbone import IsingBackbone, NetworkIsingBackbone
+from .ising_backbone import IsingBackbone, NetworkIsingBackbone, GraphIsingBackbone
 
 
 def binary_power_and_rest(number: int):

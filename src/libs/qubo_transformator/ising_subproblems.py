@@ -174,7 +174,8 @@ class HamiltonianPathSubproblem(AbstractIsingSubproblem):
                     target=float(-num_nodes)
                 )
 
-
+class TspCostSubproblem(AbstractIsingSubproblem):
+    pass
 
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
