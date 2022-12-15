@@ -14,6 +14,10 @@ input/networks/*
 input/!defaultnetwork.nc
 input/!network_4qubit_2_bus.nc
 
+# tsp test graph
+input/graphs/*
+input/graphs/min_test_graph.yaml
+
 # ignore yaml (config) files except the example
 input/configs/*.yaml
 input/!configs/config-all.yaml
