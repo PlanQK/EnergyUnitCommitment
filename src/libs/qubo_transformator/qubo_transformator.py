@@ -8,7 +8,7 @@ import pypsa
 
 
 from .ising_backbone import NetworkIsingBackbone, GraphIsingBackbone
-from .qubit_encoder import NetworkEncoder
+from .qubit_encoder import NetworkEncoder, GraphEncoder
 from .ising_subproblems import (
     KirchhoffSubproblem,
     MarginalCostSubproblem,
@@ -26,7 +26,7 @@ class TspTransformator:
         self.config = config
 
     def transform_network_to_qubo(self) -> GraphIsingBackbone:
-        backbone_result = GraphIsingBackbone()
+        backbone_result = GraphIsingBackbone(self.graph)
         print()
         print("--- Generating Ising problem ---")
         subproblem_table = {
@@ -34,7 +34,7 @@ class TspTransformator:
             "tsp_cost": TspCostSubproblem,
         }
         GraphEncoder.create_encoder(backbone_result, self.graph).encode_qubits()
-
+        unmatched_subproblems = []
         for subproblem, subproblem_configuration in config.items():
             if subproblem not in subproblem_table:
                 print(

@@ -168,15 +168,25 @@ class HamiltonianPathSubproblem(AbstractIsingSubproblem):
                 )
     def encode_number_edges(self):
         num_nodes = len(self.backbone.get_nodes())
-        label_list = [str(edge)+"+1" for edge in self.graph.keys()]
+        label_list = [str(edge)+"+_1" for edge in self.graph.keys()]
         self.backbone.encode_squared_distance(
                     label_list=label_list,
                     target=float(-num_nodes)
                 )
-
-class TspCostSubproblem(AbstractIsingSubproblem):
+class TspCostSubproblem(AbstractIsingSubproblem, ABC):
+    @classmethod
+    def build_subproblem(cls, backbone: IsingBackbone, configuration: dict) -> "AbstractIsingSubproblem":
+        subclass_table = {
+            "quadratic_cost": QuadraticCost,
+            "linear_cost": LinearCost
+        }
+        return subclass_table[
+            configuration.setdefault("strategy", "quadratic_cost")
+        ](backbone=backbone, config=configuration)
+class QuadraticCost(TspCostSubproblem):
     pass
-
+class LinearCost(TspCostSubproblem):
+    pass
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
     """
