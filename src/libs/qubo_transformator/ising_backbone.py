@@ -861,6 +861,14 @@ class GraphIsingBackbone(IsingBackbone):
         # network to be solved
         self.graph = graph
 
+    def get_nodes(self):
+        nodes = []
+        for edge in self.graph:
+            nodes += edge
+        return list(set(nodes))
+    def get_adjacent_edges(self, node):
+        return [str(edge) for edge in self.graph if node in edge]
+
 class NetworkIsingBackbone(IsingBackbone):
     """
     This class implements the conversion of a unit commitment problem

@@ -20,18 +20,8 @@ class TspTransformator:
 
     def __init__(self, graph_dict, config):
         self.graph = graph_dict
-        self.nodes = self.get_nodes()
         self.edges = [str(edge) for edge in self.graph]
         self.config = config
-
-    def get_nodes(self):
-        nodes = []
-        for edge in self.graph:
-            nodes += edge
-        return list(set(nodes))
-
-    def get_adjacent_edges(self, node):
-        return [str(edge) for edge in self.graph if node in edge]
 
     def transform_network_to_qubo(self) -> IsingBackbone:
         backbone_result = IsingBackbone()
@@ -69,7 +59,6 @@ class TspTransformator:
         )
         for key in backbone_result.get_subproblems():
             print("--- - " + key)
-        return backbone_result
         return backbone_result
 
 
