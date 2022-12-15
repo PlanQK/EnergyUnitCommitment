@@ -16,6 +16,62 @@ from .ising_subproblems import (
     PowerOutputInvariant,
 )
 
+class TspTransformator:
+
+    def __init__(self, graph_dict, config):
+        self.graph = graph_dict
+        self.nodes = self.get_nodes()
+        self.edges = [str(edge) for edge in self.graph]
+        self.config = config
+
+    def get_nodes(self):
+        nodes = []
+        for edge in self.graph:
+            nodes += edge
+        return list(set(nodes))
+
+    def get_adjacent_edges(self, node):
+        return [str(edge) for edge in self.graph if node in edge]
+
+    def transform_network_to_qubo(self) -> IsingBackbone:
+        backbone_result = IsingBackbone()
+        print()
+        print("--- Generating Ising problem ---")
+        subproblem_table = {
+            "hamiltonian": HamiltonianPathSubproblem,
+            "tsp_cost": TspCostSubproblem,
+        }
+        GraphEncoder.create_encoder(backbone_result, self.graph).encode_qubits()
+
+        for subproblem, subproblem_configuration in config.items():
+            if subproblem not in subproblem_table:
+                print(
+                    f"{subproblem} is not a valid subproblem, deleting and skipping "
+                    f"encoding"
+                )
+                unmatched_subproblems.append(subproblem)
+                continue
+            if subproblem_configuration is None:
+                subproblem_configuration = {}
+            subproblem_instance = subproblem_table[subproblem].build_subproblem(
+                backbone_result, subproblem_configuration
+            )
+            backbone_result.get_subproblems()[subproblem] = subproblem_instance
+            backbone_result.flush_cached_problem()
+            subproblem_instance.encode_subproblem()
+        for subproblem in unmatched_subproblems:
+            config.pop(subproblem)
+        print()
+        print(
+            "--- Finish generating Ising Problem with\n"
+            f"- spectral gap:{backbone_result.get_spectral_gap()}\n"
+            "and the following subproblems ---\n"
+        )
+        for key in backbone_result.get_subproblems():
+            print("--- - " + key)
+        return backbone_result
+        return backbone_result
+
 
 class QuboTransformator:
     """

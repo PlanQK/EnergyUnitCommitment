@@ -845,6 +845,22 @@ class IsingBackbone:
         """
         return self._subproblems
 
+class GraphIsingBackbone(IsingBackbone):
+    def __init__(self, graph: dict):
+        """
+        Constructor for an Ising Backbone. It requires a network and
+        the name of the function that defines how to encode lines. Then
+        it goes through the configuration dictionary and encodes all
+        sub-problem present into the instance.
+
+        Args:
+            network: (pypsa.Network)
+                The pypsa network which to encode into qubits.
+        """
+        super().__init__()
+        # network to be solved
+        self.graph = graph
+
 class NetworkIsingBackbone(IsingBackbone):
     """
     This class implements the conversion of a unit commitment problem

@@ -24,7 +24,6 @@ from werkzeug.utils import secure_filename
 
 from .. import backends
 
-
 class InputReader:
     """
     This class is a reader to obtain the configuration dictionary and
@@ -308,3 +307,38 @@ class InputReader:
                 The network name.
         """
         return self.network_name
+
+
+class GraphReader(InputReader):
+
+    def __init__(
+        self,
+        graph: str,
+        config: str,
+        params_dict: dict = None,
+    ):
+        self.graph = self.make_graph(graph)
+        self.config = self.make_config(config)
+        print(f"running with the following configuration {self.config}")
+
+    def make_graph(
+        self, graph: str
+    ) -> dict:
+        if isinstance(graph, str):
+
+            input_graph = secure_filename(input_graph)
+            filename, filetype = input_graph.split(".")[-2:]
+            try:
+                loader = self.loaders[filetype]
+            except KeyError:
+                raise KeyError(
+                    f"The file format {filetype} doesn't match any supported "
+                    f"format. The supported formats are {list(self.loaders.keys())}"
+                ) from None
+            if environ.get("RUNNING_IN_DOCKER", False):
+                graph_path = "problemset/"
+            else:
+                graph_path = "../input/graphs/"
+
+            with open(graph_path + input_graph, encoding="utf-8") as file:
+                return loader(file)

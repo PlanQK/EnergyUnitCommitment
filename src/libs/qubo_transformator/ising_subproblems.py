@@ -118,6 +118,32 @@ class AbstractIsingSubproblem:
             solution=solution, ising_interactions=self._ising_coefficients
         )
 
+class HamiltonianPathSubproblem(AbstractIsingSubproblem):
+    @classmethod
+    def build_subproblem(
+        cls, backbone: IsingBackbone, configuration: dict
+    ) -> "HamiltonianPathSubproblem":
+        return HamiltonianPathSubproblem(backbone=backbone, config=configuration)
+
+    def encode_subproblem(self) -> None:
+        self.graph = self.backbone.graph
+
+        self.encode_mutual_exlusivity()
+        self.encode_single_destination()
+        self.encode_single_departure()
+        self.encode_time_order()
+        self.encode_order_transitivity()
+        self.encode_number_edges()
+
+    def encode_mutual_exlusivity():
+        for edges in self.graph.keys():
+            label_list = [str(edge) + "_0", str(edge) + "_1", str(edge) + "_2"]
+            self.backbone.encode_squared_distance(
+                label_list=label_list,
+                target=-1.0
+            )
+
+
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
     """
