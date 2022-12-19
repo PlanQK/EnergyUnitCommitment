@@ -118,6 +118,7 @@ class AbstractIsingSubproblem:
             solution=solution, ising_interactions=self._ising_coefficients
         )
 
+
 class HamiltonianPathSubproblem(AbstractIsingSubproblem):
     @classmethod
     def build_subproblem(
@@ -138,55 +139,65 @@ class HamiltonianPathSubproblem(AbstractIsingSubproblem):
     def encode_mutual_exlusivity(self):
         for edge in self.graph.keys():
             label_list = [str(edge) + "_0", str(edge) + "_1", str(edge) + "_2"]
-            self.backbone.encode_squared_distance(
-                label_list=label_list,
-                target=-1.0
-            )
-    def encode_single_destination(self):   
+            self.backbone.encode_squared_distance(label_list=label_list, target=-1.0)
+
+    def encode_single_destination(self):
         for node in self.backbone.get_nodes():
-            label_list = [str(edge)+"_1" for edge in self.graph if edge[1]==node]
-            self.backbone.encode_squared_distance(
-                label_list=label_list,
-                target=-1.0
-            )
+            label_list = [str(edge) + "_1" for edge in self.graph if edge[1] == node]
+            self.backbone.encode_squared_distance(label_list=label_list, target=-1.0)
+
     def encode_single_departure(self):
         for node in self.backbone.get_nodes():
-            label_list = [str(edge)+"_1" for edge in self.graph if edge[0]==node]
-            self.backbone.encode_squared_distance(
-                label_list=label_list,
-                target=-1.0
-            )        
+            label_list = [str(edge) + "_1" for edge in self.graph if edge[0] == node]
+            self.backbone.encode_squared_distance(label_list=label_list, target=-1.0)
 
     def encode_time_order(self):
         nodes = self.backbone.get_nodes()
-        for i,ni in enumerate(nodes):
-            for j,nj in enumerate(nodes[i+1,:]):
-                label_list = [str([ni,nj])+"_2",str([nj,ni])+"_2"]
+        for i, ni in enumerate(nodes):
+            for j, nj in enumerate(nodes[i + 1, :]):
+                label_list = [str([ni, nj]) + "_2", str([nj, ni]) + "_2"]
                 self.backbone.encode_squared_distance(
-                    label_list=label_list,
-                    target=-1.0
+                    label_list=label_list, target=-1.0
                 )
+
     def encode_number_edges(self):
         num_nodes = len(self.backbone.get_nodes())
-        label_list = [str(edge)+"+_1" for edge in self.graph.keys()]
+        label_list = [str(edge) + "+_1" for edge in self.graph.keys()]
         self.backbone.encode_squared_distance(
-                    label_list=label_list,
-                    target=float(-num_nodes)
-                )
+            label_list=label_list, target=float(-num_nodes)
+        )
+
+
 class TspCostSubproblem(AbstractIsingSubproblem, ABC):
     @classmethod
-    def build_subproblem(cls, backbone: IsingBackbone, configuration: dict) -> "AbstractIsingSubproblem":
-        subclass_table = {
-            "quadratic_cost": QuadraticCost,
-            "linear_cost": LinearCost
-        }
-        return subclass_table[
-            configuration.setdefault("strategy", "quadratic_cost")
-        ](backbone=backbone, config=configuration)
+    def build_subproblem(
+        cls, backbone: IsingBackbone, configuration: dict
+    ) -> "AbstractIsingSubproblem":
+        subclass_table = {"quadratic_cost": QuadraticCost, "linear_cost": LinearCost}
+        return subclass_table[configuration.setdefault("strategy", "quadratic_cost")](
+            backbone=backbone, config=configuration
+        )
+
+
 class QuadraticCost(TspCostSubproblem):
-    pass
+    def __init__(self, backbone: IsingBackbone, config: dict):
+        super().__init__(backbone, config)
+        self.graph = self.backbone.graph
+        self.target_cost = config["target_cost"]
+
+    def encode_subproblem(self) -> None:
+        edge_vars = [str(edge) + "_1" for edge in self.graph.keys()]
+        cost_dict = dict(zip(edge_vars, list(self.graph.values())))
+        self.backbone.encode_squared_distance(
+            label_dictionary=cost_dict,
+            target=self.target_cost,
+            global_factor=self.scale_factor,
+        )
+
+
 class LinearCost(TspCostSubproblem):
     pass
+
 
 class MarginalCostSubproblem(AbstractIsingSubproblem, ABC):
     """
