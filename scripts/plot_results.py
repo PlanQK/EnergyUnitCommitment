@@ -595,7 +595,7 @@ class DataExtractor:
         agent = DataExtractor()
         agent.df = pd.DataFrame()
         for solver, glob_list in glob_dict.items():
-            agent.df = agent.df.append(
+            agent.df = agent.df._append(
                 agent.extract_data(
                     solver,
                     glob_list,

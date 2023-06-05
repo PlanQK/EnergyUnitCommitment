@@ -35,7 +35,7 @@ class TspTransformator:
         }
         GraphEncoder.create_encoder(backbone_result, self.graph).encode_qubits()
         unmatched_subproblems = []
-        for subproblem, subproblem_configuration in config.items():
+        for subproblem, subproblem_configuration in self.config.items():
             if subproblem not in subproblem_table:
                 print(
                     f"{subproblem} is not a valid subproblem, deleting and skipping "
@@ -52,7 +52,7 @@ class TspTransformator:
             backbone_result.flush_cached_problem()
             subproblem_instance.encode_subproblem()
         for subproblem in unmatched_subproblems:
-            config.pop(subproblem)
+            self.config.pop(subproblem)
         print()
         print(
             "--- Finish generating Ising Problem with\n"

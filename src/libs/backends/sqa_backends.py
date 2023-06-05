@@ -19,12 +19,12 @@ from .backend_base import BackendBase
 # /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.26' not found
 # (required by /energy/libs/backends/siquan.cpython-39-x86_64-linux-gnu.so)`
 try:
-    from . import siquan
+    #from . import siquan
     from ..qubo_transformator import QuboTransformator, TspTransformator
 # try import from installed module siquan
 except ImportError:
     from libs.qubo_transformator import QuboTransformator, TspTransformator
-    import siquan
+    #import siquan
 
 
 class ClassicalBackend(BackendBase):

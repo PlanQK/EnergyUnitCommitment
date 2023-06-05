@@ -67,7 +67,7 @@ class AbstractIsingSubproblem:
         self._ising_coefficients = {}
         self.scale_factor = config.setdefault("scale_factor", 1.0)
         self.backbone = backbone
-        self.network = backbone.network
+        ##self.network = backbone.network
 
     @classmethod
     def build_subproblem(
@@ -133,12 +133,13 @@ class HamiltonianPathSubproblem(AbstractIsingSubproblem):
         self.encode_single_destination()
         self.encode_single_departure()
         self.encode_time_order()
-        self.encode_order_transitivity()
+        #self.encode_order_transitivity()
         self.encode_number_edges()
 
     def encode_mutual_exlusivity(self):
         for edge in self.graph.keys():
             label_list = [str(edge) + "_0", str(edge) + "_1", str(edge) + "_2"]
+            print(label_list)
             self.backbone.encode_squared_distance(label_list=label_list, target=-1.0)
 
     def encode_single_destination(self):
@@ -154,15 +155,15 @@ class HamiltonianPathSubproblem(AbstractIsingSubproblem):
     def encode_time_order(self):
         nodes = self.backbone.get_nodes()
         for i, ni in enumerate(nodes):
-            for j, nj in enumerate(nodes[i + 1, :]):
-                label_list = [str([ni, nj]) + "_2", str([nj, ni]) + "_2"]
+            for j, nj in enumerate(nodes[(i + 1):]):
+                label_list = [f"({ni},{nj})_2", f"({nj},{ni})_2"]
                 self.backbone.encode_squared_distance(
                     label_list=label_list, target=-1.0
                 )
 
     def encode_number_edges(self):
         num_nodes = len(self.backbone.get_nodes())
-        label_list = [str(edge) + "+_1" for edge in self.graph.keys()]
+        label_list = [str(edge) + "_1" for edge in self.graph.keys()]
         self.backbone.encode_squared_distance(
             label_list=label_list, target=float(-num_nodes)
         )

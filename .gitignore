@@ -1,5 +1,5 @@
 # The virtual environment and cached python files
-venv/*
+.venv/*
 *.pyc
 
 
